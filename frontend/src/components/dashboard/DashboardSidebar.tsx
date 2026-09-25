@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ChevronLeft,
@@ -11,10 +11,8 @@ import {
   ShieldAlert,
   Building2,
   Users2,
-  Trophy,
   Activity,
   FileCode2,
-  GitPullRequest,
   CheckCircle2,
   GraduationCap,
   Briefcase,
@@ -24,20 +22,28 @@ import {
   Cpu,
   BarChart3,
   Sliders,
-  HelpCircle,
   Crown,
   Terminal,
   Settings,
   BookOpen,
   LineChart,
+  Megaphone,
+  UserSearch,
+  UserCog,
+  Mic,
+  Newspaper,
+  Award,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { clearSession, getStoredUser } from "@/lib/auth";
+import { getStoredUser } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
-import { STUDENT_PROFILE } from "@/data/mockDashboardData";
+import { useMyStats } from "@/lib/useMyStats";
+import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
+import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 
-export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "user";
+export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "admin_marketing" | "user" | "section_coordinator" | "admin_company";
 
 interface NavItem {
   label: string;
@@ -75,32 +81,76 @@ export function DashboardSidebar({
   const collapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
-  const pathname = usePathname();
-  const router = useRouter();
+  // While collapsed, hovering the rail temporarily reveals full labels —
+  // a floating "peek" over the content (the content's own left padding
+  // stays keyed to `collapsed`, so it never reflows just from a hover).
+  // Moving the pointer away snaps it back to icon-only, after a short
+  // delay so briefly crossing the edge doesn't flicker it open and shut.
+  const [hoverPeek, setHoverPeek] = useState(false);
+  const expanded = !collapsed || hoverPeek;
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track client-side hash and search query to highlight exact active item
-  const [currentHash, setCurrentHash] = useState("");
-  const [currentSearch, setCurrentSearch] = useState("");
+  const handleRailMouseEnter = () => {
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (collapsed) setHoverPeek(true);
+  };
+
+  const handleRailMouseLeave = () => {
+    closeTimeoutRef.current = setTimeout(() => setHoverPeek(false), 200);
+  };
 
   useEffect(() => {
-    const updateLocation = () => {
-      if (typeof window !== "undefined") {
-        setCurrentHash(window.location.hash || "");
-        setCurrentSearch(window.location.search || "");
-      }
-    };
-    updateLocation();
-    window.addEventListener("hashchange", updateLocation);
-    window.addEventListener("popstate", updateLocation);
     return () => {
-      window.removeEventListener("hashchange", updateLocation);
-      window.removeEventListener("popstate", updateLocation);
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  const pathname = usePathname();
+  const router = useRouter();
+  const { logout } = useAuth();
+
+  const { stats: myStats } = useMyStats(currentRole === "user");
+  // Real segment counts for Mellow Ops nav badges (Partner Colleges/Problem
+  // Bank) — same source of truth as the tabs they link to, via
+  // AdminController::overview(). Never fetched for any other role. Called
+  // here (not lower in the component) so getNavSections(), which reads
+  // `adminOverview`, is invoked after this hook has actually run.
+  const { overview: adminOverview } = useAdminOverviewCounts(
+    currentRole === "admin_internal" || currentRole === "superadmin"
+  );
+
+  // Query-string changes made via next/navigation (Link clicks,
+  // router.push/replace — how every ?tab=/?status= sidebar item navigates)
+  // never fire "popstate", so a window.location-based listener for this
+  // goes stale the instant a soft client-side navigation happens; that
+  // used to leave every query-based item highlighted "active" at once.
+  // useSearchParams() re-renders correctly on those navigations instead.
+  const searchParams = useSearchParams();
+  const currentSearch = searchParams?.toString() ?? "";
+
+  // Hash changes are still native browser events (real anchor clicks),
+  // so this tracking is correct as-is for the remaining #-based items.
+  const [currentHash, setCurrentHash] = useState("");
+
+  useEffect(() => {
+    const updateHash = () => {
+      if (typeof window !== "undefined") setCurrentHash(window.location.hash || "");
+    };
+    updateHash();
+    window.addEventListener("hashchange", updateHash);
+    window.addEventListener("popstate", updateHash);
+    return () => {
+      window.removeEventListener("hashchange", updateHash);
+      window.removeEventListener("popstate", updateHash);
     };
   }, []);
 
   const handleSignOut = () => {
     api.post("/logout").catch(() => {});
-    clearSession();
+    logout();
     router.push("/login");
   };
 
@@ -130,43 +180,133 @@ export function DashboardSidebar({
 
   // Define navigation links dynamically based on role
   const getNavSections = (): NavSection[] => {
+    // Shared by admin_internal and superadmin below — a superadmin is a
+    // trust tier above admin_internal (see User::canManageColleges()) and
+    // the backend already lets superadmin call every one of these routes
+    // (role:admin_internal,superadmin — see routes/api.php), so the nav
+    // must offer the same links, not just the API. Defined once so the two
+    // branches can never drift out of sync with each other.
+    const mellowOpsSections: NavSection[] = [
+      {
+        title: "Mellow Ops",
+        items: [
+          { label: "Overview", href: "/admin?view=mellow&tab=overview", icon: LayoutDashboard },
+          {
+            label: "Partner Colleges & TPOs",
+            href: "/admin?view=mellow&tab=colleges",
+            icon: Building2,
+            badge: adminOverview ? `${adminOverview.segments.colleges}` : undefined,
+            badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
+          },
+          {
+            label: "Platform Users",
+            href: "/admin?view=mellow&tab=users",
+            icon: Users2,
+            badge: adminOverview ? `${adminOverview.segments.platform_users}` : undefined,
+            badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+          },
+          {
+            label: "Problem Bank",
+            href: "/admin?view=mellow&tab=problems",
+            icon: FileCode2,
+            badge: adminOverview ? `${adminOverview.segments.problems}` : undefined,
+            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+          },
+          {
+            label: "Placement Drives",
+            href: "/admin/placements",
+            icon: Briefcase,
+            badge: adminOverview ? `${adminOverview.segments.placement_drives}` : undefined,
+            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+          },
+          {
+            label: "Contests",
+            href: "/admin/contests",
+            icon: Swords,
+            badge: adminOverview ? `${adminOverview.segments.contests}` : undefined,
+            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+          },
+          {
+            label: "AI Interviews",
+            href: "/admin/interviews",
+            icon: Mic,
+            badge: adminOverview ? `${adminOverview.segments.interviews}` : undefined,
+            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+          },
+          {
+            label: "Articles",
+            href: "/admin/articles",
+            icon: Newspaper,
+            badge: adminOverview ? `${adminOverview.segments.articles}` : undefined,
+            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+          },
+          {
+            label: "Talent Pool",
+            href: "/admin/talent-pool",
+            icon: Award,
+            badge: "New",
+            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+          },
+        ],
+      },
+      {
+        title: "Customer Success",
+        items: [
+          {
+            label: "My Customers",
+            href: "/admin/customers",
+            icon: UserSearch,
+            badge: "Converted",
+            badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
+          },
+        ],
+      },
+    ];
+
     if (currentRole === "superadmin") {
+      // One item per real tab on the (client-side tab-shell) superadmin
+      // page — matches ?tab= exactly as superadmin/page.tsx reads it,
+      // same query-param convention the admin_marketing section below
+      // already uses for /marketing?status=. Judge Infrastructure and
+      // Feature Flags are one merged "Infrastructure & Flags" tab now, and
+      // "Users & Roles" is three real tabs (Students/Leads/Mellow Staff),
+      // not one — every link here must land somewhere real. Also gets the
+      // full Mellow Ops section below it — useAuthGuard already lets
+      // superadmin onto every one of those pages, so the sidebar must
+      // actually link there instead of leaving them reachable only by
+      // typing the URL directly.
       return [
         {
           title: "Executive",
           items: [
-            { label: "Overview & KPI", href: "/superadmin", icon: LayoutDashboard },
-            {
-              label: "Judge Infrastructure",
-              href: "/superadmin#judge-nodes",
-              icon: Cpu,
-              badge: "99.99%",
-              badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
-            },
-            {
-              label: "Partner Universities",
-              href: "/superadmin#colleges",
-              icon: Building2,
-              badge: "94 Active",
-              badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
-            },
+            { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
+            { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
           ],
         },
         {
           title: "Governance",
           items: [
-            { label: "Users & Roles", href: "/superadmin#users", icon: Users2 },
-            { label: "Contest Management", href: "/superadmin#contests", icon: Trophy },
+            { label: "Students", href: "/superadmin?tab=students", icon: GraduationCap },
+            { label: "Leads", href: "/superadmin?tab=leads", icon: UserSearch },
+            { label: "Marketing Performance", href: "/superadmin?tab=marketing", icon: Megaphone },
+            { label: "Mellow Staff", href: "/superadmin?tab=staff", icon: Users2 },
             {
               label: "Audit & Security",
-              href: "/superadmin#audit-logs",
+              href: "/superadmin?tab=audit",
               icon: ShieldAlert,
               badge: "Live",
               badgeColor: "bg-status-warning/15 text-status-warning border-status-warning/30",
             },
-            { label: "Feature Flags", href: "/superadmin#feature-flags", icon: Sliders },
+            {
+              label: "Infrastructure & Flags",
+              href: "/superadmin?tab=infrastructure",
+              icon: Cpu,
+              badge: "99.99%",
+              badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
+            },
           ],
         },
+        ...mellowOpsSections,
       ];
     }
 
@@ -174,66 +314,7 @@ export function DashboardSidebar({
       currentRole === "admin_internal" ||
       (currentRole === "admin_tpo" && currentTpoView === "mellow")
     ) {
-      return [
-        {
-          title: "Platform Ops",
-          items: [
-            { label: "Mellow Ops Center", href: "/admin?view=mellow", icon: LayoutDashboard },
-            {
-              label: "Problem Bank",
-              href: "/admin?view=mellow#problems",
-              icon: FileCode2,
-              badge: "Curate",
-              badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
-            },
-            {
-              label: "Plagiarism Radar",
-              href: "/admin?view=mellow#plagiarism",
-              icon: GitPullRequest,
-              badge: "2 Flags",
-              badgeColor: "bg-status-danger/15 text-status-danger border-status-danger/30",
-            },
-          ],
-        },
-        {
-          title: "College & TPO Governance",
-          items: [
-            {
-              label: "Partner Colleges & TPOs",
-              href: "/admin?view=mellow#colleges",
-              icon: Building2,
-              badge: "6 Active",
-              badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
-            },
-            {
-              label: "Platform Users",
-              href: "/admin?view=mellow#users",
-              icon: Users2,
-              badge: "Manage",
-              badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-            },
-          ],
-        },
-        {
-          title: "Arena Live",
-          items: [
-            {
-              label: "Contest War Room",
-              href: "/admin?view=mellow#war-room",
-              icon: Swords,
-              badge: "Live",
-              badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
-            },
-            {
-              label: "Support Tickets",
-              href: "/admin?view=mellow#tickets",
-              icon: HelpCircle,
-              badge: "3 Open",
-              badgeColor: "bg-status-warning/15 text-status-warning border-status-warning/30",
-            },
-          ],
-        },
-      ];
+      return mellowOpsSections;
     }
 
     if (currentRole === "admin_tpo" || currentTpoView === "tpo") {
@@ -241,28 +322,102 @@ export function DashboardSidebar({
         {
           title: "Placement Hub",
           items: [
-            { label: "TPO Command Center", href: "/admin?view=tpo", icon: LayoutDashboard },
+            { label: "TPO Command Center", href: "/admin", icon: LayoutDashboard },
             {
               label: "Campus Drives",
-              href: "/admin?view=tpo#drives",
+              href: "/admin/drives",
               icon: Briefcase,
-              badge: "4 Active",
-              badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
             },
             {
               label: "Student Cohort",
-              href: "/admin?view=tpo#students",
+              href: "/admin/students",
               icon: GraduationCap,
               badge: "1,450",
               badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
+            },
+            {
+              label: "Section Coordinators",
+              href: "/admin/coordinators",
+              icon: UserCog,
+            },
+            {
+              label: "Mock Contests",
+              href: "/admin/mock-contests",
+              icon: Swords,
+            },
+            {
+              label: "Mock Interviews",
+              href: "/admin/mock-interviews",
+              icon: Mic,
             },
           ],
         },
         {
           title: "Intelligence",
           items: [
-            { label: "Readiness Analytics", href: "/admin?view=tpo#analytics", icon: BarChart3 },
-            { label: "Placement Reports", href: "/admin?view=tpo#reports", icon: CheckCircle2 },
+            { label: "Readiness Analytics", href: "/admin/analytics", icon: BarChart3 },
+            { label: "Placement Reports", href: "/admin/reports", icon: CheckCircle2 },
+            { label: "Proctoring", href: "/admin/proctoring", icon: ShieldAlert },
+          ],
+        },
+      ];
+    }
+
+    if (currentRole === "admin_company") {
+      // A company hiring tenant's own dashboard — reuses the exact same
+      // shell/pattern as the TPO's "Placement Hub" above, minus anything
+      // section-shaped (no Section Coordinators-equivalent item exists here
+      // at all — a company has no sections to coordinate).
+      return [
+        {
+          title: "Hiring Hub",
+          items: [
+            { label: "Hiring Command Center", href: "/admin", icon: LayoutDashboard },
+            { label: "Partner Colleges", href: "/admin/company/colleges", icon: GraduationCap },
+            { label: "Job Openings", href: "/admin/company/drives", icon: Briefcase },
+            { label: "Candidates", href: "/admin/company/candidates", icon: Users2 },
+            { label: "Assessments", href: "/admin/company/assessments", icon: Swords },
+            { label: "AI Interviews", href: "/admin/company/interviews", icon: Mic },
+            {
+              label: "Talent Pool",
+              href: "/admin/company/talent-pool",
+              icon: Award,
+              badge: "New",
+              badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+            },
+          ],
+        },
+        {
+          title: "Intelligence",
+          items: [
+            { label: "Hiring Reports", href: "/admin/company/reports", icon: CheckCircle2 },
+            { label: "Proctoring", href: "/admin/company/proctoring", icon: ShieldAlert },
+          ],
+        },
+      ];
+    }
+
+    if (currentRole === "section_coordinator") {
+      return [
+        {
+          title: "My Section",
+          items: [
+            { label: "Section Roster", href: "/coordinator", icon: Users2 },
+            { label: "Section Reports", href: "/coordinator/reports", icon: CheckCircle2 },
+            { label: "Proctoring", href: "/coordinator/proctoring", icon: ShieldAlert },
+          ],
+        },
+      ];
+    }
+
+    if (currentRole === "admin_marketing") {
+      return [
+        {
+          title: "Lead Management",
+          items: [
+            { label: "All Leads", href: "/marketing", icon: LayoutDashboard },
+            { label: "New Leads", href: "/marketing?status=new", icon: UserSearch },
+            { label: "Converted", href: "/marketing?status=converted", icon: CheckCircle2 },
           ],
         },
       ];
@@ -278,8 +433,6 @@ export function DashboardSidebar({
             label: "Practice Arena",
             href: "/dashboard/practice",
             icon: BookOpen,
-            badge: "6 Tracks",
-            badgeColor: "bg-accent-primary/10 text-accent-primary border-accent-primary/25",
           },
           {
             label: "Performance Report",
@@ -288,6 +441,11 @@ export function DashboardSidebar({
             badge: "New",
             badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
           },
+          {
+            label: "Articles",
+            href: "/dashboard/articles",
+            icon: Newspaper,
+          },
         ],
       },
       {
@@ -295,13 +453,26 @@ export function DashboardSidebar({
         items: [
           {
             label: "Upcoming & Drives",
-            href: "/dashboard#upcoming",
+            href: "/dashboard#placement-drives",
             icon: Briefcase,
-            badge: "1 Mandatory",
-            badgeColor: "bg-status-danger/10 text-status-danger border-status-danger/25",
+          },
+          { label: "Contests", href: "/dashboard/contests", icon: Swords },
+          {
+            label: "AI Interviews",
+            href: "/dashboard/interviews",
+            icon: Mic,
+            badge: "New",
+            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+          },
+          {
+            label: "Talent Pool",
+            href: "/dashboard/talent-pool",
+            icon: Award,
+            badge: "New",
+            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
           },
           { label: "Submissions", href: "/dashboard#submissions", icon: Activity },
-          { label: "Global Leaderboard", href: "/#leaderboard", icon: Swords },
+          { label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Swords },
         ],
       },
     ];
@@ -351,6 +522,17 @@ export function DashboardSidebar({
       email: "tpo@apex.edu.in",
       subtext: "Placement Hub",
     },
+    admin_marketing: {
+      label: "Mellow Marketing",
+      badge: "Lead Growth",
+      icon: Megaphone,
+      iconColor: "text-rose-400",
+      iconBg: "bg-rose-500/15 border-rose-500/30",
+      activeBadge: "bg-rose-500/10 text-rose-400 border-rose-500/20",
+      name: "Marketing Team",
+      email: "marketing@mellow.ai",
+      subtext: "Lead Management",
+    },
     user: {
       label: "Student Coder",
       badge: "Candidate Master",
@@ -361,6 +543,28 @@ export function DashboardSidebar({
       name: "Alex Chen",
       email: "alex_coder",
       subtext: "Student Arena",
+    },
+    section_coordinator: {
+      label: "Section Coordinator",
+      badge: "Section Lead",
+      icon: UserCog,
+      iconColor: "text-sky-400",
+      iconBg: "bg-sky-500/15 border-sky-500/30",
+      activeBadge: "bg-sky-500/10 text-sky-400 border-sky-500/20",
+      name: "Section Coordinator",
+      email: "coordinator@apex.edu.in",
+      subtext: "Section Roster",
+    },
+    admin_company: {
+      label: "Hiring Partner",
+      badge: "Hiring Tenant",
+      icon: Briefcase,
+      iconColor: "text-teal-400",
+      iconBg: "bg-teal-500/15 border-teal-500/30",
+      activeBadge: "bg-teal-500/10 text-teal-400 border-teal-500/20",
+      name: "Hiring Team",
+      email: "hiring@company.example",
+      subtext: "Hiring Hub",
     },
   };
 
@@ -378,7 +582,8 @@ export function DashboardSidebar({
   const storedUser = getStoredUser();
   const displayName = storedUser?.name ?? currentRoleInfo.name;
   const displayEmail = storedUser?.email ?? currentRoleInfo.email;
-  const studentTier = getRatingTier(STUDENT_PROFILE.rating);
+  const isRatedStudent = (myStats?.rating.rated_contests_count ?? 0) > 0;
+  const studentTier = isRatedStudent ? getRatingTier(myStats!.rating.current_rating) : null;
 
   const sidebarContent = (
     <div className="flex flex-col h-full bg-surface border-r border-border-subtle relative select-none">
@@ -389,45 +594,29 @@ export function DashboardSidebar({
           className="flex items-center gap-2.5 overflow-hidden group focus-visible:outline-none min-w-0"
         >
           {/* Bespoke Production Brand Emblem */}
-          <div className="relative w-9 h-9 rounded-control bg-gradient-to-br from-accent-primary/20 via-accent-secondary/15 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-accent-primary group-hover:border-accent-primary/60 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.25)] transition-all duration-300 flex-shrink-0">
-            <svg
-              className="w-5 h-5 text-accent-primary"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              {/* Stylized code brackets with center energy spark */}
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-              <line x1="12" y1="2" x2="12" y2="6" strokeWidth="2.5" className="text-accent-secondary" />
-              <line x1="12" y1="18" x2="12" y2="22" strokeWidth="2.5" className="text-accent-secondary" />
-              <circle cx="12" cy="12" r="2" fill="currentColor" className="text-amber-400" />
-            </svg>
-          </div>
+          <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:drop-shadow-[0_0_10px_rgba(99,102,241,0.4)]" />
 
-          {!collapsed && (
-            <motion.div
-              initial={{ opacity: 0, x: -6 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -6 }}
-              className="flex flex-col min-w-0"
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-base tracking-tight text-primary leading-none truncate">
-                  Code<span className="bg-gradient-to-r from-accent-primary via-indigo-500 to-accent-secondary bg-clip-text text-transparent">Forge</span>
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="flex flex-col min-w-0 whitespace-nowrap"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Wordmark className="font-extrabold text-base tracking-tight text-primary leading-none truncate" />
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase bg-accent-primary/10 text-accent-primary border border-accent-primary/25 tracking-wider">
+                    PRO
+                  </span>
+                </div>
+                <span className="text-[10px] font-semibold text-text-muted tracking-wider uppercase mt-1 truncate">
+                  {currentRoleInfo.subtext}
                 </span>
-                <span className="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase bg-accent-primary/10 text-accent-primary border border-accent-primary/25 tracking-wider">
-                  PRO
-                </span>
-              </div>
-              <span className="text-[10px] font-semibold text-text-muted tracking-wider uppercase mt-1 truncate">
-                {currentRoleInfo.subtext}
-              </span>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Link>
 
         {/* Desktop Collapse Toggle */}
@@ -453,24 +642,41 @@ export function DashboardSidebar({
             <RoleIcon className={cn("w-3.5 h-3.5", currentRoleInfo.iconColor)} strokeWidth={2.2} />
           </div>
 
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <span className="text-xs font-semibold text-primary truncate block leading-tight">
-                {displayName}
-              </span>
-              {currentRole === "user" ? (
-                <span className="flex items-center gap-1.5 mt-0.5 text-[10px] font-medium">
-                  <span className={cn("font-black", studentTier.text)}>{studentTier.label}</span>
-                  <span className="text-text-muted font-mono">{STUDENT_PROFILE.rating}</span>
-                  <span className="text-text-muted">· Div {studentTier.division}</span>
+          <AnimatePresence>
+            {expanded && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="flex-1 min-w-0 whitespace-nowrap"
+              >
+                <span className="text-xs font-semibold text-primary truncate block leading-tight">
+                  {displayName}
                 </span>
-              ) : (
-                <span className="text-[10px] text-text-muted font-medium truncate block mt-0.5">
-                  {currentRoleInfo.label}
-                </span>
-              )}
-            </div>
-          )}
+                {currentRole === "user" && myStats ? (
+                  <span className="flex items-center gap-1.5 mt-0.5 text-[10px] font-medium">
+                    {studentTier ? (
+                      <>
+                        <span className={cn("font-black", studentTier.text)}>{studentTier.label}</span>
+                        <span className="text-text-muted font-mono">{myStats.rating.current_rating}</span>
+                        <span className="text-text-muted">· Div {studentTier.division}</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-text-muted font-mono">{myStats.rating.solved_score} pts</span>
+                        <span className="text-text-muted">· Unrated</span>
+                      </>
+                    )}
+                  </span>
+                ) : currentRole !== "user" ? (
+                  <span className="text-[10px] text-text-muted font-medium truncate block mt-0.5">
+                    {currentRoleInfo.label}
+                  </span>
+                ) : null}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
@@ -478,7 +684,7 @@ export function DashboardSidebar({
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
         {navSections.map((section, idx) => (
           <div key={idx} className="space-y-1">
-            {!collapsed && section.title && (
+            {expanded && section.title && (
               <div className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted/75">
                 {section.title}
               </div>
@@ -505,7 +711,7 @@ export function DashboardSidebar({
                       ? "bg-accent-primary/10 text-accent-primary font-semibold shadow-subtle border border-accent-primary/20"
                       : "text-text-secondary hover:text-primary hover:bg-surface-hover/70"
                   )}
-                  title={collapsed ? item.label : undefined}
+                  title={expanded ? undefined : item.label}
                 >
                   {/* High-end active indicator pill */}
                   {active && (
@@ -518,22 +724,30 @@ export function DashboardSidebar({
                     )}
                     strokeWidth={active ? 2.2 : 1.8}
                   />
-                  {!collapsed && (
-                    <div className="flex-1 flex items-center justify-between overflow-hidden">
-                      <span className="truncate">{item.label}</span>
-                      {item.badge && (
-                        <span
-                          className={cn(
-                            "ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full border tracking-wide",
-                            item.badgeColor ||
-                              "bg-accent-primary/10 text-accent-primary border-accent-primary/20"
-                          )}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                  <AnimatePresence>
+                    {expanded && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.12 }}
+                        className="flex-1 flex items-center justify-between overflow-hidden whitespace-nowrap"
+                      >
+                        <span className="truncate">{item.label}</span>
+                        {item.badge && (
+                          <span
+                            className={cn(
+                              "ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full border tracking-wide",
+                              item.badgeColor ||
+                                "bg-accent-primary/10 text-accent-primary border-accent-primary/20"
+                            )}
+                          >
+                            {item.badge}
+                          </span>
+                        )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </Link>
               );
             })}
@@ -545,8 +759,16 @@ export function DashboardSidebar({
       {/* Production Profile & Sign Out Footer (Theme selector removed per user instructions) */}
       <div className="p-3 border-t border-border-subtle bg-surface/80 backdrop-blur-sm flex-shrink-0">
         <div className="flex items-center justify-between gap-2">
-          {!collapsed ? (
-            <>
+          <AnimatePresence mode="wait" initial={false}>
+          {expanded ? (
+            <motion.div
+              key="footer-expanded"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="flex items-center justify-between gap-2 w-full"
+            >
               {/* User Profile Information */}
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 <div className="relative flex-shrink-0">
@@ -578,9 +800,16 @@ export function DashboardSidebar({
               >
                 <LogOut className="w-4 h-4" />
               </button>
-            </>
+            </motion.div>
           ) : (
-            <div className="relative mx-auto flex flex-col items-center gap-2">
+            <motion.div
+              key="footer-collapsed"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
+              className="relative mx-auto flex flex-col items-center gap-2"
+            >
               <div className="relative">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-primary/20 via-accent-secondary/15 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-xs font-bold text-accent-primary shadow-subtle">
                   {displayName.charAt(0)}
@@ -595,8 +824,9 @@ export function DashboardSidebar({
               >
                 <LogOut className="w-4 h-4" />
               </button>
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
@@ -604,15 +834,29 @@ export function DashboardSidebar({
 
   return (
     <>
-      {/* Desktop Persistent Sidebar */}
-      <aside
-        className={cn(
-          "hidden md:block fixed inset-y-0 left-0 z-30 transition-all duration-300 ease-in-out",
-          collapsed ? "w-20" : "w-64"
-        )}
+      {/* Desktop Persistent Sidebar — while collapsed, hovering it "peeks"
+          open over the content (see `expanded` above) without shifting the
+          page layout, since the content's own padding stays keyed to the
+          real `collapsed` value below in DashboardShell. A spring — not a
+          linear tween — is what actually reads as "smooth" here. */}
+      <motion.aside
+        onMouseEnter={handleRailMouseEnter}
+        onMouseLeave={handleRailMouseLeave}
+        animate={{
+          // Widened from 256 -> 280 so the full "CodeGen Box" wordmark + PRO
+          // badge fit on one line without truncating (CodeForge, at 9
+          // characters, fit at 256; CodeGen Box needs the extra room).
+          width: expanded ? 280 : 80,
+          boxShadow:
+            collapsed && hoverPeek
+              ? "0 25px 50px -12px rgba(0,0,0,0.35)"
+              : "0 0px 0px 0 rgba(0,0,0,0)",
+        }}
+        transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.7 }}
+        className="hidden md:block fixed inset-y-0 left-0 z-30 overflow-hidden"
       >
         {sidebarContent}
-      </aside>
+      </motion.aside>
 
       {/* Mobile Drawer Overlay */}
       <AnimatePresence>

@@ -1,49 +1,29 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { PROBLEMS_DATA } from "@/data/problems";
-import { ProblemFilter } from "@/types/problem";
-import { filterProblems } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 import { Container } from "@/components/layout/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { ProblemFilters } from "./ProblemFilters";
-import { ProblemSearch } from "./ProblemSearch";
-import { ProblemCard } from "./ProblemCard";
+import { DifficultyBadge } from "./DifficultyBadge";
+import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { AlertCircle, RotateCcw, ArrowRight } from "lucide-react";
+import { usePublicSampleProblems, usePublicStats } from "@/lib/usePublicPlatformData";
+import { ArrowRight } from "lucide-react";
 
+function titleCase(difficulty: string): string {
+  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+}
+
+/**
+ * A real sample from the catalog (GET /public/problems/sample) — no search
+ * or filter chrome, deliberately. That UI made sense over a "1,400+"
+ * catalog; it doesn't over a 9-problem honest preview, where "filtering"
+ * would just be theater around the same 9 cards. The full, searchable
+ * catalog is what signing up actually unlocks.
+ */
 export function ProblemExplorer() {
-  const [currentFilter, setCurrentFilter] = useState<ProblemFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTag, setSelectedTag] = useState("All");
-
-  // Collect unique tags
-  const allTags = useMemo(() => {
-    const tagsSet = new Set<string>();
-    PROBLEMS_DATA.forEach((p) => p.tags.forEach((t) => tagsSet.add(t)));
-    return Array.from(tagsSet).sort();
-  }, []);
-
-  // Compute counts per difficulty
-  const counts = useMemo(() => {
-    return {
-      all: PROBLEMS_DATA.length,
-      easy: PROBLEMS_DATA.filter((p) => p.difficulty === "Easy").length,
-      medium: PROBLEMS_DATA.filter((p) => p.difficulty === "Medium").length,
-      hard: PROBLEMS_DATA.filter((p) => p.difficulty === "Hard").length,
-    };
-  }, []);
-
-  // Filter problems
-  const filteredProblems = useMemo(() => {
-    return filterProblems(PROBLEMS_DATA, searchQuery, currentFilter, selectedTag);
-  }, [searchQuery, currentFilter, selectedTag]);
-
-  const handleResetFilters = () => {
-    setCurrentFilter("All");
-    setSearchQuery("");
-    setSelectedTag("All");
-  };
+  const router = useRouter();
+  const { problems, loading } = usePublicSampleProblems();
+  const stats = usePublicStats();
 
   return (
     <section id="problems" className="py-20 sm:py-28">
@@ -52,77 +32,62 @@ export function ProblemExplorer() {
           badge="Problem Explorer"
           title="Battle-Tested"
           highlight="Algorithmic Problems"
-          description="Master high-yield patterns across dynamic programming, graph theory, trees, and system design with verified constraints."
+          description="A real sample from the catalog — dynamic programming, graphs, trees, and everything in between, judged against real, hidden test cases."
         />
 
-        {/* Filter & Search Bar */}
-        <div className="space-y-4 mb-8">
-          <ProblemSearch
-            query={searchQuery}
-            onQueryChange={setSearchQuery}
-            selectedTag={selectedTag}
-            onSelectTag={setSelectedTag}
-            availableTags={allTags}
-          />
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-2">
-            <ProblemFilters
-              currentFilter={currentFilter}
-              onSelectFilter={setCurrentFilter}
-              counts={counts}
-            />
-
-            <div className="text-xs text-text-muted font-mono">
-              Showing <span className="text-primary font-bold">{filteredProblems.length}</span> of{" "}
-              <span>{PROBLEMS_DATA.length}</span> problems
-            </div>
-          </div>
-        </div>
-
-        {/* Problems Grid */}
-        {filteredProblems.length > 0 ? (
+        {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredProblems.map((problem) => (
-              <ProblemCard
-                key={problem.id}
-                problem={problem}
-                onClick={() => {
-                  const previewEl = document.getElementById("editor-preview");
-                  previewEl?.scrollIntoView({ behavior: "smooth" });
-                }}
-              />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-44 rounded-card bg-surface border border-border-subtle p-5 animate-pulse" />
             ))}
           </div>
         ) : (
-          /* Empty state */
-          <div className="rounded-card bg-surface border border-border-subtle p-12 text-center max-w-lg mx-auto">
-            <div className="w-12 h-12 rounded-full bg-surface-hover border border-border-subtle flex items-center justify-center mx-auto mb-4 text-text-muted">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-bold text-primary mb-2">No problems found</h3>
-            <p className="text-sm text-text-secondary mb-6">
-              We couldn&apos;t find any problems matching &ldquo;{searchQuery}&rdquo; with the selected filters.
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<RotateCcw className="w-3.5 h-3.5" />}
-              onClick={handleResetFilters}
-            >
-              Reset Filters
-            </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {problems.map((problem) => (
+              <Card
+                key={problem.slug}
+                variant="interactive"
+                onClick={() => router.push("/signup")}
+                className="card-shine p-5 sm:p-6 flex flex-col justify-between group transition-all duration-300 border-border-subtle hover:border-accent-primary/40 hover:shadow-card"
+              >
+                <div>
+                  <div className="mb-3">
+                    <DifficultyBadge difficulty={titleCase(problem.difficulty)} size="sm" />
+                  </div>
+
+                  <h3 className="text-base sm:text-lg font-bold text-primary group-hover:text-accent-primary transition-colors line-clamp-1 mb-2.5">
+                    {problem.title}
+                  </h3>
+
+                  <div className="flex flex-wrap gap-1.5">
+                    {problem.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted group-hover:border-border-strong transition-colors"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 mt-4 border-t border-border-subtle flex items-center justify-end text-xs text-text-secondary group-hover:text-accent-primary group-hover:translate-x-1 transition-all font-sans font-semibold">
+                  <span>Solve</span>
+                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
+                </div>
+              </Card>
+            ))}
           </div>
         )}
 
-        {/* Bottom CTA / More */}
         <div className="mt-12 text-center">
           <Button
             variant="secondary"
             size="lg"
             rightIcon={<ArrowRight className="w-4 h-4" />}
-            onClick={() => alert("Demo: Navigating to Full Problem Archive")}
+            onClick={() => router.push("/signup")}
           >
-            Explore All 1,400+ Curated Problems
+            {stats ? `Unlock All ${stats.problems_total} Problems — Free` : "Sign Up Free"}
           </Button>
         </div>
       </Container>

@@ -8,7 +8,7 @@ import { Zap, Code, Terminal, ArrowRight } from "lucide-react";
 
 export function Languages() {
   const jumpToEditor = () => {
-    const el = document.getElementById("editor-preview");
+    const el = document.getElementById("problems");
     el?.scrollIntoView({ behavior: "smooth" });
   };
 
@@ -22,7 +22,7 @@ export function Languages() {
           description="Code in your native language with strictly benchmarked compiler versions, memory limit isolations, and sandboxed runtimes."
         />
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {LANGUAGES_DATA.map((lang) => (
             <Card
               key={lang.id}

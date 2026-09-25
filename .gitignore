@@ -5,3 +5,7 @@ Thumbs.db
 # Editors
 .vscode/
 .idea/
+
+# Dev server output
+*.log
+*.out

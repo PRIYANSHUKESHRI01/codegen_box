@@ -127,11 +127,11 @@ export const RATING_HISTORY: RatingPoint[] = [
 ];
 
 export const CONTEST_RESULTS: ContestResult[] = [
-  { id: "c-24", name: "CodeForge Weekly #24", date: "01 Sep 2026", rank: 342, participants: 18420, solved: 4, total: 4, ratingChange: 48, percentile: 98.1 },
+  { id: "c-24", name: "CodeGen Box Weekly #24", date: "01 Sep 2026", rank: 342, participants: 18420, solved: 4, total: 4, ratingChange: 48, percentile: 98.1 },
   { id: "c-23", name: "Div 1 Round #04", date: "11 Aug 2026", rank: 402, participants: 9860, solved: 4, total: 5, ratingChange: 85, percentile: 95.9 },
-  { id: "c-22", name: "CodeForge Weekly #22", date: "14 Jul 2026", rank: 710, participants: 17240, solved: 3, total: 4, ratingChange: -26, percentile: 95.9 },
+  { id: "c-22", name: "CodeGen Box Weekly #22", date: "14 Jul 2026", rank: 710, participants: 17240, solved: 3, total: 4, ratingChange: -26, percentile: 95.9 },
   { id: "c-21", name: "Grand Prix #03", date: "23 Jun 2026", rank: 520, participants: 12180, solved: 4, total: 6, ratingChange: 48, percentile: 95.7 },
-  { id: "c-20", name: "CodeForge Weekly #21", date: "09 Jun 2026", rank: 640, participants: 16890, solved: 4, total: 4, ratingChange: 66, percentile: 96.2 },
+  { id: "c-20", name: "CodeGen Box Weekly #21", date: "09 Jun 2026", rank: 640, participants: 16890, solved: 4, total: 4, ratingChange: 66, percentile: 96.2 },
   { id: "c-19", name: "Div 1 Round #02", date: "26 May 2026", rank: 880, participants: 9240, solved: 3, total: 5, ratingChange: 76, percentile: 90.5 },
 ];
 
@@ -208,9 +208,9 @@ export const UPCOMING_EVENTS: UpcomingEvent[] = [
   },
   {
     id: "ev-02",
-    title: "CodeForge Weekly Challenge #25",
+    title: "CodeGen Box Weekly Challenge #25",
     type: "Rated Contest",
-    organizer: "CodeForge Global",
+    organizer: "CodeGen Box Global",
     startsInMinutes: 3180,
     durationMins: 120,
     problems: 4,

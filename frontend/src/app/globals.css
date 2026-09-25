@@ -23,6 +23,28 @@ html.light {
   --status-warning: #D97706;
   --status-danger: #DC2626;
 
+  /* RGB-triplet twins of the solid colors above, consumed by
+     tailwind.config.ts as rgb(var(--x-rgb) / <alpha-value>) so utilities
+     like bg-surface/95 or border-accent-primary/25 actually carry an alpha
+     channel instead of silently generating no rule at all (a plain
+     `var(--x)` color value can't have opacity injected into it). Border
+     tokens are intentionally excluded — they're already pre-baked
+     translucent rgba() constants meant to be used unmodified. */
+  --bg-background-rgb: 247 248 252;
+  --bg-surface-rgb: 255 255 255;
+  --bg-elevated-rgb: 255 255 255;
+  --bg-surface-hover-rgb: 240 242 248;
+  --text-primary-rgb: 17 24 39;
+  --text-secondary-rgb: 75 85 99;
+  --text-muted-rgb: 107 114 128;
+  --accent-primary-rgb: 79 70 229;
+  --accent-primary-hover-rgb: 67 56 202;
+  --accent-secondary-rgb: 2 132 199;
+  --accent-secondary-hover-rgb: 3 105 161;
+  --status-success-rgb: 5 150 105;
+  --status-warning-rgb: 217 119 6;
+  --status-danger-rgb: 220 38 38;
+
   color-scheme: light;
   --scrollbar-thumb: #CBD5E1;
   --scrollbar-track: #F7F8FC;
@@ -47,6 +69,21 @@ html.dark {
   --status-success: #10B981;
   --status-warning: #F59E0B;
   --status-danger: #EF4444;
+
+  --bg-background-rgb: 8 9 13;
+  --bg-surface-rgb: 16 19 26;
+  --bg-elevated-rgb: 21 25 35;
+  --bg-surface-hover-rgb: 25 30 43;
+  --text-primary-rgb: 255 255 255;
+  --text-secondary-rgb: 203 213 225;
+  --text-muted-rgb: 148 163 184;
+  --accent-primary-rgb: 99 102 241;
+  --accent-primary-hover-rgb: 79 70 229;
+  --accent-secondary-rgb: 6 182 212;
+  --accent-secondary-hover-rgb: 8 145 178;
+  --status-success-rgb: 16 185 129;
+  --status-warning-rgb: 245 158 11;
+  --status-danger-rgb: 239 68 68;
 
   color-scheme: dark;
   --scrollbar-thumb: #2A3346;

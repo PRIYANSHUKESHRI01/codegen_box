@@ -1,0 +1,87 @@
+# Reference deployment of the JUDGE TIER — N stateless Piston execution nodes.
+#
+#   cp .env.example .env            # set JUDGE_SLOTS to the node's PHYSICAL core count (vCPUs / 2 on most x86)
+#   docker compose up -d
+#   ./install-runtimes.sh           # once per node: installs runtimes + tunes the JVM launcher
+#
+# Deploy this on hosts dedicated to running untrusted student code: no
+# database, no secrets, and nothing but the app's workers able to reach
+# port 2000. Add capacity by adding a service (copy piston-2) and listing it
+# in the app's PISTON_NODES — nodes are stateless, so scaling out is that
+# simple and losing one costs 1/N of capacity, not everything.
+#
+# Why these settings (each was measured or is documented Piston behaviour —
+# see docs/scaling-the-judge.md):
+#
+#  PISTON_MAX_CONCURRENT_JOBS  = physical core count. Piston queues anything above this
+#     INSIDE its own process with NO timeout, so overload becomes hung requests
+#     that finish after the caller gave up. Laravel keeps the queue instead
+#     (bounded, prioritised, visible) and never sends more than the workers
+#     allow. It also keeps wall-time ~ CPU-time, so a correct solution isn't
+#     marked "time limit exceeded" just because the host was oversubscribed
+#     (measured: 6 slots on 4 physical cores killed correct Java and C++ runs).
+#  PISTON_OUTPUT_MAX_SIZE      = 1 MiB. The default is 1024 BYTES and Piston
+#     SIGKILLs any program that prints more — our harness prints one line per
+#     test case, so a problem with many/large hidden cases would fail a
+#     CORRECT solution as a runtime error.
+#  PISTON_RUN_CPU_TIME         = 10s ceiling (default 3s). The JVM burns 2-3
+#     CPU-seconds starting up; with the 3s default Java submissions get
+#     SIGKILLed at random, worse on larger hosts. The app sends a tighter
+#     per-language limit (config/piston.php); the node only sets the ceiling.
+#  PISTON_RUN_TIMEOUT          = 10s wall ceiling; the app requests 7s. A CPU-bound
+#     loop dies at the CPU limit (3.1 s measured); the wall limit is what stops a
+#     program that sleeps or blocks on input (7.1 s measured) — before, 15 s.
+#  PISTON_MAX_PROCESS_COUNT    = 256 (default 64). isolate counts threads as
+#     processes and the JVM starts many (GC, JIT, compiler threads).
+#  PISTON_RUN_MEMORY_LIMIT     = 512 MiB per run (Piston's default is -1, no
+#     explicit cap). Measured on this env: a program using 400 MB runs, 700 MB is
+#     killed.
+#
+#  NOTE: no `init: true` here. Piston's entrypoint sets up cgroup v2 by moving
+#     PID 1 into a sub-cgroup; with an init shim as PID 1 the entrypoint script
+#     stays behind and the controller setup fails with "Device or resource busy"
+#     (the container exits at start-up).
+
+x-piston-node: &piston-node
+  image: ghcr.io/engineer-man/piston:latest   # pin to a digest in production
+  privileged: true                             # isolate needs namespaces + cgroups
+  restart: unless-stopped
+  environment: &piston-env
+    PISTON_MAX_CONCURRENT_JOBS: ${JUDGE_SLOTS:-8}
+    PISTON_RUN_TIMEOUT: 10000
+    PISTON_COMPILE_TIMEOUT: 15000
+    PISTON_RUN_CPU_TIME: 10000
+    PISTON_COMPILE_CPU_TIME: 15000
+    PISTON_RUN_MEMORY_LIMIT: 536870912          # 512 MiB per run
+    PISTON_COMPILE_MEMORY_LIMIT: 1073741824     # 1 GiB per compile
+    PISTON_OUTPUT_MAX_SIZE: 1048576
+    PISTON_MAX_PROCESS_COUNT: 256
+    PISTON_DISABLE_NETWORKING: "true"
+    PISTON_LOG_LEVEL: INFO
+  healthcheck:
+    # The Piston image has neither curl nor wget, and Node 15 has no fetch().
+    test: ["CMD", "node", "-e", "require('http').get('http://localhost:2000/api/v2/runtimes',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+    interval: 15s
+    timeout: 5s
+    retries: 3
+    start_period: 20s
+
+services:
+  piston-1:
+    <<: *piston-node
+    ports: ["2001:2000"]      # publish only to a private interface / behind a firewall
+    volumes: ["piston_1:/piston"]
+
+  piston-2:
+    <<: *piston-node
+    ports: ["2002:2000"]
+    volumes: ["piston_2:/piston"]
+
+  # The Redis pair for the queue + result cache lives with the APP tier (infra/redis), not here.
+  # (Redis defaults are wrong for a queue: use `maxmemory-policy noeviction`, and
+  # keep cache and queue on separate instances so a cache eviction storm can
+  # never drop a queued submission. See docs/scaling-the-judge.md.)
+
+volumes:
+  piston_1:
+  piston_2:

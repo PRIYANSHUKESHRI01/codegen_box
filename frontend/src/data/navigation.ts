@@ -1,135 +1,92 @@
 import { NavLink } from "@/types/common";
 
 export const ANNOUNCEMENT_DATA = {
-  text: "Weekly Challenge #24 is now live",
-  ctaText: "Join the contest",
-  href: "#contests",
+  text: "Now onboarding partner campuses for the new placement season",
+  ctaText: "See how it works",
+  href: "#how-it-works",
   isLive: true,
 };
 
 export const NAV_LINKS: NavLink[] = [
-  { label: "Problems", href: "#problems" },
-  { label: "Contests", href: "#contests", badge: "Live" },
-  { label: "Leaderboard", href: "#leaderboard" },
-  { label: "Practice", href: "#editor-preview" },
-  { label: "Features", href: "#features" },
+  { label: "Platform", href: "#features" },
+  { label: "Practice", href: "#problems" },
+  { label: "DSA Sheets", href: "#dsa-sheets" },
   { label: "Pricing", href: "/pricing" },
 ];
 
-export const FOOTER_COLUMNS = [
-  {
-    title: "Platform",
-    links: [
-      { label: "Problems", href: "#problems" },
-      { label: "Contests", href: "#contests" },
-      { label: "Leaderboard", href: "#leaderboard" },
-      { label: "Practice", href: "#editor-preview" },
-    ],
-  },
-  {
-    title: "Resources",
-    links: [
-      { label: "Guides & Tutorials", href: "#" },
-      { label: "Algorithm Challenges", href: "#" },
-      { label: "API Documentation", href: "#" },
-      { label: "Compiler Specs", href: "#languages" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About CodeForge", href: "#" },
-      { label: "Careers", href: "#", badge: "Hiring" },
-      { label: "Contact Support", href: "#" },
-      { label: "Engineering Blog", href: "#" },
-    ],
-  },
-  {
-    title: "Legal",
-    links: [
-      { label: "Privacy Policy", href: "#" },
-      { label: "Terms of Service", href: "#" },
-      { label: "Contest Rules", href: "#" },
-      { label: "Security", href: "#" },
-    ],
-  },
-];
-
-export const SOCIAL_LINKS = [
-  { name: "GitHub", href: "https://github.com", icon: "Github" },
-  { name: "LinkedIn", href: "https://linkedin.com", icon: "Linkedin" },
-  { name: "X", href: "https://x.com", icon: "Twitter" },
-  { name: "YouTube", href: "https://youtube.com", icon: "Youtube" },
-];
+// Note: Footer.tsx defines its own inline `footerLinks` (richer shape than
+// NavLink, with its own column titles) rather than reading from a shared
+// export here — there is no FOOTER_COLUMNS consumer, so it was removed
+// 2026-09-13 rather than kept as dead, unmaintained-in-practice data.
 
 export const FEATURES_DATA = [
   {
+    id: "drives",
+    icon: "Briefcase",
+    title: "Campus Drive Management",
+    description: "Your placement cell maps every recruiter to your campus, sets CGPA/backlog/branch eligibility, and tracks the whole pipeline from one dashboard.",
+    tag: "TPO Tools",
+  },
+  {
+    id: "prep",
+    icon: "BookOpen",
+    title: "Company-Specific Interview Prep",
+    description: "Students get a dedicated prep pack per recruiter — company overview, hiring-process breakdown, and real previous-year interview questions.",
+    tag: "Student Prep",
+  },
+  {
+    id: "onboarding",
+    icon: "Upload",
+    title: "Bulk Roster Onboarding",
+    description: "Import an entire batch from a single CSV — account creation and welcome emails are handled automatically in the background, no size limit on the roster.",
+    tag: "Fast Setup",
+  },
+  {
+    id: "analytics",
+    icon: "BarChart3",
+    title: "Placement Analytics",
+    description: "Branch-wise readiness, package distribution, and drive funnels — the reports your placement cell needs for audits and management reviews.",
+    tag: "Reporting",
+  },
+  {
     id: "judge",
     icon: "Cpu",
-    title: "Powerful Sandboxed Judge",
-    description: "Sub-millisecond execution times with memory and CPU limit precision across 20+ programming languages.",
-    tag: "Low Latency",
+    title: "Sandboxed Practice Judge",
+    description: "A real coding arena with instant verdicts and topic-wise tracks, with recommended problem sets pulled straight from each company's prep pack.",
+    tag: "Practice Arena",
   },
   {
-    id: "contests",
-    icon: "Trophy",
-    title: "Real-Time Contests",
-    description: "Dynamic scoreboard updates, penalty time computation, and anti-cheat telemetry for competitive integrity.",
-    tag: "Live Sync",
-  },
-  {
-    id: "progress",
-    icon: "TrendingUp",
-    title: "Progress Tracking",
-    description: "Visualize rating progression, submission heatmaps, topic mastery percentages, and current day streaks.",
-    tag: "Analytics",
-  },
-  {
-    id: "leaderboard",
-    icon: "Globe",
-    title: "Global Leaderboards",
-    description: "Tiered ranking divisions (Div 1, Div 2, College, Global) with Elo-based rating adjustment formulas.",
-    tag: "Competitive",
-  },
-  {
-    id: "languages",
-    icon: "Code2",
-    title: "Multiple Languages",
-    description: "Support for modern C++20, Java 21, Python 3.12, JavaScript, Rust 1.77, and Go with standardized runtimes.",
-    tag: "Multi-Stack",
-  },
-  {
-    id: "community",
+    id: "roles",
     icon: "Users2",
-    title: "Developer Community",
-    description: "Collaborate, share editorial solutions, discuss edge cases, and learn from top rated competitive programmers.",
-    tag: "Social",
+    title: "Role-Based Command Centers",
+    description: "Purpose-built dashboards for students, placement officers, and platform admins — everyone sees exactly what their role needs, nothing more.",
+    tag: "Built for Teams",
   },
 ];
 
 export const HOW_IT_WORKS_STEPS = [
   {
     step: "01",
-    title: "Choose Problem",
-    description: "Select from hundreds of curated problems categorized by algorithmic pattern, difficulty, and company tags.",
-    icon: "Layers",
+    title: "Onboard Your Campus",
+    description: "Mellow sets up your college and provisions your placement cell's TPO account in minutes — no lengthy IT rollout required.",
+    icon: "Building2",
   },
   {
     step: "02",
-    title: "Write Solution",
-    description: "Code in your preferred language using our full-featured editor with auto-completion, linting, and syntax checks.",
-    icon: "FileCode",
+    title: "Import Your Batch",
+    description: "Upload one CSV for your entire batch. Every student gets an account and a welcome email with their login, handled automatically in the background.",
+    icon: "Upload",
   },
   {
     step: "03",
-    title: "Submit & Verify",
-    description: "Execute against comprehensive test cases in sandboxed environments to verify time and space complexity.",
-    icon: "PlayCircle",
+    title: "Map Placement Drives",
+    description: "Opt into recruiters visiting your campus, set eligibility criteria, and publish the drive to your students instantly.",
+    icon: "Briefcase",
   },
   {
     step: "04",
-    title: "Track Progress",
-    description: "Gain rating points, unlock achievement badges, climb the leaderboard, and analyze detailed performance graphs.",
+    title: "Students Prepare & Get Placed",
+    description: "Students see a live countdown, company-specific prep, and recommended practice — everything they need before walking into the interview.",
     icon: "Award",
   },
 ];

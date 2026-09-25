@@ -30,7 +30,7 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
     ctaLabel: "Get Started Free",
     ctaHref: "/signup",
     features: [
-      "500+ Easy & Medium practice problems",
+      "1 practice problem + 1 AI mock interview per day",
       "Join weekly public rated contests",
       "Rating, streaks & submission history",
       "Global & college leaderboards",
@@ -51,9 +51,11 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
     ctaHref: "/signup",
     features: [
       "Everything in Coder, plus:",
+      "Unlimited practice problems — no daily cap",
+      "3 AI mock interviews per day, scored instantly",
+      "Full placement drive access",
       "Full problem vault incl. Hard & company-tagged sets",
       "Unlimited virtual contests + full archive access",
-      "Rating analytics & topic-mastery breakdown",
       "AI-powered hints & step-by-step editorials",
       "Priority judge queue — faster execution",
     ],
@@ -70,7 +72,7 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
     ctaHref: "/signup",
     features: [
       "Everything in Expert, plus:",
-      "1:1 mock interviews with hiring engineers",
+      "10 AI mock interviews per day, scored instantly",
       "Personalized AI coach & readiness score",
       "Resume review & referral network access",
       "Early access to new problems & contests",
@@ -87,7 +89,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     icon: "Building2",
     annualPrice: 149000,
     ctaLabel: "Talk to Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeForge%20Standard%20Plan%20Inquiry",
+    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Standard%20Plan%20Inquiry",
     features: [
       "Up to 500 student seats",
       "Full practice arena + rated contests for your batch",
@@ -105,7 +107,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     annualPrice: 449000,
     featured: true,
     ctaLabel: "Talk to Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeForge%20Pro%20Campus%20Plan%20Inquiry",
+    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Pro%20Campus%20Plan%20Inquiry",
     features: [
       "Everything in Standard, plus:",
       "Up to 2,000 student seats",
@@ -122,7 +124,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     icon: "Landmark",
     badge: "Enterprise",
     ctaLabel: "Contact Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeForge%20Academic%20Enterprise%20Inquiry",
+    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Academic%20Enterprise%20Inquiry",
     features: [
       "Everything in Pro Campus, plus:",
       "Unlimited student seats, multi-campus support",

@@ -13,6 +13,14 @@ export class ApiError extends Error {
   }
 }
 
+async function throwForFailedResponse(res: Response): Promise<never> {
+  const data = await res.json().catch(() => null);
+  const firstError = data?.errors ? Object.values(data.errors)[0] : undefined;
+  const message =
+    data?.message ?? (Array.isArray(firstError) ? firstError[0] : "Something went wrong. Please try again.");
+  throw new ApiError(message, res.status, data?.errors);
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
 
@@ -26,16 +34,43 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
 
-  const data = await res.json().catch(() => null);
+  if (!res.ok) return throwForFailedResponse(res);
 
-  if (!res.ok) {
-    const firstError = data?.errors ? Object.values(data.errors)[0] : undefined;
-    const message =
-      data?.message ?? (Array.isArray(firstError) ? firstError[0] : "Something went wrong. Please try again.");
-    throw new ApiError(message, res.status, data?.errors);
-  }
+  return (await res.json().catch(() => null)) as T;
+}
 
-  return data as T;
+/** Multipart uploads (e.g. a CSV file) — no Content-Type header, so the
+ * browser can set it itself with the correct multipart boundary. */
+async function requestFormData<T>(path: string, formData: FormData): Promise<T> {
+  const token = getToken();
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) return throwForFailedResponse(res);
+
+  return (await res.json().catch(() => null)) as T;
+}
+
+/** Authenticated file downloads (e.g. the CSV import template) — a plain
+ * `<a href>` can't carry a Bearer token, so this fetches the bytes directly
+ * for the caller to turn into a download via an object URL. */
+async function requestBlob(path: string): Promise<Blob> {
+  const token = getToken();
+
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!res.ok) return throwForFailedResponse(res);
+
+  return res.blob();
 }
 
 // Dedupe identical concurrent GETs (e.g. React 18 dev Strict Mode's
@@ -59,4 +94,9 @@ export const api = {
   get: <T>(path: string) => dedupedGet<T>(path),
   post: <T>(path: string, body?: unknown, init?: RequestInit) =>
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined, ...init }),
+  put: <T>(path: string, body?: unknown, init?: RequestInit) =>
+    request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined, ...init }),
+  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  postFormData: <T>(path: string, formData: FormData) => requestFormData<T>(path, formData),
+  getFile: (path: string) => requestBlob(path),
 };

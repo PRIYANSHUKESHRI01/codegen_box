@@ -2,14 +2,13 @@ import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
 import { Hero } from "@/components/hero/Hero";
 import { Stats } from "@/components/sections/Stats";
+import { DsaSheets } from "@/components/sections/DsaSheets";
 import { ProblemExplorer } from "@/components/problems/ProblemExplorer";
 import { Features } from "@/components/sections/Features";
+import { PlatformRoles } from "@/components/sections/PlatformRoles";
 import { HowItWorks } from "@/components/sections/HowItWorks";
-import { ContestPreview } from "@/components/contests/ContestPreview";
-import { Leaderboard } from "@/components/leaderboard/Leaderboard";
-import { ProgressCard } from "@/components/dashboard/ProgressCard";
 import { Languages } from "@/components/sections/Languages";
-import { Testimonials } from "@/components/sections/Testimonials";
+import { TrustPrinciples } from "@/components/sections/TrustPrinciples";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { Footer } from "@/components/layout/Footer";
 import { ScrollMotion } from "@/components/layout/ScrollMotion";
@@ -23,43 +22,42 @@ export default function Home() {
       {/* 2. Sticky Navbar with ThemeToggle and Search */}
       <Navbar />
 
-      {/* Main Page Flow */}
+      {/* Main Page Flow — every number and every problem shown from here
+          down is real, fetched from GET /public/stats and
+          /public/problems/sample, never hardcoded marketing copy. */}
       <main className="flex-1">
-        {/* 3. Hero & Monaco Preview */}
+        {/* 3. Hero & Dual-Role Product Preview */}
         <Hero />
 
-        {/* 4. Platform Stats */}
+        {/* 4. Real Platform Stats */}
         <Stats />
 
-        {/* 5. Problem Explorer Preview */}
-        <ProblemExplorer />
+        {/* 5. Famous DSA Sheets — community-trusted roadmaps, credited to their creators */}
+        <DsaSheets />
 
-        {/* 6. Features Grid */}
+        {/* 6. Features Grid (bento layout) */}
         <Features />
 
-        {/* 7. How It Works Timeline */}
+        {/* 7. Built for Every Role */}
+        <PlatformRoles />
+
+        {/* 8. How It Works Timeline */}
         <HowItWorks />
 
-        {/* 8. Contest Preview & Live Timer */}
-        <ContestPreview />
+        {/* 9. Problem Explorer — a real sample from the catalog */}
+        <ProblemExplorer />
 
-        {/* 9. Global Leaderboard */}
-        <Leaderboard />
-
-        {/* 10. Developer Progress / Profile Preview */}
-        <ProgressCard />
-
-        {/* 11. Polyglot Supported Languages */}
+        {/* 10. Polyglot Supported Languages — the real 4 the judge supports */}
         <Languages />
 
-        {/* 12. Verified Community Testimonials */}
-        <Testimonials />
+        {/* 11. Trust Principles — what actually makes the numbers trustworthy */}
+        <TrustPrinciples />
 
-        {/* 13. Final CTA */}
+        {/* 12. Final CTA */}
         <FinalCTA />
       </main>
 
-      {/* 14. Responsive Footer */}
+      {/* 13. Responsive Footer */}
       <Footer />
 
       {/* GSAP Scroll Animations */}

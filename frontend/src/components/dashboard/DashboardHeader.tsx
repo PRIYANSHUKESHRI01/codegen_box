@@ -28,11 +28,13 @@ import {
   Settings,
   BookOpen,
   LineChart,
+  Megaphone,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/navigation/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { getRatingTier } from "@/lib/rating";
-import { STUDENT_PROFILE } from "@/data/mockDashboardData";
+import { useAuth } from "@/lib/AuthContext";
+import { useMyStats } from "@/lib/useMyStats";
 import { DashboardRole } from "./DashboardSidebar";
 
 interface DashboardHeaderProps {
@@ -66,37 +68,20 @@ export function DashboardHeader({
   actionButton,
 }: DashboardHeaderProps) {
   const router = useRouter();
+  const { user } = useAuth();
+  const { stats } = useMyStats(role === "user");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const [notifications, setNotifications] = useState<NotificationItem[]>([
-    {
-      id: 1,
-      title: "Plagiarism Radar Alert",
-      desc: "High similarity (96.4%) detected in Weekly Contest #24 between two student submissions.",
-      time: "12m ago",
-      unread: true,
-      category: "Security",
-    },
-    {
-      id: 2,
-      title: "Google SDE-1 Assessment Live",
-      desc: "Campus Drive configured and active for Apex Institute 2026 Cohort.",
-      time: "1h ago",
-      unread: true,
-      category: "Drive",
-    },
-    {
-      id: 3,
-      title: "Isolated Judge Cluster Auto-Scaled",
-      desc: "Mumbai Judge nodes scaled 4 isolated Docker sandbox workers under surge load.",
-      time: "3h ago",
-      unread: false,
-      category: "Infrastructure",
-    },
-  ]);
+  // No real notification system exists yet (no backend table, no events) —
+  // this used to ship 3 permanently-hardcoded fake alerts to every role,
+  // including one about a Plagiarism Radar feature that has since been
+  // removed entirely (see AdminController/ProblemBankPanel). Left empty
+  // and honest until a real notifications feature is built, rather than
+  // fabricating more placeholder content.
+  const [notifications] = useState<NotificationItem[]>([]);
 
   // Global keyboard shortcut for Command Palette (⌘K or Ctrl+K)
   useEffect(() => {
@@ -117,7 +102,6 @@ export function DashboardHeader({
 
   const markAllNotificationsRead = () => {
     setNotificationsRead(true);
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
   };
 
   const unreadCount = notifications.filter((n) => n.unread).length;
@@ -128,6 +112,8 @@ export function DashboardHeader({
     if (role === "superadmin") return "Executive";
     if (role === "admin_internal") return "Platform Ops";
     if (role === "admin_tpo") return "Placement Cell";
+    if (role === "admin_marketing") return "Lead Growth";
+    if (role === "admin_company") return "Hiring Cell";
     return "Developer Arena";
   };
 
@@ -136,6 +122,8 @@ export function DashboardHeader({
     if (role === "superadmin") return "Master Console";
     if (role === "admin_internal") return "Mellow Operations";
     if (role === "admin_tpo") return "College TPO Hub";
+    if (role === "admin_marketing") return "Marketing Hub";
+    if (role === "admin_company") return "Hiring Command Center";
     return "Candidate Arena";
   };
 
@@ -158,25 +146,61 @@ export function DashboardHeader({
       );
     }
     if (role === "admin_tpo" || currentTpoView === "tpo") {
+      // A TPO's own real college — never a hardcoded stand-in. Blank until
+      // useAuth() resolves rather than flashing a wrong college name.
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-cyan-500/10 text-cyan-400 border border-cyan-500/25 shadow-subtle flex-shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-          <span>Apex Inst.</span>
+          <span>{user?.college?.name ?? "Loading..."}</span>
         </span>
       );
     }
-    const tier = getRatingTier(STUDENT_PROFILE.rating);
+    if (role === "admin_marketing") {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/25 shadow-subtle flex-shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
+          <span>Marketing Team</span>
+        </span>
+      );
+    }
+    if (role === "admin_company") {
+      // A hiring tenant's own real company — never a hardcoded stand-in,
+      // same convention as the TPO's college badge above.
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-teal-500/10 text-teal-400 border border-teal-500/25 shadow-subtle flex-shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-teal-400 animate-pulse" />
+          <span>{user?.company?.name ?? "Loading..."}</span>
+        </span>
+      );
+    }
+
+    // Student badge: a real earned tier once rated_contests_count > 0 (see
+    // User::displayRating() on the backend), otherwise a neutral
+    // solved-score badge — never the default starting rating shown as if
+    // it were earned.
+    if (!stats) return null;
+
+    if (stats.rating.rated_contests_count > 0) {
+      const tier = getRatingTier(stats.rating.current_rating);
+      return (
+        <span
+          className={cn(
+            "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap border shadow-subtle flex-shrink-0",
+            tier.bg,
+            tier.border
+          )}
+        >
+          <span className={cn("font-black", tier.text)}>{tier.label}</span>
+          <span className="text-primary font-mono">{stats.rating.current_rating}</span>
+          <span className="text-text-muted">Div {tier.division}</span>
+        </span>
+      );
+    }
+
     return (
-      <span
-        className={cn(
-          "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap border shadow-subtle flex-shrink-0",
-          tier.bg,
-          tier.border
-        )}
-      >
-        <span className={cn("font-black", tier.text)}>{tier.label}</span>
-        <span className="text-primary font-mono">{STUDENT_PROFILE.rating}</span>
-        <span className="text-text-muted">Div {tier.division}</span>
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-elevated text-text-secondary border border-border-subtle shadow-subtle flex-shrink-0">
+        <span className="font-mono">{stats.rating.solved_score} pts</span>
+        <span className="text-text-muted">Unrated</span>
       </span>
     );
   };
@@ -226,7 +250,7 @@ export function DashboardHeader({
       icon: Briefcase,
       category: "Navigation",
       roles: ["user"],
-      action: () => router.push("/dashboard#upcoming"),
+      action: () => router.push("/dashboard#placement-drives"),
     },
     {
       id: "superadmin",
@@ -256,12 +280,48 @@ export function DashboardHeader({
       action: () => router.push("/admin?view=tpo"),
     },
     {
+      id: "placement_content",
+      title: "Placement Drives & Companies",
+      subtext: "Manage the shared company catalog and drive prep content",
+      icon: Briefcase,
+      category: "Administration",
+      roles: ["admin_internal", "superadmin"],
+      action: () => router.push("/admin/placements"),
+    },
+    {
+      id: "marketing_leads",
+      title: "Lead Management",
+      subtext: "Mellow Direct leads — status, notes and outreach",
+      icon: Megaphone,
+      category: "Administration",
+      roles: ["admin_marketing", "superadmin"],
+      action: () => router.push("/marketing"),
+    },
+    {
+      id: "hiring_hub",
+      title: "Hiring Command Center",
+      subtext: "Job openings, candidate pipeline & assessments",
+      icon: Briefcase,
+      category: "Administration",
+      roles: ["admin_company"],
+      action: () => router.push("/admin"),
+    },
+    {
+      id: "hiring_reports",
+      title: "Hiring Reports",
+      subtext: "Funnel, time-to-hire and offer-accept analytics",
+      icon: CheckCircle2,
+      category: "Administration",
+      roles: ["admin_company"],
+      action: () => router.push("/admin/company/reports"),
+    },
+    {
       id: "settings",
       title: "Profile Settings",
       subtext: "Identity, security, preferences and notifications",
       icon: Settings,
       category: "Account",
-      roles: ["user", "admin_internal", "admin_tpo", "superadmin"],
+      roles: ["user", "admin_internal", "admin_tpo", "admin_marketing", "superadmin", "admin_company"],
       action: () => router.push("/settings"),
     },
     {
@@ -271,7 +331,7 @@ export function DashboardHeader({
       icon: Trophy,
       category: "Community",
       roles: ["user", "admin_internal", "admin_tpo", "superadmin"],
-      action: () => router.push("/#leaderboard"),
+      action: () => router.push("/dashboard/leaderboard"),
     },
   ];
 
@@ -306,7 +366,7 @@ export function DashboardHeader({
                 href="/"
                 className="font-medium text-text-muted hover:text-primary transition-colors"
               >
-                CodeForge
+                CodeGen Box
               </Link>
               <span className="text-text-muted/40 font-mono text-[11px]">/</span>
               <span className="text-text-muted/80 font-medium truncate">
@@ -399,6 +459,9 @@ export function DashboardHeader({
                   </div>
 
                   <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
+                    {notifications.length === 0 && (
+                      <p className="text-[11px] text-text-muted text-center py-4">No new notifications.</p>
+                    )}
                     {notifications.map((item) => (
                       <div
                         key={item.id}

@@ -1,0 +1,217 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import { X, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { api } from "@/lib/api";
+import { avatarColorClass, initials } from "@/lib/avatarColor";
+import {
+  LEAD_STATUSES,
+  LEAD_STATUS_LABELS,
+  LEAD_STATUS_BADGE_CLASS,
+  type LeadStatus,
+  type LeadDetail,
+} from "@/types/lead";
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+}
+
+interface LeadDetailDrawerProps {
+  leadId: number;
+  onClose: () => void;
+  onChanged: () => void;
+  /**
+   * Hides the status-changer and note composer — for a viewer authorized to
+   * see a lead's real stats/history but whose actual outreach workflow
+   * belongs elsewhere (the superadmin dashboard's Leads tab links out to
+   * the full Marketing dashboard for that instead of duplicating it here).
+   */
+  readOnly?: boolean;
+}
+
+/**
+ * Extracted from marketing/page.tsx so both the Marketing team's own
+ * dashboard and superadmin's read-only Leads tab render the exact same real
+ * stats/notes/status data — one source of truth, no duplicated fetch logic.
+ */
+export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false }: LeadDetailDrawerProps) {
+  const [detail, setDetail] = useState<LeadDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [noteText, setNoteText] = useState("");
+  const [savingNote, setSavingNote] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<LeadDetail>(`/marketing/leads/${leadId}`);
+      setDetail(res);
+    } finally {
+      setLoading(false);
+    }
+  }, [leadId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const handleAddNote = async () => {
+    if (!noteText.trim()) return;
+    setSavingNote(true);
+    try {
+      await api.post(`/marketing/leads/${leadId}/notes`, { note: noteText.trim() });
+      setNoteText("");
+      await load();
+      onChanged();
+    } finally {
+      setSavingNote(false);
+    }
+  };
+
+  const handleSetStatus = async (s: LeadStatus) => {
+    if (readOnly) return;
+    setSavingStatus(true);
+    try {
+      await api.post(`/marketing/leads/${leadId}/status`, { status: s });
+      await load();
+      onChanged();
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <motion.div
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 260 }}
+        className="relative w-full max-w-md h-full bg-surface border-l border-border-strong shadow-2xl overflow-y-auto"
+      >
+        {loading || !detail ? (
+          <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Loading lead...
+          </div>
+        ) : (
+          <div className="p-6 space-y-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={cn(
+                    "w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                    avatarColorClass(detail.lead.name)
+                  )}
+                >
+                  {initials(detail.lead.name)}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold text-primary truncate">{detail.lead.name}</h3>
+                  <p className="text-xs text-text-muted truncate">{detail.lead.email}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary shrink-0">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Status</p>
+              <div className="flex flex-wrap gap-1.5">
+                {LEAD_STATUSES.map((s) => (
+                  <button
+                    key={s}
+                    disabled={savingStatus || readOnly}
+                    onClick={() => handleSetStatus(s)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors disabled:opacity-50",
+                      detail.lead.lead_status === s
+                        ? LEAD_STATUS_BADGE_CLASS[s]
+                        : "bg-elevated text-text-muted border-border-subtle hover:text-primary",
+                      readOnly && "cursor-default hover:text-text-muted"
+                    )}
+                  >
+                    {LEAD_STATUS_LABELS[s]}
+                  </button>
+                ))}
+              </div>
+              {readOnly && (
+                <p className="text-[10px] text-text-muted mt-1.5">
+                  Status changes happen in the Marketing dashboard.
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
+                <div className="text-base font-black text-primary font-mono">{detail.stats.solved_score}</div>
+                <div className="text-[9px] text-text-muted uppercase mt-1">Solved Score</div>
+              </div>
+              <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
+                <div className="text-base font-black text-primary font-mono">{detail.stats.solved_by_difficulty.total_solved}</div>
+                <div className="text-[9px] text-text-muted uppercase mt-1">Problems Solved</div>
+              </div>
+              <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
+                <div className="text-base font-black text-primary font-mono">{detail.stats.streak.current}</div>
+                <div className="text-[9px] text-text-muted uppercase mt-1">Day Streak</div>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs">
+              <div className="flex justify-between text-text-secondary">
+                <span>Plan</span>
+                <strong className="text-primary">{detail.lead.subscription?.plan_name ?? "—"}</strong>
+              </div>
+              <div className="flex justify-between text-text-secondary mt-1">
+                <span>Signed up</span>
+                <strong className="text-primary">{formatDate(detail.lead.created_at)}</strong>
+              </div>
+            </div>
+
+            {!readOnly && (
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Add Note</p>
+                <textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Called on Tuesday, interested in the Pro plan..."
+                  rows={3}
+                  className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs placeholder:text-text-muted outline-none focus:border-accent-primary resize-none"
+                />
+                <button
+                  onClick={handleAddNote}
+                  disabled={savingNote || !noteText.trim()}
+                  className="mt-2 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                >
+                  {savingNote ? "Saving..." : "Save Note"}
+                </button>
+              </div>
+            )}
+
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">History</p>
+              {detail.notes.length === 0 ? (
+                <p className="text-[11px] text-text-muted">No notes yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {detail.notes.map((n) => (
+                    <div key={n.id} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
+                      <p className="text-xs text-text-secondary">{n.note}</p>
+                      <p className="text-[10px] text-text-muted mt-1">
+                        {n.author_name} · {formatDate(n.created_at)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+}

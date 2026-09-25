@@ -2,10 +2,11 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { X, Search, Sparkles, LogIn, Code2 } from "lucide-react";
+import { X, Search, Sparkles, LogIn } from "lucide-react";
 import { NAV_LINKS } from "@/data/navigation";
 import { ThemeToggle } from "./ThemeToggle";
 import { Button } from "@/components/ui/Button";
+import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 
 interface MobileMenuProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
       role="dialog"
       aria-modal="true"
       aria-label="Mobile Navigation Menu"
-      className="fixed inset-0 z-50 lg:hidden"
+      className="fixed inset-0 z-50 xl:hidden"
     >
       {/* Backdrop */}
       <div
@@ -59,12 +60,8 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
           {/* Header */}
           <div className="flex items-center justify-between pb-6 border-b border-border-subtle">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-control bg-accent-primary/20 border border-accent-primary/30 flex items-center justify-center text-accent-primary">
-                <Code2 className="w-5 h-5" />
-              </div>
-              <span className="font-bold text-lg tracking-tight text-primary">
-                Code<span className="text-accent-primary">Forge</span>
-              </span>
+              <LogoBadge className="w-8 h-8" />
+              <Wordmark className="font-bold text-lg tracking-tight text-primary" />
             </div>
             <button
               type="button"

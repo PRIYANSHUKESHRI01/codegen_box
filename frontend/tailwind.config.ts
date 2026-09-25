@@ -22,26 +22,34 @@ const config: Config = {
     },
     extend: {
       colors: {
-        background: "var(--bg-background)",
-        surface: "var(--bg-surface)",
-        elevated: "var(--bg-elevated)",
-        "surface-hover": "var(--bg-surface-hover)",
-        primary: "var(--text-primary)",
-        secondary: "var(--text-secondary)",
-        muted: "var(--text-muted)",
-        "text-primary": "var(--text-primary)",
-        "text-secondary": "var(--text-secondary)",
-        "text-muted": "var(--text-muted)",
+        // These use the rgb(var(--x-rgb) / <alpha-value>) form so opacity
+        // modifiers (bg-surface/95, text-accent-primary/60, ...) actually
+        // work — a color defined as a plain `var(--x)` string can't have
+        // Tailwind inject an alpha channel into it, so every `/NN` variant
+        // silently generated no CSS rule at all (fully transparent).
+        background: "rgb(var(--bg-background-rgb) / <alpha-value>)",
+        surface: "rgb(var(--bg-surface-rgb) / <alpha-value>)",
+        elevated: "rgb(var(--bg-elevated-rgb) / <alpha-value>)",
+        "surface-hover": "rgb(var(--bg-surface-hover-rgb) / <alpha-value>)",
+        primary: "rgb(var(--text-primary-rgb) / <alpha-value>)",
+        secondary: "rgb(var(--text-secondary-rgb) / <alpha-value>)",
+        muted: "rgb(var(--text-muted-rgb) / <alpha-value>)",
+        "text-primary": "rgb(var(--text-primary-rgb) / <alpha-value>)",
+        "text-secondary": "rgb(var(--text-secondary-rgb) / <alpha-value>)",
+        "text-muted": "rgb(var(--text-muted-rgb) / <alpha-value>)",
+        // Already pre-baked translucent rgba() constants, used unmodified
+        // almost everywhere — left as plain vars so their baked-in opacity
+        // doesn't get overridden to fully opaque by the alpha-value default.
         "border-subtle": "var(--border-subtle)",
         "border-strong": "var(--border-strong)",
-        "accent-primary": "var(--accent-primary)",
-        "accent-primary-hover": "var(--accent-primary-hover)",
+        "accent-primary": "rgb(var(--accent-primary-rgb) / <alpha-value>)",
+        "accent-primary-hover": "rgb(var(--accent-primary-hover-rgb) / <alpha-value>)",
         "accent-primary-light": "var(--accent-primary-light)",
-        "accent-secondary": "var(--accent-secondary)",
-        "accent-secondary-hover": "var(--accent-secondary-hover)",
-        "status-success": "var(--status-success)",
-        "status-warning": "var(--status-warning)",
-        "status-danger": "var(--status-danger)",
+        "accent-secondary": "rgb(var(--accent-secondary-rgb) / <alpha-value>)",
+        "accent-secondary-hover": "rgb(var(--accent-secondary-hover-rgb) / <alpha-value>)",
+        "status-success": "rgb(var(--status-success-rgb) / <alpha-value>)",
+        "status-warning": "rgb(var(--status-warning-rgb) / <alpha-value>)",
+        "status-danger": "rgb(var(--status-danger-rgb) / <alpha-value>)",
       },
       borderRadius: {
         control: "9px",
@@ -68,10 +76,15 @@ const config: Config = {
           from: { transform: "translateY(-10px)", opacity: "0" },
           to: { transform: "translateY(0)", opacity: "1" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0px)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
       },
       animation: {
         "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
         "slide-down": "slide-down 0.25s ease-out",
+        float: "float 5s ease-in-out infinite",
       },
     },
   },

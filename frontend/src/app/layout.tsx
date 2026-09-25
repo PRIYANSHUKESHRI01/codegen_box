@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import NextTopLoader from "nextjs-toploader";
+import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -15,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CodeForge — Master Competitive Programming",
+  title: "CodeGen Box — Master Competitive Programming",
   description: "Solve challenging algorithmic problems, compete in rated global contests, track your progress, and accelerate your engineering career.",
   keywords: [
     "competitive programming",
@@ -28,19 +30,19 @@ export const metadata: Metadata = {
     "developer tools",
     "interview preparation"
   ],
-  authors: [{ name: "CodeForge Team" }],
+  authors: [{ name: "CodeGen Box Team" }],
   openGraph: {
-    title: "CodeForge — Master Competitive Programming",
+    title: "CodeGen Box — Master Competitive Programming",
     description: "Solve challenging problems, compete in contests, track your progress, and sharpen developer skills.",
     type: "website",
     locale: "en_US",
-    siteName: "CodeForge",
+    siteName: "CodeGen Box",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CodeForge — Master Competitive Programming",
+    title: "CodeGen Box — Master Competitive Programming",
     description: "Solve challenging problems, compete in contests, and track your progress.",
-    creator: "@codeforge",
+    creator: "@codegenbox",
   },
 };
 
@@ -82,7 +84,13 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans min-h-screen bg-background text-primary antialiased selection:bg-accent-primary/20 selection:text-accent-primary`}>
-        {children}
+        {/* A thin top-of-page progress bar on every route change — this is
+            the single biggest "feels instant" cue on a click-heavy dashboard:
+            it gives immediate feedback on the click itself, well before the
+            next route's data has even started loading. Patches next/link and
+            router.push/replace automatically; no per-page wiring needed. */}
+        <NextTopLoader color="#4F46E5" height={3} showSpinner={false} shadow="0 0 10px #4F46E5,0 0 5px #4F46E5" />
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

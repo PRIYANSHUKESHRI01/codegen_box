@@ -1,11 +1,20 @@
 import { SupportedLanguage } from "@/types/common";
 
+/**
+ * Exactly the 4 languages the real judge supports — backend/config/piston.php
+ * is the single source of truth for versions; keep these in sync with it by
+ * hand (there's no build-time link between the two). This used to also list
+ * a fifth "Rust" entry that the judge has never actually supported — see
+ * PublicController::stats()'s languages_total, which reads the real config
+ * count so the landing page's Stats section can never silently drift out of
+ * sync with this list again.
+ */
 export const LANGUAGES_DATA: SupportedLanguage[] = [
   {
     id: "cpp",
     name: "C++",
-    version: "GCC 13.2 (C++20)",
-    compiler: "g++ -O3 -std=c++20",
+    version: "GCC 10.2.0",
+    compiler: "g++ -O3",
     speedTier: "Fastest",
     popularity: "Most Popular in Contests",
     defaultSnippet: `#include <bits/stdc++.h>
@@ -43,7 +52,7 @@ int main() {
   {
     id: "python",
     name: "Python",
-    version: "Python 3.12",
+    version: "Python 3.10.0",
     compiler: "python3",
     speedTier: "Balanced",
     popularity: "Highest Readability",
@@ -67,8 +76,8 @@ if __name__ == "__main__":
   {
     id: "java",
     name: "Java",
-    version: "OpenJDK 21",
-    compiler: "javac --release 21",
+    version: "OpenJDK 15.0.2",
+    compiler: "javac --release 15",
     speedTier: "Fast",
     popularity: "Standard Enterprise Choice",
     defaultSnippet: `import java.util.HashMap;
@@ -97,8 +106,8 @@ class Solution {
   {
     id: "javascript",
     name: "JavaScript",
-    version: "Node.js 20.x",
-    compiler: "node --v8-options",
+    version: "Node.js 18.15.0",
+    compiler: "node",
     speedTier: "Fast",
     popularity: "Full-Stack Native",
     defaultSnippet: `/**
@@ -120,30 +129,5 @@ function twoSum(nums, target) {
 
 console.log(twoSum([2, 7, 11, 15], 9));
 `,
-  },
-  {
-    id: "rust",
-    name: "Rust",
-    version: "Rust 1.77",
-    compiler: "rustc --edition 2021 -O",
-    speedTier: "Fastest",
-    popularity: "Memory-Safe Systems",
-    defaultSnippet: `use std::collections::HashMap;
-
-pub fn two_sum(nums: Vec<i32>, target: i32) -> Vec<i32> {
-    let mut map = HashMap::new();
-    for (i, &num) in nums.iter().enumerate() {
-        if let Some(&prev_idx) = map.get(&(target - num)) {
-            return vec![prev_idx as i32, i as i32];
-        }
-        map.insert(num, i);
-    }
-    vec![]
-}
-
-fn main() {
-    let res = two_sum(vec![2, 7, 11, 15], 9);
-    println!("{:?}", res);
-}`,
   },
 ];

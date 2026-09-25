@@ -2,20 +2,37 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Code2, Terminal } from "lucide-react";
+import { Terminal } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Container } from "./Container";
+import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 import { DesktopNav } from "@/components/navigation/DesktopNav";
 import { MobileNav } from "@/components/navigation/MobileNav";
 import { MobileMenu } from "@/components/navigation/MobileMenu";
-import { PROBLEMS_DATA } from "@/data/problems";
-import { Problem } from "@/types/problem";
 import { getDifficultyStyle } from "@/lib/formatters";
+import { usePublicSampleProblems, PublicSampleProblem } from "@/lib/usePublicPlatformData";
+
+function titleCase(difficulty: string): string {
+  return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
+}
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Problem[]>([]);
+  const [searchResults, setSearchResults] = useState<PublicSampleProblem[]>([]);
+  const [scrolled, setScrolled] = useState(false);
+  const { problems: sampleProblems } = usePublicSampleProblems();
+
+  // Subtle elevation once the page scrolls past the announcement bar — a
+  // small "the header is a real surface" cue rather than a flat line
+  // sitting on the page from the very first pixel.
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // Keyboard shortcut listener (Cmd+K / Ctrl+K)
   useEffect(() => {
@@ -32,24 +49,30 @@ export function Navbar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [searchOpen]);
 
-  // Live filter in search modal
+  // Live filter in search modal — over the real sample set (see
+  // PublicController::sampleProblems()), not a fake 1,400-problem catalog.
   useEffect(() => {
     if (!searchQuery.trim()) {
-      setSearchResults(PROBLEMS_DATA.slice(0, 5));
+      setSearchResults(sampleProblems.slice(0, 5));
     } else {
       const q = searchQuery.toLowerCase();
-      const filtered = PROBLEMS_DATA.filter(
+      const filtered = sampleProblems.filter(
         (p) =>
           p.title.toLowerCase().includes(q) ||
           p.tags.some((t) => t.toLowerCase().includes(q))
       );
       setSearchResults(filtered.slice(0, 6));
     }
-  }, [searchQuery]);
+  }, [searchQuery, sampleProblems]);
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-border-subtle bg-background/85 backdrop-blur-md transition-colors">
+      <header
+        className={cn(
+          "sticky top-0 z-40 w-full border-b bg-background/85 backdrop-blur-md transition-[box-shadow,border-color] duration-300",
+          scrolled ? "border-border-strong shadow-[0_4px_20px_-8px_rgba(0,0,0,0.12)]" : "border-border-subtle"
+        )}
+      >
         {/* Top subtle gradient hairline */}
         <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-75" />
         <Container size="xl">
@@ -57,17 +80,13 @@ export function Navbar() {
             {/* Brand Logo */}
             <Link
               href="/"
-              className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control"
+              className="flex items-center gap-2.5 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control"
             >
-              <div className="w-9 h-9 rounded-control bg-accent-primary/15 border border-accent-primary/30 flex items-center justify-center text-accent-primary group-hover:scale-105 transition-transform duration-200 shadow-subtle">
-                <Code2 className="w-5 h-5" />
-              </div>
+              <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.4)]" />
               <div className="flex flex-col">
-                <span className="font-bold text-lg tracking-tight text-primary leading-none">
-                  Code<span className="text-accent-primary">Forge</span>
-                </span>
-                <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase">
-                  Arena &bull; Judge
+                <Wordmark className="font-bold text-lg tracking-tight text-primary leading-none" />
+                <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase whitespace-nowrap">
+                  Placements &bull; Practice
                 </span>
               </div>
             </Link>
@@ -126,10 +145,10 @@ export function Navbar() {
                 </div>
               ) : (
                 searchResults.map((problem) => {
-                  const diffStyle = getDifficultyStyle(problem.difficulty);
+                  const diffStyle = getDifficultyStyle(titleCase(problem.difficulty));
                   return (
                     <a
-                      key={problem.id}
+                      key={problem.slug}
                       href="#problems"
                       onClick={() => setSearchOpen(false)}
                       className="flex items-center justify-between p-3 rounded-control hover:bg-elevated transition-colors group"
@@ -137,9 +156,9 @@ export function Navbar() {
                       <div className="flex items-center gap-2.5">
                         <span
                           className={`w-2 h-2 rounded-full ${
-                            problem.difficulty === "Easy"
+                            problem.difficulty === "easy"
                               ? "bg-emerald-400"
-                              : problem.difficulty === "Medium"
+                              : problem.difficulty === "medium"
                               ? "bg-amber-400"
                               : "bg-rose-400"
                           }`}
@@ -148,16 +167,9 @@ export function Navbar() {
                           {problem.title}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded border ${diffStyle.badgeClass}`}
-                        >
-                          {problem.difficulty}
-                        </span>
-                        <span className="text-xs text-text-muted font-mono">
-                          {problem.acceptanceRate}%
-                        </span>
-                      </div>
+                      <span className={`text-xs px-2 py-0.5 rounded border ${diffStyle.badgeClass}`}>
+                        {titleCase(problem.difficulty)}
+                      </span>
                     </a>
                   );
                 })

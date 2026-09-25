@@ -42,7 +42,8 @@ export interface Testimonial {
   name: string;
   role: string;
   organization: string;
-  rating: number;
+  /** A CP rating badge, shown only for student voices — null for TPO/staff testimonials, where a rating doesn't apply. */
+  rating: number | null;
   avatarUrl: string;
 }
 

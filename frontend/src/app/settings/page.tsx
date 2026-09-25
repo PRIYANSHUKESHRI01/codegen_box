@@ -1,6 +1,15 @@
 "use client";
+import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ConfirmationResult } from "firebase/auth";
+import {
+  isFirebasePhoneAuthConfigured,
+  sendPhoneOtp,
+  confirmPhoneOtp,
+  resetPhoneRecaptcha,
+  friendlyFirebaseError,
+} from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   User,
@@ -12,27 +21,51 @@ import {
   AtSign,
   Building2,
   GraduationCap,
-  Calendar,
+  Phone,
+  Hash,
+  Award,
+  AlertTriangle,
   KeyRound,
   Monitor,
-  Smartphone,
   LogOut,
   Check,
   Camera,
+  Loader2,
+  CreditCard,
+  BadgeCheck,
+  Calendar,
+  X,
+  Sparkles,
+  Linkedin,
+  Github,
+  FileText,
+  Download,
+  Upload,
+  RotateCcw,
 } from "lucide-react";
+import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ThemeToggle } from "@/components/navigation/ThemeToggle";
 import { STUDENT_PROFILE } from "@/data/mockDashboardData";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
+import { ProfileCompletionBar } from "@/components/settings/ProfileCompletionBar";
+import { SkillsTagInput } from "@/components/settings/SkillsTagInput";
+import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
+import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/utils";
 import { getRatingTier } from "@/lib/rating";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useAuth } from "@/lib/AuthContext";
+import { getToken, AuthUser } from "@/lib/auth";
+import { api, ApiError } from "@/lib/api";
+import { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
 
-type TabId = "profile" | "security" | "preferences" | "notifications";
+type TabId = "profile" | "security" | "preferences" | "notifications" | "billing";
 
 const TABS: { id: TabId; label: string; icon: typeof User }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
+  { id: "billing", label: "Billing", icon: CreditCard },
   { id: "preferences", label: "Preferences", icon: Sliders },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
@@ -42,38 +75,9 @@ const ROLE_LABEL: Record<string, string> = {
   admin_internal: "Mellow Staff",
   admin_tpo: "College TPO",
   superadmin: "Super Admin",
+  section_coordinator: "Section Coordinator",
 };
 
-function Toggle({
-  checked,
-  onChange,
-  label,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative w-11 h-6 rounded-full transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
-        checked ? "bg-accent-primary" : "bg-border-strong"
-      )}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform",
-          checked ? "translate-x-[22px]" : "translate-x-0.5"
-        )}
-      />
-    </button>
-  );
-}
 
 function Field({
   label,
@@ -101,20 +105,281 @@ function Field({
 const inputClass =
   "w-full py-2.5 rounded-control bg-elevated border border-border-subtle text-sm text-primary placeholder:text-text-muted outline-none focus:border-accent-primary transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
+/**
+ * The recruiter-facing extension of a student's profile — bio, LinkedIn/
+ * GitHub, skills, resume — shown only for `isStudent` (both college-
+ * affiliated and Mellow Direct, per StudentProfileController's own scoping).
+ * Deliberately its own component/state, separate from the generic Personal
+ * Information card above (which still saves via PUT /me/profile) — this
+ * saves via PUT /me/student-profile, mirroring how the backend keeps the
+ * two write paths apart. What's actually shown to a hiring partner, and how
+ * completion drives Talent Pool search ranking, lives in
+ * CompanyTalentPoolController on the backend.
+ */
+function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (msg: string) => void }) {
+  const { login } = useAuth();
+  const [bio, setBio] = useState(user.bio ?? "");
+  const [linkedinUrl, setLinkedinUrl] = useState(user.linkedin_url ?? "");
+  const [githubUrl, setGithubUrl] = useState(user.github_url ?? "");
+  const [skills, setSkills] = useState<string[]>(user.skills ?? []);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [resumeUploading, setResumeUploading] = useState(false);
+  const [downloadingResume, setDownloadingResume] = useState(false);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await api.put<{ user: AuthUser }>("/me/student-profile", {
+        bio: bio.trim() || null,
+        linkedin_url: linkedinUrl.trim() || null,
+        github_url: githubUrl.trim() || null,
+        skills,
+      });
+      const token = getToken();
+      if (token) login(token, res.user);
+      onToast("Recruiter profile saved.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to save your recruiter profile.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleResumeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setResumeUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("resume", file);
+      const res = await api.postFormData<{ user: AuthUser }>("/me/resume", formData);
+      const token = getToken();
+      if (token) login(token, res.user);
+      onToast("Resume uploaded.");
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : "Failed to upload your resume — make sure it's a PDF under 5MB.");
+    } finally {
+      setResumeUploading(false);
+      if (resumeInputRef.current) resumeInputRef.current.value = "";
+    }
+  };
+
+  const handleResumeRemove = async () => {
+    setResumeUploading(true);
+    try {
+      const res = await api.delete<{ user: AuthUser }>("/me/resume");
+      const token = getToken();
+      if (token) login(token, res.user);
+      onToast("Resume removed.");
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : "Failed to remove your resume.");
+    } finally {
+      setResumeUploading(false);
+    }
+  };
+
+  const handleResumeDownload = async () => {
+    setDownloadingResume(true);
+    try {
+      const blob = await api.getFile("/me/resume");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "resume.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      onToast("Failed to download your resume.");
+    } finally {
+      setDownloadingResume(false);
+    }
+  };
+
+  return (
+    <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5">
+      <div>
+        <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent-primary" />
+          Recruiter Profile
+        </h3>
+        <p className="text-xs text-text-muted mt-0.5">
+          What hiring partners see when they search the Talent Pool — the more complete, the higher you rank.
+        </p>
+      </div>
+
+      <ProfileCompletionBar user={user} />
+
+      <Field label="About You" hint="A couple of sentences on what you're looking for and what you're good at.">
+        <textarea
+          rows={3}
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          maxLength={500}
+          placeholder="e.g. Final-year CS student focused on backend systems, looking for SDE roles..."
+          className={cn(inputClass, "px-3 resize-none")}
+        />
+      </Field>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label="LinkedIn URL" icon={Linkedin}>
+          <input
+            type="url"
+            value={linkedinUrl}
+            onChange={(e) => setLinkedinUrl(e.target.value)}
+            placeholder="https://linkedin.com/in/..."
+            className={cn(inputClass, "pl-9 pr-3")}
+          />
+        </Field>
+        <Field label="GitHub URL" icon={Github}>
+          <input
+            type="url"
+            value={githubUrl}
+            onChange={(e) => setGithubUrl(e.target.value)}
+            placeholder="https://github.com/..."
+            className={cn(inputClass, "pl-9 pr-3")}
+          />
+        </Field>
+      </div>
+
+      <Field label="Skills" hint="Recruiters search by these — add the technologies and tools you actually know.">
+        <SkillsTagInput value={skills} onChange={setSkills} />
+      </Field>
+
+      {error && <p className="text-[11px] text-status-danger">{error}</p>}
+
+      <div className="flex justify-end pt-2 border-t border-border-subtle">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2 disabled:opacity-60"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <span>{saving ? "Saving..." : "Save Changes"}</span>
+        </button>
+      </div>
+
+      <div className="pt-4 border-t border-border-subtle">
+        <h4 className="text-xs font-bold text-primary mb-2 flex items-center gap-1.5">
+          <FileText className="w-3.5 h-3.5" />
+          Resume
+        </h4>
+        {user.has_resume ? (
+          <div className="flex items-center justify-between gap-3 p-3 rounded-control bg-elevated/60 border border-border-subtle">
+            <div className="flex items-center gap-2 min-w-0">
+              <FileText className="w-4 h-4 text-accent-primary shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs font-semibold text-primary truncate">Resume on file</div>
+                {user.resume_uploaded_at && (
+                  <div className="text-[10px] text-text-muted">
+                    Uploaded{" "}
+                    {new Date(user.resume_uploaded_at).toLocaleDateString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleResumeDownload}
+                disabled={downloadingResume}
+                title="Download"
+                className="p-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                {downloadingResume ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={() => resumeInputRef.current?.click()}
+                disabled={resumeUploading}
+                title="Replace"
+                className="p-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleResumeRemove}
+                disabled={resumeUploading}
+                title="Remove"
+                className="p-2 rounded-control bg-elevated hover:bg-status-danger/10 border border-border-subtle hover:border-status-danger/30 text-text-muted hover:text-status-danger transition-colors disabled:opacity-50"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => resumeInputRef.current?.click()}
+            disabled={resumeUploading}
+            className="w-full p-4 rounded-control border-2 border-dashed border-border-subtle hover:border-accent-primary/50 text-center transition-colors disabled:opacity-50"
+          >
+            {resumeUploading ? (
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-text-muted" />
+            ) : (
+              <>
+                <Upload className="w-5 h-5 mx-auto text-text-muted mb-1.5" />
+                <span className="text-xs font-semibold text-text-secondary">Upload your resume (PDF, max 5MB)</span>
+              </>
+            )}
+          </button>
+        )}
+        <input ref={resumeInputRef} type="file" accept="application/pdf" onChange={handleResumeUpload} className="hidden" />
+      </div>
+    </section>
+  );
+}
+
+interface ApiSession {
+  id: number;
+  name: string;
+  created_at: string;
+  last_used_at: string | null;
+  is_current: boolean;
+}
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
 export default function SettingsPage() {
   const { user, status } = useAuthGuard();
+  const { login } = useAuth();
   const [tab, setTab] = useState<TabId>("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
-  // Profile fields — seeded from the real session, stats stay mocked.
+  // Profile fields — seeded from the real session and persisted for real via
+  // PUT /me/profile. College/roll number/branch/CGPA/backlogs are the
+  // placement cell's source of truth (set through roster import) and are
+  // shown read-only rather than editable here.
   const [name, setName] = useState("");
   const [handle, setHandle] = useState("");
-  const [institution, setInstitution] = useState("");
-  const [branch, setBranch] = useState(STUDENT_PROFILE.branch);
-  const [gradYear, setGradYear] = useState(String(STUDENT_PROFILE.graduationYear));
-  const [bio, setBio] = useState("Candidate Master chasing a 2100 rating before placement season.");
+  const [phone, setPhone] = useState("");
   const [initialised, setInitialised] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Phone verification — independent of the Save Changes flow above.
+  // Verifying an SMS OTP IS the save for `phone` specifically (see
+  // PhoneVerificationController on the backend, which always writes the
+  // phone number from inside the verified Firebase ID token, never from a
+  // client-submitted string), so there's no separate "save" step here.
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpValue, setOtpValue] = useState("");
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [phoneVerifyError, setPhoneVerifyError] = useState<string | null>(null);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+  const RECAPTCHA_CONTAINER_ID = "phone-verify-recaptcha";
+
+  // Profile photo — real upload via POST /me/avatar, shared by every role.
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Preferences
   const [defaultLanguage, setDefaultLanguage] = useState("C++20");
@@ -130,26 +395,59 @@ export default function SettingsPage() {
     productUpdates: false,
   });
 
-  // Security
-  const [twoFactor, setTwoFactor] = useState(false);
+  // Security — password change is real (PUT /me/password); sessions are the
+  // caller's actual Sanctum tokens, not a hardcoded device list.
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [sessions, setSessions] = useState<ApiSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (status !== "ready") return;
+    api
+      .get<{ sessions: ApiSession[] }>("/me/sessions")
+      .then((res) => setSessions(res.sessions))
+      .catch(() => setSessions([]))
+      .finally(() => setSessionsLoading(false));
+  }, [status]);
+
+  // Billing — every student and TPO has a plan (see SubscriptionController);
+  // Mellow staff don't, so this is simply never fetched/shown for them.
+  const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
+  const [coverageLoading, setCoverageLoading] = useState(true);
+  const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
+
+  useEffect(() => {
+    if (status !== "ready" || (user?.role !== "user" && user?.role !== "admin_tpo")) {
+      setCoverageLoading(false);
+      return;
+    }
+    api
+      .get<MySubscriptionResponse>("/me/subscription")
+      .then((res) => {
+        setCoverage(res.coverage);
+        setEntitlements(res.entitlements);
+      })
+      .catch(() => setCoverage(null))
+      .finally(() => setCoverageLoading(false));
+  }, [status, user]);
+
+  // Seed the editable fields from the authenticated user once.
+  if (status === "ready" && user && !initialised) {
+    setName(user.name);
+    setHandle(user.handle ?? "");
+    setPhone(user.phone ?? "");
+    setInitialised(true);
+  }
 
   if (status !== "ready" || !user) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center text-xs text-text-muted">
-        Verifying your session...
-      </div>
+      <SessionLoader />
     );
-  }
-
-  // Seed the editable fields from the authenticated user once.
-  if (!initialised) {
-    setName(user.name);
-    setHandle(user.handle ?? "");
-    setInstitution(user.college?.name ?? "");
-    setInitialised(true);
   }
 
   const triggerToast = (msg: string) => {
@@ -157,31 +455,174 @@ export default function SettingsPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleSave = (section: string) => {
-    setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      triggerToast(`${section} saved successfully.`);
-    }, 650);
+  const handleProfileSave = async () => {
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      const res = await api.put<{ user: AuthUser }>("/me/profile", {
+        name,
+        handle: handle || null,
+        phone: phone || null,
+      });
+      const token = getToken();
+      if (token) login(token, res.user);
+      triggerToast("Profile saved successfully.");
+    } catch (err) {
+      setProfileError(err instanceof ApiError ? err.message : "Failed to save your profile.");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
-  const handlePasswordSave = () => {
+  /** Strips everything but digits and keeps the last 10 — tolerates "+91", spaces, or a leading 0 already typed in. */
+  const toE164IndianNumber = (raw: string): string | null => {
+    const digits = raw.replace(/\D/g, "").slice(-10);
+    return digits.length === 10 ? `+91${digits}` : null;
+  };
+
+  const handleSendPhoneOtp = async () => {
+    setPhoneVerifyError(null);
+
+    if (!isFirebasePhoneAuthConfigured()) {
+      setPhoneVerifyError("Phone verification isn't set up yet — contact support.");
+      return;
+    }
+
+    const e164 = toE164IndianNumber(phone);
+    if (!e164) {
+      setPhoneVerifyError("Enter a valid 10-digit mobile number first.");
+      return;
+    }
+
+    setSendingOtp(true);
+    try {
+      confirmationResultRef.current = await sendPhoneOtp(e164, RECAPTCHA_CONTAINER_ID);
+      setOtpSent(true);
+      setOtpValue("");
+    } catch (err) {
+      setPhoneVerifyError(friendlyFirebaseError(err));
+      resetPhoneRecaptcha();
+    } finally {
+      setSendingOtp(false);
+    }
+  };
+
+  const handleConfirmPhoneOtp = async () => {
+    setPhoneVerifyError(null);
+
+    if (otpValue.trim().length !== 6) {
+      setPhoneVerifyError("Enter the 6-digit code sent to your phone.");
+      return;
+    }
+    if (!confirmationResultRef.current) {
+      setPhoneVerifyError("Please request a new code.");
+      setOtpSent(false);
+      return;
+    }
+
+    setVerifyingOtp(true);
+    try {
+      const idToken = await confirmPhoneOtp(confirmationResultRef.current, otpValue.trim());
+      const res = await api.post<{ user: AuthUser }>("/me/phone/verify", { id_token: idToken });
+
+      const token = getToken();
+      if (token) login(token, res.user);
+      setPhone(res.user.phone ?? "");
+      setOtpSent(false);
+      setOtpValue("");
+      confirmationResultRef.current = null;
+      triggerToast("Phone number verified!");
+    } catch (err) {
+      setPhoneVerifyError(err instanceof ApiError ? err.message : friendlyFirebaseError(err));
+    } finally {
+      setVerifyingOtp(false);
+    }
+  };
+
+  const handleCancelPhoneOtp = () => {
+    setOtpSent(false);
+    setOtpValue("");
+    setPhoneVerifyError(null);
+    confirmationResultRef.current = null;
+    resetPhoneRecaptcha();
+  };
+
+  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await api.postFormData<{ user: AuthUser }>("/me/avatar", formData);
+      const token = getToken();
+      if (token) login(token, res.user);
+      triggerToast("Profile photo updated.");
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to upload your photo.");
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  };
+
+  const handleAvatarRemove = async () => {
+    setAvatarUploading(true);
+    try {
+      const res = await api.delete<{ user: AuthUser }>("/me/avatar");
+      const token = getToken();
+      if (token) login(token, res.user);
+      triggerToast("Profile photo removed.");
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to remove your photo.");
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  const handlePasswordSave = async () => {
+    setPasswordError(null);
     if (!currentPassword || !newPassword) {
-      triggerToast("Enter your current and new password to continue.");
+      setPasswordError("Enter your current and new password to continue.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      triggerToast("New password and confirmation do not match.");
+      setPasswordError("New password and confirmation do not match.");
       return;
     }
     if (newPassword.length < 8) {
-      triggerToast("New password must be at least 8 characters.");
+      setPasswordError("New password must be at least 8 characters.");
       return;
     }
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    triggerToast("Password updated. You'll stay signed in on this device.");
+    setPasswordSaving(true);
+    try {
+      await api.put("/me/password", {
+        current_password: currentPassword,
+        password: newPassword,
+        password_confirmation: confirmPassword,
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      triggerToast("Password updated. You'll stay signed in on this device.");
+    } catch (err) {
+      setPasswordError(err instanceof ApiError ? err.message : "Failed to update your password.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const handleRevokeSession = async (id: number) => {
+    setRevokingId(id);
+    try {
+      await api.delete(`/me/sessions/${id}`);
+      setSessions((prev) => prev.filter((s) => s.id !== id));
+      triggerToast("Session revoked.");
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to revoke that session.");
+    } finally {
+      setRevokingId(null);
+    }
   };
 
   const isStudent = user.role === "user";
@@ -216,16 +657,42 @@ export default function SettingsPage() {
       {/* Identity header */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col sm:flex-row sm:items-center gap-5">
         <div className="relative shrink-0">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent-primary/25 via-accent-secondary/20 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-2xl font-black text-accent-primary">
-            {initials}
-          </div>
+          {user.avatar_url ? (
+            <img
+              src={user.avatar_url}
+              alt={user.name}
+              className="w-20 h-20 rounded-full object-cover border border-accent-primary/30"
+            />
+          ) : (
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent-primary/25 via-accent-secondary/20 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-2xl font-black text-accent-primary">
+              {initials}
+            </div>
+          )}
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleAvatarFileChange}
+            className="hidden"
+          />
           <button
-            onClick={() => triggerToast("Avatar upload is coming soon.")}
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={avatarUploading}
             aria-label="Change avatar"
-            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface border border-border-strong shadow-subtle flex items-center justify-center text-text-muted hover:text-primary transition-colors"
+            className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-surface border border-border-strong shadow-subtle flex items-center justify-center text-text-muted hover:text-primary transition-colors disabled:opacity-50"
           >
-            <Camera className="w-3.5 h-3.5" />
+            {avatarUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Camera className="w-3.5 h-3.5" />}
           </button>
+          {user.avatar_url && !avatarUploading && (
+            <button
+              onClick={handleAvatarRemove}
+              aria-label="Remove photo"
+              title="Remove photo"
+              className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-status-danger text-white flex items-center justify-center hover:bg-status-danger/80 transition-colors"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
@@ -258,13 +725,24 @@ export default function SettingsPage() {
                 Div {getRatingTier(STUDENT_PROFILE.rating).division}
               </div>
             </div>
+            <div className="text-center">
+              <div
+                className={cn(
+                  "text-lg font-black font-mono",
+                  user.profile_completion_percent >= 100 ? "text-status-success" : "text-accent-primary"
+                )}
+              >
+                {user.profile_completion_percent}%
+              </div>
+              <div className="text-[10px] uppercase tracking-wider text-text-muted">Profile</div>
+            </div>
           </div>
         )}
       </section>
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 rounded-btn bg-surface border border-border-subtle shadow-subtle overflow-x-auto">
-        {TABS.map((t) => {
+        {TABS.filter((t) => t.id !== "billing" || isStudent || user.role === "admin_tpo").map((t) => {
           const Icon = t.icon;
           return (
             <button
@@ -286,99 +764,210 @@ export default function SettingsPage() {
 
       {/* ---------------- Profile ---------------- */}
       {tab === "profile" && (
-        <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5">
-          <div>
-            <h3 className="text-sm font-bold text-primary">Personal Information</h3>
-            <p className="text-xs text-text-muted mt-0.5">
-              This is how you appear on leaderboards, contests and placement reports.
-            </p>
-          </div>
+        <div className="space-y-6">
+          <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5">
+            <div>
+              <h3 className="text-sm font-bold text-primary">Personal Information</h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                This is how you appear on leaderboards, contests and placement reports.
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Full Name" icon={User}>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className={cn(inputClass, "pl-9 pr-3")}
-              />
-            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Full Name" icon={User}>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className={cn(inputClass, "pl-9 pr-3")}
+                />
+              </Field>
 
-            <Field label="Handle" icon={AtSign} hint="Shown on leaderboards and contest standings.">
-              <input
-                type="text"
-                value={handle}
-                onChange={(e) => setHandle(e.target.value)}
-                placeholder="your_handle"
-                className={cn(inputClass, "pl-9 pr-3 font-mono")}
-              />
-            </Field>
+              <Field label="Handle" icon={AtSign} hint="Shown on leaderboards and contest standings.">
+                <input
+                  type="text"
+                  value={handle}
+                  onChange={(e) => setHandle(e.target.value)}
+                  placeholder="your_handle"
+                  className={cn(inputClass, "pl-9 pr-3 font-mono")}
+                />
+              </Field>
 
-            <Field label="Email Address" icon={Mail} hint="Contact support to change your registered email.">
-              <input type="email" value={user.email} disabled className={cn(inputClass, "pl-9 pr-3")} />
-            </Field>
+              <Field label="Email Address" icon={Mail} hint="Contact support to change your registered email.">
+                <input type="email" value={user.email} disabled className={cn(inputClass, "pl-9 pr-3")} />
+              </Field>
 
-            <Field label={isStudent ? "College / Institute" : "Institution"} icon={Building2}>
-              <input
-                type="text"
-                value={institution}
-                onChange={(e) => setInstitution(e.target.value)}
-                placeholder="Not linked to an institution"
-                className={cn(inputClass, "pl-9 pr-3")}
-              />
-            </Field>
-
-            {isStudent && (
-              <>
-                <Field label="Branch" icon={GraduationCap}>
+              <div className="sm:col-span-2">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <label className="block text-xs font-semibold text-text-secondary">Phone Number</label>
+                  {user.phone_verified_at && (
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-success/15 text-status-success">
+                      <BadgeCheck className="w-3 h-3" />
+                      Verified
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                   <input
-                    type="text"
-                    value={branch}
-                    onChange={(e) => setBranch(e.target.value)}
+                    type="tel"
+                    value={phone}
+                    disabled={Boolean(user.phone_verified_at)}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="10-digit mobile number"
                     className={cn(inputClass, "pl-9 pr-3")}
                   />
-                </Field>
+                </div>
 
-                <Field label="Graduation Year" icon={Calendar}>
-                  <select
-                    value={gradYear}
-                    onChange={(e) => setGradYear(e.target.value)}
-                    className={cn(inputClass, "pl-9 pr-3")}
-                  >
-                    {["2025", "2026", "2027", "2028"].map((y) => (
-                      <option key={y} value={y}>
-                        Class of {y}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </>
-            )}
-          </div>
+                {user.phone_verified_at ? (
+                  <p className="text-[11px] text-text-muted mt-1.5">
+                    Verified on {new Date(user.phone_verified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Contact support to change it.
+                  </p>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    {!otpSent ? (
+                      <button
+                        type="button"
+                        onClick={handleSendPhoneOtp}
+                        disabled={sendingOtp || !toE164IndianNumber(phone)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {sendingOtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
+                        {sendingOtp ? "Sending code..." : "Verify Number"}
+                      </button>
+                    ) : (
+                      <AnimatePresence>
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-2 flex-wrap"
+                        >
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            maxLength={6}
+                            value={otpValue}
+                            onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ""))}
+                            placeholder="6-digit code"
+                            className="w-32 py-2 px-3 rounded-control bg-elevated border border-border-subtle text-sm text-primary placeholder:text-text-muted outline-none focus:border-accent-primary font-mono tracking-widest"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleConfirmPhoneOtp}
+                            disabled={verifyingOtp || otpValue.length !== 6}
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                          >
+                            {verifyingOtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                            Confirm
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSendPhoneOtp}
+                            disabled={sendingOtp}
+                            className="text-[11px] font-semibold text-accent-primary hover:underline disabled:opacity-50"
+                          >
+                            Resend
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelPhoneOtp}
+                            className="text-[11px] font-semibold text-text-muted hover:text-primary"
+                          >
+                            Cancel
+                          </button>
+                        </motion.div>
+                      </AnimatePresence>
+                    )}
+                    {phoneVerifyError && <p className="text-[11px] text-status-danger">{phoneVerifyError}</p>}
+                    {/* Firebase's invisible reCAPTCHA attaches here — must exist before Verify Number is clicked, so it's always rendered, just visually empty. */}
+                    <div id={RECAPTCHA_CONTAINER_ID} />
+                  </div>
+                )}
+              </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-text-secondary mb-1.5">Bio</label>
-            <textarea
-              rows={3}
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              maxLength={180}
-              className={cn(inputClass, "px-3 resize-none")}
-            />
-            <p className="text-[11px] text-text-muted mt-1.5">{bio.length}/180 characters</p>
-          </div>
+              <Field
+                label={isStudent ? "College / Institute" : "Institution"}
+                icon={Building2}
+                hint="Set by Mellow's onboarding team — contact support to correct it."
+              >
+                <input
+                  type="text"
+                  value={user.college?.name ?? "Not linked to an institution"}
+                  disabled
+                  className={cn(inputClass, "pl-9 pr-3")}
+                />
+              </Field>
+            </div>
 
-          <div className="flex justify-end pt-2 border-t border-border-subtle">
-            <button
-              onClick={() => handleSave("Profile")}
-              disabled={saving}
-              className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2 disabled:opacity-60"
-            >
-              <Save className="w-4 h-4" />
-              <span>{saving ? "Saving..." : "Save Changes"}</span>
-            </button>
-          </div>
-        </section>
+            {profileError && <p className="text-[11px] text-status-danger">{profileError}</p>}
+
+            <div className="flex justify-end pt-2 border-t border-border-subtle">
+              <button
+                onClick={handleProfileSave}
+                disabled={profileSaving}
+                className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2 disabled:opacity-60"
+              >
+                {profileSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                <span>{profileSaving ? "Saving..." : "Save Changes"}</span>
+              </button>
+            </div>
+          </section>
+
+          {isStudent && (
+            <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5">
+              <div>
+                <h3 className="text-sm font-bold text-primary">Academic Profile</h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Set by your placement cell during roster import — used to check your eligibility for mapped drives.
+                  Spot an error? Ask your TPO to correct it.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                    <Hash className="w-3 h-3" />
+                    <span>Roll Number</span>
+                  </div>
+                  <div className="text-sm font-bold text-primary font-mono truncate">{user.roll_number ?? "—"}</div>
+                </div>
+                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                    <GraduationCap className="w-3 h-3" />
+                    <span>Branch</span>
+                  </div>
+                  <div className="text-sm font-bold text-primary truncate">{user.branch ?? "—"}</div>
+                </div>
+                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                    <Award className="w-3 h-3" />
+                    <span>CGPA</span>
+                  </div>
+                  <div className="text-sm font-bold text-primary font-mono">
+                    {user.cgpa !== null ? Number(user.cgpa).toFixed(2) : "—"}
+                  </div>
+                </div>
+                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                    <AlertTriangle className="w-3 h-3" />
+                    <span>Backlogs</span>
+                  </div>
+                  <div className="text-sm font-bold text-primary font-mono">{user.backlogs ?? "—"}</div>
+                </div>
+              </div>
+
+              {user.cgpa === null && user.branch === null && user.backlogs === null && (
+                <p className="text-[11px] text-text-muted">
+                  Your academic profile hasn&apos;t been imported yet — drive eligibility checks will show as
+                  &quot;unknown&quot; until your TPO uploads your roster record.
+                </p>
+              )}
+            </section>
+          )}
+
+          {isStudent && <RecruiterProfileSection user={user} onToast={triggerToast} />}
+        </div>
       )}
 
       {/* ---------------- Security ---------------- */}
@@ -420,13 +1009,16 @@ export default function SettingsPage() {
               </Field>
             </div>
 
+            {passwordError && <p className="text-[11px] text-status-danger">{passwordError}</p>}
+
             <div className="flex justify-end pt-2 border-t border-border-subtle">
               <button
                 onClick={handlePasswordSave}
-                className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2"
+                disabled={passwordSaving}
+                className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2 disabled:opacity-60"
               >
-                <KeyRound className="w-4 h-4" />
-                <span>Update Password</span>
+                {passwordSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                <span>{passwordSaving ? "Updating..." : "Update Password"}</span>
               </button>
             </div>
           </section>
@@ -434,70 +1026,165 @@ export default function SettingsPage() {
           <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
             <div className="flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <h3 className="text-sm font-bold text-primary">Two-Factor Authentication</h3>
+                <h3 className="text-sm font-bold text-primary flex items-center gap-2">
+                  <span>Two-Factor Authentication</span>
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
+                    Coming Soon
+                  </span>
+                </h3>
                 <p className="text-xs text-text-muted mt-0.5">
                   Require a one-time code at sign-in. Strongly recommended before proctored assessments.
                 </p>
               </div>
-              <Toggle
-                checked={twoFactor}
-                label="Two-factor authentication"
-                onChange={(v) => {
-                  setTwoFactor(v);
-                  triggerToast(v ? "Two-factor authentication enabled." : "Two-factor authentication disabled.");
-                }}
-              />
+              <Toggle checked={false} label="Two-factor authentication (coming soon)" onChange={() => triggerToast("Two-factor authentication isn't available yet.")} />
             </div>
           </section>
 
           <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-4">
             <div>
               <h3 className="text-sm font-bold text-primary">Active Sessions</h3>
-              <p className="text-xs text-text-muted mt-0.5">Devices currently signed in to your account.</p>
+              <p className="text-xs text-text-muted mt-0.5">Access tokens currently signed in to your account.</p>
             </div>
 
-            {[
-              { device: "Chrome · Windows 11", location: "Bengaluru, IN", last: "Active now", current: true, icon: Monitor },
-              { device: "Safari · iPhone 15", location: "Bengaluru, IN", last: "2 days ago", current: false, icon: Smartphone },
-            ].map((session) => {
-              const Icon = session.icon;
-              return (
+            {sessionsLoading ? (
+              <div className="p-4 flex items-center justify-center gap-2 text-xs text-text-muted">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Loading sessions...
+              </div>
+            ) : sessions.length === 0 ? (
+              <p className="text-xs text-text-muted">No active sessions found.</p>
+            ) : (
+              sessions.map((session) => (
                 <div
-                  key={session.device}
+                  key={session.id}
                   className="p-3.5 rounded-control bg-elevated/60 border border-border-subtle flex items-center justify-between gap-4"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-control bg-surface border border-border-subtle flex items-center justify-center text-text-secondary shrink-0">
-                      <Icon className="w-4 h-4" />
+                      <Monitor className="w-4 h-4" />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-primary flex items-center gap-2">
-                        <span className="truncate">{session.device}</span>
-                        {session.current && (
+                        <span className="truncate">Signed in {formatDateTime(session.created_at)}</span>
+                        {session.is_current && (
                           <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-status-success/15 text-status-success border border-status-success/30 shrink-0">
                             This device
                           </span>
                         )}
                       </div>
                       <div className="text-[11px] text-text-muted">
-                        {session.location} · {session.last}
+                        {session.last_used_at ? `Last active ${formatDateTime(session.last_used_at)}` : "Never used"}
                       </div>
                     </div>
                   </div>
-                  {!session.current && (
+                  {!session.is_current && (
                     <button
-                      onClick={() => triggerToast(`Signed out of ${session.device}.`)}
-                      className="px-3 py-1.5 rounded-control border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-status-danger hover:border-status-danger/40 transition-colors flex items-center gap-1.5 shrink-0"
+                      onClick={() => handleRevokeSession(session.id)}
+                      disabled={revokingId === session.id}
+                      className="px-3 py-1.5 rounded-control border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-status-danger hover:border-status-danger/40 transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50"
                     >
-                      <LogOut className="w-3.5 h-3.5" />
+                      {revokingId === session.id ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <LogOut className="w-3.5 h-3.5" />
+                      )}
                       <span>Revoke</span>
                     </button>
                   )}
                 </div>
-              );
-            })}
+              ))
+            )}
           </section>
         </div>
+      )}
+
+      {/* ---------------- Billing ---------------- */}
+      {tab === "billing" && (
+        <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5">
+          <div>
+            <h3 className="text-sm font-bold text-primary">Your Plan</h3>
+            <p className="text-xs text-text-muted mt-0.5">
+              {isStudent
+                ? "What your account currently has access to."
+                : "Your college's current plan with Mellow — this covers every student at your institution."}
+            </p>
+          </div>
+
+          {coverageLoading ? (
+            <div className="p-4 flex items-center justify-center gap-2 text-xs text-text-muted">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading your plan...
+            </div>
+          ) : !coverage || coverage.source === "none" ? (
+            <div className="p-4 rounded-control bg-elevated/60 border border-border-subtle text-xs text-text-muted">
+              {isStudent
+                ? "No active plan found on your account."
+                : "Your college doesn't have an active plan yet — contact Mellow to get started."}
+            </div>
+          ) : (
+            <div className="p-4 sm:p-5 rounded-control bg-elevated/60 border border-border-subtle flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+              <div className="w-11 h-11 rounded-control bg-accent-primary/15 border border-accent-primary/30 text-accent-primary flex items-center justify-center shrink-0">
+                <BadgeCheck className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-base font-bold text-primary">{coverage.plan?.name}</span>
+                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-elevated text-text-muted border border-border-subtle">
+                    {coverage.source === "institution" ? `Via ${user.college?.name ?? "your college"}` : "Personal plan"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs text-text-muted mt-1.5">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {coverage.days_remaining === null ? (
+                    <span>Never expires</span>
+                  ) : (
+                    <span>
+                      Expires in <strong className="text-text-secondary font-mono">{coverage.days_remaining}</strong>{" "}
+                      day{coverage.days_remaining === 1 ? "" : "s"}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {isStudent ? (
+                <Link
+                  href="/pricing"
+                  className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow shrink-0 text-center"
+                >
+                  Change Plan
+                </Link>
+              ) : (
+                <span className="text-[11px] text-text-muted shrink-0 max-w-[220px] text-right">
+                  Only Mellow staff can change your institution&apos;s plan — contact support to upgrade or renew.
+                </span>
+              )}
+            </div>
+          )}
+
+          {isStudent && !coverageLoading && entitlements && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-primary">Today&apos;s Usage</h4>
+              <UsageLimitBanner
+                label="practice problems"
+                used={entitlements.practice_problems_used_today}
+                max={entitlements.max_practice_problems_per_day}
+              />
+              <UsageLimitBanner
+                label="mock interviews"
+                used={entitlements.mock_interviews_used_today}
+                max={entitlements.max_mock_interviews_per_day}
+              />
+              {!entitlements.drive_access && (
+                <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
+                  <span className="text-[11px] text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
+                  <Link href="/pricing" className="text-[10.5px] font-bold text-accent-primary hover:underline shrink-0">
+                    Upgrade →
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
       )}
 
       {/* ---------------- Preferences ---------------- */}
@@ -552,14 +1239,18 @@ export default function SettingsPage() {
             </Field>
           </div>
 
+          <p className="text-[11px] text-text-muted">
+            These apply to the in-browser code editor, which is launching alongside proctored assessments — saved
+            locally on this device for now.
+          </p>
+
           <div className="flex justify-end pt-2 border-t border-border-subtle">
             <button
-              onClick={() => handleSave("Preferences")}
-              disabled={saving}
-              className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2 disabled:opacity-60"
+              onClick={() => triggerToast("Preferences saved on this device.")}
+              className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              <span>{saving ? "Saving..." : "Save Preferences"}</span>
+              <span>Save Preferences</span>
             </button>
           </div>
         </section>
@@ -569,8 +1260,16 @@ export default function SettingsPage() {
       {tab === "notifications" && (
         <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-1">
           <div className="mb-4">
-            <h3 className="text-sm font-bold text-primary">Notification Preferences</h3>
-            <p className="text-xs text-text-muted mt-0.5">Choose what reaches your inbox. Critical assessment alerts are always sent.</p>
+            <h3 className="text-sm font-bold text-primary">
+              Notification Preferences{" "}
+              <span className="align-middle px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
+                Early Access
+              </span>
+            </h3>
+            <p className="text-xs text-text-muted mt-0.5">
+              These preferences are saved for when email/in-app alerting ships — today, the only email you&apos;ll get
+              from us is your account credentials.
+            </p>
           </div>
 
           {[

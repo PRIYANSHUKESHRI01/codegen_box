@@ -9,7 +9,7 @@ interface MobileNavProps {
 
 export function MobileNav({ onToggleMenu }: MobileNavProps) {
   return (
-    <div className="flex lg:hidden items-center gap-2">
+    <div className="flex xl:hidden items-center gap-2">
       <ThemeToggle />
       <button
         type="button"

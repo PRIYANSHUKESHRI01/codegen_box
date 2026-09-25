@@ -9,6 +9,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Time-of-day greeting, shared across every role's dashboard header so a
+ * personalized welcome ("Good evening, Dr. Sharma") is used consistently
+ * instead of each page restating its own portal name as the page heading.
+ */
+export function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
+
+/**
  * Filter problems array based on search term, difficulty filter, and optional tag.
  */
 export function filterProblems<T extends { title: string; difficulty: string; tags: string[]; description?: string }>(

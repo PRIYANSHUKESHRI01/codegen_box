@@ -2,10 +2,22 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { RatingPoint } from "@/data/studentAnalytics";
+
+/** A point on the rating chart — contest/date/rating/change are always
+ * real; rank/solved/total are optional so this can render either a real
+ * contest's rating-history point or a lighter-weight series. */
+export interface RatingChartPoint {
+  contest: string;
+  date: string;
+  rating: number;
+  change: number;
+  rank?: number;
+  solved?: number;
+  total?: number;
+}
 
 interface RatingChartProps {
-  data: RatingPoint[];
+  data: RatingChartPoint[];
   height?: number;
   showAxis?: boolean;
 }
@@ -179,9 +191,12 @@ export function RatingChart({ data, height = 260, showAxis = true }: RatingChart
                   {active.change}
                 </span>
               </div>
-              <div className="text-text-muted text-[11px] mt-0.5">
-                Rank #{active.rank.toLocaleString()} • {active.solved}/{active.total} solved
-              </div>
+              {active.rank !== undefined && (
+                <div className="text-text-muted text-[11px] mt-0.5">
+                  Rank #{active.rank.toLocaleString()}
+                  {active.solved !== undefined && active.total !== undefined && ` • ${active.solved}/${active.total} solved`}
+                </div>
+              )}
             </div>
           </div>
           );

@@ -1,31 +1,4 @@
-// Comprehensive mock data store for CodeForge dashboards
-
-export interface SuperAdminStats {
-  totalUsers: number;
-  usersGrowth: string;
-  partnerColleges: number;
-  collegesGrowth: string;
-  activeContests: number;
-  submissionsToday: number;
-  submissionsGrowth: string;
-  monthlyRevenue: string;
-  revenueGrowth: string;
-  systemHealth: number; // percentage
-  judgeUptime: string;
-}
-
-export interface JudgeNode {
-  id: string;
-  name: string;
-  region: string;
-  provider: "AWS" | "GCP" | "BareMetal";
-  cpuUsage: number;
-  memoryUsage: number;
-  activeJobs: number;
-  maxJobs: number;
-  status: "healthy" | "busy" | "degraded";
-  latencyMs: number;
-}
+// Comprehensive mock data store for CodeGen Box dashboards
 
 export interface PartnerCollege {
   id: string;
@@ -39,78 +12,6 @@ export interface PartnerCollege {
   placementRate: number;
   status: "Active" | "Pending" | "Suspended";
   joinedDate: string;
-}
-
-export interface UserManagementRecord {
-  id: string;
-  name: string;
-  handle: string;
-  email: string;
-  role: "superadmin" | "admin_internal" | "admin_tpo" | "user";
-  roleLabel: string;
-  institution: string;
-  status: "Active" | "Blocked" | "Pending Verification";
-  rating: number;
-  submissionsCount: number;
-  joinedDate: string;
-  lastActive: string;
-}
-
-export interface AuditLogEntry {
-  id: string;
-  actor: string;
-  actorRole: string;
-  action: string;
-  target: string;
-  ipAddress: string;
-  timestamp: string;
-  severity: "info" | "warning" | "critical";
-}
-
-export interface FeatureFlag {
-  id: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-  category: "Judge System" | "Anti-Cheat" | "Campus Recruitment" | "UI & Beta";
-}
-
-// -------------------------------------------------------------
-// Mellow Internal Employee Data
-// -------------------------------------------------------------
-export interface CuratedProblem {
-  id: string;
-  title: string;
-  slug: string;
-  difficulty: "Easy" | "Medium" | "Hard";
-  tags: string[];
-  status: "Published" | "In Review" | "Draft" | "Needs Testcases";
-  author: string;
-  submissions: number;
-  acceptanceRate: string;
-  lastUpdated: string;
-}
-
-export interface PlagiarismFlag {
-  id: string;
-  contestName: string;
-  problemTitle: string;
-  similarityScore: number;
-  userA: { name: string; handle: string; college: string; codeSnippet: string };
-  userB: { name: string; handle: string; college: string; codeSnippet: string };
-  timestamp: string;
-  status: "Flagged" | "Disqualified" | "Exonerated" | "Under Review";
-}
-
-export interface SupportTicket {
-  id: string;
-  studentName: string;
-  studentHandle: string;
-  type: "Judge Timeout" | "Wrong Testcase" | "Rating Discrepancy" | "Campus Drive Issue";
-  priority: "Low" | "Medium" | "High" | "Urgent";
-  subject: string;
-  status: "Open" | "In Progress" | "Resolved";
-  timeAgo: string;
 }
 
 // -------------------------------------------------------------
@@ -226,121 +127,19 @@ export interface StudentAssessment {
 // ACTUAL MOCK DATASETS
 // =============================================================
 
-export const SUPERADMIN_STATS: SuperAdminStats = {
-  totalUsers: 148920,
-  usersGrowth: "+18.4%",
-  partnerColleges: 94,
-  collegesGrowth: "+12 this quarter",
-  activeContests: 6,
-  submissionsToday: 54310,
-  submissionsGrowth: "+24.2%",
-  monthlyRevenue: "$68,450",
-  revenueGrowth: "+15.8% MoM",
-  systemHealth: 99.98,
-  judgeUptime: "99.99%",
-};
-
-export const JUDGE_NODES: JudgeNode[] = [
-  { id: "node-us-east-1", name: "Cluster-Alpha-US1", region: "N. Virginia (AWS)", provider: "AWS", cpuUsage: 48, memoryUsage: 62, activeJobs: 142, maxJobs: 250, status: "healthy", latencyMs: 28 },
-  { id: "node-ap-south-1", name: "Cluster-Bravo-IN1", region: "Mumbai (AWS)", provider: "AWS", cpuUsage: 82, memoryUsage: 79, activeJobs: 238, maxJobs: 250, status: "busy", latencyMs: 14 },
-  { id: "node-eu-west-1", name: "Cluster-Charlie-EU1", region: "Frankfurt (GCP)", provider: "GCP", cpuUsage: 35, memoryUsage: 45, activeJobs: 88, maxJobs: 250, status: "healthy", latencyMs: 34 },
-  { id: "node-ap-southeast-1", name: "Cluster-Delta-SG1", region: "Singapore (BareMetal)", provider: "BareMetal", cpuUsage: 64, memoryUsage: 71, activeJobs: 160, maxJobs: 250, status: "healthy", latencyMs: 22 },
-];
-
-export const PARTNER_COLLEGES: PartnerCollege[] = [
-  { id: "col-1", name: "Indian Institute of Technology, Bombay", shortCode: "IIT-B", logo: "🏛️", tpoName: "Dr. Vikram Seth", tpoEmail: "vikram.seth@iitb.ac.in", activeStudents: 2840, tier: "Academic Enterprise", placementRate: 94.2, status: "Active", joinedDate: "Jan 2024" },
-  { id: "col-2", name: "Birla Institute of Technology and Science, Pilani", shortCode: "BITS", logo: "🎓", tpoName: "Prof. Ananya Roy", tpoEmail: "tpo@pilani.bits.edu", activeStudents: 2190, tier: "Academic Enterprise", placementRate: 91.8, status: "Active", joinedDate: "Mar 2024" },
-  { id: "col-3", name: "National Institute of Technology, Trichy", shortCode: "NITT", logo: "🏛️", tpoName: "Dr. K. Ramanathan", tpoEmail: "placement@nitt.edu", activeStudents: 1750, tier: "Pro Campus", placementRate: 88.5, status: "Active", joinedDate: "Jun 2024" },
-  { id: "col-4", name: "Apex Institute of Technology & Research", shortCode: "AITR", logo: "⚡", tpoName: "Dr. Rajeshwar Sharma", tpoEmail: "tpo@apex.edu.in", activeStudents: 1450, tier: "Pro Campus", placementRate: 74.0, status: "Active", joinedDate: "Aug 2024" },
-  { id: "col-5", name: "Stanford School of Engineering", shortCode: "STAN", logo: "🌲", tpoName: "Sarah Jenkins", tpoEmail: "sjenkins@stanford.edu", activeStudents: 980, tier: "Academic Enterprise", placementRate: 98.6, status: "Active", joinedDate: "Nov 2024" },
-  { id: "col-6", name: "Vellore Institute of Technology", shortCode: "VIT", logo: "🏫", tpoName: "Prof. S. Balasubramanian", tpoEmail: "careers@vit.ac.in", activeStudents: 4120, tier: "Academic Enterprise", placementRate: 86.4, status: "Active", joinedDate: "Jan 2025" },
-];
-
-export const USER_MANAGEMENT_RECORDS: UserManagementRecord[] = [
-  { id: "usr-01", name: "Aryan Varma", handle: "aryan_master", email: "aryan@mellow.ai", role: "superadmin", roleLabel: "Super Admin", institution: "Mellow Core Team", status: "Active", rating: 2450, submissionsCount: 1420, joinedDate: "2023-11-01", lastActive: "Just now" },
-  { id: "usr-02", name: "Priya Sundaram", handle: "priya_curator", email: "priya@mellow.ai", role: "admin_internal", roleLabel: "Mellow Staff", institution: "Mellow Problem Editorial", status: "Active", rating: 2180, submissionsCount: 980, joinedDate: "2024-01-15", lastActive: "12m ago" },
-  { id: "usr-03", name: "Dr. Rajeshwar Sharma", handle: "tpo_apex", email: "tpo@apex.edu.in", role: "admin_tpo", roleLabel: "College TPO", institution: "Apex Inst of Tech", status: "Active", rating: 1720, submissionsCount: 240, joinedDate: "2024-08-10", lastActive: "2h ago" },
-  { id: "usr-04", name: "Alex Chen", handle: "alex_coder", email: "alex.chen@student.apex.edu", role: "user", roleLabel: "Candidate Master", institution: "Apex Inst of Tech", status: "Active", rating: 1945, submissionsCount: 680, joinedDate: "2024-08-15", lastActive: "4m ago" },
-  { id: "usr-05", name: "Rohan Kapoor", handle: "rohan_algo", email: "rohan99@gmail.com", role: "user", roleLabel: "Student Coder", institution: "IIT Bombay", status: "Active", rating: 1820, submissionsCount: 420, joinedDate: "2024-03-22", lastActive: "1d ago" },
-  { id: "usr-06", name: "Devansh Patel", handle: "shadow_coder", email: "d.patel@cheatproxy.net", role: "user", roleLabel: "Suspicious", institution: "Independent", status: "Blocked", rating: 1990, submissionsCount: 180, joinedDate: "2025-01-04", lastActive: "3d ago (Banned for Plagiarism)" },
-  { id: "usr-07", name: "Neha Kulkarni", handle: "neha_ops", email: "neha.k@mellow.ai", role: "admin_internal", roleLabel: "Mellow Staff", institution: "Mellow Trust & Safety", status: "Active", rating: 1960, submissionsCount: 512, joinedDate: "2024-04-10", lastActive: "45m ago" },
-];
-
-export const AUDIT_LOGS: AuditLogEntry[] = [
-  { id: "log-101", actor: "Aryan Varma (Superadmin)", actorRole: "superadmin", action: "Suspended Account: shadow_coder for multi-account contest collision", target: "User: usr-06", ipAddress: "142.250.190.46", timestamp: "Today, 18:42", severity: "warning" },
-  { id: "log-102", actor: "System Sandbox Watcher", actorRole: "system", action: "Cluster-Bravo-IN1 auto-scaled 4 supplementary Docker isolation workers", target: "Judge Infrastructure", ipAddress: "10.0.4.12", timestamp: "Today, 17:15", severity: "info" },
-  { id: "log-103", actor: "Priya Sundaram", actorRole: "admin_internal", action: "Published Problem: 'Maximum Flow in Dynamic Railway Network'", target: "Problem Bank #CF-842", ipAddress: "49.37.152.88", timestamp: "Today, 15:30", severity: "info" },
-  { id: "log-104", actor: "Dr. Rajeshwar Sharma", actorRole: "admin_tpo", action: "Scheduled Campus Drive: 'Google SDE-1 Assessment Round'", target: "Apex Inst Batch 2026", ipAddress: "115.112.45.19", timestamp: "Today, 14:02", severity: "info" },
-  { id: "log-105", actor: "Security Sentinel", actorRole: "security", action: "Blocked 1,420 automated scraping requests from AS16509 IP block", target: "Rate Limiter", ipAddress: "52.88.241.10", timestamp: "Today, 11:20", severity: "critical" },
-];
-
-export const FEATURE_FLAGS: FeatureFlag[] = [
-  { id: "ff-1", name: "Sandboxed Memory Limit Strictness (256MB)", description: "Terminates jobs exceeding resident set size immediately without warning grace.", enabled: true, category: "Judge System" },
-  { id: "ff-2", name: "Real-time AI Plagiarism Token Cross-Check", description: "Performs AST vector embedding similarity across concurrent submissions during rated contests.", enabled: true, category: "Anti-Cheat" },
-  { id: "ff-3", name: "Campus TPO Proctoring Telemetry (Webcam & Tab switch)", description: "Captures focus loss and proctor events during scheduled college recruitment drives.", enabled: true, category: "Campus Recruitment" },
-  { id: "ff-4", name: "AI Editorial Assistant in Beta", description: "Generates step-by-step algorithmic hints when student fails 3 consecutive testcases.", enabled: false, category: "UI & Beta" },
-  { id: "ff-5", name: "Maintenance Mode (ReadOnly Judge)", description: "Locks code submission queue for planned database migrations.", enabled: false, category: "Judge System" },
-];
-
-// -------------------------------------------------------------
-// Mellow Internal Mock Data
-// -------------------------------------------------------------
-export const CURATED_PROBLEMS: CuratedProblem[] = [
-  { id: "prb-01", title: "Median of Two Distributed Streams", slug: "median-distributed-streams", difficulty: "Hard", tags: ["Binary Search", "Divide and Conquer"], status: "Published", author: "Priya Sundaram", submissions: 3410, acceptanceRate: "28.4%", lastUpdated: "Yesterday" },
-  { id: "prb-02", title: "Valid Route in Constrained Grid", slug: "valid-route-constrained-grid", difficulty: "Medium", tags: ["BFS", "Shortest Path", "Bitmask"], status: "Published", author: "Aryan Varma", submissions: 8940, acceptanceRate: "44.1%", lastUpdated: "2 days ago" },
-  { id: "prb-03", title: "Dynamic Tree Diameter with Edge Updates", slug: "dynamic-tree-diameter", difficulty: "Hard", tags: ["Heavy-Light Decomposition", "Segment Tree"], status: "In Review", author: "Neha Kulkarni", submissions: 0, acceptanceRate: "—", lastUpdated: "3 hours ago" },
-  { id: "prb-04", title: "Lexicographically Smallest Subsequence", slug: "lexicographical-subsequence", difficulty: "Medium", tags: ["Monotonic Stack", "Greedy"], status: "Needs Testcases", author: "Priya Sundaram", submissions: 0, acceptanceRate: "—", lastUpdated: "5 hours ago" },
-  { id: "prb-05", title: "Two Sum: Prefix XOR Variation", slug: "prefix-xor-variation", difficulty: "Easy", tags: ["Hash Table", "Bit Manipulation"], status: "Published", author: "Aryan Varma", submissions: 18450, acceptanceRate: "62.8%", lastUpdated: "3 days ago" },
-];
-
-export const PLAGIARISM_FLAGS: PlagiarismFlag[] = [
-  {
-    id: "plg-401",
-    contestName: "CodeForge Weekly Challenge #24",
-    problemTitle: "Dynamic Tree Diameter with Edge Updates",
-    similarityScore: 96.4,
-    userA: {
-      name: "Rohit Verma",
-      handle: "rohit_v_99",
-      college: "Apex Institute of Tech",
-      codeSnippet: `vector<int> adj[MAXN];\nvoid dfs(int u, int p, int d) {\n  dist[u] = d;\n  for(auto v : adj[u]) if(v != p) dfs(v, u, d+1);\n}`,
-    },
-    userB: {
-      name: "Samir K.",
-      handle: "samir_dev",
-      college: "Apex Institute of Tech",
-      codeSnippet: `vector<int> g[MAXN];\nvoid explore(int node, int par, int depth) {\n  dist[node] = depth;\n  for(auto nxt : g[node]) if(nxt != par) explore(nxt, node, depth+1);\n}`,
-    },
-    timestamp: "18 mins ago",
-    status: "Flagged",
-  },
-  {
-    id: "plg-402",
-    contestName: "Div 2 Bi-Weekly #12",
-    problemTitle: "Valid Route in Constrained Grid",
-    similarityScore: 92.1,
-    userA: {
-      name: "Karan Johar",
-      handle: "karan_algo",
-      college: "NIT Trichy",
-      codeSnippet: `int solve(vector<vector<int>>& grid) {\n  queue<pair<int,int>> q;\n  q.push({0,0});\n  while(!q.empty()) { ... }\n}`,
-    },
-    userB: {
-      name: "Anil R.",
-      handle: "anil_code",
-      college: "Independent",
-      codeSnippet: `int calculate(vector<vector<int>>& g) {\n  queue<pair<int,int>> queue_nodes;\n  queue_nodes.push({0,0});\n  while(!queue_nodes.empty()) { ... }\n}`,
-    },
-    timestamp: "1 hour ago",
-    status: "Under Review",
-  },
-];
-
-export const SUPPORT_TICKETS: SupportTicket[] = [
-  { id: "TCK-882", studentName: "Rohan Kapoor", studentHandle: "rohan_algo", type: "Wrong Testcase", priority: "High", subject: "Problem #CF-842 Testcase 14 has output exceeding 64-bit signed int", status: "In Progress", timeAgo: "22 mins ago" },
-  { id: "TCK-881", studentName: "Divya Nair", studentHandle: "divya_n", type: "Judge Timeout", priority: "Medium", subject: "C++20 submission queued for >45 seconds during contest start", status: "Resolved", timeAgo: "1 hour ago" },
-  { id: "TCK-880", studentName: "Dr. Sharma (TPO)", studentHandle: "tpo_apex", type: "Campus Drive Issue", priority: "Urgent", subject: "Need custom CSV export for students scoring >= 80% on Microsoft Mock Test", status: "Open", timeAgo: "3 hours ago" },
-];
+// SUPERADMIN_STATS, JUDGE_NODES and FEATURE_FLAGS (formerly here), plus
+// PARTNER_COLLEGES/USER_MANAGEMENT_RECORDS/AUDIT_LOGS before them, were
+// removed once the superadmin dashboard was wired to real, DB-backed data —
+// /api/superadmin/overview, /api/superadmin/judge-nodes, and
+// /api/superadmin/feature-flags respectively (2026-09-17).
+//
+// CURATED_PROBLEMS, PLAGIARISM_FLAGS and SUPPORT_TICKETS (formerly here)
+// were removed the same way once the Mellow Ops dashboard was rebuilt on
+// real data (2026-09-18) — see AdminController::overview()/
+// AdminProblemController::index(). Plagiarism detection and a support-ticket
+// system don't exist in this codebase at all yet, so unlike the sections
+// above, nothing replaced these 1:1 — the dashboard just no longer shows a
+// feature that was never real.
 
 // -------------------------------------------------------------
 // College TPO Mock Data (Apex Institute of Technology)
@@ -428,5 +227,5 @@ export const STUDENT_SUBMISSIONS: StudentSubmission[] = [
 export const STUDENT_ASSESSMENTS: StudentAssessment[] = [
   { id: "asm-01", title: "Google SDE-1 On-Campus Placement Test", organizer: "Apex TPO Cell x Google", type: "Campus Drive", scheduledTime: "Tomorrow at 10:00 AM", duration: "90 Mins", totalQuestions: 3, status: "Mandatory", badgeColor: "bg-status-danger/15 text-status-danger border-status-danger/30" },
   { id: "asm-02", title: "Microsoft Coding Assessment Prep Mock", organizer: "Apex Placement Cell", type: "College Mock Test", scheduledTime: "Sunday, 4:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30" },
-  { id: "asm-03", title: "CodeForge Weekly Challenge #25", organizer: "CodeForge Global", type: "Mellow Weekly", scheduledTime: "Saturday, 8:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30" },
+  { id: "asm-03", title: "CodeGen Box Weekly Challenge #25", organizer: "CodeGen Box Global", type: "Mellow Weekly", scheduledTime: "Saturday, 8:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30" },
 ];

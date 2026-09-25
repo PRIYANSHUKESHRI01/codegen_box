@@ -3,31 +3,83 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Code2,
   Lock,
   Mail,
   User,
   Building2,
   GraduationCap,
   Sparkles,
-  ArrowRight,
-  Shield,
-  Key,
   CheckCircle2,
-  Check,
+  AtSign,
+  Calendar,
+  Briefcase,
+  Trophy,
 } from "lucide-react";
-import { ThemeToggle } from "@/components/navigation/ThemeToggle";
+import { AuthChrome } from "@/components/auth/AuthChrome";
+import { FormField, authInputClass } from "@/components/auth/FormField";
+import { AuthSubmitButton } from "@/components/auth/AuthSubmitButton";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { AuthUser, homeRouteForRole, saveSession } from "@/lib/auth";
+import { AuthUser, homeRouteForRole } from "@/lib/auth";
+import { useAuth } from "@/lib/AuthContext";
+import { usePublicStats } from "@/lib/usePublicPlatformData";
 
-type SignupType = "student" | "tpo" | "mellow";
+// Mellow Staff (Ops/Marketing) used to be a third self-signup option here —
+// it never actually worked (submitting it always just showed an error, and
+// its "invite token" field validated nothing). Those accounts are now
+// exclusively superadmin-provisioned, with access superadmin grants
+// per-employee — see MellowStaffPanel.tsx — so there is no self-signup path
+// for them at all, and no reason to advertise one.
+type SignupType = "student" | "tpo";
+
+const ACCOUNT_TYPES: {
+  id: SignupType;
+  emoji: string;
+  title: string;
+  description: string;
+  activeCls: string;
+}[] = [
+  {
+    id: "student",
+    emoji: "💻",
+    title: "Student Coder",
+    description: "Company-specific prep, campus drives, and a real practice arena.",
+    activeCls: "bg-emerald-500/10 border-emerald-500/40 ring-1 ring-emerald-500/40",
+  },
+  {
+    id: "tpo",
+    emoji: "🎓",
+    title: "College TPO",
+    description: "Campus recruitment drives, bulk onboarding & placement reports.",
+    activeCls: "bg-cyan-500/10 border-cyan-500/40 ring-1 ring-cyan-500/40",
+  },
+];
+
+const fieldVariants = {
+  hidden: { opacity: 0, y: 10 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
+};
+
+const staggerContainer = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.05, delayChildren: 0.1 } },
+};
+
+const STRENGTH_META = [
+  { label: "Enter a password", color: "bg-elevated" },
+  { label: "Weak password", color: "bg-status-danger" },
+  { label: "Fair password", color: "bg-status-warning" },
+  { label: "Good password", color: "bg-accent-primary" },
+  { label: "Strong password", color: "bg-status-success" },
+];
 
 export default function SignupPage() {
   const router = useRouter();
+  const { login } = useAuth();
   const [accountType, setAccountType] = useState<SignupType>("student");
+  const publicStats = usePublicStats();
 
   // Form states
   const [name, setName] = useState("");
@@ -37,7 +89,6 @@ export default function SignupPage() {
   const [institution, setInstitution] = useState("");
   const [gradYear, setGradYear] = useState("2026");
   const [designation, setDesignation] = useState("Head of Training & Placement");
-  const [inviteCode, setInviteCode] = useState("");
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +112,7 @@ export default function SignupPage() {
 
     if (accountType !== "student") {
       setError(
-        "College TPO and Mellow Staff accounts are provisioned by an administrator, not self-registered. Ask your Mellow account manager to onboard your institution, or sign in if you've already received credentials."
+        "College TPO accounts are provisioned by an administrator, not self-registered. Ask your Mellow account manager to onboard your institution, or sign in if you've already received credentials."
       );
       return;
     }
@@ -76,9 +127,8 @@ export default function SignupPage() {
         handle,
         password,
         password_confirmation: password,
-        institution,
       });
-      saveSession(token, user);
+      login(token, user);
       router.push(homeRouteForRole(user.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to create your account. Please try again.");
@@ -87,401 +137,341 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-primary flex flex-col justify-between selection:bg-accent-primary/20 selection:text-accent-primary relative overflow-hidden">
-      {/* Background Glows */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-accent-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-accent-secondary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
-
-      {/* Header */}
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 group focus-visible:outline-none">
-          <div className="w-9 h-9 rounded-control bg-accent-primary/15 border border-accent-primary/30 flex items-center justify-center text-accent-primary group-hover:scale-105 transition-transform shadow-subtle">
-            <Code2 className="w-5 h-5" />
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg tracking-tight text-primary leading-none">
-              Code<span className="text-accent-primary">Forge</span>
-            </span>
-            <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase">
-              Arena &bull; Judge
-            </span>
-          </div>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <Link
-            href="/login"
-            className="px-3.5 py-1.5 rounded-btn bg-surface border border-border-subtle hover:border-border-strong text-xs font-semibold text-text-secondary hover:text-primary transition-colors shadow-subtle"
-          >
-            Sign In Instead
-          </Link>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
+    <AuthChrome altLabel="Sign In Instead" altHref="/login">
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+        {/* Left Column: value props (4 cols) */}
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-2xl p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6"
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="hidden lg:flex lg:col-span-4 flex-col justify-between space-y-6 pr-4"
         >
-          {/* Headline */}
-          <div className="text-center space-y-1">
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-primary tracking-tight">
-              Create your CodeForge Account
+          <div className="space-y-4">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Free for Students</span>
+            </span>
+
+            <h1 className="text-3xl font-extrabold tracking-tight text-primary leading-tight">
+              Start Preparing in Minutes.
             </h1>
-            <p className="text-xs text-text-muted">
-              Select your role to configure your dedicated workspace and dashboards.
+
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Create your account to unlock company-specific interview prep, a real practice arena, and
+              a live countdown to every drive your campus maps.
             </p>
           </div>
 
-          {/* 1. Account Type Picker Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Student */}
-            <button
-              type="button"
-              onClick={() => setAccountType("student")}
-              className={cn(
-                "p-4 rounded-panel text-left border transition-all relative flex flex-col justify-between space-y-2",
-                accountType === "student"
-                  ? "bg-emerald-500/10 border-emerald-500/40 shadow-subtle ring-1 ring-emerald-500/40"
-                  : "bg-elevated/60 border-border-subtle hover:border-border-strong hover:bg-surface-hover"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl">💻</span>
-                {accountType === "student" && (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                )}
-              </div>
-              <div>
-                <div className="font-bold text-xs text-primary">Student Coder</div>
-                <div className="text-[11px] text-text-muted leading-tight mt-0.5">
-                  DSA contests, practice, and campus placement tests.
+          <div className="space-y-3">
+            {[
+              { icon: Trophy, text: "Company-specific prep packs, not generic tips" },
+              { icon: Briefcase, text: "See every drive your placement cell opens up" },
+              { icon: GraduationCap, text: "A real coding arena to sharpen before interviews" },
+            ].map((item) => (
+              <div
+                key={item.text}
+                className="flex items-center gap-3 p-3 rounded-control bg-surface/70 backdrop-blur-md border border-border-subtle shadow-subtle hover:border-border-strong hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <div className="w-8 h-8 rounded-control bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary shrink-0">
+                  <item.icon className="w-4 h-4" />
                 </div>
+                <span className="text-xs text-text-secondary">{item.text}</span>
               </div>
-            </button>
-
-            {/* College TPO */}
-            <button
-              type="button"
-              onClick={() => setAccountType("tpo")}
-              className={cn(
-                "p-4 rounded-panel text-left border transition-all relative flex flex-col justify-between space-y-2",
-                accountType === "tpo"
-                  ? "bg-cyan-500/10 border-cyan-500/40 shadow-subtle ring-1 ring-cyan-500/40"
-                  : "bg-elevated/60 border-border-subtle hover:border-border-strong hover:bg-surface-hover"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl">🎓</span>
-                {accountType === "tpo" && (
-                  <CheckCircle2 className="w-4 h-4 text-cyan-400" />
-                )}
-              </div>
-              <div>
-                <div className="font-bold text-xs text-primary">College TPO</div>
-                <div className="text-[11px] text-text-muted leading-tight mt-0.5">
-                  Campus recruitment drives, batch tracker & reports.
-                </div>
-              </div>
-            </button>
-
-            {/* Mellow Staff */}
-            <button
-              type="button"
-              onClick={() => setAccountType("mellow")}
-              className={cn(
-                "p-4 rounded-panel text-left border transition-all relative flex flex-col justify-between space-y-2",
-                accountType === "mellow"
-                  ? "bg-indigo-500/10 border-indigo-500/40 shadow-subtle ring-1 ring-indigo-500/40"
-                  : "bg-elevated/60 border-border-subtle hover:border-border-strong hover:bg-surface-hover"
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xl">🛠️</span>
-                {accountType === "mellow" && (
-                  <CheckCircle2 className="w-4 h-4 text-indigo-400" />
-                )}
-              </div>
-              <div>
-                <div className="font-bold text-xs text-primary">Mellow Staff</div>
-                <div className="text-[11px] text-text-muted leading-tight mt-0.5">
-                  Curate problems, testcases, and contest moderation.
-                </div>
-              </div>
-            </button>
+            ))}
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSignupSubmit} className="space-y-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block font-semibold text-text-secondary mb-1">
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Alex Chen"
-                  className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-text-secondary mb-1">
-                  {accountType === "tpo"
-                    ? "Official College Email *"
-                    : accountType === "mellow"
-                    ? "Mellow Internal Email *"
-                    : "Email Address *"}
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder={
-                    accountType === "tpo"
-                      ? "tpo@institution.edu"
-                      : accountType === "mellow"
-                      ? "name@mellow.ai"
-                      : "alex@example.com"
-                  }
-                  className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                />
-              </div>
-            </div>
-
-            {/* Dynamic Role-specific Fields */}
-            {accountType === "student" && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-text-secondary mb-1">
-                    Coder Handle *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={handle}
-                    onChange={(e) => setHandle(e.target.value)}
-                    placeholder="e.g. alex_coder"
-                    className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary font-mono"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-text-secondary mb-1">
-                    College / Institute *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    placeholder="e.g. Apex Inst of Tech"
-                    className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-text-secondary mb-1">
-                    Graduation Year
-                  </label>
-                  <select
-                    value={gradYear}
-                    onChange={(e) => setGradYear(e.target.value)}
-                    className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                  >
-                    <option value="2025">Class of 2025</option>
-                    <option value="2026">Class of 2026</option>
-                    <option value="2027">Class of 2027</option>
-                    <option value="2028">Class of 2028</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {accountType === "tpo" && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-text-secondary mb-1">
-                    University / College Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    placeholder="e.g. Indian Institute of Tech, Bombay"
-                    className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-text-secondary mb-1">
-                    Official Designation *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={designation}
-                    onChange={(e) => setDesignation(e.target.value)}
-                    placeholder="Head of Corporate Relations / TPO"
-                    className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-                  />
-                </div>
-              </div>
-            )}
-
-            {accountType === "mellow" && (
-              <div>
-                <label className="block font-semibold text-text-secondary mb-1">
-                  Internal Staff Invite Token / Passkey *
-                </label>
-                <div className="relative">
-                  <Key className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                  <input
-                    type="text"
-                    required
-                    value={inviteCode}
-                    onChange={(e) => setInviteCode(e.target.value)}
-                    placeholder="Enter 16-character authorization token"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary font-mono"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* Password with Strength Meter */}
+          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-subtle text-xs">
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">
-                Password *
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a strong password"
-                className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary font-mono"
-              />
-
-              {/* Strength Bars */}
-              {password && (
-                <div className="mt-2 space-y-1">
-                  <div className="flex gap-1 h-1">
-                    <div
-                      className={cn(
-                        "flex-1 rounded-full transition-colors",
-                        strength >= 1 ? "bg-status-danger" : "bg-elevated"
-                      )}
-                    />
-                    <div
-                      className={cn(
-                        "flex-1 rounded-full transition-colors",
-                        strength >= 2 ? "bg-status-warning" : "bg-elevated"
-                      )}
-                    />
-                    <div
-                      className={cn(
-                        "flex-1 rounded-full transition-colors",
-                        strength >= 3 ? "bg-accent-primary" : "bg-elevated"
-                      )}
-                    />
-                    <div
-                      className={cn(
-                        "flex-1 rounded-full transition-colors",
-                        strength >= 4 ? "bg-status-success" : "bg-elevated"
-                      )}
-                    />
-                  </div>
-                  <div className="text-[10px] text-text-muted">
-                    {strength <= 1
-                      ? "Weak password"
-                      : strength === 2
-                      ? "Fair password"
-                      : strength === 3
-                      ? "Good password"
-                      : "Strong password"}
-                  </div>
-                </div>
-              )}
+              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.problems_total : "—"}</strong>
+              <span className="text-[11px] text-text-muted">Practice Problems</span>
             </div>
-
-            {/* Terms Agreement */}
-            <div className="pt-1">
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  required
-                  checked={agreeTerms}
-                  onChange={(e) => setAgreeTerms(e.target.checked)}
-                  className="w-4 h-4 rounded mt-0.5 border-border-subtle text-accent-primary focus:ring-accent-primary"
-                />
-                <span className="text-text-secondary text-xs leading-tight">
-                  I agree to the CodeForge{" "}
-                  <Link href="/#" className="text-accent-primary hover:underline">
-                    Terms of Service
-                  </Link>
-                  ,{" "}
-                  <Link href="/#" className="text-accent-primary hover:underline">
-                    Contest Honor Code
-                  </Link>
-                  , and{" "}
-                  <Link href="/#" className="text-accent-primary hover:underline">
-                    Privacy Policy
-                  </Link>
-                  .
-                </span>
-              </label>
+            <div>
+              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.topics_total : "—"}</strong>
+              <span className="text-[11px] text-text-muted">DSA Topics</span>
             </div>
-
-            {/* Signup Error / Notice Banner */}
-            {error && (
-              <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/30 text-[11px] text-status-danger leading-relaxed">
-                {error}
-              </div>
-            )}
-
-            {/* Submit */}
-            <button
-              type="submit"
-              disabled={loading || !agreeTerms}
-              className="w-full py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-all shadow-subtle hover:shadow-glow flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              {loading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <>
-                  <span>Create Account & Continue</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Already have an account */}
-          <div className="text-center text-xs text-text-muted pt-2 border-t border-border-subtle">
-            Already registered?{" "}
-            <Link href="/login" className="text-accent-primary font-bold hover:underline">
-              Sign in to your dashboard &rarr;
-            </Link>
           </div>
         </motion.div>
-      </main>
 
-      {/* Simple Footer */}
-      <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-text-muted border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>&copy; {new Date().getFullYear()} CodeForge Inc. All rights reserved.</span>
-        <div className="flex items-center gap-4">
-          <Link href="/#" className="hover:text-primary">Terms</Link>
-          <Link href="/#" className="hover:text-primary">Privacy Policy</Link>
-          <Link href="/#" className="hover:text-primary">Contest Rules</Link>
-          <Link href="/#" className="hover:text-primary">Security</Link>
+        {/* Right Column: Signup Card (8 cols) */}
+        <div className="lg:col-span-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="relative w-full max-w-2xl mx-auto"
+          >
+            <div className="absolute -inset-0.5 rounded-panel bg-gradient-to-r from-accent-primary/20 via-indigo-400/10 to-accent-secondary/20 blur-lg opacity-60 pointer-events-none" />
+
+            <div className="relative p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6">
+              {/* Headline */}
+              <div className="text-center space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-primary tracking-tight">
+                  Create your CodeGen Box account
+                </h1>
+                <p className="text-xs text-text-muted">
+                  Select your role to configure your dedicated workspace and dashboards.
+                </p>
+              </div>
+
+              {/* 1. Account Type Picker Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {ACCOUNT_TYPES.map((type) => {
+                  const isActive = accountType === type.id;
+                  return (
+                    <button
+                      key={type.id}
+                      type="button"
+                      onClick={() => setAccountType(type.id)}
+                      className={cn(
+                        "p-4 rounded-panel text-left border transition-all duration-200 relative flex flex-col justify-between space-y-2 hover:-translate-y-0.5",
+                        isActive
+                          ? cn(type.activeCls, "shadow-subtle")
+                          : "bg-elevated/60 border-border-subtle hover:border-border-strong hover:bg-surface-hover"
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xl">{type.emoji}</span>
+                        <AnimatePresence>
+                          {isActive && (
+                            <motion.span
+                              initial={{ scale: 0, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0, opacity: 0 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                      <div>
+                        <div className="font-bold text-xs text-primary">{type.title}</div>
+                        <div className="text-[11px] text-text-muted leading-tight mt-0.5">{type.description}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Form */}
+              <motion.form
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                onSubmit={handleSignupSubmit}
+                className="space-y-4 text-xs"
+              >
+                <motion.div variants={fieldVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FormField label="Full Name *" icon={User}>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Alex Chen"
+                      className={cn(authInputClass, "pl-9 pr-3")}
+                    />
+                  </FormField>
+
+                  <FormField label={accountType === "tpo" ? "Official College Email *" : "Email Address *"} icon={Mail}>
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder={accountType === "tpo" ? "tpo@institution.edu" : "alex@example.com"}
+                      className={cn(authInputClass, "pl-9 pr-3")}
+                    />
+                  </FormField>
+                </motion.div>
+
+                {/* Dynamic Role-specific Fields */}
+                <AnimatePresence mode="wait">
+                  {accountType === "student" && (
+                    <motion.div
+                      key="student-fields"
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-3"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <FormField label="Coder Handle *" icon={AtSign}>
+                          <input
+                            type="text"
+                            required
+                            value={handle}
+                            onChange={(e) => setHandle(e.target.value)}
+                            placeholder="e.g. alex_coder"
+                            className={cn(authInputClass, "pl-9 pr-3 font-mono")}
+                          />
+                        </FormField>
+                        <FormField label="Graduation Year" icon={Calendar}>
+                          <select
+                            value={gradYear}
+                            onChange={(e) => setGradYear(e.target.value)}
+                            className={cn(authInputClass, "pl-9 pr-3")}
+                          >
+                            <option value="2025">Class of 2025</option>
+                            <option value="2026">Class of 2026</option>
+                            <option value="2027">Class of 2027</option>
+                            <option value="2028">Class of 2028</option>
+                          </select>
+                        </FormField>
+                      </div>
+
+                      {/* No college field here on purpose — self-signup can never
+                          attach a real college (only a TPO's roster import or admin
+                          action can), so this path is always a personal/"Mellow
+                          Direct" account. Campus-affiliated students should never
+                          reach this form at all; they get credentials emailed to
+                          them directly once their TPO adds them. */}
+                      <div className="p-3 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted flex items-start gap-2">
+                        <GraduationCap className="w-3.5 h-3.5 text-accent-primary shrink-0 mt-0.5" />
+                        <span>
+                          This creates a personal CodeGen Box account, usable on its own — no college required.
+                          Already part of a partner campus? Your placement cell (TPO) sets up your official login
+                          for you; look out for a welcome email instead of signing up here.
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
+
+                  {accountType === "tpo" && (
+                    <motion.div
+                      key="tpo-fields"
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.2 }}
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-3"
+                    >
+                      <FormField label="University / College Name *" icon={Building2}>
+                        <input
+                          type="text"
+                          required
+                          value={institution}
+                          onChange={(e) => setInstitution(e.target.value)}
+                          placeholder="e.g. Indian Institute of Tech, Bombay"
+                          className={cn(authInputClass, "pl-9 pr-3")}
+                        />
+                      </FormField>
+                      <FormField label="Official Designation *" icon={Briefcase}>
+                        <input
+                          type="text"
+                          required
+                          value={designation}
+                          onChange={(e) => setDesignation(e.target.value)}
+                          placeholder="Head of Corporate Relations / TPO"
+                          className={cn(authInputClass, "pl-9 pr-3")}
+                        />
+                      </FormField>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Password with Strength Meter */}
+                <motion.div variants={fieldVariants}>
+                  <FormField label="Password *" icon={Lock}>
+                    <input
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Create a strong password"
+                      className={cn(authInputClass, "pl-9 pr-3 font-mono")}
+                    />
+                  </FormField>
+
+                  {/* Strength Bar */}
+                  <AnimatePresence>
+                    {password && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-2 space-y-1.5">
+                          <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
+                            <motion.div
+                              className={cn("h-full rounded-full", STRENGTH_META[strength].color)}
+                              initial={false}
+                              animate={{ width: `${(strength / 4) * 100}%` }}
+                              transition={{ duration: 0.3, ease: "easeOut" }}
+                            />
+                          </div>
+                          <div className="text-[10px] text-text-muted">{STRENGTH_META[strength].label}</div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Terms Agreement */}
+                <motion.div variants={fieldVariants} className="pt-1">
+                  <label className="flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      required
+                      checked={agreeTerms}
+                      onChange={(e) => setAgreeTerms(e.target.checked)}
+                      className="w-4 h-4 rounded mt-0.5 border-border-subtle text-accent-primary focus:ring-accent-primary"
+                    />
+                    <span className="text-text-secondary text-xs leading-tight">
+                      I agree to the CodeGen Box{" "}
+                      <Link href="/#" className="text-accent-primary hover:underline">
+                        Terms of Service
+                      </Link>
+                      ,{" "}
+                      <Link href="/#" className="text-accent-primary hover:underline">
+                        Contest Honor Code
+                      </Link>
+                      , and{" "}
+                      <Link href="/#" className="text-accent-primary hover:underline">
+                        Privacy Policy
+                      </Link>
+                      .
+                    </span>
+                  </label>
+                </motion.div>
+
+                {/* Signup Error / Notice Banner */}
+                <AnimatePresence>
+                  {error && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/30 text-[11px] text-status-danger leading-relaxed">
+                        {error}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Submit */}
+                <motion.div variants={fieldVariants}>
+                  <AuthSubmitButton loading={loading} disabled={!agreeTerms}>
+                    Create Account & Continue
+                  </AuthSubmitButton>
+                </motion.div>
+              </motion.form>
+
+              {/* Already have an account */}
+              <div className="text-center text-xs text-text-muted pt-2 border-t border-border-subtle">
+                Already registered?{" "}
+                <Link href="/login" className="text-accent-primary font-bold hover:underline">
+                  Sign in to your dashboard &rarr;
+                </Link>
+              </div>
+            </div>
+          </motion.div>
         </div>
-      </footer>
-    </div>
+      </div>
+    </AuthChrome>
   );
 }

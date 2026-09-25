@@ -1,0 +1,4 @@
+# Secrets and machine-local state for the judge/Redis stacks — never commit.
+.env
+**/.env
+local/.run/

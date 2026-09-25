@@ -1,0 +1,8239 @@
+[
+  {
+    "slug": "running-sum-of-1d-array",
+    "title": "Running Sum of 1d Array",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Prefix Sum"
+    ],
+    "description": "Given an array `nums`, return the running sum where `runningSum[i] = sum(nums[0]..nums[i])`.",
+    "function_name": "runningSum",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 1000",
+      "-10^6 <= nums[i] <= 10^6"
+    ],
+    "hints": [
+      "Keep a running total as you scan left to right, appending it after adding each element."
+    ],
+    "acceptance_rate": 64.5,
+    "total_submissions": 46500,
+    "display_order": 206,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "expected_output": [
+          1,
+          3,
+          6,
+          10
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "expected_output": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            3,
+            1,
+            2,
+            10,
+            1
+          ]
+        },
+        "expected_output": [
+          3,
+          4,
+          6,
+          16,
+          17
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "richest-customer-wealth",
+    "title": "Richest Customer Wealth",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given a 2D array `accounts` where `accounts[i][j]` is customer `i`'s money in bank `j`, return the wealth (sum of accounts) of the richest customer.",
+    "function_name": "maximumWealth",
+    "params": [
+      {
+        "name": "accounts",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= accounts.length, accounts[i].length <= 50",
+      "1 <= accounts[i][j] <= 100"
+    ],
+    "hints": [
+      "Sum each row, then take the maximum of those sums."
+    ],
+    "acceptance_rate": 57.09,
+    "total_submissions": 44876,
+    "display_order": 207,
+    "test_cases": [
+      {
+        "inputs": {
+          "accounts": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              3,
+              2,
+              1
+            ]
+          ]
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "accounts": [
+            [
+              1,
+              5
+            ],
+            [
+              7,
+              3
+            ],
+            [
+              3,
+              5
+            ]
+          ]
+        },
+        "expected_output": 10,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "accounts": [
+            [
+              2,
+              8,
+              7
+            ],
+            [
+              7,
+              1,
+              3
+            ],
+            [
+              1,
+              9,
+              5
+            ]
+          ]
+        },
+        "expected_output": 17,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "kids-with-the-greatest-number-of-candies",
+    "title": "Kids With the Greatest Number of Candies",
+    "difficulty": "easy",
+    "tags": [
+      "Array"
+    ],
+    "description": "Given `candies` where `candies[i]` is the number of candies kid `i` has, and an integer `extraCandies`, return a boolean array where element `i` is `true` if giving kid `i` all `extraCandies` would make them have the greatest number of candies among all kids (ties allowed).",
+    "function_name": "kidsWithCandies",
+    "params": [
+      {
+        "name": "candies",
+        "type": "integer[]"
+      },
+      {
+        "name": "extraCandies",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= candies.length <= 100",
+      "1 <= candies[i] <= 100",
+      "1 <= extraCandies <= 50"
+    ],
+    "hints": [
+      "Find the current maximum, then check for each kid whether candies[i] + extraCandies reaches or beats it."
+    ],
+    "acceptance_rate": 61.03,
+    "total_submissions": 73951,
+    "display_order": 208,
+    "test_cases": [
+      {
+        "inputs": {
+          "candies": [
+            2,
+            3,
+            5,
+            1,
+            3
+          ],
+          "extraCandies": 3
+        },
+        "expected_output": [
+          true,
+          true,
+          true,
+          false,
+          true
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "candies": [
+            4,
+            2,
+            1,
+            1,
+            2
+          ],
+          "extraCandies": 1
+        },
+        "expected_output": [
+          true,
+          false,
+          false,
+          false,
+          false
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "candies": [
+            12,
+            1,
+            12
+          ],
+          "extraCandies": 10
+        },
+        "expected_output": [
+          true,
+          false,
+          true
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "shuffle-the-array",
+    "title": "Shuffle the Array",
+    "difficulty": "easy",
+    "tags": [
+      "Array"
+    ],
+    "description": "Given an array `nums` of `2n` elements in the form `[x1,...,xn,y1,...,yn]`, return the array in the interleaved form `[x1,y1,x2,y2,...,xn,yn]`.",
+    "function_name": "shuffleArray",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      },
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 500",
+      "nums.length == 2n"
+    ],
+    "hints": [
+      "Walk i from 0 to n-1, appending nums[i] then nums[n+i] each step."
+    ],
+    "acceptance_rate": 59.2,
+    "total_submissions": 8701,
+    "display_order": 209,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            2,
+            5,
+            1,
+            3,
+            4,
+            7
+          ],
+          "n": 3
+        },
+        "expected_output": [
+          2,
+          3,
+          5,
+          4,
+          1,
+          7
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4,
+            4,
+            3,
+            2,
+            1
+          ],
+          "n": 4
+        },
+        "expected_output": [
+          1,
+          4,
+          2,
+          3,
+          3,
+          2,
+          4,
+          1
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            1,
+            2,
+            2
+          ],
+          "n": 2
+        },
+        "expected_output": [
+          1,
+          2,
+          1,
+          2
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "xor-operation-in-an-array",
+    "title": "XOR Operation in an Array",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Bit Manipulation",
+      "Math"
+    ],
+    "description": "Given integers `n` and `start`, define `nums[i] = start + 2*i` for `0 <= i < n`. Return the bitwise XOR of all elements of `nums`.",
+    "function_name": "xorOperation",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "start",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 1000",
+      "0 <= start <= 1000"
+    ],
+    "hints": [
+      "Just build the array directly (n is small) and XOR every element together."
+    ],
+    "acceptance_rate": 61.42,
+    "total_submissions": 71008,
+    "display_order": 210,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 5,
+          "start": 0
+        },
+        "expected_output": 8,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 4,
+          "start": 3
+        },
+        "expected_output": 8,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1,
+          "start": 7
+        },
+        "expected_output": 7,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "final-value-of-variable-after-performing-operations",
+    "title": "Final Value of Variable After Performing Operations",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "String",
+      "Simulation"
+    ],
+    "description": "A variable `X` starts at 0. Given an array `operations` of strings, each either `\"++X\"`, `\"X++\"`, `\"--X\"`, or `\"X--\"`, return the final value of `X` after applying every operation in order.",
+    "function_name": "finalValueAfterOperations",
+    "params": [
+      {
+        "name": "operations",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= operations.length <= 100"
+    ],
+    "hints": [
+      "Each operation either contains '+' (increment) or '-' (decrement) — you don't need to check the exact position of X in the string."
+    ],
+    "acceptance_rate": 55.34,
+    "total_submissions": 42184,
+    "display_order": 211,
+    "test_cases": [
+      {
+        "inputs": {
+          "operations": [
+            "--X",
+            "X++",
+            "X++"
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "operations": [
+            "++X",
+            "++X",
+            "X++"
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "operations": [
+            "X++",
+            "++X",
+            "--X",
+            "X--"
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "defanging-an-ip-address",
+    "title": "Defanging an IP Address",
+    "difficulty": "easy",
+    "tags": [
+      "String"
+    ],
+    "description": "Given a valid IPv4 address `address`, return a defanged version of it by replacing every `.` with `[.]`.",
+    "function_name": "defangIPaddr",
+    "params": [
+      {
+        "name": "address",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "The given address is a valid IPv4 address."
+    ],
+    "hints": [
+      "A straightforward string replace of '.' with '[.]'."
+    ],
+    "acceptance_rate": 63.83,
+    "total_submissions": 3577,
+    "display_order": 212,
+    "test_cases": [
+      {
+        "inputs": {
+          "address": "1.1.1.1"
+        },
+        "expected_output": "1[.]1[.]1[.]1",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "address": "255.100.50.0"
+        },
+        "expected_output": "255[.]100[.]50[.]0",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "address": "192.168.1.1"
+        },
+        "expected_output": "192[.]168[.]1[.]1",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "jewels-and-stones",
+    "title": "Jewels and Stones",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Hash Table"
+    ],
+    "description": "Given strings `jewels` (types of stones that are jewels) and `stones` (the stones you have), return how many of your stones are also jewels. Letters are case sensitive.",
+    "function_name": "numJewelsInStones",
+    "params": [
+      {
+        "name": "jewels",
+        "type": "string"
+      },
+      {
+        "name": "stones",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= jewels.length, stones.length <= 50",
+      "jewels and stones consist of English letters."
+    ],
+    "hints": [
+      "Put the jewel characters in a set, then count how many stones are members of that set."
+    ],
+    "acceptance_rate": 60.75,
+    "total_submissions": 5258,
+    "display_order": 213,
+    "test_cases": [
+      {
+        "inputs": {
+          "jewels": "aA",
+          "stones": "aAAbbbb"
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "jewels": "z",
+          "stones": "ZZ"
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "jewels": "abc",
+          "stones": "aabbccdd"
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "number-complement",
+    "title": "Number Complement",
+    "difficulty": "easy",
+    "tags": [
+      "Bit Manipulation"
+    ],
+    "description": "Given a positive integer `num`, return its complement — flip every bit in its binary representation (without leading zeros).",
+    "function_name": "findComplement",
+    "params": [
+      {
+        "name": "num",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= num <= 2^31 - 1"
+    ],
+    "hints": [
+      "Build a mask of all 1s the same bit-length as num, then XOR num with that mask."
+    ],
+    "acceptance_rate": 65.11,
+    "total_submissions": 66026,
+    "display_order": 214,
+    "test_cases": [
+      {
+        "inputs": {
+          "num": 5
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "num": 1
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "num": 8
+        },
+        "expected_output": 7,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "power-of-three",
+    "title": "Power of Three",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Recursion"
+    ],
+    "description": "Given an integer `n`, return `true` if it is a power of three, and `false` otherwise.",
+    "function_name": "isPowerOfThree",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "-2^31 <= n <= 2^31 - 1"
+    ],
+    "hints": [
+      "Repeatedly divide n by 3 while it's evenly divisible; n is a power of three if you end at exactly 1 (and n started positive)."
+    ],
+    "acceptance_rate": 67.82,
+    "total_submissions": 81397,
+    "display_order": 215,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 27
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 0
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 9
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 45
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "power-of-four",
+    "title": "Power of Four",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Bit Manipulation"
+    ],
+    "description": "Given an integer `n`, return `true` if it is a power of four, and `false` otherwise.",
+    "function_name": "isPowerOfFour",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "-2^31 <= n <= 2^31 - 1"
+    ],
+    "hints": [
+      "First check it's a power of two, then also confirm the single set bit sits at an even position (so it's a power of four, not just two)."
+    ],
+    "acceptance_rate": 58.46,
+    "total_submissions": 3587,
+    "display_order": 216,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 16
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 5
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 8
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "arranging-coins",
+    "title": "Arranging Coins",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Binary Search"
+    ],
+    "description": "You have `n` coins and want to build a staircase where the `i`-th row has exactly `i` coins. Return the number of complete rows you can build.",
+    "function_name": "arrangeCoins",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 2^31 - 1"
+    ],
+    "hints": [
+      "The largest k with k*(k+1)/2 <= n is the answer — binary search for it, or solve the quadratic directly."
+    ],
+    "acceptance_rate": 59.01,
+    "total_submissions": 72651,
+    "display_order": 217,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 5
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 8
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 10
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-moves-to-equal-array-elements",
+    "title": "Minimum Moves to Equal Array Elements",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Math"
+    ],
+    "description": "Given an integer array `nums` of size `n`, return the minimum number of moves required to make all array elements equal, where in one move you can increment `n - 1` elements of the array by 1.",
+    "function_name": "minMoves",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9"
+    ],
+    "hints": [
+      "Incrementing all but one element is equivalent to decrementing that one element relative to the rest.",
+      "The answer is the sum of every element's distance from the minimum element."
+    ],
+    "acceptance_rate": 47.13,
+    "total_submissions": 16905,
+    "display_order": 218,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            1,
+            1
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-moves-to-equal-array-elements-ii",
+    "title": "Minimum Moves to Equal Array Elements II",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Math",
+      "Sorting"
+    ],
+    "description": "Given an integer array `nums`, return the minimum number of moves required to make all array elements equal, where in one move you can increment or decrement an element by 1.",
+    "function_name": "minMoves2",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "-10^9 <= nums[i] <= 10^9"
+    ],
+    "hints": [
+      "The median minimizes the total absolute distance to every other point.",
+      "Sort the array, take the median, and sum everyone's distance to it."
+    ],
+    "acceptance_rate": 43.53,
+    "total_submissions": 13499,
+    "display_order": 219,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            10,
+            2,
+            9
+          ]
+        },
+        "expected_output": 16,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            0,
+            0,
+            8,
+            6
+          ]
+        },
+        "expected_output": 14,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "find-the-duplicate-number",
+    "title": "Find the Duplicate Number",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Two Pointers"
+    ],
+    "description": "Given an array of integers `nums` containing `n + 1` integers where each integer is in the range `[1, n]` inclusive, there is exactly one repeated number. Return that repeated number, without modifying the array, using only constant extra space.",
+    "function_name": "findDuplicate",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 10^5",
+      "nums.length == n + 1",
+      "1 <= nums[i] <= n",
+      "There is exactly one repeated number."
+    ],
+    "hints": [
+      "Treat the array as a linked list where index i points to nums[i] — the duplicate creates a cycle.",
+      "Floyd's cycle detection (tortoise and hare) finds the entrance to that cycle, which is exactly the duplicate value."
+    ],
+    "acceptance_rate": 51.48,
+    "total_submissions": 11419,
+    "display_order": 220,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            3,
+            4,
+            2,
+            2
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            3,
+            1,
+            3,
+            4,
+            2
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            1
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "nums": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "max-number-of-k-sum-pairs",
+    "title": "Max Number of K-Sum Pairs",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Hash Table",
+      "Two Pointers",
+      "Sorting"
+    ],
+    "description": "Given an integer array `nums` and an integer `k`, in one operation you may pick two numbers from the array whose sum equals `k` and remove them. Return the maximum number of such operations.",
+    "function_name": "maxOperations",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "1 <= nums[i] <= 10^9",
+      "1 <= k <= 10^9"
+    ],
+    "hints": [
+      "Count the frequency of every value, then for each value v pair it with k - v, being careful with the v == k - v case (pairs come from the same bucket)."
+    ],
+    "acceptance_rate": 52.68,
+    "total_submissions": 2269,
+    "display_order": 221,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "k": 5
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            3,
+            1,
+            3,
+            4,
+            3
+          ],
+          "k": 6
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            2,
+            2,
+            2,
+            2
+          ],
+          "k": 4
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "monotonic-array",
+    "title": "Monotonic Array",
+    "difficulty": "easy",
+    "tags": [
+      "Array"
+    ],
+    "description": "An array is monotonic if it is either entirely non-increasing or entirely non-decreasing. Given an integer array `nums`, return `true` if it is monotonic.",
+    "function_name": "isMonotonic",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "-10^5 <= nums[i] <= 10^5"
+    ],
+    "hints": [
+      "Check whether the array is non-decreasing everywhere, or non-increasing everywhere — it's monotonic if either holds."
+    ],
+    "acceptance_rate": 68.38,
+    "total_submissions": 34402,
+    "display_order": 222,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            2,
+            3
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            6,
+            5,
+            4,
+            4
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            3,
+            2
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            1,
+            1
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "degree-of-an-array",
+    "title": "Degree of an Array",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Hash Table"
+    ],
+    "description": "Given a non-empty array of non-negative integers `nums`, its degree is the maximum frequency of any element. Return the length of the shortest contiguous subarray that has the same degree as `nums`.",
+    "function_name": "findShortestSubArray",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 5 * 10^4",
+      "0 <= nums[i] <= 5 * 10^4"
+    ],
+    "hints": [
+      "Track each value's count, and its first and last index of appearance.",
+      "For every value that achieves the overall maximum frequency, its minimal window is (last index - first index + 1) — take the smallest such window."
+    ],
+    "acceptance_rate": 57.33,
+    "total_submissions": 11100,
+    "display_order": 223,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            2,
+            3,
+            1
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            2,
+            3,
+            1,
+            4,
+            2
+          ]
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "maximum-gap",
+    "title": "Maximum Gap",
+    "difficulty": "hard",
+    "tags": [
+      "Array",
+      "Sorting"
+    ],
+    "description": "Given an integer array `nums`, return the maximum difference between two successive elements in its sorted form. Return `0` if the array contains fewer than two elements.",
+    "function_name": "maximumGap",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "0 <= nums[i] <= 10^9"
+    ],
+    "hints": [
+      "Sort the array, then scan through and track the largest gap between consecutive elements."
+    ],
+    "acceptance_rate": 35.86,
+    "total_submissions": 48409,
+    "display_order": 224,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            3,
+            6,
+            9,
+            1
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            10
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            10,
+            100,
+            1000
+          ]
+        },
+        "expected_output": 900,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "contiguous-array",
+    "title": "Contiguous Array",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Hash Table"
+    ],
+    "description": "Given a binary array `nums`, return the maximum length of a contiguous subarray with an equal number of `0`s and `1`s.",
+    "function_name": "findMaxLength",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 10^5",
+      "nums[i] is 0 or 1."
+    ],
+    "hints": [
+      "Treat 0 as -1 and track a running sum — a subarray has equal 0s and 1s exactly when its running sum returns to a value seen before.",
+      "Store the first index at which each running-sum value was seen in a hash map."
+    ],
+    "acceptance_rate": 54.51,
+    "total_submissions": 2028,
+    "display_order": 225,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            0,
+            1
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            0,
+            1,
+            0
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            0,
+            1,
+            1
+          ]
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "reverse-vowels-of-a-string",
+    "title": "Reverse Vowels of a String",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Two Pointers"
+    ],
+    "description": "Given a string `s`, reverse only the vowels (`a, e, i, o, u`, both cases) in it and return the resulting string. All other characters keep their original positions.",
+    "function_name": "reverseVowels",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 3 * 10^5"
+    ],
+    "hints": [
+      "Use two pointers from both ends, skipping non-vowel characters, and swap the vowels you find."
+    ],
+    "acceptance_rate": 66.21,
+    "total_submissions": 82662,
+    "display_order": 226,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "hello"
+        },
+        "expected_output": "holle",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "leetcode"
+        },
+        "expected_output": "leotcede",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "aA"
+        },
+        "expected_output": "Aa",
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "programming"
+        },
+        "expected_output": "prigrammong",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "goat-latin",
+    "title": "Goat Latin",
+    "difficulty": "easy",
+    "tags": [
+      "String"
+    ],
+    "description": "Given a sentence `sentence`, convert it to Goat Latin: a word starting with a vowel gets \"ma\" appended; a word starting with a consonant has its first letter moved to the end, then \"ma\" appended; then each word gets one extra letter 'a' appended per its 1-indexed position in the sentence. Return the resulting sentence.",
+    "function_name": "toGoatLatin",
+    "params": [
+      {
+        "name": "sentence",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= sentence.length <= 150",
+      "sentence consists of English letters and spaces."
+    ],
+    "hints": [
+      "Process each word by index: apply the vowel/consonant rule first, then append 'a' repeated (index+1) times."
+    ],
+    "acceptance_rate": 61.37,
+    "total_submissions": 74876,
+    "display_order": 227,
+    "test_cases": [
+      {
+        "inputs": {
+          "sentence": "I speak Goat Latin"
+        },
+        "expected_output": "Imaa peaksmaaa oatGmaaaa atinLmaaaaa",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "sentence": "The quick brown fox jumped over the lazy dog"
+        },
+        "expected_output": "heTmaa uickqmaaa rownbmaaaa oxfmaaaaa umpedjmaaaaaa overmaaaaaaa hetmaaaaaaaa azylmaaaaaaaaa ogdmaaaaaaaaaa",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "sentence": "Each word consists of lowercase and uppercase letters only"
+        },
+        "expected_output": "Eachmaa ordwmaaa onsistscmaaaa ofmaaaaa owercaselmaaaaaa andmaaaaaaa uppercasemaaaaaaaa etterslmaaaaaaaaa onlymaaaaaaaaaa",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "unique-email-addresses",
+    "title": "Unique Email Addresses",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Hash Table"
+    ],
+    "description": "Given an array of strings `emails`, each a valid email, normalize each address (in the local name, ignore everything after the first '+', and remove all '.' characters; the domain name is unchanged) and return the number of distinct normalized addresses.",
+    "function_name": "numUniqueEmails",
+    "params": [
+      {
+        "name": "emails",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= emails.length <= 100",
+      "1 <= emails[i].length <= 100",
+      "emails[i] contains exactly one '@'."
+    ],
+    "hints": [
+      "Split each address on '@'; for the local part, cut it off at the first '+' and strip all '.' characters before rejoining with the domain."
+    ],
+    "acceptance_rate": 62.64,
+    "total_submissions": 29935,
+    "display_order": 228,
+    "test_cases": [
+      {
+        "inputs": {
+          "emails": [
+            "test.email+alex@leetcode.com",
+            "test.e.mail+bob.cathy@leetcode.com",
+            "testemail+david@lee.tcode.com"
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "emails": [
+            "a@leetcode.com",
+            "b@leetcode.com",
+            "c@leetcode.com"
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "emails": [
+            "a.b@x.com",
+            "ab@x.com"
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "buddy-strings",
+    "title": "Buddy Strings",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Hash Table"
+    ],
+    "description": "Given two strings `s` and `goal`, return `true` if you can swap exactly two characters in `s` so that it becomes equal to `goal`.",
+    "function_name": "buddyStrings",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "goal",
+        "type": "string"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length, goal.length <= 2 * 10^4"
+    ],
+    "hints": [
+      "If s already equals goal, a swap is only possible if some character repeats (swap two identical characters).",
+      "Otherwise, exactly two positions must differ, and swapping those two characters in s must produce goal."
+    ],
+    "acceptance_rate": 56.53,
+    "total_submissions": 81198,
+    "display_order": 229,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "ab",
+          "goal": "ba"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "ab",
+          "goal": "ab"
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "aa",
+          "goal": "aa"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "ab",
+          "goal": "bb"
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "to-lower-case",
+    "title": "To Lower Case",
+    "difficulty": "easy",
+    "tags": [
+      "String"
+    ],
+    "description": "Given a string `s`, convert every uppercase letter to lowercase and return the resulting string.",
+    "function_name": "toLowerCaseStr",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 100",
+      "s consists of printable ASCII characters."
+    ],
+    "hints": [
+      "For each uppercase letter, shift its character code by the difference between 'a' and 'A'."
+    ],
+    "acceptance_rate": 56.24,
+    "total_submissions": 29435,
+    "display_order": 230,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "Hello"
+        },
+        "expected_output": "hello",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "here"
+        },
+        "expected_output": "here",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "LOVELY"
+        },
+        "expected_output": "lovely",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "detect-capital",
+    "title": "Detect Capital",
+    "difficulty": "easy",
+    "tags": [
+      "String"
+    ],
+    "description": "Given a word `word`, return `true` if the usage of capitals is correct, according to these rules: all letters are capitals (e.g. \"USA\"), all letters are lowercase (e.g. \"leetcode\"), or only the first letter is capital (e.g. \"Google\").",
+    "function_name": "detectCapitalUse",
+    "params": [
+      {
+        "name": "word",
+        "type": "string"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= word.length <= 100",
+      "word consists of lowercase and uppercase English letters."
+    ],
+    "hints": [
+      "Check the three valid patterns directly: word.isupper(), word.islower(), or word[0].isupper() with the rest lowercase."
+    ],
+    "acceptance_rate": 57.77,
+    "total_submissions": 58423,
+    "display_order": 231,
+    "test_cases": [
+      {
+        "inputs": {
+          "word": "USA"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word": "FlaG"
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word": "leetcode"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "word": "Google"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "rearrange-words-in-a-sentence",
+    "title": "Rearrange Words in a Sentence",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Sorting"
+    ],
+    "description": "Given a sentence `text` (first letter capitalized, rest lowercase, words separated by single spaces), rearrange the words in order of increasing length (stable — ties keep their original relative order), then capitalize the first letter of the resulting sentence and make the rest lowercase.",
+    "function_name": "arrangeWords",
+    "params": [
+      {
+        "name": "text",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= text.length <= 10^5",
+      "text begins with a capital letter and ends with a period is NOT guaranteed here; treat it as space-separated words."
+    ],
+    "hints": [
+      "Lowercase everything first, split into words, then do a stable sort by word length.",
+      "Capitalize just the first character of the final joined sentence."
+    ],
+    "acceptance_rate": 50.74,
+    "total_submissions": 29232,
+    "display_order": 232,
+    "test_cases": [
+      {
+        "inputs": {
+          "text": "Leetcode is cool"
+        },
+        "expected_output": "Is cool leetcode",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "text": "Keep calm and code on"
+        },
+        "expected_output": "On and keep calm code",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "text": "To be or not to be"
+        },
+        "expected_output": "To be or to be not",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "sorting-the-sentence",
+    "title": "Sorting the Sentence",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Sorting"
+    ],
+    "description": "A sentence is shuffled such that each word has a digit (1-9) appended indicating its original 1-indexed position. Given the shuffled sentence `s`, reconstruct and return the original sentence.",
+    "function_name": "sortSentence",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= s.length <= 200"
+    ],
+    "hints": [
+      "Split into words, strip the trailing digit from each to get its position, then place each word at that position."
+    ],
+    "acceptance_rate": 65.23,
+    "total_submissions": 73552,
+    "display_order": 233,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "is2 sentence4 This1 a3"
+        },
+        "expected_output": "This is a sentence",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "Myself2 Me1 I4 and3"
+        },
+        "expected_output": "Me Myself and I",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "One6 two4 Three3 four5 five1 six2"
+        },
+        "expected_output": "five six Three two four One",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "split-a-string-in-balanced-strings",
+    "title": "Split a String in Balanced Strings",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Greedy"
+    ],
+    "description": "A balanced string has an equal number of 'L' and 'R' characters. Given a balanced string `s`, split it into the maximum number of balanced substrings possible, and return that maximum number.",
+    "function_name": "balancedStringSplit",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 1000",
+      "s[i] is 'L' or 'R'.",
+      "s is a balanced string."
+    ],
+    "hints": [
+      "Track a running balance: +1 for 'L', -1 for 'R'. Every time it returns to zero, you've found one more balanced piece."
+    ],
+    "acceptance_rate": 54.61,
+    "total_submissions": 62837,
+    "display_order": 234,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "RLRRLLRLRL"
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "RLLLLRRRLR"
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "LLLLRRRR"
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "RLRRRLLRLL"
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "maximum-number-of-vowels-in-a-substring",
+    "title": "Maximum Number of Vowels in a Substring of Given Length",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Sliding Window"
+    ],
+    "description": "Given a string `s` and an integer `k`, return the maximum number of vowel letters in any substring of `s` with length `k`.",
+    "function_name": "maxVowels",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 10^5",
+      "1 <= k <= s.length"
+    ],
+    "hints": [
+      "Slide a fixed-size window of length k across s, maintaining a running vowel count as characters enter and leave the window."
+    ],
+    "acceptance_rate": 45.08,
+    "total_submissions": 24351,
+    "display_order": 235,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "abciiidef",
+          "k": 3
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "aeiou",
+          "k": 2
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "leetcode",
+          "k": 3
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "rhythms",
+          "k": 4
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "number-of-substrings-containing-all-three-characters",
+    "title": "Number of Substrings Containing All Three Characters",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Sliding Window",
+      "Hash Table"
+    ],
+    "description": "Given a string `s` consisting only of characters 'a', 'b', and 'c', return the number of substrings containing at least one occurrence of all three characters.",
+    "function_name": "numberOfSubstrings",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "3 <= s.length <= 5 * 10^4",
+      "s consists only of 'a', 'b', or 'c'."
+    ],
+    "hints": [
+      "Slide a window that always contains at least one of each character, shrinking it from the left as much as possible.",
+      "Once the window from `left` to `right` is valid, every further extension to the left (down to index 0) is also valid — that's how many new substrings end at `right`."
+    ],
+    "acceptance_rate": 47.36,
+    "total_submissions": 6972,
+    "display_order": 236,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "abcabc"
+        },
+        "expected_output": 10,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "aaacb"
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "abc"
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "consecutive-characters",
+    "title": "Consecutive Characters",
+    "difficulty": "easy",
+    "tags": [
+      "String"
+    ],
+    "description": "The power of a string is the maximum length of a non-empty substring that contains only one unique character. Given a string `s`, return its power.",
+    "function_name": "maxPower",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 500"
+    ],
+    "hints": [
+      "Scan through, tracking the current run length of identical consecutive characters, resetting to 1 whenever the character changes."
+    ],
+    "acceptance_rate": 68.31,
+    "total_submissions": 71112,
+    "display_order": 237,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "leetcode"
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "abbcccddddeeeeedcba"
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "tourist"
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "determine-if-string-halves-are-alike",
+    "title": "Determine if String Halves Are Alike",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Two Pointers"
+    ],
+    "description": "Given a string `s` of even length, split it into two halves of equal length. Return `true` if both halves contain the same number of vowels (case matters for the letter but both cases count as vowels).",
+    "function_name": "halvesAreAlike",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= s.length <= 1000",
+      "s.length is even.",
+      "s consists of uppercase and lowercase English letters."
+    ],
+    "hints": [
+      "Split the string exactly in half, count vowels (both cases) in each half, and compare the counts."
+    ],
+    "acceptance_rate": 63.64,
+    "total_submissions": 41361,
+    "display_order": 238,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "book"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "textbook"
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "MerryChristmas"
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "AbCdEfGh"
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "check-if-two-string-arrays-are-equivalent",
+    "title": "Check If Two String Arrays are Equivalent",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "String"
+    ],
+    "description": "Given two string arrays `word1` and `word2`, return `true` if the concatenation of all strings in `word1` equals the concatenation of all strings in `word2`.",
+    "function_name": "arrayStringsAreEqual",
+    "params": [
+      {
+        "name": "word1",
+        "type": "string[]"
+      },
+      {
+        "name": "word2",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= word1.length, word2.length <= 100"
+    ],
+    "hints": [
+      "Join each array into a single string and compare the two results directly."
+    ],
+    "acceptance_rate": 57.71,
+    "total_submissions": 24800,
+    "display_order": 239,
+    "test_cases": [
+      {
+        "inputs": {
+          "word1": [
+            "ab",
+            "c"
+          ],
+          "word2": [
+            "a",
+            "bc"
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word1": [
+            "a",
+            "cb"
+          ],
+          "word2": [
+            "ab",
+            "c"
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word1": [
+            "abc",
+            "d",
+            "defg"
+          ],
+          "word2": [
+            "abcddefg"
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "palindrome-partitioning-ii",
+    "title": "Palindrome Partitioning II",
+    "difficulty": "hard",
+    "tags": [
+      "String",
+      "Dynamic Programming"
+    ],
+    "description": "Given a string `s`, partition it such that every substring of the partition is a palindrome. Return the minimum number of cuts needed for such a partition.",
+    "function_name": "minCut",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 2000",
+      "s consists of lowercase English letters."
+    ],
+    "hints": [
+      "Precompute, for every substring, whether it's a palindrome (expand around every center, or a 2D DP table).",
+      "Then let cuts[i] = fewest cuts needed for s[:i]; for every j where s[j:i] is a palindrome, cuts[i] = min(cuts[i], cuts[j] + 1)."
+    ],
+    "acceptance_rate": 31.58,
+    "total_submissions": 78897,
+    "display_order": 240,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "aab"
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "a"
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "ab"
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "racecarxy"
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "find-smallest-letter-greater-than-target",
+    "title": "Find Smallest Letter Greater Than Target",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Binary Search"
+    ],
+    "description": "Given a sorted array of lowercase letters `letters` (with at least two distinct letters) and a character `target`, return the smallest character in `letters` that is strictly greater than `target`. If no such character exists, wrap around and return the first letter of `letters`.",
+    "function_name": "nextGreatestLetter",
+    "params": [
+      {
+        "name": "letters",
+        "type": "string[]"
+      },
+      {
+        "name": "target",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= letters.length <= 10^4",
+      "letters[i] is a lowercase English letter.",
+      "letters is sorted in ascending order."
+    ],
+    "hints": [
+      "Binary search for the leftmost letter strictly greater than target.",
+      "If the search runs off the end, wrap around to index 0."
+    ],
+    "acceptance_rate": 65.79,
+    "total_submissions": 16165,
+    "display_order": 241,
+    "test_cases": [
+      {
+        "inputs": {
+          "letters": [
+            "c",
+            "f",
+            "j"
+          ],
+          "target": "a"
+        },
+        "expected_output": "c",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "letters": [
+            "c",
+            "f",
+            "j"
+          ],
+          "target": "c"
+        },
+        "expected_output": "f",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "letters": [
+            "c",
+            "f",
+            "j"
+          ],
+          "target": "j"
+        },
+        "expected_output": "c",
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "letters": [
+            "e",
+            "e",
+            "e",
+            "e",
+            "e",
+            "e",
+            "n",
+            "n",
+            "n",
+            "n"
+          ],
+          "target": "e"
+        },
+        "expected_output": "n",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "nth-digit",
+    "title": "Nth Digit",
+    "difficulty": "medium",
+    "tags": [
+      "Math",
+      "Binary Search"
+    ],
+    "description": "Given an integer `n`, return the `n`-th digit of the infinite integer sequence `1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, ...`.",
+    "function_name": "findNthDigit",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 2^31 - 1"
+    ],
+    "hints": [
+      "Numbers with d digits contribute 9 * 10^(d-1) * d digits total to the sequence — subtract those counts digit-group by digit-group until you land in the right group.",
+      "Once you know which number (and which digit within it) n falls on, extract that digit directly."
+    ],
+    "acceptance_rate": 39.39,
+    "total_submissions": 75205,
+    "display_order": 242,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 11
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 15
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 1000
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-absolute-difference",
+    "title": "Minimum Absolute Difference",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Sorting"
+    ],
+    "description": "Given an array of distinct integers `arr`, find the minimum absolute difference between any two elements, and return every pair `[a, b]` (with `a < b`) achieving that minimum difference, sorted in ascending order.",
+    "function_name": "minimumAbsDifference",
+    "params": [
+      {
+        "name": "arr",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= arr.length <= 10^5",
+      "-10^6 <= arr[i] <= 10^6",
+      "All elements are distinct."
+    ],
+    "hints": [
+      "The minimum absolute difference in a sorted array always occurs between some pair of adjacent elements.",
+      "Sort the array, find the minimum gap between consecutive elements, then collect every adjacent pair achieving that gap."
+    ],
+    "acceptance_rate": 64.08,
+    "total_submissions": 70216,
+    "display_order": 243,
+    "test_cases": [
+      {
+        "inputs": {
+          "arr": [
+            4,
+            2,
+            1,
+            3
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            2
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            1,
+            3,
+            6,
+            10,
+            15
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            3
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            3,
+            8,
+            -10,
+            23,
+            19,
+            -4,
+            -14,
+            27
+          ]
+        },
+        "expected_output": [
+          [
+            -14,
+            -10
+          ],
+          [
+            19,
+            23
+          ],
+          [
+            23,
+            27
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "two-sum-less-than-k",
+    "title": "Two Sum Less Than K",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Two Pointers",
+      "Sorting"
+    ],
+    "description": "Given an array `nums` of integers and an integer `k`, return the maximum sum of two distinct elements less than `k`, or `-1` if no such pair exists.",
+    "function_name": "twoSumLessThanK",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 100",
+      "1 <= nums[i] <= 1000",
+      "1 <= k <= 2000"
+    ],
+    "hints": [
+      "Sort the array, then use two pointers from both ends: if the sum is too big, move the right pointer in; otherwise record the sum and move the left pointer up."
+    ],
+    "acceptance_rate": 66.56,
+    "total_submissions": 10954,
+    "display_order": 244,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            34,
+            23,
+            1,
+            24,
+            75,
+            33,
+            54,
+            8
+          ],
+          "k": 60
+        },
+        "expected_output": 58,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            10,
+            20,
+            30
+          ],
+          "k": 15
+        },
+        "expected_output": -1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "k": 100
+        },
+        "expected_output": 7,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "magnetic-force-between-two-balls",
+    "title": "Magnetic Force Between Two Balls",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Greedy"
+    ],
+    "description": "Given an array `position` of basket positions and an integer `m` (number of balls to place), place all `m` balls into baskets such that the minimum magnetic force between any two balls is maximized. Return that maximum possible minimum force.",
+    "function_name": "maxDistanceBalls",
+    "params": [
+      {
+        "name": "position",
+        "type": "integer[]"
+      },
+      {
+        "name": "m",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= position.length <= 10^5",
+      "1 <= position[i] <= 10^9",
+      "2 <= m <= position.length"
+    ],
+    "hints": [
+      "Binary search on the answer (the minimum force): for a candidate force, greedily place balls as early as possible, only placing the next ball once it's at least that far from the last placed one.",
+      "Find the largest force for which this greedy placement fits all m balls."
+    ],
+    "acceptance_rate": 44.27,
+    "total_submissions": 8854,
+    "display_order": 245,
+    "test_cases": [
+      {
+        "inputs": {
+          "position": [
+            1,
+            2,
+            3,
+            4,
+            7
+          ],
+          "m": 3
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "position": [
+            5,
+            4,
+            3,
+            2,
+            1,
+            1000000000
+          ],
+          "m": 2
+        },
+        "expected_output": 999999999,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "position": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7
+          ],
+          "m": 4
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-number-of-days-to-make-m-bouquets",
+    "title": "Minimum Number of Days to Make m Bouquets",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Binary Search"
+    ],
+    "description": "Given `bloomDay`, an array where `bloomDay[i]` is the day flower `i` blooms, and integers `m` and `k`, you need `m` bouquets each made from `k` adjacent flowers that have already bloomed. Return the minimum number of days needed to make `m` bouquets, or `-1` if it's impossible.",
+    "function_name": "minDays",
+    "params": [
+      {
+        "name": "bloomDay",
+        "type": "integer[]"
+      },
+      {
+        "name": "m",
+        "type": "integer"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "bloomDay.length == n",
+      "1 <= n <= 10^5",
+      "1 <= m <= 10^6",
+      "1 <= k <= n",
+      "1 <= bloomDay[i] <= 10^9"
+    ],
+    "hints": [
+      "If m * k > n, it's impossible immediately.",
+      "Binary search on the day: for a candidate day, count how many bouquets can be made by scanning for consecutive runs of already-bloomed flowers, each run contributing (run length / k) bouquets."
+    ],
+    "acceptance_rate": 41.12,
+    "total_submissions": 20722,
+    "display_order": 246,
+    "test_cases": [
+      {
+        "inputs": {
+          "bloomDay": [
+            1,
+            10,
+            3,
+            10,
+            2
+          ],
+          "m": 3,
+          "k": 1
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "bloomDay": [
+            1,
+            10,
+            3,
+            10,
+            2
+          ],
+          "m": 3,
+          "k": 2
+        },
+        "expected_output": -1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "bloomDay": [
+            7,
+            7,
+            7,
+            7,
+            12,
+            7,
+            7
+          ],
+          "m": 2,
+          "k": 3
+        },
+        "expected_output": 12,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "split-array-largest-sum",
+    "title": "Split Array Largest Sum",
+    "difficulty": "hard",
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Dynamic Programming"
+    ],
+    "description": "Given an integer array `nums` and an integer `k`, split `nums` into `k` non-empty contiguous subarrays to minimize the largest sum among these subarrays. Return that minimized largest sum.",
+    "function_name": "splitArray",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 1000",
+      "0 <= nums[i] <= 10^6",
+      "1 <= k <= min(50, nums.length)"
+    ],
+    "hints": [
+      "Binary search on the answer: the largest sum must be at least max(nums) and at most sum(nums).",
+      "For a candidate max sum, greedily count how many subarrays are needed to keep every subarray's sum at or below it; find the smallest candidate needing at most k subarrays."
+    ],
+    "acceptance_rate": 29.51,
+    "total_submissions": 73808,
+    "display_order": 247,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            7,
+            2,
+            5,
+            10,
+            8
+          ],
+          "k": 2
+        },
+        "expected_output": 18,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "k": 2
+        },
+        "expected_output": 9,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            4,
+            4
+          ],
+          "k": 3
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "valid-perfect-square",
+    "title": "Valid Perfect Square",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Binary Search"
+    ],
+    "description": "Given a positive integer `num`, return `true` if `num` is a perfect square, without using any built-in library function for square roots.",
+    "function_name": "isPerfectSquare",
+    "params": [
+      {
+        "name": "num",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= num <= 2^31 - 1"
+    ],
+    "hints": [
+      "Binary search for an integer r such that r * r == num, over the range 1..num."
+    ],
+    "acceptance_rate": 67.33,
+    "total_submissions": 65882,
+    "display_order": 248,
+    "test_cases": [
+      {
+        "inputs": {
+          "num": 16
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "num": 14
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "num": 1
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "num": 808201
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "count-negative-numbers-in-a-sorted-matrix",
+    "title": "Count Negative Numbers in a Sorted Matrix",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Matrix"
+    ],
+    "description": "Given an `m x n` matrix `grid` sorted in non-increasing order both row-wise and column-wise, return the number of negative numbers in `grid`.",
+    "function_name": "countNegatives",
+    "params": [
+      {
+        "name": "grid",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == grid.length",
+      "n == grid[i].length",
+      "1 <= m, n <= 100"
+    ],
+    "hints": [
+      "Start from the bottom-left corner: if the current value is negative, everything to its right in this row is negative too — add that whole count and move up a row. Otherwise move right."
+    ],
+    "acceptance_rate": 58.01,
+    "total_submissions": 10983,
+    "display_order": 249,
+    "test_cases": [
+      {
+        "inputs": {
+          "grid": [
+            [
+              4,
+              3,
+              2,
+              -1
+            ],
+            [
+              3,
+              2,
+              1,
+              -1
+            ],
+            [
+              1,
+              1,
+              -1,
+              -2
+            ],
+            [
+              -1,
+              -1,
+              -2,
+              -3
+            ]
+          ]
+        },
+        "expected_output": 8,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            [
+              3,
+              2
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            [
+              -1
+            ]
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "h-index",
+    "title": "H-Index",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Sorting",
+      "Binary Search"
+    ],
+    "description": "Given an array `citations` where `citations[i]` is the number of citations a researcher received for their `i`-th paper, return the researcher's h-index — the maximum value `h` such that the researcher has published at least `h` papers with at least `h` citations each.",
+    "function_name": "hIndex",
+    "params": [
+      {
+        "name": "citations",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= citations.length <= 5000",
+      "0 <= citations[i] <= 1000"
+    ],
+    "hints": [
+      "Sort the citations in descending order, then find the largest index i (1-indexed) where citations[i-1] >= i."
+    ],
+    "acceptance_rate": 47.34,
+    "total_submissions": 45089,
+    "display_order": 250,
+    "test_cases": [
+      {
+        "inputs": {
+          "citations": [
+            3,
+            0,
+            6,
+            1,
+            5
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "citations": [
+            1,
+            3,
+            1
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "citations": [
+            100
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "citations": [
+            0,
+            0,
+            0
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "combinations",
+    "title": "Combinations",
+    "difficulty": "medium",
+    "tags": [
+      "Backtracking"
+    ],
+    "description": "Given two integers `n` and `k`, return all possible combinations of `k` distinct numbers chosen from the range `[1, n]`, in any order.",
+    "function_name": "combine",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "unordered",
+    "constraints": [
+      "1 <= n <= 20",
+      "1 <= k <= n"
+    ],
+    "hints": [
+      "Backtrack by choosing numbers in increasing order, always starting the next choice after the last one picked, to avoid duplicate combinations."
+    ],
+    "acceptance_rate": 39.62,
+    "total_submissions": 26536,
+    "display_order": 251,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 4,
+          "k": 2
+        },
+        "expected_output": [
+          [
+            1,
+            2
+          ],
+          [
+            1,
+            3
+          ],
+          [
+            1,
+            4
+          ],
+          [
+            2,
+            3
+          ],
+          [
+            2,
+            4
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1,
+          "k": 1
+        },
+        "expected_output": [
+          [
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 4,
+          "k": 4
+        },
+        "expected_output": [
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "letter-case-permutation",
+    "title": "Letter Case Permutation",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Backtracking"
+    ],
+    "description": "Given a string `s`, transform every letter to lowercase or uppercase and return all possible resulting strings, in any order. Digits are left unchanged.",
+    "function_name": "letterCasePermutation",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "string[]",
+    "comparison_mode": "unordered",
+    "constraints": [
+      "1 <= s.length <= 12",
+      "s consists of lowercase/uppercase English letters and digits."
+    ],
+    "hints": [
+      "Backtrack character by character: for a letter, branch into both cases; for a digit, there's only one choice."
+    ],
+    "acceptance_rate": 43.22,
+    "total_submissions": 40843,
+    "display_order": 252,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "a1b2"
+        },
+        "expected_output": [
+          "a1b2",
+          "a1B2",
+          "A1b2",
+          "A1B2"
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "3z4"
+        },
+        "expected_output": [
+          "3z4",
+          "3Z4"
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "12345"
+        },
+        "expected_output": [
+          "12345"
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "beautiful-arrangement",
+    "title": "Beautiful Arrangement",
+    "difficulty": "medium",
+    "tags": [
+      "Backtracking"
+    ],
+    "description": "Suppose you have `n` integers labeled `1` to `n`. A permutation is beautiful if for every position `i` (1-indexed), either `perm[i]` is divisible by `i`, or `i` is divisible by `perm[i]`. Return the number of beautiful arrangements you can construct.",
+    "function_name": "countArrangement",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 15"
+    ],
+    "hints": [
+      "Backtrack position by position (from n down to 1, or 1 up to n), only placing a number if it satisfies the divisibility rule with the current position, and marking numbers as used."
+    ],
+    "acceptance_rate": 49.77,
+    "total_submissions": 25774,
+    "display_order": 253,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 2
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 4
+        },
+        "expected_output": 8,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "matchsticks-to-square",
+    "title": "Matchsticks to Square",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Backtracking"
+    ],
+    "description": "Given an integer array `matchsticks` where `matchsticks[i]` is the length of the `i`-th matchstick, return `true` if you can use all the matchsticks (each used exactly once, none broken) to form a square.",
+    "function_name": "makesquare",
+    "params": [
+      {
+        "name": "matchsticks",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= matchsticks.length <= 15",
+      "1 <= matchsticks[i] <= 10^8"
+    ],
+    "hints": [
+      "The total length must be divisible by 4 — that's the target side length.",
+      "Sort descending (to fail fast) and backtrack, trying to place each matchstick into one of the 4 sides without exceeding the target length."
+    ],
+    "acceptance_rate": 42.88,
+    "total_submissions": 50547,
+    "display_order": 254,
+    "test_cases": [
+      {
+        "inputs": {
+          "matchsticks": [
+            1,
+            1,
+            2,
+            2,
+            2
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matchsticks": [
+            3,
+            3,
+            3,
+            3,
+            4
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matchsticks": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "partition-to-k-equal-sum-subsets",
+    "title": "Partition to K Equal Sum Subsets",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Backtracking",
+      "Dynamic Programming"
+    ],
+    "description": "Given an integer array `nums` and an integer `k`, return `true` if it's possible to divide this array into `k` non-empty subsets whose sums are all equal.",
+    "function_name": "canPartitionKSubsets",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= k <= nums.length <= 16",
+      "1 <= nums[i] <= 10^4"
+    ],
+    "hints": [
+      "The total sum must divide evenly by k — that quotient is each subset's target sum.",
+      "Sort descending, then backtrack building one subset (bucket) at a time up to the target, moving to the next bucket once the current one is full."
+    ],
+    "acceptance_rate": 53.48,
+    "total_submissions": 60152,
+    "display_order": 255,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            4,
+            3,
+            2,
+            3,
+            5,
+            2,
+            1
+          ],
+          "k": 4
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "k": 3
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            2,
+            2,
+            2,
+            2,
+            3,
+            4,
+            5
+          ],
+          "k": 4
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "unique-binary-search-trees",
+    "title": "Unique Binary Search Trees",
+    "difficulty": "medium",
+    "tags": [
+      "Dynamic Programming",
+      "Math"
+    ],
+    "description": "Given an integer `n`, return the number of structurally unique binary search trees that store values `1` to `n`.",
+    "function_name": "numTrees",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 19"
+    ],
+    "hints": [
+      "This is the Catalan number sequence: dp[n] = sum over every root choice i of dp[i-1] * dp[n-i], with dp[0] = 1."
+    ],
+    "acceptance_rate": 42.49,
+    "total_submissions": 49986,
+    "display_order": 256,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 5
+        },
+        "expected_output": 42,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "n-th-tribonacci-number",
+    "title": "N-th Tribonacci Number",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Dynamic Programming"
+    ],
+    "description": "The Tribonacci sequence is defined as `T(0) = 0, T(1) = 1, T(2) = 1`, and `T(n) = T(n-1) + T(n-2) + T(n-3)` for `n >= 3`. Given `n`, return `T(n)`.",
+    "function_name": "tribonacci",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "0 <= n <= 37"
+    ],
+    "hints": [
+      "Iterate forward, keeping only the last three values."
+    ],
+    "acceptance_rate": 65.52,
+    "total_submissions": 2778,
+    "display_order": 257,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 4
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 25
+        },
+        "expected_output": 1389537,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 0
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "fibonacci-number",
+    "title": "Fibonacci Number",
+    "difficulty": "easy",
+    "tags": [
+      "Math",
+      "Dynamic Programming",
+      "Recursion"
+    ],
+    "description": "The Fibonacci numbers form a sequence such that `F(0) = 0, F(1) = 1`, and `F(n) = F(n-1) + F(n-2)` for `n > 1`. Given `n`, return `F(n)`.",
+    "function_name": "fib",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "0 <= n <= 30"
+    ],
+    "hints": [
+      "Iterate forward, keeping only the last two values, rather than plain recursion (which recomputes the same values many times)."
+    ],
+    "acceptance_rate": 64.04,
+    "total_submissions": 2376,
+    "display_order": 258,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 2
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 4
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 0
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "domino-and-tromino-tiling",
+    "title": "Domino and Tromino Tiling",
+    "difficulty": "medium",
+    "tags": [
+      "Dynamic Programming"
+    ],
+    "description": "You have a `2 x n` board. You are given two tile types: a `2x1` domino and an L-shaped tromino (which can be rotated). Return the number of ways to tile the board, modulo `10^9 + 7`.",
+    "function_name": "numTilings",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 1000"
+    ],
+    "hints": [
+      "Let dp[i] be the number of ways to fully tile a 2 x i board. The recurrence is dp[i] = 2*dp[i-1] + dp[i-3], accounting for the extra tromino-pair configurations."
+    ],
+    "acceptance_rate": 38.27,
+    "total_submissions": 82751,
+    "display_order": 259,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 5
+        },
+        "expected_output": 24,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "longest-arithmetic-subsequence",
+    "title": "Longest Arithmetic Subsequence",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming"
+    ],
+    "description": "Given an array `nums` of integers, return the length of the longest arithmetic subsequence in it (a subsequence where consecutive elements have the same difference).",
+    "function_name": "longestArithSeqLength",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= nums.length <= 1000",
+      "0 <= nums[i] <= 500"
+    ],
+    "hints": [
+      "Let dp[i][d] be the length of the longest arithmetic subsequence ending at index i with common difference d.",
+      "For each pair (j, i) with j < i, dp[i][nums[i]-nums[j]] = dp[j][nums[i]-nums[j]] + 1 (or 2 if no prior entry)."
+    ],
+    "acceptance_rate": 47.2,
+    "total_submissions": 45006,
+    "display_order": 260,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            3,
+            6,
+            9,
+            12
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            9,
+            4,
+            7,
+            2,
+            10
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            20,
+            1,
+            15,
+            3,
+            10,
+            5,
+            8
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "longest-turbulent-subarray",
+    "title": "Longest Turbulent Subarray",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming",
+      "Sliding Window"
+    ],
+    "description": "Given an integer array `arr`, return the length of the longest turbulent subarray — a subarray where comparisons between consecutive elements strictly alternate between greater-than and less-than.",
+    "function_name": "maxTurbulenceSize",
+    "params": [
+      {
+        "name": "arr",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= arr.length <= 4 * 10^4",
+      "0 <= arr[i] <= 10^9"
+    ],
+    "hints": [
+      "Track two running lengths as you scan: the longest turbulent run ending here if the last comparison was '>', and if it was '<'.",
+      "At each step, one of them extends from the other (based on the current comparison) and the other resets to 1."
+    ],
+    "acceptance_rate": 43.32,
+    "total_submissions": 8759,
+    "display_order": 261,
+    "test_cases": [
+      {
+        "inputs": {
+          "arr": [
+            9,
+            4,
+            2,
+            10,
+            7,
+            8,
+            8,
+            1,
+            9
+          ]
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            4,
+            8,
+            12,
+            16
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            100
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "maximum-length-of-pair-chain",
+    "title": "Maximum Length of Pair Chain",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming",
+      "Greedy",
+      "Sorting"
+    ],
+    "description": "Given an array of `pairs` where `pairs[i] = [lefti, righti]`, a pair `(c, d)` can follow `(a, b)` if `b < c`. Return the length of the longest chain of pairs you can form (using each pair at most once), choosing pairs in any order.",
+    "function_name": "findLongestChain",
+    "params": [
+      {
+        "name": "pairs",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= pairs.length <= 1000",
+      "pairs[i].length == 2",
+      "lefti < righti"
+    ],
+    "hints": [
+      "This is really an interval scheduling problem — sort pairs by their second value, then greedily take a pair whenever its start is after the last chosen pair's end."
+    ],
+    "acceptance_rate": 52.12,
+    "total_submissions": 48668,
+    "display_order": 262,
+    "test_cases": [
+      {
+        "inputs": {
+          "pairs": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "pairs": [
+            [
+              1,
+              2
+            ],
+            [
+              7,
+              8
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "pairs": [
+            [
+              -10,
+              -8
+            ],
+            [
+              8,
+              9
+            ],
+            [
+              -5,
+              0
+            ],
+            [
+              6,
+              10
+            ],
+            [
+              -6,
+              -4
+            ],
+            [
+              1,
+              7
+            ],
+            [
+              9,
+              10
+            ],
+            [
+              -4,
+              7
+            ]
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "number-of-longest-increasing-subsequence",
+    "title": "Number of Longest Increasing Subsequence",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming"
+    ],
+    "description": "Given an integer array `nums`, return the number of distinct longest strictly increasing subsequences.",
+    "function_name": "findNumberOfLIS",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 2000",
+      "-10^6 <= nums[i] <= 10^6"
+    ],
+    "hints": [
+      "Track two arrays: length[i] = longest increasing subsequence ending at i, and count[i] = how many such subsequences of that length end at i.",
+      "When extending from j to i (nums[j] < nums[i]), update length[i]/count[i] based on whether j offers a strictly longer or an equally long path."
+    ],
+    "acceptance_rate": 44.44,
+    "total_submissions": 30653,
+    "display_order": 263,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            3,
+            5,
+            4,
+            7
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            2,
+            2,
+            2,
+            2,
+            2
+          ]
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            4,
+            3,
+            5,
+            4,
+            7,
+            2
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-cost-for-tickets",
+    "title": "Minimum Cost For Tickets",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming"
+    ],
+    "description": "You are given an array `days` of the days you need to travel, and `costs = [cost1, cost7, cost30]` for a 1-day, 7-day, or 30-day pass. Return the minimum total cost to cover every travel day.",
+    "function_name": "mincostTickets",
+    "params": [
+      {
+        "name": "days",
+        "type": "integer[]"
+      },
+      {
+        "name": "costs",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= days.length <= 365",
+      "1 <= days[i] <= 365",
+      "days is sorted in ascending order.",
+      "costs.length == 3"
+    ],
+    "hints": [
+      "dp[d] = minimum cost to cover all travel through day d.",
+      "If day d isn't a travel day, dp[d] = dp[d-1]; otherwise, take the best of buying a 1-day pass (dp[d-1]+cost1), 7-day pass (dp[d-7]+cost7), or 30-day pass (dp[d-30]+cost30)."
+    ],
+    "acceptance_rate": 54.29,
+    "total_submissions": 7045,
+    "display_order": 264,
+    "test_cases": [
+      {
+        "inputs": {
+          "days": [
+            1,
+            4,
+            6,
+            7,
+            8,
+            20
+          ],
+          "costs": [
+            2,
+            7,
+            15
+          ]
+        },
+        "expected_output": 11,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "days": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            30,
+            31
+          ],
+          "costs": [
+            2,
+            7,
+            15
+          ]
+        },
+        "expected_output": 17,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "days": [
+            1,
+            3,
+            5
+          ],
+          "costs": [
+            1,
+            10,
+            100
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "stone-game",
+    "title": "Stone Game",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming",
+      "Game Theory"
+    ],
+    "description": "Alice and Bob play a game with piles of stones, `piles`, taking turns (Alice first), where each turn a player takes an entire pile from either end of the remaining row. Both play optimally to maximize their own stones. Return `true` if Alice wins (assume the total number of stones is odd, so there's no tie).",
+    "function_name": "stoneGame",
+    "params": [
+      {
+        "name": "piles",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= piles.length <= 500",
+      "piles.length is even.",
+      "1 <= piles[i] <= 500"
+    ],
+    "hints": [
+      "Let dp[i][j] be the maximum score advantage the current player can achieve over the other, for the subgame piles[i..j].",
+      "dp[i][j] = max(piles[i] - dp[i+1][j], piles[j] - dp[i][j-1]). Alice wins if dp[0][n-1] > 0."
+    ],
+    "acceptance_rate": 44.45,
+    "total_submissions": 51058,
+    "display_order": 265,
+    "test_cases": [
+      {
+        "inputs": {
+          "piles": [
+            5,
+            3,
+            4,
+            5
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "piles": [
+            3,
+            7,
+            2,
+            3
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "piles": [
+            1,
+            100
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "predict-the-winner",
+    "title": "Predict the Winner",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming",
+      "Game Theory"
+    ],
+    "description": "Two players take turns picking a number from either end of the array `nums` (player 1 goes first), each trying to maximize their own total. Return `true` if player 1 can win or tie.",
+    "function_name": "predictTheWinner",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= nums.length <= 20",
+      "0 <= nums[i] <= 10^7"
+    ],
+    "hints": [
+      "Same score-advantage DP idea as Stone Game, but here piles aren't restricted to even length or distinct values — the same recurrence still applies.",
+      "dp[i][j] = max(nums[i] - dp[i+1][j], nums[j] - dp[i][j-1]); player 1 wins or ties if dp[0][n-1] >= 0."
+    ],
+    "acceptance_rate": 51.62,
+    "total_submissions": 71433,
+    "display_order": 266,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            5,
+            2
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1,
+            5,
+            233,
+            7
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            1
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "jump-game-iv",
+    "title": "Jump Game IV",
+    "difficulty": "hard",
+    "tags": [
+      "Array",
+      "BFS",
+      "Hash Table"
+    ],
+    "description": "Given an array of integers `arr`, you start at index 0. In one step you can move to index `i+1`, `i-1`, or to any index `j` where `arr[j] == arr[i]`. Return the minimum number of steps to reach the last index.",
+    "function_name": "minJumps",
+    "params": [
+      {
+        "name": "arr",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= arr.length <= 5 * 10^4",
+      "-10^8 <= arr[i] <= 10^8"
+    ],
+    "hints": [
+      "BFS gives the shortest path in this unweighted graph of index-moves.",
+      "Group indices by value first; once you've used a value group's same-value jumps once, clear that group — revisiting it later can never be shorter."
+    ],
+    "acceptance_rate": 35.06,
+    "total_submissions": 20827,
+    "display_order": 267,
+    "test_cases": [
+      {
+        "inputs": {
+          "arr": [
+            100,
+            -23,
+            -23,
+            404,
+            100,
+            23,
+            23,
+            23,
+            3,
+            404
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            7
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            7,
+            6,
+            9,
+            6,
+            9,
+            6,
+            9,
+            7
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "maximum-subarray-sum-with-one-deletion",
+    "title": "Maximum Subarray Sum with One Deletion",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Dynamic Programming"
+    ],
+    "description": "Given an array of integers `arr`, return the largest sum of a contiguous, non-empty subarray, allowing you to optionally delete at most one element from it.",
+    "function_name": "maximumSumWithDeletion",
+    "params": [
+      {
+        "name": "arr",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= arr.length <= 10^5",
+      "-10^4 <= arr[i] <= 10^4"
+    ],
+    "hints": [
+      "Track two running values: the best sum ending here with no deletion used yet, and the best sum ending here with exactly one deletion already used.",
+      "The no-deletion value follows Kadane's rule; the one-deletion value is either 'skip the current element' (carry forward the previous no-deletion best) or 'extend the previous one-deletion best by including this element'."
+    ],
+    "acceptance_rate": 48.93,
+    "total_submissions": 3773,
+    "display_order": 268,
+    "test_cases": [
+      {
+        "inputs": {
+          "arr": [
+            1,
+            -2,
+            0,
+            3
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            1,
+            -2,
+            -2,
+            3
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            -1,
+            -1,
+            -1,
+            -1
+          ]
+        },
+        "expected_output": -1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "knight-dialer",
+    "title": "Knight Dialer",
+    "difficulty": "medium",
+    "tags": [
+      "Dynamic Programming"
+    ],
+    "description": "A chess knight sits on a phone dial pad (digits 0-9 laid out as on a standard telephone). Given `n`, return the number of distinct phone numbers of length `n` you can dial by starting on any digit and making `n - 1` valid knight moves, modulo `10^9 + 7`.",
+    "function_name": "knightDialer",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 5000"
+    ],
+    "hints": [
+      "Precompute which digits a knight can jump to from each digit on the pad.",
+      "dp[step][digit] = number of ways to end on digit after this many moves; sum dp[n-1][*] over every starting digit for the final answer."
+    ],
+    "acceptance_rate": 52.3,
+    "total_submissions": 72177,
+    "display_order": 269,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": 10,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 2
+        },
+        "expected_output": 20,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": 46,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 4
+        },
+        "expected_output": 104,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "delete-operation-for-two-strings",
+    "title": "Delete Operation for Two Strings",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Dynamic Programming"
+    ],
+    "description": "Given two strings `word1` and `word2`, return the minimum number of steps required to make `word1` and `word2` the same, where in one step you can delete exactly one character from either string.",
+    "function_name": "minDistanceDelete",
+    "params": [
+      {
+        "name": "word1",
+        "type": "string"
+      },
+      {
+        "name": "word2",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= word1.length, word2.length <= 500",
+      "word1 and word2 consist of lowercase English letters."
+    ],
+    "hints": [
+      "Find the length of the Longest Common Subsequence of the two strings.",
+      "Every character not part of that common subsequence, in either string, must be deleted."
+    ],
+    "acceptance_rate": 44.61,
+    "total_submissions": 21337,
+    "display_order": 270,
+    "test_cases": [
+      {
+        "inputs": {
+          "word1": "sea",
+          "word2": "eat"
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word1": "leetcode",
+          "word2": "etco"
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "word1": "abc",
+          "word2": "abc"
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "employee-importance",
+    "title": "Employee Importance",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "BFS",
+      "DFS",
+      "Hash Table"
+    ],
+    "description": "You have `n` employees, given as parallel arrays `ids` and `importanceValues` (employee `ids[i]` has importance `importanceValues[i]`), and `subordinates[i]` lists the ids of employee `ids[i]`'s direct subordinates. Given an employee `id`, return the total importance of that employee plus every employee under them (direct or indirect).",
+    "function_name": "getImportance",
+    "params": [
+      {
+        "name": "ids",
+        "type": "integer[]"
+      },
+      {
+        "name": "importanceValues",
+        "type": "integer[]"
+      },
+      {
+        "name": "subordinates",
+        "type": "integer[][]"
+      },
+      {
+        "name": "id",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= ids.length <= 2000",
+      "ids are unique.",
+      "1 <= importanceValues[i] <= 100"
+    ],
+    "hints": [
+      "Build a lookup from id to (importance, subordinate ids), then DFS/BFS from the target id, summing importance as you visit every reachable subordinate."
+    ],
+    "acceptance_rate": 51.7,
+    "total_submissions": 29100,
+    "display_order": 271,
+    "test_cases": [
+      {
+        "inputs": {
+          "ids": [
+            1,
+            2,
+            3
+          ],
+          "importanceValues": [
+            5,
+            3,
+            3
+          ],
+          "subordinates": [
+            [
+              2,
+              3
+            ],
+            [],
+            []
+          ],
+          "id": 1
+        },
+        "expected_output": 11,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "ids": [
+            1,
+            2,
+            3
+          ],
+          "importanceValues": [
+            5,
+            3,
+            3
+          ],
+          "subordinates": [
+            [
+              2,
+              3
+            ],
+            [],
+            []
+          ],
+          "id": 2
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "ids": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "importanceValues": [
+            10,
+            5,
+            3,
+            1
+          ],
+          "subordinates": [
+            [
+              2
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            []
+          ],
+          "id": 1
+        },
+        "expected_output": 19,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "time-needed-to-inform-all-employees",
+    "title": "Time Needed to Inform All Employees",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "BFS",
+      "DFS"
+    ],
+    "description": "A company has `n` employees with a unique manager tree rooted at `headID`. `manager[i]` is the direct manager of employee `i` (`-1` for the head), and `informTime[i]` is how long it takes employee `i` to inform all of their direct subordinates (in parallel). Return the total time needed to inform every employee.",
+    "function_name": "numOfMinutes",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "headID",
+        "type": "integer"
+      },
+      {
+        "name": "manager",
+        "type": "integer[]"
+      },
+      {
+        "name": "informTime",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 10^5",
+      "0 <= headID < n",
+      "manager[headID] == -1",
+      "manager forms a tree rooted at headID."
+    ],
+    "hints": [
+      "Build each manager's list of direct subordinates, then BFS/DFS from headID, tracking the cumulative time to reach each employee.",
+      "The answer is the maximum cumulative time across every employee (informTime is 0 for leaves, so it stops accumulating there)."
+    ],
+    "acceptance_rate": 43.07,
+    "total_submissions": 26690,
+    "display_order": 272,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 1,
+          "headID": 0,
+          "manager": [
+            -1
+          ],
+          "informTime": [
+            0
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 6,
+          "headID": 2,
+          "manager": [
+            2,
+            2,
+            -1,
+            2,
+            2,
+            2
+          ],
+          "informTime": [
+            0,
+            0,
+            1,
+            0,
+            0,
+            0
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 7,
+          "headID": 6,
+          "manager": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            -1
+          ],
+          "informTime": [
+            0,
+            6,
+            5,
+            4,
+            3,
+            2,
+            1
+          ]
+        },
+        "expected_output": 21,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "keys-and-rooms",
+    "title": "Keys and Rooms",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "BFS"
+    ],
+    "description": "There are `n` rooms labeled `0` to `n-1`, and room `0` is unlocked. `rooms[i]` is a list of keys found in room `i`, each key opening the room with that number. Return `true` if you can visit every room, starting from room 0.",
+    "function_name": "canVisitAllRooms",
+    "params": [
+      {
+        "name": "rooms",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "n == rooms.length",
+      "1 <= n <= 1000"
+    ],
+    "hints": [
+      "DFS/BFS from room 0, unlocking and visiting every room reachable via the keys found along the way.",
+      "You can visit every room exactly when this traversal reaches all n rooms."
+    ],
+    "acceptance_rate": 43.09,
+    "total_submissions": 23492,
+    "display_order": 273,
+    "test_cases": [
+      {
+        "inputs": {
+          "rooms": [
+            [
+              1
+            ],
+            [
+              2
+            ],
+            [
+              3
+            ],
+            []
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "rooms": [
+            [
+              1,
+              3
+            ],
+            [
+              3,
+              0,
+              1
+            ],
+            [
+              2
+            ],
+            [
+              0
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "rooms": [
+            [
+              1
+            ],
+            [],
+            [
+              2
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "find-eventual-safe-states",
+    "title": "Find Eventual Safe States",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "Topological Sort"
+    ],
+    "description": "Given a directed graph `graph` where `graph[i]` lists the nodes reachable from node `i`, a node is 'safe' if every possible path starting from it eventually leads to a terminal node (no cycles). Return every safe node, sorted in ascending order.",
+    "function_name": "eventualSafeNodes",
+    "params": [
+      {
+        "name": "graph",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "n == graph.length",
+      "1 <= n <= 10^4"
+    ],
+    "hints": [
+      "A node is unsafe if it's on a cycle or leads to one — 3-color DFS (unvisited/visiting/safe) detects this: if you revisit a node currently 'in progress', that's a cycle.",
+      "Memoize each node's safe/unsafe result to avoid recomputation."
+    ],
+    "acceptance_rate": 46.41,
+    "total_submissions": 31355,
+    "display_order": 274,
+    "test_cases": [
+      {
+        "inputs": {
+          "graph": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              5
+            ],
+            [
+              0
+            ],
+            [
+              5
+            ],
+            [],
+            []
+          ]
+        },
+        "expected_output": [
+          2,
+          4,
+          5,
+          6
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "graph": [
+            [
+              1,
+              2,
+              3,
+              4
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              0,
+              4
+            ],
+            []
+          ]
+        },
+        "expected_output": [
+          4
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "graph": [
+            [],
+            [
+              0,
+              2,
+              3,
+              4
+            ],
+            [
+              3
+            ],
+            [
+              4
+            ],
+            []
+          ]
+        },
+        "expected_output": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "possible-bipartition",
+    "title": "Possible Bipartition",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "BFS",
+      "Union Find"
+    ],
+    "description": "Given `n` people labeled `1` to `n` and a list `dislikes` of pairs of people who dislike each other, return `true` if it's possible to split everyone into two groups such that no two people in the same group dislike each other.",
+    "function_name": "possibleBipartition",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "dislikes",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 2000",
+      "0 <= dislikes.length <= 10^4"
+    ],
+    "hints": [
+      "Build a graph where an edge connects two people who dislike each other, then this is exactly the Is Graph Bipartite check: try to 2-color the graph, and fail if any edge connects two same-colored people."
+    ],
+    "acceptance_rate": 39.86,
+    "total_submissions": 81568,
+    "display_order": 275,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 4,
+          "dislikes": [
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              4
+            ]
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 3,
+          "dislikes": [
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 5,
+          "dislikes": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              4
+            ],
+            [
+              4,
+              5
+            ],
+            [
+              1,
+              5
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "loud-and-rich",
+    "title": "Loud and Rich",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "Topological Sort"
+    ],
+    "description": "Given `richer` (a list of pairs `[a, b]` meaning person `a` has more money than person `b`) and `quiet` (where `quiet[i]` is how quiet person `i` is, all distinct), return an array `answer` where `answer[x]` is the least quiet person among everyone who has money greater than or equal to person `x`.",
+    "function_name": "loudAndRich",
+    "params": [
+      {
+        "name": "richer",
+        "type": "integer[][]"
+      },
+      {
+        "name": "quiet",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= quiet.length <= 500",
+      "0 <= richer.length <= n * (n - 1) / 2",
+      "All quiet[i] are distinct."
+    ],
+    "hints": [
+      "Build a graph with an edge from richer person to poorer person, then for each person, DFS through everyone at least as rich as them, tracking the minimum quiet value found (memoize to avoid recomputation)."
+    ],
+    "acceptance_rate": 44.64,
+    "total_submissions": 31336,
+    "display_order": 276,
+    "test_cases": [
+      {
+        "inputs": {
+          "richer": [
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              1
+            ],
+            [
+              3,
+              1
+            ],
+            [
+              3,
+              7
+            ],
+            [
+              4,
+              3
+            ],
+            [
+              5,
+              3
+            ],
+            [
+              6,
+              3
+            ]
+          ],
+          "quiet": [
+            3,
+            2,
+            5,
+            4,
+            6,
+            1,
+            7,
+            0
+          ]
+        },
+        "expected_output": [
+          5,
+          5,
+          2,
+          5,
+          4,
+          5,
+          6,
+          7
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "richer": [],
+          "quiet": [
+            0
+          ]
+        },
+        "expected_output": [
+          0
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "richer": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ]
+          ],
+          "quiet": [
+            3,
+            2,
+            1,
+            0
+          ]
+        },
+        "expected_output": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "course-schedule-iii",
+    "title": "Course Schedule III",
+    "difficulty": "hard",
+    "tags": [
+      "Array",
+      "Greedy",
+      "Heap"
+    ],
+    "description": "Given `courses` where `courses[i] = [durationi, lastDayi]` means the course takes `durationi` days and must be finished by day `lastDayi`, taking one course at a time, return the maximum number of courses you can take.",
+    "function_name": "scheduleCourse",
+    "params": [
+      {
+        "name": "courses",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= courses.length <= 10^4",
+      "1 <= durationi <= 10^4",
+      "1 <= lastDayi <= 10^4"
+    ],
+    "hints": [
+      "Sort courses by deadline, greedily taking every course you can fit.",
+      "Whenever adding a course would blow the current deadline, use a max-heap of taken durations to drop the single longest course taken so far if that helps fit more courses in overall."
+    ],
+    "acceptance_rate": 38.98,
+    "total_submissions": 14482,
+    "display_order": 277,
+    "test_cases": [
+      {
+        "inputs": {
+          "courses": [
+            [
+              100,
+              200
+            ],
+            [
+              200,
+              1300
+            ],
+            [
+              1000,
+              1250
+            ],
+            [
+              2000,
+              3200
+            ]
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "courses": [
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "courses": [
+            [
+              3,
+              2
+            ],
+            [
+              4,
+              3
+            ]
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "parallel-courses",
+    "title": "Parallel Courses",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "Topological Sort",
+      "BFS"
+    ],
+    "description": "You are given an integer `n` (courses labeled 1 to n) and a list `relations` where `relations[i] = [prevCourse, nextCourse]` means `prevCourse` must be taken before `nextCourse`. In one semester you can take any number of courses as long as their prerequisites were completed in a previous semester. Return the minimum number of semesters needed to take all courses, or `-1` if impossible (a cycle exists).",
+    "function_name": "minimumSemesters",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "relations",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 5000",
+      "1 <= relations.length <= 5000"
+    ],
+    "hints": [
+      "This is a topological sort (Kahn's algorithm) processed level by level (BFS layers): each layer is one semester, since everything in it has all prerequisites already satisfied.",
+      "If you can't process all n courses this way, there's a cycle — return -1."
+    ],
+    "acceptance_rate": 39.71,
+    "total_submissions": 46018,
+    "display_order": 278,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 3,
+          "relations": [
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 3,
+          "relations": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              3,
+              1
+            ]
+          ]
+        },
+        "expected_output": -1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1,
+          "relations": []
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "reorder-routes-to-make-all-paths-lead-to-the-city-zero",
+    "title": "Reorder Routes to Make All Paths Lead to the City Zero",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "BFS"
+    ],
+    "description": "There are `n` cities connected by `n-1` one-directional roads, given as `connections[i] = [a, b]` meaning a road from `a` to `b`. Every city can reach city 0 if some roads are reversed. Return the minimum number of roads that need to be reversed so every city can reach city 0.",
+    "function_name": "minReorder",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "connections",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= n <= 5 * 10^4",
+      "connections.length == n - 1"
+    ],
+    "hints": [
+      "Build an undirected version of the tree, remembering the original direction of each edge.",
+      "DFS/BFS from city 0 outward: whenever you traverse an edge in the direction away from 0 (i.e. the original road already points away from 0), it needs to be reversed."
+    ],
+    "acceptance_rate": 38.76,
+    "total_submissions": 5950,
+    "display_order": 279,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 6,
+          "connections": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              3
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              4,
+              0
+            ],
+            [
+              4,
+              5
+            ]
+          ]
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 5,
+          "connections": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 3,
+          "connections": [
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "number-of-operations-to-make-network-connected",
+    "title": "Number of Operations to Make Network Connected",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "Union Find",
+      "DFS",
+      "BFS"
+    ],
+    "description": "There are `n` computers connected by `connections` (each `[a, b]` a direct cable between computer `a` and `b`). In one operation you can move a cable between any two directly-connected computers to connect two different computers instead. Return the minimum number of operations to make all computers connected, or `-1` if it's impossible.",
+    "function_name": "makeConnected",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "connections",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 10^5",
+      "1 <= connections.length <= min(n * (n - 1) / 2, 10^5)"
+    ],
+    "hints": [
+      "You need at least n-1 cables to connect n computers — if there are fewer, it's impossible.",
+      "Otherwise, count the number of connected components (via Union-Find); you need exactly (components - 1) operations, since each spare cable can join two components."
+    ],
+    "acceptance_rate": 40.73,
+    "total_submissions": 5277,
+    "display_order": 280,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 4,
+          "connections": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 6,
+          "connections": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              3
+            ]
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 6,
+          "connections": [
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": -1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "smallest-string-with-swaps",
+    "title": "Smallest String With Swaps",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Union Find",
+      "Graph"
+    ],
+    "description": "Given a string `s` and an array of `pairs` where each `pairs[i] = [a, b]` indicates you may swap the characters at indices `a` and `b` (any number of times, in any order), return the lexicographically smallest string achievable.",
+    "function_name": "smallestStringWithSwaps",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "pairs",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 10^5",
+      "0 <= pairs.length <= 10^5"
+    ],
+    "hints": [
+      "Indices connected (directly or indirectly) through the pairs can have their characters freely rearranged among themselves — that's a Union-Find connected-components problem.",
+      "For each connected component, sort its characters and place them back into the component's index positions in ascending order."
+    ],
+    "acceptance_rate": 41.88,
+    "total_submissions": 14817,
+    "display_order": 281,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "dcab",
+          "pairs": [
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": "bacd",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "dcab",
+          "pairs": [
+            [
+              0,
+              3
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        "expected_output": "abcd",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "cba",
+          "pairs": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": "abc",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "similar-string-groups",
+    "title": "Similar String Groups",
+    "difficulty": "hard",
+    "tags": [
+      "String",
+      "Union Find",
+      "Graph"
+    ],
+    "description": "Two strings are similar if swapping at most two letters (in one of them) makes them equal. Given an array `strs` of anagram strings of each other, return the number of groups of similar strings (similarity is transitive within a group).",
+    "function_name": "numSimilarGroups",
+    "params": [
+      {
+        "name": "strs",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= strs.length <= 300",
+      "1 <= strs[i].length <= 300",
+      "strs[i] consists of lowercase letters and all are anagrams of each other."
+    ],
+    "hints": [
+      "Two strings are similar exactly when they differ in 0 or 2 positions (since they're anagrams).",
+      "Union-Find every pair of similar strings together, then count the number of distinct components."
+    ],
+    "acceptance_rate": 34.59,
+    "total_submissions": 77218,
+    "display_order": 282,
+    "test_cases": [
+      {
+        "inputs": {
+          "strs": [
+            "tars",
+            "rats",
+            "arst"
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "strs": [
+            "omv",
+            "ovm"
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "strs": [
+            "a"
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "regions-cut-by-slashes",
+    "title": "Regions Cut By Slashes",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Union Find",
+      "Graph",
+      "Matrix"
+    ],
+    "description": "An `n x n` grid is given as `grid`, where each cell is `' '` (blank), `'/'`, or `'\\\\'`. Each character divides its 1x1 cell into two triangles. Return the number of regions the entire grid is divided into.",
+    "function_name": "regionsBySlashes",
+    "params": [
+      {
+        "name": "grid",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "n == grid.length == grid[i].length",
+      "1 <= n <= 30",
+      "grid[i][j] is '/', '\\\\', or ' '."
+    ],
+    "hints": [
+      "Split every cell into 4 triangles (top, right, bottom, left) and union adjacent triangles: always union within a cell according to its character, and always union a cell's triangle with the matching triangle of its neighbor.",
+      "The answer is the number of connected components across all 4*n*n triangles."
+    ],
+    "acceptance_rate": 46.9,
+    "total_submissions": 1655,
+    "display_order": 283,
+    "test_cases": [
+      {
+        "inputs": {
+          "grid": [
+            " /",
+            "/ "
+          ]
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            " /",
+            "  "
+          ]
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            "/\\\\",
+            "\\\\/"
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "evaluate-division",
+    "title": "Evaluate Division",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "Union Find"
+    ],
+    "description": "You are given equations as two parallel arrays `numerators` and `denominators` (the `i`-th equation is `numerators[i] / denominators[i] = values[i]`), plus queries as two parallel arrays `queryNumerators` and `queryDenominators`. For each query `a / b`, compute its value using the given equations, or `-1.0` if it cannot be determined. Return the array of results.",
+    "function_name": "calcEquation",
+    "params": [
+      {
+        "name": "numerators",
+        "type": "string[]"
+      },
+      {
+        "name": "denominators",
+        "type": "string[]"
+      },
+      {
+        "name": "values",
+        "type": "double[]"
+      },
+      {
+        "name": "queryNumerators",
+        "type": "string[]"
+      },
+      {
+        "name": "queryDenominators",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "double[]",
+    "comparison_mode": "float_tolerance",
+    "constraints": [
+      "1 <= numerators.length <= 20",
+      "values[i] is a positive real number."
+    ],
+    "hints": [
+      "Build a weighted directed graph: an edge a -> b with weight values[i] (and the reverse edge b -> a with weight 1/values[i]).",
+      "For each query, DFS from the query's numerator variable to its denominator variable, multiplying edge weights along the path; if no path exists (or a variable is unknown), the answer is -1.0."
+    ],
+    "acceptance_rate": 45.01,
+    "total_submissions": 52305,
+    "display_order": 284,
+    "test_cases": [
+      {
+        "inputs": {
+          "numerators": [
+            "a",
+            "b"
+          ],
+          "denominators": [
+            "b",
+            "c"
+          ],
+          "values": [
+            2.0,
+            3.0
+          ],
+          "queryNumerators": [
+            "a",
+            "b",
+            "a",
+            "x"
+          ],
+          "queryDenominators": [
+            "c",
+            "a",
+            "x",
+            "x"
+          ]
+        },
+        "expected_output": [
+          6.0,
+          0.5,
+          -1.0,
+          -1.0
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "numerators": [
+            "a",
+            "b",
+            "c"
+          ],
+          "denominators": [
+            "b",
+            "c",
+            "a"
+          ],
+          "values": [
+            1.0,
+            2.0,
+            3.0
+          ],
+          "queryNumerators": [
+            "a",
+            "b",
+            "c"
+          ],
+          "queryDenominators": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "expected_output": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "numerators": [
+            "x1",
+            "x2"
+          ],
+          "denominators": [
+            "x2",
+            "x3"
+          ],
+          "values": [
+            3.0,
+            0.5
+          ],
+          "queryNumerators": [
+            "x1",
+            "x1",
+            "x1",
+            "x4"
+          ],
+          "queryDenominators": [
+            "x3",
+            "x5",
+            "x1",
+            "x4"
+          ]
+        },
+        "expected_output": [
+          1.5,
+          -1.0,
+          1.0,
+          -1.0
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ],
+    "comparison_epsilon": 1e-05
+  },
+  {
+    "slug": "course-schedule-iv",
+    "title": "Course Schedule IV",
+    "difficulty": "medium",
+    "tags": [
+      "Graph",
+      "DFS",
+      "BFS",
+      "Dynamic Programming"
+    ],
+    "description": "Given `numCourses` courses labeled `0` to `numCourses-1` and a list of `prerequisites` pairs `[a, b]` meaning `a` is a prerequisite of `b`, along with `queries`, return a boolean array where the `i`-th value indicates whether `queries[i][0]` is a (direct or indirect) prerequisite of `queries[i][1]`.",
+    "function_name": "checkIfPrerequisite",
+    "params": [
+      {
+        "name": "numCourses",
+        "type": "integer"
+      },
+      {
+        "name": "prerequisites",
+        "type": "integer[][]"
+      },
+      {
+        "name": "queries",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "boolean[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "2 <= numCourses <= 100",
+      "0 <= prerequisites.length <= (numCourses * (numCourses - 1) / 2)"
+    ],
+    "hints": [
+      "Compute full transitive reachability between every pair of courses first (e.g. run a DFS/BFS from every course, or use Floyd-Warshall-style reachability propagation in topological order).",
+      "Then each query is just an O(1) lookup into that reachability table."
+    ],
+    "acceptance_rate": 41.14,
+    "total_submissions": 43397,
+    "display_order": 285,
+    "test_cases": [
+      {
+        "inputs": {
+          "numCourses": 2,
+          "prerequisites": [
+            [
+              1,
+              0
+            ]
+          ],
+          "queries": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        "expected_output": [
+          false,
+          true
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "numCourses": 2,
+          "prerequisites": [],
+          "queries": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        "expected_output": [
+          false,
+          false
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "numCourses": 3,
+          "prerequisites": [
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              0
+            ],
+            [
+              2,
+              0
+            ]
+          ],
+          "queries": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": [
+          true,
+          true
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "diagonal-traverse",
+    "title": "Diagonal Traverse",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given an `m x n` matrix `mat`, return all elements of the matrix in a diagonal order (zig-zagging: up-right along one diagonal, then down-left along the next, alternating).",
+    "function_name": "findDiagonalOrder",
+    "params": [
+      {
+        "name": "mat",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == mat.length",
+      "n == mat[i].length",
+      "1 <= m, n <= 10^4"
+    ],
+    "hints": [
+      "Group cells by diagonal index (row + col). Even-indexed diagonals are traversed bottom-to-top, odd-indexed diagonals top-to-bottom."
+    ],
+    "acceptance_rate": 43.27,
+    "total_submissions": 23520,
+    "display_order": 286,
+    "test_cases": [
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ]
+        },
+        "expected_output": [
+          1,
+          2,
+          4,
+          7,
+          5,
+          3,
+          6,
+          8,
+          9
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        "expected_output": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2,
+              3
+            ]
+          ]
+        },
+        "expected_output": [
+          1,
+          2,
+          3
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "transpose-matrix",
+    "title": "Transpose Matrix",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given a 2D integer array `matrix`, return its transpose (the matrix with rows and columns swapped).",
+    "function_name": "transposeMatrix",
+    "params": [
+      {
+        "name": "matrix",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == matrix.length",
+      "n == matrix[i].length",
+      "1 <= m, n <= 1000"
+    ],
+    "hints": [
+      "The transposed matrix has result[c][r] = matrix[r][c] for every cell."
+    ],
+    "acceptance_rate": 70.0,
+    "total_submissions": 63266,
+    "display_order": 287,
+    "test_cases": [
+      {
+        "inputs": {
+          "matrix": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            4
+          ],
+          [
+            2,
+            5
+          ],
+          [
+            3,
+            6
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matrix": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            3
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matrix": [
+            [
+              1
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "reshape-the-matrix",
+    "title": "Reshape the Matrix",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix",
+      "Simulation"
+    ],
+    "description": "Given an `m x n` matrix `mat` and two integers `r` and `c`, reshape it into an `r x c` matrix while keeping the same row-major element order. Return the reshaped matrix, or the original matrix if the reshape is not possible (the element counts don't match).",
+    "function_name": "matrixReshape",
+    "params": [
+      {
+        "name": "mat",
+        "type": "integer[][]"
+      },
+      {
+        "name": "r",
+        "type": "integer"
+      },
+      {
+        "name": "c",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == mat.length",
+      "n == mat[i].length",
+      "1 <= m, n <= 100",
+      "1 <= r, c <= 300"
+    ],
+    "hints": [
+      "Flatten the matrix into a single sequence in row-major order, then re-chunk it into r rows of c elements each — but only if m*n == r*c."
+    ],
+    "acceptance_rate": 62.3,
+    "total_submissions": 64132,
+    "display_order": 288,
+    "test_cases": [
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ],
+          "r": 1,
+          "c": 4
+        },
+        "expected_output": [
+          [
+            1,
+            2,
+            3,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2
+            ],
+            [
+              3,
+              4
+            ]
+          ],
+          "r": 2,
+          "c": 4
+        },
+        "expected_output": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ]
+          ],
+          "r": 3,
+          "c": 2
+        },
+        "expected_output": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ],
+          [
+            5,
+            6
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "toeplitz-matrix",
+    "title": "Toeplitz Matrix",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given an `m x n` matrix `matrix`, return `true` if it is a Toeplitz matrix — every diagonal from top-left to bottom-right has the same elements.",
+    "function_name": "isToeplitzMatrix",
+    "params": [
+      {
+        "name": "matrix",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == matrix.length",
+      "n == matrix[i].length",
+      "1 <= m, n <= 20"
+    ],
+    "hints": [
+      "Every cell just needs to match the cell diagonally above-left of it (when one exists): matrix[r][c] == matrix[r-1][c-1]."
+    ],
+    "acceptance_rate": 68.65,
+    "total_submissions": 75792,
+    "display_order": 289,
+    "test_cases": [
+      {
+        "inputs": {
+          "matrix": [
+            [
+              1,
+              2,
+              3,
+              4
+            ],
+            [
+              5,
+              1,
+              2,
+              3
+            ],
+            [
+              9,
+              5,
+              1,
+              2
+            ]
+          ]
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matrix": [
+            [
+              1,
+              2
+            ],
+            [
+              2,
+              2
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "matrix": [
+            [
+              11,
+              74,
+              0,
+              93
+            ],
+            [
+              40,
+              11,
+              74,
+              7
+            ]
+          ]
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "image-smoother",
+    "title": "Image Smoother",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given an `m x n` integer matrix `img` representing grayscale values, return a smoothed image where each cell is the average (rounded down) of itself and all its existing 8 surrounding neighbors.",
+    "function_name": "imageSmoother",
+    "params": [
+      {
+        "name": "img",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == img.length",
+      "n == img[i].length",
+      "1 <= m, n <= 200",
+      "0 <= img[i][j] <= 255"
+    ],
+    "hints": [
+      "For each cell, sum its value and every valid in-bounds neighbor among the 8 surrounding cells, then divide by however many cells were actually summed (which varies near edges/corners)."
+    ],
+    "acceptance_rate": 56.88,
+    "total_submissions": 70803,
+    "display_order": 290,
+    "test_cases": [
+      {
+        "inputs": {
+          "img": [
+            [
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              0,
+              1
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ],
+          [
+            0,
+            0,
+            0
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "img": [
+            [
+              100,
+              200,
+              100
+            ],
+            [
+              200,
+              50,
+              200
+            ],
+            [
+              100,
+              200,
+              100
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            137,
+            141,
+            137
+          ],
+          [
+            141,
+            138,
+            141
+          ],
+          [
+            137,
+            141,
+            137
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "img": [
+            [
+              1
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "matrix-diagonal-sum",
+    "title": "Matrix Diagonal Sum",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given a square matrix `mat`, return the sum of the matrix diagonals — both the primary diagonal and the secondary diagonal, counting the middle element only once for an odd-sized matrix.",
+    "function_name": "diagonalSum",
+    "params": [
+      {
+        "name": "mat",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "n == mat.length == mat[i].length",
+      "1 <= n <= 100"
+    ],
+    "hints": [
+      "For row i, add mat[i][i] (primary diagonal) and mat[i][n-1-i] (secondary diagonal), but don't double-count the center cell when n is odd."
+    ],
+    "acceptance_rate": 62.83,
+    "total_submissions": 6516,
+    "display_order": 291,
+    "test_cases": [
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ]
+        },
+        "expected_output": 25,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1,
+              1
+            ]
+          ]
+        },
+        "expected_output": 8,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "mat": [
+            [
+              5
+            ]
+          ]
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "flipping-an-image",
+    "title": "Flipping an Image",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix"
+    ],
+    "description": "Given a binary matrix `image`, flip it horizontally (reverse each row), then invert it (0 becomes 1, 1 becomes 0). Return the resulting image.",
+    "function_name": "flipAndInvertImage",
+    "params": [
+      {
+        "name": "image",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "n == image.length == image[i].length",
+      "1 <= n <= 20",
+      "image[i][j] is 0 or 1."
+    ],
+    "hints": [
+      "Reversing a row and then flipping every bit is the same as reversing the row while swapping 0s and 1s as you go."
+    ],
+    "acceptance_rate": 55.35,
+    "total_submissions": 4666,
+    "display_order": 292,
+    "test_cases": [
+      {
+        "inputs": {
+          "image": [
+            [
+              1,
+              1,
+              0
+            ],
+            [
+              1,
+              0,
+              1
+            ],
+            [
+              0,
+              0,
+              0
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            1,
+            1,
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "image": [
+            [
+              1,
+              1,
+              0,
+              0
+            ],
+            [
+              1,
+              0,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              0,
+              1,
+              0
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1,
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            0,
+            1
+          ],
+          [
+            1,
+            0,
+            1,
+            0
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "image": [
+            [
+              0
+            ]
+          ]
+        },
+        "expected_output": [
+          [
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "spiral-matrix-ii",
+    "title": "Spiral Matrix II",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Matrix",
+      "Simulation"
+    ],
+    "description": "Given a positive integer `n`, generate an `n x n` matrix filled with elements `1` to `n^2` in spiral order, and return it.",
+    "function_name": "generateMatrix",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 20"
+    ],
+    "hints": [
+      "Maintain four shrinking boundaries (top, bottom, left, right) and fill values in order, moving right across the top row, down the right column, left across the bottom row, and up the left column, then shrink inward."
+    ],
+    "acceptance_rate": 40.02,
+    "total_submissions": 34657,
+    "display_order": 293,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 3
+        },
+        "expected_output": [
+          [
+            1,
+            2,
+            3
+          ],
+          [
+            8,
+            9,
+            4
+          ],
+          [
+            7,
+            6,
+            5
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1
+        },
+        "expected_output": [
+          [
+            1
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 4
+        },
+        "expected_output": [
+          [
+            1,
+            2,
+            3,
+            4
+          ],
+          [
+            12,
+            13,
+            14,
+            5
+          ],
+          [
+            11,
+            16,
+            15,
+            6
+          ],
+          [
+            10,
+            9,
+            8,
+            7
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "cells-with-odd-values-in-a-matrix",
+    "title": "Cells with Odd Values in a Matrix",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix",
+      "Simulation"
+    ],
+    "description": "Given `m`, `n`, and an array `indices` where each `indices[i] = [ri, ci]` means increment every cell in row `ri` and every cell in column `ci` by 1, apply all increments starting from an all-zero `m x n` matrix, and return the number of cells with an odd value.",
+    "function_name": "oddCells",
+    "params": [
+      {
+        "name": "m",
+        "type": "integer"
+      },
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "indices",
+        "type": "integer[][]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= m, n <= 50",
+      "1 <= indices.length <= 100"
+    ],
+    "hints": [
+      "You don't need the actual matrix — just count how many times each row and each column was incremented.",
+      "A cell's total increment is (its row's count + its column's count); it's odd exactly when those two counts have different parities."
+    ],
+    "acceptance_rate": 55.07,
+    "total_submissions": 47775,
+    "display_order": 294,
+    "test_cases": [
+      {
+        "inputs": {
+          "m": 2,
+          "n": 3,
+          "indices": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              1
+            ]
+          ]
+        },
+        "expected_output": 6,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "m": 2,
+          "n": 2,
+          "indices": [
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "m": 3,
+          "n": 3,
+          "indices": [
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              1
+            ],
+            [
+              0,
+              0
+            ]
+          ]
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "shift-2d-grid",
+    "title": "Shift 2D Grid",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Matrix",
+      "Simulation"
+    ],
+    "description": "Given an `m x n` integer `grid` and an integer `k`, shift the grid `k` times: each shift moves every element to the position immediately to its right, wrapping the last element of a row to the start of the next row (and the last element overall back to position [0][0]). Return the grid after `k` shifts.",
+    "function_name": "shiftGrid",
+    "params": [
+      {
+        "name": "grid",
+        "type": "integer[][]"
+      },
+      {
+        "name": "k",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer[][]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "m == grid.length",
+      "n == grid[i].length",
+      "1 <= m, n <= 50",
+      "0 <= k <= 100"
+    ],
+    "hints": [
+      "Flatten the grid into a single row-major list, rotate it right by k (mod the total element count), then re-chunk it back into an m x n grid."
+    ],
+    "acceptance_rate": 59.42,
+    "total_submissions": 42920,
+    "display_order": 295,
+    "test_cases": [
+      {
+        "inputs": {
+          "grid": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ],
+            [
+              7,
+              8,
+              9
+            ]
+          ],
+          "k": 1
+        },
+        "expected_output": [
+          [
+            9,
+            1,
+            2
+          ],
+          [
+            3,
+            4,
+            5
+          ],
+          [
+            6,
+            7,
+            8
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            [
+              3,
+              8,
+              1,
+              9
+            ],
+            [
+              19,
+              7,
+              2,
+              5
+            ],
+            [
+              4,
+              6,
+              11,
+              10
+            ],
+            [
+              12,
+              0,
+              21,
+              13
+            ]
+          ],
+          "k": 4
+        },
+        "expected_output": [
+          [
+            12,
+            0,
+            21,
+            13
+          ],
+          [
+            3,
+            8,
+            1,
+            9
+          ],
+          [
+            19,
+            7,
+            2,
+            5
+          ],
+          [
+            4,
+            6,
+            11,
+            10
+          ]
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "grid": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              4,
+              5,
+              6
+            ]
+          ],
+          "k": 9
+        },
+        "expected_output": [
+          [
+            4,
+            5,
+            6
+          ],
+          [
+            1,
+            2,
+            3
+          ]
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "binary-number-with-alternating-bits",
+    "title": "Binary Number with Alternating Bits",
+    "difficulty": "easy",
+    "tags": [
+      "Bit Manipulation"
+    ],
+    "description": "Given a positive integer `n`, return `true` if its binary representation has alternating bits (no two adjacent bits have the same value).",
+    "function_name": "hasAlternatingBits",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      }
+    ],
+    "return_type": "boolean",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 2^31 - 1"
+    ],
+    "hints": [
+      "Compare n with itself shifted right by 1, using XOR — for alternating bits, every bit of that XOR result is 1, meaning the result is of the form 0b111...1.",
+      "A number of the form 2^k - 1 satisfies m & (m+1) == 0."
+    ],
+    "acceptance_rate": 65.36,
+    "total_submissions": 33185,
+    "display_order": 296,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 5
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 7
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 11
+        },
+        "expected_output": false,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "n": 10
+        },
+        "expected_output": true,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "prime-number-of-set-bits-in-binary-representation",
+    "title": "Prime Number of Set Bits in Binary Representation",
+    "difficulty": "easy",
+    "tags": [
+      "Bit Manipulation",
+      "Math"
+    ],
+    "description": "Given two integers `left` and `right`, return the count of numbers in the inclusive range `[left, right]` whose binary representation has a prime number of set bits.",
+    "function_name": "countPrimeSetBits",
+    "params": [
+      {
+        "name": "left",
+        "type": "integer"
+      },
+      {
+        "name": "right",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= left <= right <= 10^6",
+      "right - left <= 10^4"
+    ],
+    "hints": [
+      "For each number in range, count its set bits, then check if that count is prime (small primes only, since bit counts here are modest)."
+    ],
+    "acceptance_rate": 64.5,
+    "total_submissions": 13702,
+    "display_order": 297,
+    "test_cases": [
+      {
+        "inputs": {
+          "left": 6,
+          "right": 10
+        },
+        "expected_output": 4,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "left": 10,
+          "right": 15
+        },
+        "expected_output": 5,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "left": 842,
+          "right": 888
+        },
+        "expected_output": 23,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "sort-integers-by-the-number-of-1-bits",
+    "title": "Sort Integers by The Number of 1 Bits",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Bit Manipulation",
+      "Sorting"
+    ],
+    "description": "Given an integer array `arr`, sort it in ascending order by the number of `1`'s in the binary representation of each number; for numbers with the same number of `1`'s, sort them in ascending numerical order.",
+    "function_name": "sortByBits",
+    "params": [
+      {
+        "name": "arr",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= arr.length <= 500",
+      "0 <= arr[i] <= 10^4"
+    ],
+    "hints": [
+      "Sort using a composite key: (number of set bits, the value itself)."
+    ],
+    "acceptance_rate": 59.88,
+    "total_submissions": 67232,
+    "display_order": 298,
+    "test_cases": [
+      {
+        "inputs": {
+          "arr": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ]
+        },
+        "expected_output": [
+          0,
+          1,
+          2,
+          4,
+          8,
+          3,
+          5,
+          6,
+          7
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            1024,
+            512,
+            256,
+            128,
+            64,
+            32,
+            16,
+            8,
+            4,
+            2,
+            1
+          ]
+        },
+        "expected_output": [
+          1,
+          2,
+          4,
+          8,
+          16,
+          32,
+          64,
+          128,
+          256,
+          512,
+          1024
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "arr": [
+            10000,
+            10000
+          ]
+        },
+        "expected_output": [
+          10000,
+          10000
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "minimum-flips-to-make-a-or-b-equal-to-c",
+    "title": "Minimum Flips to Make a OR b Equal to c",
+    "difficulty": "medium",
+    "tags": [
+      "Bit Manipulation"
+    ],
+    "description": "Given three positive integers `a`, `b`, and `c`, return the minimum number of bit flips (in `a` or `b`) needed so that `a OR b == c`.",
+    "function_name": "minFlips",
+    "params": [
+      {
+        "name": "a",
+        "type": "integer"
+      },
+      {
+        "name": "b",
+        "type": "integer"
+      },
+      {
+        "name": "c",
+        "type": "integer"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= a, b, c <= 10^9"
+    ],
+    "hints": [
+      "Examine each bit position independently. If the target bit is 1, you need at least one of a/b's corresponding bits to be 1 (0 flips if already true, else 1 flip). If the target bit is 0, both a and b's bits there must become 0, costing one flip per bit that's currently set."
+    ],
+    "acceptance_rate": 42.57,
+    "total_submissions": 39717,
+    "display_order": 299,
+    "test_cases": [
+      {
+        "inputs": {
+          "a": 2,
+          "b": 6,
+          "c": 5
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "a": 4,
+          "b": 2,
+          "c": 7
+        },
+        "expected_output": 1,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "a": 1,
+          "b": 2,
+          "c": 3
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "single-number-iii",
+    "title": "Single Number III",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Bit Manipulation"
+    ],
+    "description": "Given an integer array `nums` where exactly two elements appear only once and every other element appears exactly twice, return the two elements that appear only once, in any order.",
+    "function_name": "singleNumberIII",
+    "params": [
+      {
+        "name": "nums",
+        "type": "integer[]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "unordered",
+    "constraints": [
+      "2 <= nums.length <= 3 * 10^4",
+      "Exactly two elements appear once; the rest appear exactly twice."
+    ],
+    "hints": [
+      "XOR every number together — the result is the XOR of the two unique numbers (all pairs cancel out).",
+      "Find any set bit in that XOR result — it's a bit where the two unique numbers differ, so it can be used to split every number into two groups, each containing exactly one unique number."
+    ],
+    "acceptance_rate": 39.56,
+    "total_submissions": 56093,
+    "display_order": 300,
+    "test_cases": [
+      {
+        "inputs": {
+          "nums": [
+            1,
+            2,
+            1,
+            3,
+            2,
+            5
+          ]
+        },
+        "expected_output": [
+          3,
+          5
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            -1,
+            0
+          ]
+        },
+        "expected_output": [
+          -1,
+          0
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "nums": [
+            0,
+            1
+          ]
+        },
+        "expected_output": [
+          1,
+          0
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "baseball-game",
+    "title": "Baseball Game",
+    "difficulty": "easy",
+    "tags": [
+      "Array",
+      "Stack",
+      "Simulation"
+    ],
+    "description": "You are keeping score for a baseball game with strange rules. Given a list of string `operations`: an integer string records a new score, `\"+\"` records a new score equal to the sum of the previous two scores, `\"D\"` records a new score equal to double the previous score, and `\"C\"` invalidates and removes the previous score. Return the sum of all the scores on the record after applying all operations.",
+    "function_name": "calPoints",
+    "params": [
+      {
+        "name": "operations",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= operations.length <= 1000",
+      "operations[i] is '+', 'D', 'C', or a string representing an integer in [-3*10^4, 3*10^4]."
+    ],
+    "hints": [
+      "Simulate with a stack of scores: push for a number, and for '+'/'D'/'C' look at (and modify) only the top one or two entries."
+    ],
+    "acceptance_rate": 67.81,
+    "total_submissions": 11206,
+    "display_order": 301,
+    "test_cases": [
+      {
+        "inputs": {
+          "operations": [
+            "5",
+            "2",
+            "C",
+            "D",
+            "+"
+          ]
+        },
+        "expected_output": 30,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "operations": [
+            "5",
+            "-2",
+            "4",
+            "C",
+            "D",
+            "9",
+            "+",
+            "+"
+          ]
+        },
+        "expected_output": 27,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "operations": [
+            "1",
+            "C"
+          ]
+        },
+        "expected_output": 0,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "exclusive-time-of-functions",
+    "title": "Exclusive Time of Functions",
+    "difficulty": "medium",
+    "tags": [
+      "Array",
+      "Stack"
+    ],
+    "description": "Given `n` functions (0-indexed) running on a single-threaded CPU, and a list of string `logs` in the form `\"functionId:startOrEnd:timestamp\"` recording every function call's start and end, return an array where the `i`-th value is the total exclusive time spent executing function `i` (time spent in that function itself, not in functions it called).",
+    "function_name": "exclusiveTime",
+    "params": [
+      {
+        "name": "n",
+        "type": "integer"
+      },
+      {
+        "name": "logs",
+        "type": "string[]"
+      }
+    ],
+    "return_type": "integer[]",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= n <= 100",
+      "1 <= logs.length <= 500",
+      "logs are sorted by timestamp."
+    ],
+    "hints": [
+      "Use a call stack of active function ids: on 'start', charge any time gap to the function currently on top of the stack (if any) before pushing the new one.",
+      "On 'end', charge the current function its own time since the last recorded timestamp, then pop it."
+    ],
+    "acceptance_rate": 44.11,
+    "total_submissions": 82268,
+    "display_order": 302,
+    "test_cases": [
+      {
+        "inputs": {
+          "n": 2,
+          "logs": [
+            "0:start:0",
+            "1:start:2",
+            "1:end:5",
+            "0:end:6"
+          ]
+        },
+        "expected_output": [
+          3,
+          4
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 1,
+          "logs": [
+            "0:start:0",
+            "0:start:2",
+            "0:end:5",
+            "0:start:6",
+            "0:end:6",
+            "0:end:7"
+          ]
+        },
+        "expected_output": [
+          8
+        ],
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "n": 2,
+          "logs": [
+            "0:start:0",
+            "0:start:2",
+            "0:end:5",
+            "1:start:6",
+            "1:end:6",
+            "0:end:7"
+          ]
+        },
+        "expected_output": [
+          7,
+          1
+        ],
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "ternary-expression-parser",
+    "title": "Ternary Expression Parser",
+    "difficulty": "medium",
+    "tags": [
+      "String",
+      "Stack"
+    ],
+    "description": "Given a valid ternary expression string `expression` (digits, `?`, `:`, and possibly nested ternaries, right-associative, no leading zeros), evaluate and return the resulting single character.",
+    "function_name": "parseTernary",
+    "params": [
+      {
+        "name": "expression",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "3 <= expression.length <= 5000",
+      "expression consists of digits, '?', ':', and 'T'/'F' as boolean literals."
+    ],
+    "hints": [
+      "Scan the expression from right to left with a stack: when you see '?', pop the true-branch and false-branch values already on the stack along with the condition just before the '?', resolve, and push the result back.",
+      "Processing right to left naturally handles the right-associative nesting without needing to track brackets."
+    ],
+    "acceptance_rate": 46.9,
+    "total_submissions": 26817,
+    "display_order": 303,
+    "test_cases": [
+      {
+        "inputs": {
+          "expression": "T?2:3"
+        },
+        "expected_output": "2",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "expression": "F?1:T?4:5"
+        },
+        "expected_output": "4",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "expression": "T?T?F:5:3"
+        },
+        "expected_output": "F",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "basic-calculator",
+    "title": "Basic Calculator",
+    "difficulty": "hard",
+    "tags": [
+      "String",
+      "Stack",
+      "Math"
+    ],
+    "description": "Given a string `s` representing a valid arithmetic expression with non-negative integers, `+`, `-`, parentheses, and spaces, evaluate and return the result.",
+    "function_name": "calculate",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "integer",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 3 * 10^5",
+      "s consists of digits, '+', '-', '(', ')', and ' '.",
+      "s represents a valid expression."
+    ],
+    "hints": [
+      "Track a running result and a running sign, pushing both onto a stack whenever you enter a '(' (to save the context), and popping/combining them on ')'.",
+      "A '-' just before a parenthesis effectively flips the sign of everything inside it — that's what the sign-stack captures."
+    ],
+    "acceptance_rate": 34.12,
+    "total_submissions": 58585,
+    "display_order": 304,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "1 + 1"
+        },
+        "expected_output": 2,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": " 2-1 + 2 "
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "(1+(4+5+2)-3)+(6+8)"
+        },
+        "expected_output": 23,
+        "explanation": null,
+        "is_sample": false
+      },
+      {
+        "inputs": {
+          "s": "2-(5-6)"
+        },
+        "expected_output": 3,
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  },
+  {
+    "slug": "remove-outermost-parentheses",
+    "title": "Remove Outermost Parentheses",
+    "difficulty": "easy",
+    "tags": [
+      "String",
+      "Stack"
+    ],
+    "description": "A valid parentheses string is either empty, `(A)` where A is valid, or `AB` where A and B are valid. Given a valid parentheses string `s`, split it into its maximal primitive pieces, remove the outermost pair of parentheses from every primitive piece, and return the concatenated result.",
+    "function_name": "removeOuterParentheses",
+    "params": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "return_type": "string",
+    "comparison_mode": "exact",
+    "constraints": [
+      "1 <= s.length <= 10^5",
+      "s consists only of '(' and ')'.",
+      "s is a valid parentheses string."
+    ],
+    "hints": [
+      "Track a running depth counter: an opening bracket is part of the output unless it takes depth from 0 to 1 (an outermost open); a closing bracket is part of the output unless it takes depth from 1 to 0 (an outermost close)."
+    ],
+    "acceptance_rate": 65.8,
+    "total_submissions": 24914,
+    "display_order": 305,
+    "test_cases": [
+      {
+        "inputs": {
+          "s": "(()())(())"
+        },
+        "expected_output": "()()()",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "(()())(())(()(()))"
+        },
+        "expected_output": "()()()()(())",
+        "explanation": null,
+        "is_sample": true
+      },
+      {
+        "inputs": {
+          "s": "()()"
+        },
+        "expected_output": "",
+        "explanation": null,
+        "is_sample": false
+      }
+    ]
+  }
+]

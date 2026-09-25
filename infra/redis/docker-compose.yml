@@ -1,0 +1,62 @@
+# Redis for the APP tier — two instances on purpose (see docs/scaling-the-judge.md §3):
+#
+#  redis-queue  the judge queue. `noeviction`: when full, Redis refuses new writes
+#               (the API then answers 503 "queue unavailable") instead of silently
+#               dropping a queued submission. AOF on, so queued work survives a restart.
+#  redis-cache  results, rate limits, run-cache, breaker state. `allkeys-lru`: losing
+#               a key is harmless (a verdict not yet polled shows as "expired"; a
+#               counter resets), and it must never be able to push out queue data.
+#
+#   cp .env.example .env            # set REDIS_PASSWORD (openssl rand -hex 24)
+#   docker compose up -d
+#
+# Bound to 127.0.0.1 only. In production put these on a private network, keep the
+# password, and pin the image to a digest.
+
+x-redis: &redis
+  image: redis:7-alpine
+  restart: unless-stopped
+  environment:
+    REDISCLI_AUTH: ${REDIS_PASSWORD:?set REDIS_PASSWORD in infra/redis/.env}
+  healthcheck:
+    test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+    interval: 10s
+    timeout: 3s
+    retries: 3
+
+services:
+  redis-queue:
+    <<: *redis
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - ${REDIS_QUEUE_MAXMEMORY:-512mb}
+      - --maxmemory-policy
+      - noeviction
+    ports: ["127.0.0.1:${REDIS_QUEUE_PORT:-6379}:6379"]
+    volumes: ["redis_queue:/data"]
+
+  redis-cache:
+    <<: *redis
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD}
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --maxmemory
+      - ${REDIS_CACHE_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    ports: ["127.0.0.1:${REDIS_CACHE_PORT:-6380}:6379"]
+
+volumes:
+  redis_queue:

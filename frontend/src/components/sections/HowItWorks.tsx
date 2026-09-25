@@ -1,24 +1,24 @@
 import { Container } from "@/components/layout/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { HOW_IT_WORKS_STEPS } from "@/data/navigation";
-import { Layers, FileCode, PlayCircle, Award } from "lucide-react";
+import { Building2, Upload, Briefcase, Award } from "lucide-react";
 
 export function HowItWorks() {
-  const iconMap: Record<string, typeof Layers> = {
-    Layers,
-    FileCode,
-    PlayCircle,
+  const iconMap: Record<string, typeof Building2> = {
+    Building2,
+    Upload,
+    Briefcase,
     Award,
   };
 
   return (
-    <section className="py-20 sm:py-28 border-t border-border-subtle">
+    <section id="how-it-works" className="py-20 sm:py-28 border-t border-border-subtle">
       <Container size="xl">
         <SectionHeading
-          badge="Streamlined Workflow"
-          title="How It"
-          highlight="Works"
-          description="A frictionless, ultra-fast loop designed to build deep algorithmic intuition and contest muscle memory."
+          badge="Streamlined Onboarding"
+          title="From Signed Contract to"
+          highlight="First Placement"
+          description="No lengthy IT rollout, no manual spreadsheets — a campus can be fully live, with students prepping for real drives, inside a week."
         />
 
         {/* Desktop Horizontal Timeline & Mobile Vertical Timeline */}
@@ -28,7 +28,7 @@ export function HowItWorks() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
             {HOW_IT_WORKS_STEPS.map((step, idx) => {
-              const Icon = iconMap[step.icon] || Layers;
+              const Icon = iconMap[step.icon] || Building2;
               return (
                 <div
                   key={step.step}

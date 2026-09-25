@@ -1,11 +1,12 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { TopicMastery } from "@/data/studentAnalytics";
+import { TopicMastery } from "@/types/studentStats";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
 interface TopicMasteryListProps {
-  topics: TopicMastery[];
+  /** `trend` is optional — real topic mastery has no historical baseline to compare against, so the arrow is simply omitted. */
+  topics: (TopicMastery & { trend?: "up" | "down" | "flat" })[];
   limit?: number;
 }
 
@@ -22,7 +23,7 @@ export function TopicMasteryList({ topics, limit }: TopicMasteryListProps) {
   return (
     <div className="space-y-3.5">
       {rows.map((topic) => {
-        const pct = Math.round((topic.solved / topic.total) * 100);
+        const pct = topic.total > 0 ? Math.round((topic.solved / topic.total) * 100) : 0;
         const TrendIcon = topic.trend === "up" ? TrendingUp : topic.trend === "down" ? TrendingDown : Minus;
 
         return (
@@ -30,16 +31,18 @@ export function TopicMasteryList({ topics, limit }: TopicMasteryListProps) {
             <div className="flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className="font-semibold text-primary truncate">{topic.topic}</span>
-                <TrendIcon
-                  className={cn(
-                    "w-3.5 h-3.5 shrink-0",
-                    topic.trend === "up"
-                      ? "text-status-success"
-                      : topic.trend === "down"
-                      ? "text-status-danger"
-                      : "text-text-muted"
-                  )}
-                />
+                {topic.trend && (
+                  <TrendIcon
+                    className={cn(
+                      "w-3.5 h-3.5 shrink-0",
+                      topic.trend === "up"
+                        ? "text-status-success"
+                        : topic.trend === "down"
+                        ? "text-status-danger"
+                        : "text-text-muted"
+                    )}
+                  />
+                )}
               </div>
               <div className="flex items-center gap-2.5 shrink-0 font-mono text-text-muted">
                 <span>

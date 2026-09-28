@@ -1,19 +1,4 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin:0; padding:0; background-color:#F7F8FC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F8FC; padding:32px 16px;">
-        <tr>
-            <td align="center">
-                <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E5E7EB;">
-                    <tr>
-                        <td style="padding:28px 32px 0 32px;">
-                            <span style="font-size:20px; font-weight:800; color:#111827;">CodeGen</span> <span style="color:#4F46E5;">Box</span>
-                        </td>
-                    </tr>
+@include('emails.partials.header', ['preheader' => ($inquiry->candidate->user->name ?? 'A candidate').' '.($decision === 'decline' ? 'declined' : 'confirmed').' your HR interview invite.'])
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:{{ $decision === 'decline' ? '#FEE2E2' : '#D1FAE5' }}; color:{{ $decision === 'decline' ? '#991B1B' : '#065F46' }}; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
@@ -39,9 +24,4 @@
                             </a>
                         </td>
                     </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+@include('emails.partials.footer', ['note' => "You're receiving this because you scheduled this interview through Mellow's Talent Pool."])

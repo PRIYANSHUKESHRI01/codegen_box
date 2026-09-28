@@ -22,12 +22,22 @@ export interface Coordinator {
   created_at: string;
 }
 
+/** One real section at this college, from student data — see SectionCoordinatorService::sectionsFor(). `coordinator_name` is null when the section has no coordinator yet. */
+export interface SectionOption {
+  section: string;
+  student_count: number;
+  coordinator_name: string | null;
+}
+
 function EditCoordinatorModal({
   coordinator,
+  sections,
   onClose,
   onSaved,
 }: {
   coordinator: Coordinator;
+  /** Every real section at this college. Selectable here if it has no coordinator yet, OR it's this coordinator's own current section. */
+  sections: SectionOption[];
   onClose: () => void;
   onSaved: (updated: Coordinator) => void;
 }) {
@@ -35,6 +45,10 @@ function EditCoordinatorModal({
   const [phone, setPhone] = useState(coordinator.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const selectableSections = sections.filter(
+    (s) => s.coordinator_name === null || s.section === coordinator.section
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,12 +94,18 @@ function EditCoordinatorModal({
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-text-secondary mb-1">Section *</label>
-              <input
+              <select
                 required
                 value={section}
                 onChange={(e) => setSection(e.target.value)}
                 className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-accent-primary"
-              />
+              >
+                {selectableSections.map((s) => (
+                  <option key={s.section} value={s.section}>
+                    Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-text-secondary mb-1">Phone</label>
@@ -125,6 +145,7 @@ function EditCoordinatorModal({
 export default function SectionCoordinatorsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
   const [coordinators, setCoordinators] = useState<Coordinator[]>([]);
+  const [sections, setSections] = useState<SectionOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
@@ -141,8 +162,9 @@ export default function SectionCoordinatorsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await api.get<{ coordinators: Coordinator[] }>("/tpo/coordinators");
+      const res = await api.get<{ coordinators: Coordinator[]; sections: SectionOption[] }>("/tpo/coordinators");
       setCoordinators(res.coordinators);
+      setSections(res.sections);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "Failed to load your Section Coordinators.");
     } finally {
@@ -200,9 +222,13 @@ export default function SectionCoordinatorsPage() {
 
       <AddCoordinatorModal
         open={showAdd}
+        sections={sections}
         onClose={() => setShowAdd(false)}
         onAdded={(coordinator) => {
-          setCoordinators((prev) => [coordinator, ...prev]);
+          // Re-fetch rather than splice locally: the section this
+          // coordinator just took needs to disappear from the "available"
+          // list for next time the Add modal opens.
+          load();
           triggerToast(`${coordinator.name} added — login credentials emailed to ${coordinator.email}.`);
         }}
       />
@@ -210,9 +236,10 @@ export default function SectionCoordinatorsPage() {
       {editing && (
         <EditCoordinatorModal
           coordinator={editing}
+          sections={sections}
           onClose={() => setEditing(null)}
           onSaved={(updated) => {
-            setCoordinators((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            load();
             setEditing(null);
             triggerToast(`${updated.name} updated.`);
           }}

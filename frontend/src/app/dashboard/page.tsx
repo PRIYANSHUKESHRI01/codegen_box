@@ -553,7 +553,7 @@ export default function UserDashboardPage() {
         ) : !driveAccess ? (
           <div className="p-6 text-center rounded-panel bg-surface border border-border-subtle space-y-2">
             <p className="text-xs text-text-secondary">Placement drives aren&apos;t included on your current plan.</p>
-            <Link href="/pricing" className="inline-block text-xs font-bold text-accent-primary hover:underline">
+            <Link href="/dashboard/billing" className="inline-block text-xs font-bold text-accent-primary hover:underline">
               Upgrade to unlock placement drives →
             </Link>
           </div>

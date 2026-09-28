@@ -70,6 +70,15 @@ export function DashboardHeader({
   const router = useRouter();
   const { user } = useAuth();
   const { stats } = useMyStats(role === "user");
+
+  // A superadmin visiting a page shaped for another role (e.g. the Mellow
+  // Ops console at /admin, where `role` is deliberately "admin_internal" so
+  // the page's content/nav matches) must still see their real identity in
+  // the header breadcrumb/title/badge below — same bug and same fix as
+  // DashboardSidebar's currentRoleInfo. Only used for identity display;
+  // `role` itself still drives content-shaping checks (currentTpoView, the
+  // useMyStats call above) so the page's actual content is unaffected.
+  const identityRole = user?.role === "superadmin" ? "superadmin" : role;
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notificationsRead, setNotificationsRead] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -109,27 +118,27 @@ export function DashboardHeader({
   // Breadcrumb section context — role first, so a student is never labelled
   // with the Mellow-internal context just because currentTpoView defaults to it.
   const getBreadcrumbContext = () => {
-    if (role === "superadmin") return "Executive";
-    if (role === "admin_internal") return "Platform Ops";
-    if (role === "admin_tpo") return "Placement Cell";
-    if (role === "admin_marketing") return "Lead Growth";
-    if (role === "admin_company") return "Hiring Cell";
+    if (identityRole === "superadmin") return "Executive";
+    if (identityRole === "admin_internal") return "Platform Ops";
+    if (identityRole === "admin_tpo") return "Placement Cell";
+    if (identityRole === "admin_marketing") return "Lead Growth";
+    if (identityRole === "admin_company") return "Hiring Cell";
     return "Developer Arena";
   };
 
   // Concise portal name — stays stable while the page scrolls.
   const getDisplayTitle = () => {
-    if (role === "superadmin") return "Master Console";
-    if (role === "admin_internal") return "Mellow Operations";
-    if (role === "admin_tpo") return "College TPO Hub";
-    if (role === "admin_marketing") return "Marketing Hub";
-    if (role === "admin_company") return "Hiring Command Center";
+    if (identityRole === "superadmin") return "Master Console";
+    if (identityRole === "admin_internal") return "Mellow Operations";
+    if (identityRole === "admin_tpo") return "College TPO Hub";
+    if (identityRole === "admin_marketing") return "Marketing Hub";
+    if (identityRole === "admin_company") return "Hiring Command Center";
     return "Candidate Arena";
   };
 
   // High-density, non-wrapping status micro-badge
   const getStatusBadge = () => {
-    if (role === "superadmin") {
+    if (identityRole === "superadmin") {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-amber-500/10 text-amber-500 border border-amber-500/25 shadow-subtle flex-shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
@@ -137,7 +146,7 @@ export function DashboardHeader({
         </span>
       );
     }
-    if (role === "admin_internal" || (role === "admin_tpo" && currentTpoView === "mellow")) {
+    if (identityRole === "admin_internal" || (identityRole === "admin_tpo" && currentTpoView === "mellow")) {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 shadow-subtle flex-shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
@@ -145,7 +154,7 @@ export function DashboardHeader({
         </span>
       );
     }
-    if (role === "admin_tpo" || currentTpoView === "tpo") {
+    if (identityRole === "admin_tpo" || currentTpoView === "tpo") {
       // A TPO's own real college — never a hardcoded stand-in. Blank until
       // useAuth() resolves rather than flashing a wrong college name.
       return (
@@ -155,7 +164,7 @@ export function DashboardHeader({
         </span>
       );
     }
-    if (role === "admin_marketing") {
+    if (identityRole === "admin_marketing") {
       return (
         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 text-[11px] font-semibold rounded-full whitespace-nowrap bg-rose-500/10 text-rose-400 border border-rose-500/25 shadow-subtle flex-shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" />
@@ -163,7 +172,7 @@ export function DashboardHeader({
         </span>
       );
     }
-    if (role === "admin_company") {
+    if (identityRole === "admin_company") {
       // A hiring tenant's own real company — never a hardcoded stand-in,
       // same convention as the TPO's college badge above.
       return (

@@ -30,6 +30,44 @@ class SectionCoordinatorService
     }
 
     /**
+     * Every section that actually exists at this college — derived from its
+     * students' own `section` values (set at import time, see
+     * ProcessStudentImportJob/TpoStudentController::store()), not a
+     * free-text field the caller has to type and hope matches. This is what
+     * lets the frontend show "here are the real sections, here's which ones
+     * still need a coordinator" instead of a blind text box that only
+     * reveals a typo or a duplicate after submitting (see
+     * ensureSectionUnassigned() below, which this list is the UI-facing
+     * mirror of).
+     *
+     * @return list<array{section: string, student_count: int, coordinator_name: ?string}>
+     */
+    public function sectionsFor(int $collegeId): array
+    {
+        $studentCounts = User::where('college_id', $collegeId)
+            ->where('role', User::ROLE_USER)
+            ->whereNotNull('section')
+            ->where('section', '!=', '')
+            ->selectRaw('section, count(*) as student_count')
+            ->groupBy('section')
+            ->orderBy('section')
+            ->pluck('student_count', 'section');
+
+        $coordinatorBySection = User::where('college_id', $collegeId)
+            ->where('role', User::ROLE_SECTION_COORDINATOR)
+            ->pluck('name', 'section');
+
+        return $studentCounts
+            ->map(fn ($count, $section) => [
+                'section' => $section,
+                'student_count' => (int) $count,
+                'coordinator_name' => $coordinatorBySection[$section] ?? null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array{name: string, email: string, section: string, phone: ?string}  $data
      */
     public function create(int $collegeId, array $data, User $actor): User

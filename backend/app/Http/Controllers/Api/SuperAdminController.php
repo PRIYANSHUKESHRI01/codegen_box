@@ -7,6 +7,8 @@ use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\ActivityLog;
 use App\Models\College;
 use App\Models\Company;
+use App\Models\ContactRequest;
+use App\Models\NewsletterSubscriber;
 use App\Models\FeatureFlag;
 use App\Models\Submission;
 use App\Models\Subscription;
@@ -18,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Superadmin-only operations that sit a trust tier above admin_internal:
@@ -206,6 +209,23 @@ class SuperAdminController extends Controller
             'permissions.*' => ['string'],
         ]);
 
+        // Same seat cap every other student-creation path enforces — a
+        // "strict" limit has no admin-tool backdoor. Only meaningful for a
+        // student account; a TPO/staff account created against a college_id
+        // isn't consuming a student seat.
+        if ($validated['role'] === User::ROLE_USER && ! empty($validated['college_id'])) {
+            $college = College::find($validated['college_id']);
+            $limit = $college->studentLimit();
+
+            if ($limit !== null && $college->studentCount() >= $limit) {
+                $planName = $college->activePlan()?->name ?? 'current';
+
+                throw ValidationException::withMessages([
+                    'college_id' => ["{$college->name} is already at its {$planName} plan's limit of {$limit} students. Assign a bigger plan to add more."],
+                ]);
+            }
+        }
+
         $temporaryPassword = Str::password(16);
         $allowedPermissions = User::permissionCatalogForRole($validated['role']);
         $grantedPermissions = array_values(array_intersect($validated['permissions'] ?? [], $allowedPermissions));
@@ -240,6 +260,19 @@ class SuperAdminController extends Controller
                 ActivityLog::record(
                     $request->user(),
                     "Auto-assigned {$sweptCount} backlog lead(s) to a new marketing hire",
+                    'User',
+                    $user->name
+                );
+            }
+
+            // Same backlog sweep, for "Talk to Our Team" contact requests —
+            // its own independent queue (see LeadAssignmentService::assignContactRequest()).
+            $sweptContactRequests = app(LeadAssignmentService::class)->assignUnassignedContactRequests();
+
+            if ($sweptContactRequests > 0) {
+                ActivityLog::record(
+                    $request->user(),
+                    "Auto-assigned {$sweptContactRequests} backlog contact request(s) to a new marketing hire",
                     'User',
                     $user->name
                 );
@@ -360,6 +393,12 @@ class SuperAdminController extends Controller
         $segments = [
             'students' => User::where('role', User::ROLE_USER)->whereNotNull('college_id')->count(),
             'leads' => User::mellowDirectLeads()->count(),
+            // "Talk to Our Team" contact requests — a different lead type
+            // from the Mellow Direct leads above (never a User row, see
+            // ContactRequest's own docblock), so its own segment.
+            'contact_requests' => ContactRequest::count(),
+            'unassigned_contact_requests' => ContactRequest::whereNull('assigned_marketing_id')->count(),
+            'newsletter_subscribers' => NewsletterSubscriber::whereNull('unsubscribed_at')->count(),
             // A company-invited candidate is neither a student (no college)
             // nor a Mellow Direct lead (see scopeMellowDirectLeads) — its
             // own segment, rather than silently missing from this breakdown.

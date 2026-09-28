@@ -33,6 +33,7 @@ import {
   Mic,
   Newspaper,
   Award,
+  Inbox,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -40,8 +41,10 @@ import { getStoredUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
 import { useMyStats } from "@/lib/useMyStats";
+import type { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
 import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
 import { LogoBadge, Wordmark } from "@/components/brand/Logo";
+import { LogoutConfirmModal } from "@/components/dashboard/LogoutConfirmModal";
 
 export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "admin_marketing" | "user" | "section_coordinator" | "admin_company";
 
@@ -112,7 +115,40 @@ export function DashboardSidebar({
   const router = useRouter();
   const { logout } = useAuth();
 
+  // The actually signed-in account (from the verified session), not a
+  // switchable persona. Declared this early (rather than down by the
+  // identity-card/footer code that reads it) so getNavSections() below can
+  // also see it — a superadmin visiting a page shaped for another role
+  // (e.g. /admin's Mellow Ops console, where `currentRole` is deliberately
+  // "admin_internal" so the page's content matches) must still get their
+  // OWN full nav, not the narrower admin_internal-only section list, or
+  // they'd lose the sidebar's way back to their other superadmin sections
+  // while browsing.
+  const storedUser = getStoredUser();
+
   const { stats: myStats } = useMyStats(currentRole === "user");
+
+  // Plan shown in the footer, ChatGPT-style ("<plan> · Upgrade" under the
+  // name instead of the email). A student sees their own personal plan with
+  // a self-serve Upgrade link; a TPO sees their college's plan, read-only
+  // (coverage.source === "institution" hides the Upgrade link below — same
+  // "only Mellow staff can change it" rule as Settings' Billing tab). No
+  // other role has a plan concept at all, so this never fetches for them.
+  const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
+  useEffect(() => {
+    if (currentRole !== "user" && currentRole !== "admin_tpo") return;
+    let cancelled = false;
+    api
+      .get<MySubscriptionResponse>("/me/subscription")
+      .then((res) => {
+        if (!cancelled) setCoverage(res.coverage);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
+
   // Real segment counts for Mellow Ops nav badges (Partner Colleges/Problem
   // Bank) — same source of truth as the tabs they link to, via
   // AdminController::overview(). Never fetched for any other role. Called
@@ -148,7 +184,10 @@ export function DashboardSidebar({
     };
   }, []);
 
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
+
   const handleSignOut = () => {
+    setConfirmingLogout(false);
     api.post("/logout").catch(() => {});
     logout();
     router.push("/login");
@@ -263,18 +302,46 @@ export function DashboardSidebar({
       },
     ];
 
-    if (currentRole === "superadmin") {
+    // storedUser?.role, not currentRole: a superadmin browsing a page
+    // shaped for another role (e.g. /admin's Mellow Ops console, where
+    // currentRole is deliberately "admin_internal" so that page's own
+    // content/tabs render correctly) must still get their full nav here —
+    // otherwise the sidebar "shrinks" to just the admin_internal-only
+    // section list and they lose their way back to Students/Leads/Audit/etc
+    // without typing a URL. Checked before the admin_internal branch below
+    // for the same reason the identity-card override above is.
+    if (currentRole === "superadmin" || storedUser?.role === "superadmin") {
       // One item per real tab on the (client-side tab-shell) superadmin
       // page — matches ?tab= exactly as superadmin/page.tsx reads it,
       // same query-param convention the admin_marketing section below
       // already uses for /marketing?status=. Judge Infrastructure and
       // Feature Flags are one merged "Infrastructure & Flags" tab now, and
       // "Users & Roles" is three real tabs (Students/Leads/Mellow Staff),
-      // not one — every link here must land somewhere real. Also gets the
-      // full Mellow Ops section below it — useAuthGuard already lets
-      // superadmin onto every one of those pages, so the sidebar must
-      // actually link there instead of leaving them reachable only by
-      // typing the URL directly.
+      // not one — every link here must land somewhere real.
+      //
+      // Below that, superadmin also gets the Mellow Ops toolset — but with
+      // "Overview" and "Partner Colleges & TPOs" dropped: those are near-
+      // duplicates of "Overview & KPI" and "Partner Universities" above
+      // (different components — admin/mellow/{OpsOverviewPanel,
+      // PartnerCollegesPanel} vs admin/superadmin/{OverviewPanel,
+      // CollegesPanel} — but the same ground from a nav's perspective).
+      // Including both made the sidebar read as two dashboards stapled
+      // together, which is exactly what was reported as a bug. What's left
+      // (Problem Bank, Placement Drives, Contests, AI Interviews, Articles,
+      // Talent Pool, Platform Users, Customer Success) has no superadmin-
+      // console equivalent at all, so it stays reachable, clearly labeled
+      // as a distinct toolset rather than folded into Executive/Governance.
+      const mellowOpsExtrasForSuperadmin = mellowOpsSections.map((section) =>
+        section.title === "Mellow Ops"
+          ? {
+              ...section,
+              items: section.items.filter(
+                (item) => item.label !== "Overview" && item.label !== "Partner Colleges & TPOs"
+              ),
+            }
+          : section
+      );
+
       return [
         {
           title: "Executive",
@@ -306,7 +373,7 @@ export function DashboardSidebar({
             },
           ],
         },
-        ...mellowOpsSections,
+        ...mellowOpsExtrasForSuperadmin,
       ];
     }
 
@@ -418,6 +485,7 @@ export function DashboardSidebar({
             { label: "All Leads", href: "/marketing", icon: LayoutDashboard },
             { label: "New Leads", href: "/marketing?status=new", icon: UserSearch },
             { label: "Converted", href: "/marketing?status=converted", icon: CheckCircle2 },
+            { label: "Inquiries", href: "/marketing/inquiries", icon: Inbox },
           ],
         },
       ];
@@ -568,18 +636,22 @@ export function DashboardSidebar({
     },
   };
 
+  // (storedUser is declared near the top of the component — see that
+  // comment for why.) A superadmin visiting a page shaped for another role
+  // must still see their OWN identity here, not a "Mellow Staff" badge —
+  // checked before the admin_internal/TPO-view branches below (which exist
+  // for the same "content role ≠ identity role" reason, just for TPO
+  // pages), so it wins regardless of what `currentRole` says.
   const currentRoleInfo =
-    currentRole === "admin_internal" || (currentRole === "admin_tpo" && currentTpoView === "mellow")
+    storedUser?.role === "superadmin"
+      ? roleMeta.superadmin
+      : currentRole === "admin_internal" || (currentRole === "admin_tpo" && currentTpoView === "mellow")
       ? roleMeta.admin_internal
       : currentRole === "admin_tpo"
       ? roleMeta.admin_tpo
       : roleMeta[currentRole];
 
   const RoleIcon = currentRoleInfo.icon;
-
-  // The actually signed-in account (from the verified session), not a
-  // switchable persona — this sidebar shows who is logged in, nothing more.
-  const storedUser = getStoredUser();
   const displayName = storedUser?.name ?? currentRoleInfo.name;
   const displayEmail = storedUser?.email ?? currentRoleInfo.email;
   const isRatedStudent = (myStats?.rating.rated_contests_count ?? 0) > 0;
@@ -785,15 +857,31 @@ export function DashboardSidebar({
                   <span className="text-xs font-semibold text-primary truncate leading-tight">
                     {displayName}
                   </span>
-                  <span className="text-[10px] text-text-muted truncate mt-0.5">
-                    {displayEmail}
-                  </span>
+                  {currentRole === "user" || currentRole === "admin_tpo" ? (
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-[10px] text-text-muted truncate">
+                        {coverage === null ? "..." : coverage.plan?.name ? `${coverage.plan.name} Plan` : "No active plan"}
+                      </span>
+                      {coverage?.source === "individual" && (
+                        <Link
+                          href="/dashboard/billing"
+                          className="text-[10px] font-bold text-accent-primary hover:underline shrink-0"
+                        >
+                          Upgrade
+                        </Link>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-text-muted truncate mt-0.5">
+                      {displayEmail}
+                    </span>
+                  )}
                 </div>
               </div>
 
               {/* Sign Out Action */}
               <button
-                onClick={handleSignOut}
+                onClick={() => setConfirmingLogout(true)}
                 className="p-1.5 rounded-control text-text-muted hover:text-status-danger hover:bg-status-danger/10 transition-colors flex-shrink-0"
                 title="Sign Out"
                 aria-label="Sign Out"
@@ -817,7 +905,7 @@ export function DashboardSidebar({
                 <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-status-success ring-2 ring-surface" />
               </div>
               <button
-                onClick={handleSignOut}
+                onClick={() => setConfirmingLogout(true)}
                 className="p-1.5 rounded-control text-text-muted hover:text-status-danger hover:bg-status-danger/10 transition-colors"
                 title="Sign Out"
                 aria-label="Sign Out"
@@ -883,6 +971,12 @@ export function DashboardSidebar({
           </div>
         )}
       </AnimatePresence>
+
+      <LogoutConfirmModal
+        open={confirmingLogout}
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={handleSignOut}
+      />
     </>
   );
 }

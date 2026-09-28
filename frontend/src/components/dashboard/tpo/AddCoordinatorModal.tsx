@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, UserCog, Loader2 } from "lucide-react";
+import { X, UserCog, Loader2, Users } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Coordinator } from "@/app/admin/coordinators/page";
+import type { Coordinator, SectionOption } from "@/app/admin/coordinators/page";
 
 interface AddCoordinatorModalProps {
   open: boolean;
   onClose: () => void;
+  /** Every real section at this college — see SectionCoordinatorService::sectionsFor(). Filtered here to the ones with no coordinator yet. */
+  sections: SectionOption[];
   /** Fired with the newly created coordinator so the caller can prepend it without a full reload. */
   onAdded: (coordinator: Coordinator) => void;
 }
@@ -23,11 +25,29 @@ const EMPTY_FORM = { name: "", email: "", section: "", phone: "" };
  * server-generated-password + welcome-email + forced-first-login pipeline
  * as AddStudentModal, just a different role with no academic fields and one
  * required field a student's form doesn't have: which section they cover.
+ *
+ * Section is a picker over the college's REAL sections (from student data,
+ * see sectionsFor()) restricted to ones with no coordinator yet — not a
+ * free-text field the TPO has to type blind and only find out after
+ * submitting that it's a typo or already taken (see
+ * SectionCoordinatorService::ensureSectionUnassigned()).
  */
-export function AddCoordinatorModal({ open, onClose, onAdded }: AddCoordinatorModalProps) {
+export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoordinatorModalProps) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const availableSections = sections.filter((s) => s.coordinator_name === null);
+
+  // Default to the first available section as soon as the modal opens (or
+  // the list loads) — a picker with 8 sections and none pre-selected is
+  // more friction than a sensible default the TPO can still change.
+  useEffect(() => {
+    if (open && availableSections.length > 0 && !form.section) {
+      setForm((prev) => ({ ...prev, section: availableSections[0].section }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sections]);
 
   const set = (field: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -118,7 +138,25 @@ export function AddCoordinatorModal({ open, onClose, onAdded }: AddCoordinatorMo
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Section *</label>
-                  <input required value={form.section} onChange={set("section")} placeholder="e.g. A" className={inputClass} />
+                  {availableSections.length > 0 ? (
+                    <select
+                      required
+                      value={form.section}
+                      onChange={(e) => setForm((prev) => ({ ...prev, section: e.target.value }))}
+                      className={inputClass}
+                    >
+                      {availableSections.map((s) => (
+                        <option key={s.section} value={s.section}>
+                          Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="px-3 py-2 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 shrink-0" />
+                      <span>{sections.length === 0 ? "No sections found yet — import students first." : "Every section already has a coordinator."}</span>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-text-secondary mb-1">Phone</label>

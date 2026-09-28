@@ -306,6 +306,12 @@ class User extends Authenticatable
         return $this->hasMany(User::class, 'assigned_marketing_id');
     }
 
+    /** A marketing employee's own book of "Talk to Our Team" contact requests — a separate, independently load-balanced queue from assignedLeads() above (see LeadAssignmentService). */
+    public function assignedContactRequests(): HasMany
+    {
+        return $this->hasMany(ContactRequest::class, 'assigned_marketing_id');
+    }
+
     /**
      * The Mellow Internal (Ops) employee who owns this lead now that it has
      * converted — see LeadAssignmentService::assignInternalOwner(). Null

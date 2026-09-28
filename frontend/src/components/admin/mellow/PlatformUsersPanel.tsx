@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Plus, Users2, X } from "lucide-react";
+import { Search, Plus, Users2, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 
@@ -36,6 +36,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
   const [hasMore, setHasMore] = useState(false);
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
+  const [collegeFilter, setCollegeFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -49,10 +50,14 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
   }, [search]);
 
   const load = useCallback(
-    (s: string) => {
+    (s: string, collegeParam: string) => {
       setLoading(true);
+      const qs = new URLSearchParams();
+      if (s) qs.set("search", s);
+      if (collegeParam) qs.set("college", collegeParam);
+      const suffix = qs.toString();
       api
-        .get<ApiPage<ApiUser>>(`/admin/users${s ? `?search=${encodeURIComponent(s)}` : ""}`)
+        .get<ApiPage<ApiUser>>(`/admin/users${suffix ? `?${suffix}` : ""}`)
         .then((res) => {
           setPlatformUsers(res.data);
           setPage(res.current_page);
@@ -65,8 +70,8 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
   );
 
   useEffect(() => {
-    load(searchDebounced);
-  }, [searchDebounced, load]);
+    load(searchDebounced, collegeFilter);
+  }, [searchDebounced, collegeFilter, load]);
 
   useEffect(() => {
     api
@@ -75,10 +80,20 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
       .catch(() => {});
   }, []);
 
+  const activeFilterLabel =
+    collegeFilter === "any"
+      ? "any college"
+      : collegeFilter === "none"
+      ? "individual (no college) accounts"
+      : collegeFilter
+      ? colleges.find((c) => String(c.id) === collegeFilter)?.name ?? null
+      : null;
+
   const loadMore = () => {
     setLoadingMore(true);
     const qs = new URLSearchParams({ page: String(page + 1) });
     if (searchDebounced) qs.set("search", searchDebounced);
+    if (collegeFilter) qs.set("college", collegeFilter);
     api
       .get<ApiPage<ApiUser>>(`/admin/users?${qs.toString()}`)
       .then((res) => {
@@ -136,6 +151,27 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           <div className="relative">
+            <Filter className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+            <select
+              value={collegeFilter}
+              onChange={(e) => setCollegeFilter(e.target.value)}
+              className="pl-8 pr-7 py-1.5 rounded-control bg-surface border border-border-subtle text-xs text-primary focus:border-accent-primary outline-none appearance-none cursor-pointer max-w-[11rem] sm:max-w-[14rem]"
+            >
+              <option value="">All users</option>
+              <option value="any">Any college (all)</option>
+              <option value="none">Individual — no college</option>
+              {colleges.length > 0 && (
+                <optgroup label="By college">
+                  {colleges.map((c) => (
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               type="text"
@@ -159,7 +195,13 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
         <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">Loading platform users...</div>
       ) : platformUsers.length === 0 ? (
         <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          {searchDebounced ? `No users match "${searchDebounced}".` : 'No users found. Click "Add User" to create one.'}
+          {searchDebounced && activeFilterLabel
+            ? `No users match "${searchDebounced}" in ${activeFilterLabel}.`
+            : searchDebounced
+            ? `No users match "${searchDebounced}".`
+            : activeFilterLabel
+            ? `No users found in ${activeFilterLabel}.`
+            : 'No users found. Click "Add User" to create one.'}
         </div>
       ) : (
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">

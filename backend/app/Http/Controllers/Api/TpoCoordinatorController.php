@@ -25,19 +25,20 @@ class TpoCoordinatorController extends Controller
     {
     }
 
-    /** Every coordinator at the caller's own college, with how many students their assigned section actually contains right now. */
+    /** Every coordinator at the caller's own college, plus every real section that exists among its students (so the frontend can offer a picker instead of a free-text field — see SectionCoordinatorService::sectionsFor()). */
     public function index(Request $request)
     {
         $collegeId = $request->user()->college_id;
 
         if (! $collegeId) {
-            return response()->json(['coordinators' => []]);
+            return response()->json(['coordinators' => [], 'sections' => []]);
         }
 
         $coordinators = $this->coordinators->listFor($collegeId);
 
         return response()->json([
             'coordinators' => $coordinators->map(fn (User $c) => $this->coordinators->payload($c, $collegeId))->all(),
+            'sections' => $this->coordinators->sectionsFor($collegeId),
         ]);
     }
 

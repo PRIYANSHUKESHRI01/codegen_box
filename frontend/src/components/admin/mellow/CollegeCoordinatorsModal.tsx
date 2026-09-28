@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { UserCog, X, Plus, Ban, CheckCircle2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { UserCog, X, Plus, Ban, CheckCircle2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 
@@ -13,6 +13,13 @@ interface ApiCoordinator {
   section: string;
   is_blocked: boolean;
   managed_student_count: number;
+}
+
+/** One real section at this college, from student data — see SectionCoordinatorService::sectionsFor(). `coordinator_name` is null when the section has no coordinator yet. */
+interface SectionOption {
+  section: string;
+  student_count: number;
+  coordinator_name: string | null;
 }
 
 /**
@@ -35,6 +42,7 @@ export function CollegeCoordinatorsModal({
   triggerToast: (msg: string) => void;
 }) {
   const [coordinators, setCoordinators] = useState<ApiCoordinator[]>([]);
+  const [sections, setSections] = useState<SectionOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [name, setName] = useState("");
@@ -44,15 +52,32 @@ export function CollegeCoordinatorsModal({
   const [submitting, setSubmitting] = useState(false);
   const [sectionDrafts, setSectionDrafts] = useState<Record<number, string>>({});
 
-  useEffect(() => {
+  const load = useCallback(() => {
     if (!college) return;
     setLoading(true);
     api
-      .get<{ coordinators: ApiCoordinator[] }>(`/admin/colleges/${college.id}/coordinators`)
-      .then((res) => setCoordinators(res.coordinators))
+      .get<{ coordinators: ApiCoordinator[]; sections: SectionOption[] }>(`/admin/colleges/${college.id}/coordinators`)
+      .then((res) => {
+        setCoordinators(res.coordinators);
+        setSections(res.sections);
+      })
       .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load coordinators."))
       .finally(() => setLoading(false));
   }, [college, triggerToast]);
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [college]);
+
+  const availableSections = sections.filter((s) => s.coordinator_name === null);
+
+  useEffect(() => {
+    if (showAddForm && availableSections.length > 0 && !section) {
+      setSection(availableSections[0].section);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showAddForm, sections]);
 
   if (!college) return null;
 
@@ -67,13 +92,13 @@ export function CollegeCoordinatorsModal({
         section,
         phone: phone || undefined,
       });
-      setCoordinators((prev) => [...prev, res.coordinator]);
       setShowAddForm(false);
       setName("");
       setEmail("");
       setSection("");
       setPhone("");
       triggerToast(`Coordinator "${res.coordinator.name}" added for Section ${res.coordinator.section}.`);
+      load(); // re-fetch: that section needs to drop off the "available" list
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to add coordinator.");
     } finally {
@@ -99,9 +124,9 @@ export function CollegeCoordinatorsModal({
         section: nextSection,
         phone: coordinator.phone ?? undefined,
       });
-      setCoordinators((prev) => prev.map((c) => (c.id === coordinator.id ? res.coordinator : c)));
       setSectionDrafts((prev) => ({ ...prev, [coordinator.id]: res.coordinator.section }));
       triggerToast(`${coordinator.name} reassigned to Section ${res.coordinator.section}.`);
+      load(); // re-fetch: the old section frees up, the new one is now taken
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to reassign section.");
     }
@@ -155,12 +180,19 @@ export function CollegeCoordinatorsModal({
                   <span>{c.managed_student_count} students managed</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="text"
+                  <select
                     value={sectionDrafts[c.id] ?? c.section}
                     onChange={(e) => setSectionDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
                     className="flex-1 px-2 py-1.5 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
-                  />
+                  >
+                    {sections
+                      .filter((s) => s.coordinator_name === null || s.section === c.section)
+                      .map((s) => (
+                        <option key={s.section} value={s.section}>
+                          Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                        </option>
+                      ))}
+                  </select>
                   <button
                     onClick={() => handleReassignSection(c)}
                     className="px-2.5 py-1.5 rounded-control border border-border-subtle bg-surface hover:bg-surface-hover text-text-secondary hover:text-primary text-[11px] font-bold transition-all"
@@ -191,14 +223,28 @@ export function CollegeCoordinatorsModal({
                 className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
               />
               <div className="grid grid-cols-2 gap-2.5">
-                <input
-                  type="text"
-                  required
-                  placeholder="Section (e.g. A)"
-                  value={section}
-                  onChange={(e) => setSection(e.target.value)}
-                  className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
-                />
+                {availableSections.length > 0 ? (
+                  <select
+                    required
+                    value={section}
+                    onChange={(e) => setSection(e.target.value)}
+                    className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
+                  >
+                    <option value="" disabled>
+                      Section...
+                    </option>
+                    {availableSections.map((s) => (
+                      <option key={s.section} value={s.section}>
+                        Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-[11px] text-text-muted flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 shrink-0" />
+                    <span>{sections.length === 0 ? "No sections yet" : "All sections covered"}</span>
+                  </div>
+                )}
                 <input
                   type="text"
                   placeholder="Phone (optional)"

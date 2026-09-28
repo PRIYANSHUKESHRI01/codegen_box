@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\College;
 use App\Models\StudentImport;
 use App\Models\User;
 use Illuminate\Bus\Batch;
@@ -76,6 +77,18 @@ class ProcessStudentImportJob implements ShouldQueue
         $successCount = 0;
         $rowNumber = 1;
 
+        // The plan's seat cap, resolved once. StudentImportService already
+        // rejects the whole upload upfront when the college is already at
+        // (or past) this limit — $remaining here instead catches a batch
+        // that CROSSES the cap partway through (e.g. 495 existing + this
+        // 500-seat plan + a 10-row file: rows 1-5 succeed, rows 6-10 fail
+        // with the message below). Same-college existing-email rows are
+        // idempotent updates, not new seats, so they never touch $remaining.
+        $college = College::find($import->college_id);
+        $limit = $college?->studentLimit();
+        $remaining = $limit === null ? null : max(0, $limit - ($college?->studentCount() ?? 0));
+        $planName = $college?->activePlan()?->name;
+
         while (($row = fgetcsv($handle)) !== false) {
             $rowNumber++;
 
@@ -133,6 +146,12 @@ class ProcessStudentImportJob implements ShouldQueue
                 ], fn ($v) => $v !== null));
                 $successCount++;
             } else {
+                if ($remaining !== null && $remaining <= 0) {
+                    $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => "Your college's {$planName} plan allows up to {$limit} students — this row wasn't added. Upgrade your plan to add more."];
+
+                    continue;
+                }
+
                 $plainPassword = Str::password(12);
 
                 $user = User::create([
@@ -148,6 +167,10 @@ class ProcessStudentImportJob implements ShouldQueue
 
                 $emailJobs[] = new SendAccountCredentialsEmail($user->id, $plainPassword);
                 $successCount++;
+
+                if ($remaining !== null) {
+                    $remaining--;
+                }
             }
 
             if ($rowNumber % 50 === 0) {

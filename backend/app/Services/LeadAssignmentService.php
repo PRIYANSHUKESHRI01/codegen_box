@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ContactRequest;
 use App\Models\User;
 
 /**
@@ -160,6 +161,61 @@ class LeadAssignmentService
             ->where('is_blocked', false)
             ->withCount('assignedCustomers')
             ->orderBy('assigned_customers_count')
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * The "Talk to Our Team" analog of assignLead() above — same
+     * least-loaded/tie-break-by-id formula, but its own independent queue
+     * (assignedContactRequests, not assignedLeads). Kept separate rather
+     * than counting both types together: a B2B inquiry that expects a phone
+     * call is a different kind of work than nurturing a free-tier signup,
+     * and a marketing employee's workload for one shouldn't be masked by
+     * how many of the other they happen to have.
+     */
+    public function assignContactRequest(ContactRequest $request): void
+    {
+        if ($request->assigned_marketing_id !== null) {
+            return;
+        }
+
+        $employee = $this->leastLoadedEmployeeForContactRequests();
+
+        if ($employee === null) {
+            return;
+        }
+
+        $request->forceFill(['assigned_marketing_id' => $employee->id])->save();
+    }
+
+    /** The contact-request analog of assignUnassignedLeads() above, for the same self-correcting reason. */
+    public function assignUnassignedContactRequests(): int
+    {
+        $unassigned = ContactRequest::whereNull('assigned_marketing_id')
+            ->orderBy('created_at')
+            ->get();
+
+        $assignedCount = 0;
+
+        foreach ($unassigned as $request) {
+            $before = $request->assigned_marketing_id;
+            $this->assignContactRequest($request);
+
+            if ($request->assigned_marketing_id !== $before) {
+                $assignedCount++;
+            }
+        }
+
+        return $assignedCount;
+    }
+
+    private function leastLoadedEmployeeForContactRequests(): ?User
+    {
+        return User::where('role', User::ROLE_ADMIN_MARKETING)
+            ->where('is_blocked', false)
+            ->withCount('assignedContactRequests')
+            ->orderBy('assigned_contact_requests_count')
             ->orderBy('id')
             ->first();
     }

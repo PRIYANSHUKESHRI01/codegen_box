@@ -58,6 +58,29 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // The public "Talk to Our Team" form — same dual-key reasoning as
+        // password-reset-request above (email-only misses many IPs hitting
+        // one victim's inbox; IP-only misses one bot rotating through many
+        // fake emails). Generous enough for a real visitor to retry a typo'd
+        // field a few times, tight enough to stop a scripted flood from
+        // reaching the marketing-notification inbox.
+        RateLimiter::for('contact-request', function (Request $request) {
+            return [
+                Limit::perHour(5)->by('contact-request-email:'.Str::lower((string) $request->input('email'))),
+                Limit::perHour(10)->by('contact-request-ip:'.$request->ip()),
+            ];
+        });
+
+        // Newsletter signup — lower risk than a sales inquiry (no staff
+        // inbox to flood), but still worth a light cap against a scripted
+        // loop hammering the endpoint.
+        RateLimiter::for('newsletter-subscribe', function (Request $request) {
+            return [
+                Limit::perHour(5)->by('newsletter-email:'.Str::lower((string) $request->input('email'))),
+                Limit::perHour(20)->by('newsletter-ip:'.$request->ip()),
+            ];
+        });
+
         // Run/Submit/poll limits are per USER, never per IP: a campus lab puts
         // hundreds of students behind one NAT address, so an IP limit would
         // throttle a whole class as if it were one person. The limits stop a

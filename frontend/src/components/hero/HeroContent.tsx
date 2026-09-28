@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, GraduationCap, ShieldCheck, Terminal, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { TalkToTeamModal } from "@/components/marketing-site/TalkToTeamModal";
 
 export function HeroContent() {
   const prefersReducedMotion = useReducedMotion();
+  const [contactOpen, setContactOpen] = useState(false);
 
   const scrollToSection = (id: string) => {
     const el = document.getElementById(id);
@@ -28,6 +30,7 @@ export function HeroContent() {
   };
 
   return (
+    <>
     <motion.div
       variants={container}
       initial="hidden"
@@ -81,16 +84,15 @@ export function HeroContent() {
         variants={item}
         className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full max-w-sm sm:max-w-none mx-auto justify-center mb-10"
       >
-        <Link href="/pricing" className="w-full sm:w-auto">
-          <Button
-            variant="primary"
-            size="lg"
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-            className="w-full sm:w-auto min-h-[48px] justify-center shadow-glow hover:shadow-glow-cyan transition-all font-semibold"
-          >
-            Talk to Our Team
-          </Button>
-        </Link>
+        <Button
+          variant="primary"
+          size="lg"
+          rightIcon={<ArrowRight className="w-4 h-4" />}
+          onClick={() => setContactOpen(true)}
+          className="w-full sm:w-auto min-h-[48px] justify-center shadow-glow hover:shadow-glow-cyan transition-all font-semibold"
+        >
+          Talk to Our Team
+        </Button>
         <Button
           variant="secondary"
           size="lg"
@@ -123,5 +125,7 @@ export function HeroContent() {
         </div>
       </motion.div>
     </motion.div>
+    <TalkToTeamModal open={contactOpen} onClose={() => setContactOpen(false)} />
+    </>
   );
 }

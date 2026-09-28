@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\CompanyInterviewTrackController;
 use App\Http\Controllers\Api\CompanyProctoringController;
 use App\Http\Controllers\Api\CompanyReportsController;
 use App\Http\Controllers\Api\CompanyTalentPoolController;
+use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\CoordinatorProctoringController;
 use App\Http\Controllers\Api\CoordinatorStudentController;
 use App\Http\Controllers\Api\InterviewController;
@@ -37,7 +38,9 @@ use App\Http\Controllers\Api\InterviewTrackController;
 use App\Http\Controllers\Api\InternalCustomerController;
 use App\Http\Controllers\Api\JudgeResultController;
 use App\Http\Controllers\Api\LeaderboardController;
+use App\Http\Controllers\Api\MarketingContactRequestController;
 use App\Http\Controllers\Api\MarketingLeadController;
+use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PhoneVerificationController;
 use App\Http\Controllers\Api\ProblemController;
@@ -65,6 +68,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
+
+// The public marketing site's "Talk to Our Team" form — unauthenticated,
+// never creates a user account (see ContactRequest's own docblock for why).
+Route::post('/contact-requests', [ContactRequestController::class, 'store'])
+    ->middleware('throttle:contact-request');
+
+// The public footer's newsletter signup — unauthenticated, its own tiny surface.
+Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
+    ->middleware('throttle:newsletter-subscribe');
 
 // The only unauthenticated data reads in this API — the public marketing
 // landing page's real-numbers Stats section and Problem Explorer/navbar
@@ -349,6 +361,14 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/leads/{lead}', [MarketingLeadController::class, 'show']);
                 Route::post('/leads/{lead}/status', [MarketingLeadController::class, 'updateStatus']);
                 Route::post('/leads/{lead}/notes', [MarketingLeadController::class, 'storeNote']);
+
+                // "Talk to Our Team" contact requests — the ContactRequest
+                // sibling of the leads routes above, same permission (it's
+                // the same "manage leads" capability, a second lead type).
+                Route::get('/contact-requests', [MarketingContactRequestController::class, 'index']);
+                Route::get('/contact-requests/{contactRequest}', [MarketingContactRequestController::class, 'show']);
+                Route::post('/contact-requests/{contactRequest}/status', [MarketingContactRequestController::class, 'updateStatus']);
+                Route::post('/contact-requests/{contactRequest}/notes', [MarketingContactRequestController::class, 'storeNote']);
             });
 
             Route::middleware('permission:'.User::PERM_LEAD_OUTREACH)

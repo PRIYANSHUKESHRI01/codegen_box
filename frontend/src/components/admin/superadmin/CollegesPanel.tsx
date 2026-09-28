@@ -5,7 +5,7 @@ import { Building2, Search, Plus, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { BulkImportStudentsPanel } from "@/components/dashboard/tpo/BulkImportStudentsPanel";
-import { mapCollegeFromApi, formatInr, type ApiCollege, type College } from "./types";
+import { mapCollegeFromApi, formatInr, type ApiCollege, type College, type CollegeTier } from "./types";
 
 export function CollegesPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
   const [colleges, setColleges] = useState<College[]>([]);
@@ -16,7 +16,9 @@ export function CollegesPanel({ triggerToast }: { triggerToast: (msg: string) =>
   const [newName, setNewName] = useState("");
   const [newTpoName, setNewTpoName] = useState("");
   const [newTpoEmail, setNewTpoEmail] = useState("");
-  const [newTier, setNewTier] = useState<"Academic Enterprise" | "Pro Campus" | "Standard">("Academic Enterprise");
+  const [newTier, setNewTier] = useState<CollegeTier>("Academic Enterprise");
+  const [newMaxStudents, setNewMaxStudents] = useState("");
+  const [newAnnualPrice, setNewAnnualPrice] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -34,18 +36,36 @@ export function CollegesPanel({ triggerToast }: { triggerToast: (msg: string) =>
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newName || !newTpoName || !newTpoEmail) return;
+    if (newTier === "Custom" && !newMaxStudents) return;
 
     try {
       const res = await api.post<{ college: ApiCollege; tpo: { id: number; name: string; email: string }; temporary_password: string }>(
         "/admin/colleges",
-        { name: newName, tier: newTier, tpo_name: newTpoName, tpo_email: newTpoEmail }
+        {
+          name: newName,
+          tier: newTier,
+          tpo_name: newTpoName,
+          tpo_email: newTpoEmail,
+          ...(newTier === "Custom"
+            ? {
+                custom_max_students: Number(newMaxStudents),
+                custom_annual_price: newAnnualPrice ? Number(newAnnualPrice) : undefined,
+              }
+            : {}),
+        }
       );
 
-      setColleges((prev) => [mapCollegeFromApi({ ...res.college, users: [{ ...res.tpo, is_blocked: false }] }), ...prev]);
+      // Re-fetch rather than splice locally: plan_max_students is attached
+      // server-side by the list endpoint's per-row subscription lookup, not
+      // present on this create response.
+      load();
       setShowAddModal(false);
       setNewName("");
       setNewTpoName("");
       setNewTpoEmail("");
+      setNewTier("Academic Enterprise");
+      setNewMaxStudents("");
+      setNewAnnualPrice("");
       triggerToast(`Partner college "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to onboard college.");
@@ -130,7 +150,12 @@ export function CollegesPanel({ triggerToast }: { triggerToast: (msg: string) =>
                       <div className="text-primary font-medium">{col.tpoName}</div>
                       <div className="text-[10px] text-text-muted font-mono">{col.tpoEmail}</div>
                     </td>
-                    <td className="px-4 py-3 font-mono font-bold text-primary">{col.activeStudents.toLocaleString()}</td>
+                    <td className="px-4 py-3 font-mono font-bold text-primary">
+                      {col.activeStudents.toLocaleString()}
+                      {col.planMaxStudents !== null && (
+                        <span className="font-normal text-text-muted"> / {col.planMaxStudents.toLocaleString()}</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
                         {col.tier}
@@ -241,14 +266,44 @@ export function CollegesPanel({ triggerToast }: { triggerToast: (msg: string) =>
                 <label className="block font-semibold text-text-secondary mb-1">Subscription Tier</label>
                 <select
                   value={newTier}
-                  onChange={(e) => setNewTier(e.target.value as "Academic Enterprise" | "Pro Campus" | "Standard")}
+                  onChange={(e) => setNewTier(e.target.value as CollegeTier)}
                   className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
                 >
                   <option value="Academic Enterprise">Academic Enterprise (Unlimited Contests & Students)</option>
                   <option value="Pro Campus">Pro Campus (Up to 2,000 Students)</option>
                   <option value="Standard">Standard (Up to 500 Students)</option>
+                  <option value="Custom">Custom (Set an exact student limit)</option>
                 </select>
               </div>
+
+              {newTier === "Custom" && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-control bg-elevated border border-dashed border-accent-primary/40">
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Student Limit *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={newMaxStudents}
+                      onChange={(e) => setNewMaxStudents(e.target.value)}
+                      placeholder="e.g. 845"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                    <p className="text-[10px] text-text-muted mt-1">This college can never add more students than this.</p>
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Annual Price ₹ (optional)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={newAnnualPrice}
+                      onChange={(e) => setNewAnnualPrice(e.target.value)}
+                      placeholder="Leave blank if TBD"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="pt-3 flex justify-end gap-2">
                 <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">

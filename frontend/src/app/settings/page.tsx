@@ -1148,7 +1148,7 @@ export default function SettingsPage() {
 
               {isStudent ? (
                 <Link
-                  href="/pricing"
+                  href="/dashboard/billing"
                   className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow shrink-0 text-center"
                 >
                   Change Plan
@@ -1177,7 +1177,7 @@ export default function SettingsPage() {
               {!entitlements.drive_access && (
                 <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
                   <span className="text-[11px] text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
-                  <Link href="/pricing" className="text-[10.5px] font-bold text-accent-primary hover:underline shrink-0">
+                  <Link href="/dashboard/billing" className="text-[10.5px] font-bold text-accent-primary hover:underline shrink-0">
                     Upgrade →
                   </Link>
                 </div>

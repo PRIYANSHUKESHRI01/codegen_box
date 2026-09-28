@@ -60,7 +60,7 @@ export function AuthChrome({ altLabel, altHref, children }: AuthChromeProps) {
       </main>
 
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-text-muted border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>&copy; {new Date().getFullYear()} Mellow Technologies Inc. All rights reserved.</span>
+        <span>&copy; {new Date().getFullYear()} Mellow Vault. A Unit of Prayukti Development Private Limited.</span>
         <div className="flex items-center gap-4">
           {FOOTER_LINKS.map((l) => (
             <Link

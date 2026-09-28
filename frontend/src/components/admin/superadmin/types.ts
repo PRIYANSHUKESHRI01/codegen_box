@@ -45,11 +45,13 @@ export interface ApiAuditLog {
   created_at: string;
 }
 
+export type CollegeTier = "Academic Enterprise" | "Pro Campus" | "Standard" | "Custom";
+
 export interface ApiCollege {
   id: number;
   name: string;
   short_code: string;
-  tier: "Academic Enterprise" | "Pro Campus" | "Standard";
+  tier: CollegeTier;
   placement_rate: string;
   is_active: boolean;
   active_students_count?: number;
@@ -59,6 +61,8 @@ export interface ApiCollege {
   subscription_days_remaining?: number | null;
   /** Null legitimately means custom/Academic-Enterprise pricing with no fixed number on file. */
   plan_price?: number | null;
+  /** Null = unlimited (Academic Enterprise, or a custom plan negotiated as unlimited). */
+  plan_max_students?: number | null;
 }
 
 export interface College {
@@ -68,7 +72,7 @@ export interface College {
   tpoName: string;
   tpoEmail: string;
   activeStudents: number;
-  tier: "Academic Enterprise" | "Pro Campus" | "Standard";
+  tier: CollegeTier;
   placementRate: number;
   status: "Active" | "Suspended";
   joinedDate: string;
@@ -76,6 +80,7 @@ export interface College {
   subscriptionStatus: string | null;
   subscriptionDaysRemaining: number | null;
   planPrice: number | null;
+  planMaxStudents: number | null;
 }
 
 export function mapCollegeFromApi(college: ApiCollege): College {
@@ -99,6 +104,7 @@ export function mapCollegeFromApi(college: ApiCollege): College {
     subscriptionStatus: college.subscription_status ?? null,
     subscriptionDaysRemaining: college.subscription_days_remaining ?? null,
     planPrice: college.plan_price ?? null,
+    planMaxStudents: college.plan_max_students ?? null,
   };
 }
 

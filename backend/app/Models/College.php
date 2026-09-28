@@ -47,4 +47,22 @@ class College extends Model
     {
         return $this->hasMany(DriveApplication::class);
     }
+
+    /** The plan actually governing this college right now, or null if it has no active subscription. */
+    public function activePlan(): ?Plan
+    {
+        return $this->activeSubscription()?->plan;
+    }
+
+    /** Student headcount counted against the plan's seat cap — TPOs/coordinators don't consume a seat. */
+    public function studentCount(): int
+    {
+        return $this->users()->where('role', User::ROLE_USER)->count();
+    }
+
+    /** Null means unlimited — see 2026_09_28_010000_add_max_students_to_plans_table's docblock. */
+    public function studentLimit(): ?int
+    {
+        return $this->activePlan()?->max_students;
+    }
 }

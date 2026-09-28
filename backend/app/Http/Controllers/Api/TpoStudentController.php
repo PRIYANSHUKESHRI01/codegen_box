@@ -84,6 +84,17 @@ class TpoStudentController extends Controller
             ]);
         }
 
+        $college = $request->user()->college;
+        $limit = $college?->studentLimit();
+
+        if ($limit !== null && $college->studentCount() >= $limit) {
+            $planName = $college->activePlan()?->name ?? 'current';
+
+            throw ValidationException::withMessages([
+                'email' => ["Your college's {$planName} plan allows up to {$limit} students, and that limit has been reached. Upgrade your plan to add more."],
+            ]);
+        }
+
         $plainPassword = Str::password(12);
 
         $student = User::create([

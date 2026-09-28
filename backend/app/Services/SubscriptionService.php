@@ -114,6 +114,35 @@ class SubscriptionService
     }
 
     /**
+     * A negotiated, college-specific seat count that doesn't match any of
+     * the three fixed catalog tiers (Standard/Pro Campus/Academic
+     * Enterprise) — the "talk to sales, we agreed on 845 seats" case.
+     * Still just a Plan row under the hood (every enforcement point already
+     * reads College::studentLimit() -> activePlan()->max_students, so
+     * nothing downstream needs to know this plan is "custom"), but one
+     * dedicated row per college via updateOrCreate rather than a fresh row
+     * every time — re-adjusting a college's custom seat count later reuses
+     * the same plan instead of leaving orphaned rows behind.
+     */
+    public function assignCustomInstitutionPlan(College $college, int $maxStudents, ?int $annualPrice, User $actor): Subscription
+    {
+        $plan = Plan::updateOrCreate(
+            ['code' => "custom-college-{$college->id}"],
+            [
+                'name' => 'Custom',
+                'audience' => Plan::AUDIENCE_INSTITUTION,
+                'annual_price' => $annualPrice,
+                'duration_days' => 365,
+                'is_active' => true,
+                'max_students' => $maxStudents,
+                'drive_access' => true,
+            ]
+        );
+
+        return $this->assignInstitutionPlan($college, $plan, $actor);
+    }
+
+    /**
      * Admin-assigned company hiring-tenant purchase/renewal/change —
      * mirrors assignInstitutionPlan(), Ops-only, never self-serve. No
      * `tier` sync (Company has no tier field the way College does).

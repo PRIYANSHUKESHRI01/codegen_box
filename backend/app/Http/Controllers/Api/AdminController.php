@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Mellow-internal-staff-only operations (role: admin_internal, superadmin).
@@ -98,6 +99,9 @@ class AdminController extends Controller
             // Null legitimately means custom/Academic-Enterprise pricing with
             // no fixed number on file — never fabricated as a real figure.
             $college->plan_price = $subscription?->plan?->annual_price;
+            // Null = unlimited (Academic Enterprise) — same convention as
+            // College::studentLimit(), which every enforcement point reads.
+            $college->plan_max_students = $subscription?->plan?->max_students;
         });
 
         return response()->json(['colleges' => $colleges]);
@@ -113,7 +117,12 @@ class AdminController extends Controller
             'short_code' => ['nullable', 'string', 'max:20', 'unique:colleges,short_code'],
             'city' => ['nullable', 'string', 'max:255'],
             'state' => ['nullable', 'string', 'max:255'],
-            'tier' => ['required', Rule::in(['Academic Enterprise', 'Pro Campus', 'Standard'])],
+            'tier' => ['required', Rule::in(['Academic Enterprise', 'Pro Campus', 'Standard', 'Custom'])],
+            // Only meaningful (and required) when tier=Custom — a negotiated
+            // seat count that doesn't match any catalog plan. See
+            // SubscriptionService::assignCustomInstitutionPlan().
+            'custom_max_students' => [Rule::requiredIf($request->input('tier') === 'Custom'), 'nullable', 'integer', 'min:1'],
+            'custom_annual_price' => ['nullable', 'integer', 'min:0'],
             'tpo_name' => ['required', 'string', 'max:255'],
             'tpo_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
         ]);
@@ -145,9 +154,18 @@ class AdminController extends Controller
         // The tier chosen at onboarding IS the institution plan — activate
         // it immediately so the college is subscribed from day one, rather
         // than requiring a separate follow-up step.
-        $plan = Plan::where('audience', Plan::AUDIENCE_INSTITUTION)->where('name', $college->tier)->first();
-        if ($plan !== null) {
-            $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+        if ($validated['tier'] === 'Custom') {
+            $subscriptionService->assignCustomInstitutionPlan(
+                $college,
+                (int) $validated['custom_max_students'],
+                $validated['custom_annual_price'] ?? null,
+                $request->user()
+            );
+        } else {
+            $plan = Plan::where('audience', Plan::AUDIENCE_INSTITUTION)->where('name', $college->tier)->first();
+            if ($plan !== null) {
+                $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+            }
         }
 
         ActivityLog::record(
@@ -210,21 +228,36 @@ class AdminController extends Controller
     public function assignCollegeSubscription(Request $request, College $college, SubscriptionService $subscriptionService)
     {
         $validated = $request->validate([
-            'plan_code' => ['required', 'string', 'exists:plans,code'],
+            'plan_code' => ['nullable', 'string', 'exists:plans,code', 'required_without:max_students'],
+            // The custom-seat-count path — an alternative to plan_code, not
+            // a companion to it. See SubscriptionService::assignCustomInstitutionPlan().
+            'max_students' => ['nullable', 'integer', 'min:1', 'required_without:plan_code'],
+            'annual_price' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        $plan = Plan::where('code', $validated['plan_code'])->first();
+        if (! empty($validated['plan_code'])) {
+            $plan = Plan::where('code', $validated['plan_code'])->first();
 
-        if ($plan->audience !== Plan::AUDIENCE_INSTITUTION) {
-            return response()->json(['message' => 'That plan is not an institution plan.'], 422);
+            if ($plan->audience !== Plan::AUDIENCE_INSTITUTION) {
+                return response()->json(['message' => 'That plan is not an institution plan.'], 422);
+            }
+
+            $subscription = $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+        } else {
+            $subscription = $subscriptionService->assignCustomInstitutionPlan(
+                $college,
+                (int) $validated['max_students'],
+                $validated['annual_price'] ?? null,
+                $request->user()
+            );
         }
 
-        $subscription = $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+        $plan = $subscription->plan;
 
         return response()->json([
             'college' => $college->fresh(),
             'subscription' => [
-                'plan' => ['code' => $plan->code, 'name' => $plan->name],
+                'plan' => ['code' => $plan->code, 'name' => $plan->name, 'max_students' => $plan->max_students],
                 'days_remaining' => $subscription->daysRemaining(),
                 'started_at' => $subscription->started_at,
                 'current_period_end' => $subscription->current_period_end,
@@ -260,6 +293,7 @@ class AdminController extends Controller
 
         return response()->json([
             'coordinators' => $list->map(fn (User $c) => $coordinators->payload($c, $college->id))->all(),
+            'sections' => $coordinators->sectionsFor($college->id),
         ]);
     }
 
@@ -326,6 +360,20 @@ class AdminController extends Controller
             });
         }
 
+        // ?college= none|any|<id> — lets the Platform Users screen narrow
+        // this combined-across-every-college list down to just individual
+        // (no-college) coders, every college-affiliated student regardless
+        // of which college, or one specific college's roster.
+        if ($college = $request->query('college')) {
+            if ($college === 'none') {
+                $query->whereNull('college_id');
+            } elseif ($college === 'any') {
+                $query->whereNotNull('college_id');
+            } elseif (is_numeric($college)) {
+                $query->where('college_id', (int) $college);
+            }
+        }
+
         return $query->latest()->paginate(50);
     }
 
@@ -342,6 +390,23 @@ class AdminController extends Controller
             'handle' => ['required', 'string', 'max:64', 'alpha_dash', 'unique:users,handle'],
             'college_id' => ['nullable', 'integer', 'exists:colleges,id'],
         ]);
+
+        // Same seat cap every other student-creation path enforces (bulk
+        // import, TPO's single-add) — a "strict" limit has no admin-tool
+        // backdoor. If a college genuinely needs more room, the fix is
+        // assigning it a bigger (or custom) plan, not bypassing the check.
+        if (! empty($validated['college_id'])) {
+            $college = College::find($validated['college_id']);
+            $limit = $college->studentLimit();
+
+            if ($limit !== null && $college->studentCount() >= $limit) {
+                $planName = $college->activePlan()?->name ?? 'current';
+
+                throw ValidationException::withMessages([
+                    'college_id' => ["{$college->name} is already at its {$planName} plan's limit of {$limit} students. Assign a bigger plan to add more."],
+                ]);
+            }
+        }
 
         $temporaryPassword = Str::password(16);
 

@@ -1,11 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { Container } from "@/components/layout/Container";
 import { Button } from "@/components/ui/Button";
 import { ArrowRight, Building2, Sparkles, CheckCircle2 } from "lucide-react";
+import { TalkToTeamModal } from "@/components/marketing-site/TalkToTeamModal";
 
 export function FinalCTA() {
+  const [contactOpen, setContactOpen] = useState(false);
+
   const scrollTo = (id: string) => {
     const el = document.getElementById(id);
     el?.scrollIntoView({ behavior: "smooth" });
@@ -43,16 +46,15 @@ export function FinalCTA() {
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-8 w-full max-w-sm sm:max-w-none mx-auto">
-              <Link href="/pricing" className="w-full sm:w-auto">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  rightIcon={<ArrowRight className="w-4 h-4" />}
-                  className="w-full sm:w-auto min-h-[48px] justify-center"
-                >
-                  Talk to Our Team
-                </Button>
-              </Link>
+              <Button
+                variant="primary"
+                size="lg"
+                rightIcon={<ArrowRight className="w-4 h-4" />}
+                onClick={() => setContactOpen(true)}
+                className="w-full sm:w-auto min-h-[48px] justify-center"
+              >
+                Talk to Our Team
+              </Button>
               <Button
                 variant="secondary"
                 size="lg"
@@ -81,6 +83,7 @@ export function FinalCTA() {
           </div>
         </div>
       </Container>
+      <TalkToTeamModal open={contactOpen} onClose={() => setContactOpen(false)} />
     </section>
   );
 }

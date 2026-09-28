@@ -1,24 +1,9 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin:0; padding:0; background-color:#F7F8FC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-    @php
-        $student = $session->contestParticipant->user;
-        $contest = $session->contestParticipant->contest;
-        $locked = $session->isLocked();
-    @endphp
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F8FC; padding:32px 16px;">
-        <tr>
-            <td align="center">
-                <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E5E7EB;">
-                    <tr>
-                        <td style="padding:28px 32px 0 32px;">
-                            <span style="font-size:20px; font-weight:800; color:#111827;">CodeGen</span> <span style="color:#4F46E5;">Box</span>
-                        </td>
-                    </tr>
+@php
+    $student = $session->contestParticipant->user;
+    $contest = $session->contestParticipant->contest;
+    $locked = $session->isLocked();
+@endphp
+@include('emails.partials.header', ['width' => 560, 'preheader' => 'Proctoring report for '.$student->name.' in '.$contest->title.' — '.$session->violation_count.' strike(s) recorded.'])
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:{{ $locked ? '#FEE2E2' : '#FEF3C7' }}; color:{{ $locked ? '#991B1B' : '#92400E' }}; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
@@ -105,19 +90,4 @@
                             </a>
                         </td>
                     </tr>
-                    <tr>
-                        <td style="padding:0 32px 28px 32px;">
-                            <p style="font-size:12px; line-height:1.6; color:#9CA3AF; margin:0;">
-                                No video or audio was uploaded for this session — recording happens only in the
-                                student's browser and is not stored by the platform. This report reflects the
-                                activity log only. If this looks like a false alarm, you can reinstate the
-                                student from the dashboard.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+@include('emails.partials.footer', ['note' => "No video or audio was uploaded for this session — recording happens only in the student's browser and is not stored by the platform. This report reflects the activity log only. If this looks like a false alarm, you can reinstate the student from the dashboard."])

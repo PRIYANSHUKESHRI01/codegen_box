@@ -1,28 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin:0; padding:0; background-color:#F7F8FC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
-    @php
-        $drive = $mapping->placementDrive;
-        $company = $drive->company;
-        $eligibility = $mapping->effectiveEligibility();
-    @endphp
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#F7F8FC; padding:32px 16px;">
-        <tr>
-            <td align="center">
-                <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="background-color:#FFFFFF; border-radius:16px; overflow:hidden; border:1px solid #E5E7EB;">
-                    <tr>
-                        <td style="padding:28px 32px 0 32px;">
-                            <span style="font-size:20px; font-weight:800; color:#111827;">CodeGen</span> <span style="color:#4F46E5;">Box</span>
-                        </td>
-                    </tr>
+@php
+    $drive = $mapping->placementDrive;
+    $company = $drive->company;
+    $eligibility = $mapping->effectiveEligibility();
+@endphp
+@include('emails.partials.header', ['width' => 520, 'preheader' => 'A new placement drive from '.$company->name.' is proposed for '.$mapping->college->name.'.'])
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
-                            <span style="display:inline-block; background-color:#FEF3C7; color:#92400E; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
-                                Placeholder Template
+                            <span style="display:inline-block; background-color:#E0E7FF; color:#3730A3; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
+                                Pending Approval
                             </span>
                             <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">A new placement drive is proposed for {{ $mapping->college->name }}</h1>
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
@@ -85,17 +70,4 @@
                             </a>
                         </td>
                     </tr>
-                    <tr>
-                        <td style="padding:0 32px 28px 32px;">
-                            <p style="font-size:12px; line-height:1.6; color:#9CA3AF; margin:0;">
-                                Sign in to your TPO dashboard to approve or decline this proposal. If you weren't expecting
-                                this email, contact Mellow support.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>
+@include('emails.partials.footer', ['note' => "Sign in to your TPO dashboard to approve or decline this proposal. If you weren't expecting this email, contact Mellow support."])

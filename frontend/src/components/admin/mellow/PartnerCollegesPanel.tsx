@@ -7,11 +7,13 @@ import { CollegeCoordinatorsModal } from "@/components/admin/mellow/CollegeCoord
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 
+type CollegeTier = "Academic Enterprise" | "Pro Campus" | "Standard" | "Custom";
+
 interface ApiCollege {
   id: number;
   name: string;
   short_code: string;
-  tier: "Academic Enterprise" | "Pro Campus" | "Standard";
+  tier: CollegeTier;
   placement_rate: string;
   is_active: boolean;
   active_students_count?: number;
@@ -19,6 +21,8 @@ interface ApiCollege {
   users?: { id: number; name: string; email: string; is_blocked: boolean }[];
   subscription_days_remaining?: number | null;
   subscription_status?: string | null;
+  /** Null = unlimited (Academic Enterprise, or a custom plan negotiated as unlimited). */
+  plan_max_students?: number | null;
 }
 
 interface College {
@@ -28,7 +32,7 @@ interface College {
   tpoName: string;
   tpoEmail: string;
   activeStudents: number;
-  tier: "Academic Enterprise" | "Pro Campus" | "Standard";
+  tier: CollegeTier;
   placementRate: number;
   status: "Active" | "Pending" | "Suspended";
   joinedDate: string;
@@ -36,6 +40,7 @@ interface College {
   tpoBlocked?: boolean;
   subscriptionDaysRemaining: number | null;
   subscriptionStatus: string | null;
+  planMaxStudents: number | null;
 }
 
 function mapCollegeFromApi(college: ApiCollege): College {
@@ -55,6 +60,7 @@ function mapCollegeFromApi(college: ApiCollege): College {
     tpoBlocked: tpo?.is_blocked ?? false,
     subscriptionDaysRemaining: college.subscription_days_remaining ?? null,
     subscriptionStatus: college.subscription_status ?? null,
+    planMaxStudents: college.plan_max_students ?? null,
   };
 }
 
@@ -82,9 +88,13 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
   const [newCollegeCode, setNewCollegeCode] = useState("");
   const [newTpoName, setNewTpoName] = useState("");
   const [newTpoEmail, setNewTpoEmail] = useState("");
-  const [newCollegeTier, setNewCollegeTier] = useState<"Academic Enterprise" | "Pro Campus" | "Standard">("Academic Enterprise");
-  const [planModalCollege, setPlanModalCollege] = useState<{ id: number; name: string; tier: "Academic Enterprise" | "Pro Campus" | "Standard" } | null>(null);
-  const [selectedPlanTier, setSelectedPlanTier] = useState<"Academic Enterprise" | "Pro Campus" | "Standard">("Standard");
+  const [newCollegeTier, setNewCollegeTier] = useState<CollegeTier>("Academic Enterprise");
+  const [newCollegeMaxStudents, setNewCollegeMaxStudents] = useState("");
+  const [newCollegeAnnualPrice, setNewCollegeAnnualPrice] = useState("");
+  const [planModalCollege, setPlanModalCollege] = useState<{ id: number; name: string; tier: CollegeTier } | null>(null);
+  const [selectedPlanTier, setSelectedPlanTier] = useState<CollegeTier>("Standard");
+  const [planMaxStudents, setPlanMaxStudents] = useState("");
+  const [planAnnualPrice, setPlanAnnualPrice] = useState("");
   const [assigningPlan, setAssigningPlan] = useState(false);
 
   const loadColleges = useCallback(() => {
@@ -103,19 +113,38 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
   const handleAddCollege = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCollegeName || !newTpoName || !newTpoEmail) return;
+    if (newCollegeTier === "Custom" && !newCollegeMaxStudents) return;
 
     try {
       const res = await api.post<{ college: ApiCollege; tpo: { id: number; name: string; email: string }; temporary_password: string }>(
         "/admin/colleges",
-        { name: newCollegeName, short_code: newCollegeCode || undefined, tier: newCollegeTier, tpo_name: newTpoName, tpo_email: newTpoEmail }
+        {
+          name: newCollegeName,
+          short_code: newCollegeCode || undefined,
+          tier: newCollegeTier,
+          tpo_name: newTpoName,
+          tpo_email: newTpoEmail,
+          ...(newCollegeTier === "Custom"
+            ? {
+                custom_max_students: Number(newCollegeMaxStudents),
+                custom_annual_price: newCollegeAnnualPrice ? Number(newCollegeAnnualPrice) : undefined,
+              }
+            : {}),
+        }
       );
 
-      setColleges((prev) => [mapCollegeFromApi({ ...res.college, users: [{ ...res.tpo, is_blocked: false }] }), ...prev]);
+      // Re-fetch rather than splice locally: the response's ApiCollege
+      // doesn't carry plan_max_students (it's attached server-side by the
+      // list endpoint's per-row subscription lookup, not the create response).
+      loadColleges();
       setShowAddCollegeModal(false);
       setNewCollegeName("");
       setNewCollegeCode("");
       setNewTpoName("");
       setNewTpoEmail("");
+      setNewCollegeTier("Academic Enterprise");
+      setNewCollegeMaxStudents("");
+      setNewCollegeAnnualPrice("");
       triggerToast(`Partner University "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to onboard university.");
@@ -125,11 +154,19 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
   const handleAssignPlan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planModalCollege) return;
+    if (selectedPlanTier === "Custom" && !planMaxStudents) return;
     setAssigningPlan(true);
     try {
-      await api.post(`/admin/colleges/${planModalCollege.id}/subscription`, { plan_code: PLAN_CODE_BY_TIER[selectedPlanTier] });
+      await api.post(
+        `/admin/colleges/${planModalCollege.id}/subscription`,
+        selectedPlanTier === "Custom"
+          ? { max_students: Number(planMaxStudents), annual_price: planAnnualPrice ? Number(planAnnualPrice) : undefined }
+          : { plan_code: PLAN_CODE_BY_TIER[selectedPlanTier] }
+      );
       loadColleges();
       setPlanModalCollege(null);
+      setPlanMaxStudents("");
+      setPlanAnnualPrice("");
       triggerToast(`${planModalCollege.name} is now on the ${selectedPlanTier} plan.`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to update the plan.");
@@ -246,6 +283,8 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                             ? "bg-purple-500/15 text-purple-400 border-purple-500/30"
                             : col.tier === "Pro Campus"
                             ? "bg-cyan-500/15 text-cyan-400 border-cyan-500/30"
+                            : col.tier === "Custom"
+                            ? "bg-rose-500/15 text-rose-400 border-rose-500/30"
                             : "bg-amber-500/15 text-amber-400 border-amber-500/30"
                         )}
                       >
@@ -288,7 +327,12 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 <div className="flex items-center gap-4 text-text-secondary">
                   <div>
                     <span className="text-[10px] text-text-muted block">Students</span>
-                    <span className="font-bold text-primary">{col.activeStudents.toLocaleString()}</span>
+                    <span className="font-bold text-primary">
+                      {col.activeStudents.toLocaleString()}
+                      {col.planMaxStudents !== null && (
+                        <span className="font-normal text-text-muted"> / {col.planMaxStudents.toLocaleString()}</span>
+                      )}
+                    </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-text-muted block">Placement Rate</span>
@@ -406,14 +450,43 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 <label className="block font-semibold text-text-secondary mb-1">Partnership Tier & Infrastructure Allocation</label>
                 <select
                   value={newCollegeTier}
-                  onChange={(e) => setNewCollegeTier(e.target.value as "Academic Enterprise" | "Pro Campus" | "Standard")}
+                  onChange={(e) => setNewCollegeTier(e.target.value as CollegeTier)}
                   className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
                 >
                   <option value="Academic Enterprise">Academic Enterprise</option>
                   <option value="Pro Campus">Pro Campus (Batch Analytics + Custom Drives)</option>
                   <option value="Standard">Standard Tier</option>
+                  <option value="Custom">Custom — negotiated seat count</option>
                 </select>
               </div>
+
+              {newCollegeTier === "Custom" && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-control bg-elevated border border-dashed border-accent-primary/40">
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Student Seats *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={newCollegeMaxStudents}
+                      onChange={(e) => setNewCollegeMaxStudents(e.target.value)}
+                      placeholder="e.g. 845"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Annual Price ₹ (optional)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={newCollegeAnnualPrice}
+                      onChange={(e) => setNewCollegeAnnualPrice(e.target.value)}
+                      placeholder="Leave blank if TBD"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="p-3 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted">
                 <span className="font-semibold text-primary block mb-0.5">Scope Isolation Guarantee</span>
@@ -457,14 +530,43 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 <label className="block font-semibold text-text-secondary mb-1">Institution Plan</label>
                 <select
                   value={selectedPlanTier}
-                  onChange={(e) => setSelectedPlanTier(e.target.value as "Academic Enterprise" | "Pro Campus" | "Standard")}
+                  onChange={(e) => setSelectedPlanTier(e.target.value as CollegeTier)}
                   className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
                 >
                   <option value="Standard">Standard</option>
                   <option value="Pro Campus">Pro Campus</option>
                   <option value="Academic Enterprise">Academic Enterprise</option>
+                  <option value="Custom">Custom — negotiated seat count</option>
                 </select>
               </div>
+
+              {selectedPlanTier === "Custom" && (
+                <div className="grid grid-cols-2 gap-3 p-3 rounded-control bg-elevated border border-dashed border-accent-primary/40">
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Student Seats *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      value={planMaxStudents}
+                      onChange={(e) => setPlanMaxStudents(e.target.value)}
+                      placeholder="e.g. 845"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Annual Price ₹ (optional)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={planAnnualPrice}
+                      onChange={(e) => setPlanAnnualPrice(e.target.value)}
+                      placeholder="Leave blank if TBD"
+                      className="w-full px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="pt-3 flex justify-end gap-2">
                 <button type="button" onClick={() => setPlanModalCollege(null)} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">

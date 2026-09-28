@@ -8,26 +8,12 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
-  // A self-contained server bundle (.next/standalone) with only the
-  // node_modules actually traced as used, instead of requiring the full
-  // repo + node_modules on the server. On a modest Bigrock VPS this means a
-  // much smaller deploy artifact and a faster cold start. Next's own build
-  // step does NOT copy public/ or .next/static into it (by design — they're
-  // static assets, not server code), so those two copies are required as
-  // part of the deploy/build script:
-  //   npm run build
-  //   cp -r public .next/standalone/public
-  //   cp -r .next/static .next/standalone/.next/static
-  //   node .next/standalone/server.js
-  output: "standalone",
-
   // Removes the `X-Powered-By: Next.js` response header — no functional
   // effect, just doesn't advertise the framework/version to every visitor.
   poweredByHeader: false,
 
-  // Explicit rather than relying on the (also-true) default — if this ever
-  // ends up served directly by `next start` without a compressing reverse
-  // proxy in front of it on the VPS, responses still get gzip'd.
+  // Explicit rather than relying on the (also-true) default — belt and
+  // braces if this is ever self-hosted behind a proxy that doesn't compress.
   compress: true,
 
   experimental: {

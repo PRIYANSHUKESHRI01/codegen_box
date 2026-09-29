@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { GripVertical, GripHorizontal, Code2, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -26,8 +26,18 @@ function draftKey(contestSlug: string, contestProblemId: string, language: strin
 }
 
 export default function ContestProblemSolvePage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <ContestProblemSolvePageContent />
+    </Suspense>
+  );
+}
+
+function ContestProblemSolvePageContent() {
   const { status, user } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string; contestProblemId: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
+  const contestProblemId = searchParams.get("contestProblemId") ?? "";
   const router = useRouter();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
@@ -48,7 +58,7 @@ export default function ContestProblemSolvePage() {
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
-  const basePath = `/contests/${params.slug}/problems/${params.contestProblemId}`;
+  const basePath = `/contests/${slug}/problems/${contestProblemId}`;
 
   // A stable getter (never changes identity) so useProctoring's violation
   // listeners don't need to re-register on every keystroke just because
@@ -66,7 +76,7 @@ export default function ContestProblemSolvePage() {
   });
 
   useEffect(() => {
-    if (status !== "ready" || !params.slug || !params.contestProblemId) return;
+    if (status !== "ready" || !slug || !contestProblemId) return;
     let cancelled = false;
 
     api
@@ -95,11 +105,11 @@ export default function ContestProblemSolvePage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, params.slug, params.contestProblemId]);
+  }, [status, slug, contestProblemId]);
 
   useEffect(() => {
     if (!problem) return;
-    const saved = window.localStorage.getItem(draftKey(params.slug, params.contestProblemId, language));
+    const saved = window.localStorage.getItem(draftKey(slug, contestProblemId, language));
     setCode(saved ?? problem.starter_code[language] ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problem, language]);
@@ -107,7 +117,7 @@ export default function ContestProblemSolvePage() {
   const handleCodeChange = (value: string) => {
     setCode(value);
     if (!problem) return;
-    window.localStorage.setItem(draftKey(params.slug, params.contestProblemId, language), value);
+    window.localStorage.setItem(draftKey(slug, contestProblemId, language), value);
     setSavedAt(Date.now());
   };
 
@@ -115,7 +125,7 @@ export default function ContestProblemSolvePage() {
     if (!problem) return;
     const starter = problem.starter_code[language] ?? "";
     setCode(starter);
-    window.localStorage.setItem(draftKey(params.slug, params.contestProblemId, language), starter);
+    window.localStorage.setItem(draftKey(slug, contestProblemId, language), starter);
     setSavedAt(Date.now());
   };
 
@@ -180,7 +190,7 @@ export default function ContestProblemSolvePage() {
           <CenteredNotice
             heading="Problem not found"
             body="This contest problem doesn't exist."
-            onBack={() => router.push(`/dashboard/contests/${params.slug}`)}
+            onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
           />
         )}
 
@@ -188,7 +198,7 @@ export default function ContestProblemSolvePage() {
           <CenteredNotice
             heading={forbiddenMessage?.toLowerCase().includes("locked out") ? "You've been locked out" : "Not available yet"}
             body={forbiddenMessage ?? "You need to register for this contest before you can open its problems."}
-            onBack={() => router.push(`/dashboard/contests/${params.slug}`)}
+            onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
           />
         )}
 
@@ -208,7 +218,7 @@ export default function ContestProblemSolvePage() {
         )}
 
         {loadState === "ready" && problem && proctoring.phase === "locked" && (
-          <ProctoringLockedScreen session={proctoring.session} onBack={() => router.push(`/dashboard/contests/${params.slug}`)} />
+          <ProctoringLockedScreen session={proctoring.session} onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)} />
         )}
 
         {loadState === "ready" && problem && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost") && (
@@ -224,7 +234,7 @@ export default function ContestProblemSolvePage() {
 
             <ProblemHeaderBar
               problem={problem}
-              onBack={() => router.push(`/dashboard/contests/${params.slug}`)}
+              onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
               onRun={handleRun}
               onSubmit={handleSubmit}
               running={runState === "running"}

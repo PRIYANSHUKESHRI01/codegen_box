@@ -8,6 +8,18 @@ const withBundleAnalyzer = bundleAnalyzer({
 const nextConfig = {
   reactStrictMode: true,
 
+  // A plain static HTML/CSS/JS build (the `out/` folder) — required for
+  // BigRock shared hosting, which has no persistent Node.js process to run
+  // `next start`. Every page in this app is a "use client" component that
+  // fetches its own data at runtime from the separate Laravel API, so this
+  // works without any server-side rendering; the only real constraint was
+  // that every dynamic route needed to become a plain static page reading
+  // its id/slug from a query string instead of a [param] path segment (see
+  // app/dashboard/{practice,contests,interviews,drives,interview-tracks}
+  // and app/dashboard/articles — all converted for this). Static export
+  // also deploys fine on Vercel, so this doesn't cost anything there either.
+  output: "export",
+
   // Removes the `X-Powered-By: Next.js` response header — no functional
   // effect, just doesn't advertise the framework/version to every visitor.
   poweredByHeader: false,

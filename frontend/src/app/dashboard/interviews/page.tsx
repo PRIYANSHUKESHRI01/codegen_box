@@ -94,7 +94,7 @@ function TrackSection({ tracks }: { tracks: StudentInterviewTrackSummary[] }) {
         {tracks.map((track) => (
           <Link
             key={track.id}
-            href={`/dashboard/interview-tracks/${track.slug}`}
+            href={`/dashboard/interview-tracks?slug=${track.slug}`}
             className="p-5 rounded-panel bg-surface border border-accent-primary/25 shadow-subtle hover:border-accent-primary/50 hover:-translate-y-1 hover:shadow-card transition-all flex flex-col gap-3"
           >
             <div className="flex items-start justify-between gap-2">
@@ -142,7 +142,7 @@ function InterviewSection({
         {interviews.map((interview) => (
           <Link
             key={interview.id}
-            href={`/dashboard/interviews/${interview.slug}`}
+            href={`/dashboard/interviews/view?slug=${interview.slug}`}
             className="p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-border-strong hover:-translate-y-1 hover:shadow-card transition-all flex flex-col gap-3"
           >
             <div className="flex items-start justify-between gap-2">

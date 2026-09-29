@@ -13,7 +13,7 @@ export function PrevNextArticleNav({ previous, next }: { previous: ArticleAdjace
     <div className={cn("grid gap-3 pt-2", previous && next ? "grid-cols-2" : "grid-cols-1")}>
       {previous && (
         <Link
-          href={`/dashboard/articles/${previous.slug}`}
+          href={`/dashboard/articles/view?articleSlug=${previous.slug}`}
           className="group flex items-center gap-3 p-4 rounded-panel bg-surface border border-border-subtle hover:border-accent-primary/30 hover:bg-elevated/40 transition-all"
         >
           <ArrowLeft className="w-4 h-4 text-text-muted group-hover:-translate-x-0.5 group-hover:text-accent-primary transition-all shrink-0" />
@@ -25,7 +25,7 @@ export function PrevNextArticleNav({ previous, next }: { previous: ArticleAdjace
       )}
       {next && (
         <Link
-          href={`/dashboard/articles/${next.slug}`}
+          href={`/dashboard/articles/view?articleSlug=${next.slug}`}
           className="group flex items-center gap-3 p-4 rounded-panel bg-accent-primary/[0.06] border border-accent-primary/25 hover:border-accent-primary/50 hover:bg-accent-primary/10 transition-all text-right justify-end"
         >
           <div className="min-w-0">

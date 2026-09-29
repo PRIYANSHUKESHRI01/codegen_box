@@ -212,7 +212,7 @@ export default function AdminArticlesPage() {
                   {article.status === "published" ? "Unpublish" : "Publish"}
                 </button>
                 <button
-                  onClick={() => router.push(`/admin/articles/${article.slug}/edit`)}
+                  onClick={() => router.push(`/admin/articles/edit?slug=${article.slug}`)}
                   className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   Edit

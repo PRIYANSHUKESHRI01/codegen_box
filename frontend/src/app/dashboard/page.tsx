@@ -296,7 +296,7 @@ export default function UserDashboardPage() {
               <div className="flex items-center gap-2">
                 {priorityIsContest ? (
                   <Link
-                    href={`/dashboard/contests/${nextContest!.slug}`}
+                    href={`/dashboard/contests/view?slug=${nextContest!.slug}`}
                     className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <span>{nextContest!.is_registered ? (contestIsLive ? "Start Contest" : "View Contest") : "Register"}</span>
@@ -304,7 +304,7 @@ export default function UserDashboardPage() {
                   </Link>
                 ) : (
                   <Link
-                    href={`/dashboard/drives/${nextDrive!.id}`}
+                    href={`/dashboard/drives?driveId=${nextDrive!.id}`}
                     className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
                   >
                     <span>Prepare</span>
@@ -615,7 +615,7 @@ export default function UserDashboardPage() {
                 </div>
 
                 <Link
-                  href={`/dashboard/drives/${drive.id}`}
+                  href={`/dashboard/drives?driveId=${drive.id}`}
                   className="mt-1 w-full py-2 rounded-btn bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/25 text-accent-primary text-xs font-bold transition-colors flex items-center justify-center gap-1.5"
                 >
                   <span>Prepare</span>
@@ -699,7 +699,7 @@ export default function UserDashboardPage() {
                 return (
                   <Link
                     key={contest.id}
-                    href={`/dashboard/contests/${contest.slug}`}
+                    href={`/dashboard/contests/view?slug=${contest.slug}`}
                     className="block p-3.5 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong transition-colors space-y-2"
                   >
                     <div className="flex items-start justify-between gap-2">

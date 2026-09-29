@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Mic, Headphones, MessageSquare, CheckCircle2, ArrowLeft, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -19,8 +19,17 @@ function formatEstimatedTime(totalSeconds: number | null): string | null {
 }
 
 export default function InterviewDetailPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <InterviewDetailPageContent />
+    </Suspense>
+  );
+}
+
+function InterviewDetailPageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
   const [interview, setInterview] = useState<StudentInterviewSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,11 +39,11 @@ export default function InterviewDetailPage() {
   useEffect(() => {
     if (status !== "ready") return;
     api
-      .get<StudentInterviewSummary>(`/interviews/${params.slug}`)
+      .get<StudentInterviewSummary>(`/interviews/${slug}`)
       .then(setInterview)
       .catch((err) => setError(err instanceof ApiError ? err.message : "This interview isn't available."))
       .finally(() => setLoading(false));
-  }, [status, params.slug]);
+  }, [status, slug]);
 
   // Fetched separately (not part of the summary above) — only meaningful
   // once completed, and this page is also reached straight from the
@@ -43,10 +52,10 @@ export default function InterviewDetailPage() {
   useEffect(() => {
     if (status !== "ready" || interview?.my_session_status !== "completed") return;
     api
-      .get<InterviewResult>(`/interviews/${params.slug}/result`)
+      .get<InterviewResult>(`/interviews/${slug}/result`)
       .then(setResult)
       .catch(() => setResult(null));
-  }, [status, params.slug, interview?.my_session_status]);
+  }, [status, slug, interview?.my_session_status]);
 
   if (status !== "ready") return <SessionLoader />;
 
@@ -193,7 +202,7 @@ export default function InterviewDetailPage() {
             )
           ) : (
             <button
-              onClick={() => router.push(`/dashboard/interviews/${interview.slug}/session`)}
+              onClick={() => router.push(`/dashboard/interviews/session?slug=${interview.slug}`)}
               className="w-full py-3 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-sm font-bold transition-colors flex items-center justify-center gap-2"
             >
               <Mic className="w-4 h-4" />

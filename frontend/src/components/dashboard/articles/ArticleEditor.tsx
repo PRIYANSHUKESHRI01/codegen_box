@@ -71,7 +71,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
     try {
       if (mode === "create") {
         const res = await api.post<{ article: AdminArticleDetail }>("/admin/articles", payload);
-        router.push(`/admin/articles/${res.article.slug}/edit`);
+        router.push(`/admin/articles/edit?slug=${res.article.slug}`);
       } else if (initialArticle) {
         await api.post(`/admin/articles/${initialArticle.slug}`, payload);
         router.push("/admin/articles");

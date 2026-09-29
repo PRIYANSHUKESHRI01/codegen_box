@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { DashboardSidebar, DashboardRole } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
 import { cn } from "@/lib/utils";
@@ -75,17 +75,23 @@ export function DashboardShell({
     // their natural scroll-into-view safety net if their content ever runs
     // taller than a short viewport.
     <div className={cn("bg-background text-primary flex", hideChrome ? "h-screen overflow-hidden" : "min-h-screen")}>
-      {/* Production Sidebar */}
+      {/* Production Sidebar — Suspense-wrapped because it reads
+          useSearchParams() (for ?tab=/?status=-based active-link
+          highlighting), which static export requires to be wrapped or the
+          build fails. The fallback is only ever visible for a frame during
+          initial hydration in the real browser. */}
       {!hideChrome && (
-        <DashboardSidebar
-          currentRole={role}
-          currentTpoView={currentTpoView}
-          onSwitchTpoView={onSwitchTpoView}
-          mobileOpen={mobileOpen}
-          onCloseMobile={() => setMobileOpen(false)}
-          collapsed={collapsed}
-          onToggleCollapse={() => setCollapsed(!collapsed)}
-        />
+        <Suspense fallback={<div className={cn("hidden md:block flex-shrink-0", collapsed ? "md:w-20" : "md:w-64")} />}>
+          <DashboardSidebar
+            currentRole={role}
+            currentTpoView={currentTpoView}
+            onSwitchTpoView={onSwitchTpoView}
+            mobileOpen={mobileOpen}
+            onCloseMobile={() => setMobileOpen(false)}
+            collapsed={collapsed}
+            onToggleCollapse={() => setCollapsed(!collapsed)}
+          />
+        </Suspense>
       )}
 
       {/* Main Content Area */}

@@ -40,7 +40,7 @@ export function TopicSidebarNav({
           {articles.map((a, idx) => (
             <Link
               key={a.slug}
-              href={`/dashboard/articles/${a.slug}`}
+              href={`/dashboard/articles/view?articleSlug=${a.slug}`}
               className={cn(
                 "flex items-center gap-2.5 px-4 py-2.5 text-xs transition-colors",
                 a.slug === currentSlug ? "bg-accent-primary/[0.06] text-accent-primary font-bold" : "text-text-secondary hover:bg-elevated/60 hover:text-primary"

@@ -85,7 +85,7 @@ function ContestSection({
           return (
             <Link
               key={contest.id}
-              href={`/dashboard/contests/${contest.slug}`}
+              href={`/dashboard/contests/view?slug=${contest.slug}`}
               className="p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-border-strong hover:-translate-y-1 hover:shadow-card transition-all flex flex-col gap-3"
             >
               <div className="flex items-start justify-between gap-2">

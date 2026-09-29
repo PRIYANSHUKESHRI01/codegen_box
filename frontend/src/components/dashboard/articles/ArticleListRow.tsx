@@ -8,7 +8,7 @@ import type { ArticleListItem } from "@/types/article";
 export function ArticleListRow({ article, index }: { article: ArticleListItem; index: number }) {
   return (
     <Link
-      href={`/dashboard/articles/${article.slug}`}
+      href={`/dashboard/articles/view?articleSlug=${article.slug}`}
       className="group flex items-center gap-4 p-4 rounded-panel bg-surface border border-border-subtle hover:border-accent-primary/30 hover:bg-elevated/40 shadow-subtle transition-all"
     >
       <div

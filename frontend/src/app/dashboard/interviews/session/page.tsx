@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Mic,
@@ -171,8 +171,17 @@ function Stat({ value, label }: { value: string; label: string }) {
  * interview is a video-call experience, not silent surveillance.
  */
 export default function InterviewSessionPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <InterviewSessionPageContent />
+    </Suspense>
+  );
+}
+
+function InterviewSessionPageContent() {
   const { status, user } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("loading");
@@ -209,7 +218,7 @@ export default function InterviewSessionPage() {
   const ttsSupported = hasSpeechSynthesis();
   const sttSupported = hasSpeechRecognition() && hasMediaRecorder();
 
-  const basePath = `/interviews/${params.slug}`;
+  const basePath = `/interviews/${slug}`;
   const alreadyComplete = phase === "complete" && totalQuestions > 0 && answeredCount >= totalQuestions;
 
   // Polls for the AI-scored result once the interview is complete —
@@ -306,7 +315,7 @@ export default function InterviewSessionPage() {
     if (status !== "ready") return;
     startInterview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, params.slug]);
+  }, [status, slug]);
 
   useEffect(() => {
     if (revealedRef.current) return;

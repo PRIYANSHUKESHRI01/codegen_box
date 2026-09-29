@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Group, Panel, Separator } from "react-resizable-panels";
 import { GripVertical, GripHorizontal, Code2, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -24,8 +24,17 @@ function draftKey(slug: string, language: string) {
 }
 
 export default function ProblemSolvePage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <ProblemSolvePageContent />
+    </Suspense>
+  );
+}
+
+function ProblemSolvePageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
@@ -45,11 +54,11 @@ export default function ProblemSolvePage() {
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
   useEffect(() => {
-    if (status !== "ready" || !params.slug) return;
+    if (status !== "ready" || !slug) return;
     let cancelled = false;
 
     api
-      .get<{ problem: ProblemDetail }>(`/problems/${params.slug}`)
+      .get<{ problem: ProblemDetail }>(`/problems/${slug}`)
       .then((res) => {
         if (cancelled) return;
         setProblem(res.problem);
@@ -64,7 +73,7 @@ export default function ProblemSolvePage() {
     return () => {
       cancelled = true;
     };
-  }, [status, params.slug]);
+  }, [status, slug]);
 
   // Restore a saved draft for this problem+language, else fall back to the
   // starter stub, whenever the problem loads or the language is switched.
@@ -144,7 +153,7 @@ export default function ProblemSolvePage() {
         {loadState === "not_found" && (
           <CenteredNotice
             heading="Problem not found"
-            body={`"${params.slug}" doesn't match any problem in the catalog.`}
+            body={`"${slug}" doesn't match any problem in the catalog.`}
             onBack={() => router.push("/dashboard/practice")}
           />
         )}

@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Lock, CheckCircle2, XCircle, PlayCircle, Award } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -15,12 +15,21 @@ import type { TrackPipeline, TrackPipelineRound } from "@/types/interviewTrack";
  * A candidate's "Final Interview" pipeline overview — 3 rounds, each
  * locked/unlocked/in-progress/completed based on InterviewTrackController::show().
  * Taking a round itself reuses the existing, unchanged
- * /dashboard/interviews/[slug] -> /session voice-taking flow: a round IS a
- * plain Interview under the hood.
+ * /dashboard/interviews/view?slug= -> /session voice-taking flow: a round IS
+ * a plain Interview under the hood.
  */
 export default function InterviewTrackPipelinePage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <InterviewTrackPipelinePageContent />
+    </Suspense>
+  );
+}
+
+function InterviewTrackPipelinePageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
   const [pipeline, setPipeline] = useState<TrackPipeline | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,11 +37,11 @@ export default function InterviewTrackPipelinePage() {
   useEffect(() => {
     if (status !== "ready") return;
     api
-      .get<TrackPipeline>(`/interview-tracks/${params.slug}`)
+      .get<TrackPipeline>(`/interview-tracks/${slug}`)
       .then(setPipeline)
       .catch((err) => setError(err instanceof ApiError ? err.message : "This Final Interview isn't available."))
       .finally(() => setLoading(false));
-  }, [status, params.slug]);
+  }, [status, slug]);
 
   if (status !== "ready") return <SessionLoader />;
 
@@ -170,7 +179,7 @@ function RoundRow({ round, isLast }: { round: TrackPipelineRound; isLast: boolea
             )
           ) : (
             <Link
-              href={`/dashboard/interviews/${round.interview_slug}`}
+              href={`/dashboard/interviews/view?slug=${round.interview_slug}`}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
             >
               <PlayCircle className="w-3.5 h-3.5" />

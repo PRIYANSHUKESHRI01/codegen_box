@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -118,7 +118,16 @@ const YEAR_FILTER_ALL = "All";
 const CATEGORY_FILTER_ALL = "All";
 
 export default function PlacementDrivePreparePage() {
-  const params = useParams<{ driveId: string }>();
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <PlacementDrivePreparePageContent />
+    </Suspense>
+  );
+}
+
+function PlacementDrivePreparePageContent() {
+  const searchParams = useSearchParams();
+  const driveId = searchParams.get("driveId") ?? "";
   const router = useRouter();
   const { status: authStatus } = useAuthGuard(["user"]);
 
@@ -131,12 +140,12 @@ export default function PlacementDrivePreparePage() {
   const [minutesFromNow, setMinutesFromNow] = useState(0);
 
   useEffect(() => {
-    if (authStatus !== "ready" || !params?.driveId) return;
+    if (authStatus !== "ready" || !driveId) return;
     let cancelled = false;
     setLoadState("loading");
 
     api
-      .get<ApiDriveDetailResponse>(`/drives/${params.driveId}`)
+      .get<ApiDriveDetailResponse>(`/drives/${driveId}`)
       .then((res) => {
         if (cancelled) return;
         const mapped = mapDriveDetailFromApi(res);
@@ -152,7 +161,7 @@ export default function PlacementDrivePreparePage() {
     return () => {
       cancelled = true;
     };
-  }, [authStatus, params?.driveId]);
+  }, [authStatus, driveId]);
 
   const years = useMemo(() => {
     if (!detail) return [];

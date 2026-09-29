@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, ChevronLeft, Clock3, CalendarDays, CheckCircle2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MarkdownRenderer } from "@/components/dashboard/articles/MarkdownRenderer";
@@ -33,8 +33,17 @@ function formatDate(iso: string | null): string {
  * correct here — see ReadingProgressBar's own docblock.
  */
 export default function ArticleReaderPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <ArticleReaderPageContent />
+    </Suspense>
+  );
+}
+
+function ArticleReaderPageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ articleSlug: string }>();
+  const searchParams = useSearchParams();
+  const articleSlug = searchParams.get("articleSlug") ?? "";
   const router = useRouter();
 
   const [article, setArticle] = useState<ArticleDetail | null>(null);
@@ -52,7 +61,7 @@ export default function ArticleReaderPage() {
     markedReadRef.current = false;
     try {
       const res = await api.get<{ article: ArticleDetail; previous: ArticleAdjacent | null; next: ArticleAdjacent | null }>(
-        `/articles/${params.articleSlug}`
+        `/articles/${articleSlug}`
       );
       setArticle(res.article);
       setPrevious(res.previous);
@@ -68,7 +77,7 @@ export default function ArticleReaderPage() {
     } finally {
       setLoading(false);
     }
-  }, [params.articleSlug]);
+  }, [articleSlug]);
 
   useEffect(() => {
     if (status === "ready") load();
@@ -120,7 +129,7 @@ export default function ArticleReaderPage() {
           <ReadingProgressBar />
           <div className="max-w-[720px] mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
             <button
-              onClick={() => router.push(`/dashboard/articles/topic/${article.article_topic.slug}`)}
+              onClick={() => router.push(`/dashboard/articles/topic?topicSlug=${article.article_topic.slug}`)}
               className="flex items-center gap-1 text-[11px] font-semibold text-text-muted hover:text-primary transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />

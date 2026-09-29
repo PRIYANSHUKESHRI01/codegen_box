@@ -16,7 +16,7 @@ export function ArticleTopicCard({ topic }: { topic: ArticleTopicSummary }) {
   return (
     <motion.div whileHover={{ y: -3 }} transition={{ duration: 0.18, ease: "easeOut" }}>
       <Link
-        href={`/dashboard/articles/topic/${topic.slug}`}
+        href={`/dashboard/articles/topic?topicSlug=${topic.slug}`}
         className="group block h-full rounded-panel bg-surface border border-border-subtle hover:border-border-strong shadow-subtle hover:shadow-card transition-all p-5 space-y-4"
       >
         <div className="flex items-start justify-between">

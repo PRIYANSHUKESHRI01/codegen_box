@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, ChevronLeft } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ArticleListRow } from "@/components/dashboard/articles/ArticleListRow";
@@ -15,8 +15,17 @@ import type { ArticleListItem, ArticleTopicSummary } from "@/types/article";
 
 /** One topic's reading path, syllabus-style — click any article to start, or resume where a checkmark leaves off. */
 export default function ArticleTopicPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <ArticleTopicPageContent />
+    </Suspense>
+  );
+}
+
+function ArticleTopicPageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ topicSlug: string }>();
+  const searchParams = useSearchParams();
+  const topicSlug = searchParams.get("topicSlug") ?? "";
   const router = useRouter();
 
   const [topic, setTopic] = useState<ArticleTopicSummary | null>(null);
@@ -27,7 +36,7 @@ export default function ArticleTopicPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ topic: ArticleTopicSummary; articles: ArticleListItem[] }>(`/articles/topics/${params.topicSlug}`);
+      const res = await api.get<{ topic: ArticleTopicSummary; articles: ArticleListItem[] }>(`/articles/topics/${topicSlug}`);
       setTopic(res.topic);
       setArticles(res.articles);
     } catch (err) {
@@ -35,7 +44,7 @@ export default function ArticleTopicPage() {
     } finally {
       setLoading(false);
     }
-  }, [params.topicSlug]);
+  }, [topicSlug]);
 
   useEffect(() => {
     if (status === "ready") load();

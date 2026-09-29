@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Swords, Trophy, CheckCircle2, ArrowRight, Loader2, Lock } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
@@ -15,8 +15,17 @@ import type { ContestDetail, ContestLeaderboard } from "@/types/liveContest";
 type Tab = "problems" | "leaderboard";
 
 export default function ContestDetailPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <ContestDetailPageContent />
+    </Suspense>
+  );
+}
+
+function ContestDetailPageContent() {
   const { status } = useAuthGuard(["user"]);
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
 
   const [contest, setContest] = useState<ContestDetail | null>(null);
@@ -33,7 +42,7 @@ export default function ContestDetailPage() {
 
   const loadContest = () => {
     api
-      .get<ContestDetail>(`/contests/${params.slug}`)
+      .get<ContestDetail>(`/contests/${slug}`)
       .then((res) => {
         setContest(res);
         setLoadState("ready");
@@ -44,18 +53,18 @@ export default function ContestDetailPage() {
   };
 
   useEffect(() => {
-    if (status !== "ready" || !params.slug) return;
+    if (status !== "ready" || !slug) return;
     loadContest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, params.slug]);
+  }, [status, slug]);
 
   useEffect(() => {
-    if (tab !== "leaderboard" || !params.slug) return;
+    if (tab !== "leaderboard" || !slug) return;
     api
-      .get<ContestLeaderboard>(`/contests/${params.slug}/leaderboard`)
+      .get<ContestLeaderboard>(`/contests/${slug}/leaderboard`)
       .then(setLeaderboard)
       .catch(() => setLeaderboard(null));
-  }, [tab, params.slug]);
+  }, [tab, slug]);
 
   if (status !== "ready" || loadState === "loading") {
     return <SessionLoader label={status !== "ready" ? undefined : "Loading contest..."} />;
@@ -155,7 +164,9 @@ export default function ContestDetailPage() {
               // same one the problems tab lists first.
               contest.problems && contest.problems.length > 0 && (
                 <button
-                  onClick={() => router.push(`/dashboard/contests/${contest.slug}/problems/${contest.problems![0].id}`)}
+                  onClick={() =>
+                    router.push(`/dashboard/contests/problem?slug=${contest.slug}&contestProblemId=${contest.problems![0].id}`)
+                  }
                   className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
                 >
                   <span>Start Contest</span>
@@ -222,7 +233,7 @@ export default function ContestDetailPage() {
             {contest.problems?.map((cp) => (
               <button
                 key={cp.id}
-                onClick={() => router.push(`/dashboard/contests/${contest.slug}/problems/${cp.id}`)}
+                onClick={() => router.push(`/dashboard/contests/problem?slug=${contest.slug}&contestProblemId=${cp.id}`)}
                 disabled={!contest.has_started}
                 className="w-full p-4 flex items-center justify-between gap-4 hover:bg-surface-hover/60 transition-colors text-left"
               >

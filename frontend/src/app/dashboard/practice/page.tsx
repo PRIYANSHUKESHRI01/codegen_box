@@ -346,7 +346,7 @@ function PracticeArenaPageContent() {
                       />
                     )}
                     <button
-                      onClick={() => router.push(`/dashboard/practice/${problem.slug}`)}
+                      onClick={() => router.push(`/dashboard/practice/view?slug=${problem.slug}`)}
                       className="px-3 py-1.5 rounded-control bg-elevated hover:bg-accent-primary hover:text-white border border-border-subtle hover:border-transparent text-xs font-bold text-primary transition-all shrink-0"
                     >
                       Solve

@@ -1,8 +1,8 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -13,9 +13,18 @@ import { api, ApiError } from "@/lib/api";
 import type { AdminArticleDetail } from "@/types/article";
 
 export default function EditArticlePage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <EditArticlePageContent />
+    </Suspense>
+  );
+}
+
+function EditArticlePageContent() {
   const { status, user } = useAuthGuard(["admin_internal", "superadmin"]);
   const hasAccess = userHasPermission(user, "articles");
-  const params = useParams<{ slug: string }>();
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
 
   const [article, setArticle] = useState<AdminArticleDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,14 +33,14 @@ export default function EditArticlePage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ article: AdminArticleDetail }>(`/admin/articles/${params.slug}`);
+      const res = await api.get<{ article: AdminArticleDetail }>(`/admin/articles/${slug}`);
       setArticle(res.article);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load this article.");
     } finally {
       setLoading(false);
     }
-  }, [params.slug]);
+  }, [slug]);
 
   useEffect(() => {
     if (status === "ready" && hasAccess) load();

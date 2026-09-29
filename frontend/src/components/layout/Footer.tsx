@@ -117,9 +117,9 @@ export function Footer() {
               </p>
             </div>
 
-            <a href="mailto:campus@mellow.ai" className="shrink-0">
+            <a href="mailto:support@mellowvault.com" className="shrink-0">
               <Button variant="primary" size="lg" rightIcon={<Mail className="w-4 h-4" />} className="shadow-glow">
-                campus@mellow.ai
+                support@mellowvault.com
               </Button>
             </a>
           </div>

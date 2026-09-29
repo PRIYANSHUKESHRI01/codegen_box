@@ -227,8 +227,8 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
 
                 <p className="text-center text-[11px] text-text-muted">
                   Prefer email? Write to us at{" "}
-                  <a href="mailto:campus@mellow.ai" className="text-accent-primary hover:underline">
-                    campus@mellow.ai
+                  <a href="mailto:support@mellowvault.com" className="text-accent-primary hover:underline">
+                    support@mellowvault.com
                   </a>
                 </p>
               </form>

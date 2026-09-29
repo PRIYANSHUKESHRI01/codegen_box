@@ -89,7 +89,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     icon: "Building2",
     annualPrice: 149000,
     ctaLabel: "Talk to Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Standard%20Plan%20Inquiry",
+    ctaHref: "mailto:support@mellowvault.com?subject=CodeGen%20Box%20Standard%20Plan%20Inquiry",
     features: [
       "Up to 500 student seats",
       "Full practice arena + rated contests for your batch",
@@ -107,7 +107,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     annualPrice: 449000,
     featured: true,
     ctaLabel: "Talk to Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Pro%20Campus%20Plan%20Inquiry",
+    ctaHref: "mailto:support@mellowvault.com?subject=CodeGen%20Box%20Pro%20Campus%20Plan%20Inquiry",
     features: [
       "Everything in Standard, plus:",
       "Up to 2,000 student seats",
@@ -124,7 +124,7 @@ export const INSTITUTION_PLANS: PricingPlan[] = [
     icon: "Landmark",
     badge: "Enterprise",
     ctaLabel: "Contact Sales",
-    ctaHref: "mailto:campus@mellow.ai?subject=CodeGen%20Box%20Academic%20Enterprise%20Inquiry",
+    ctaHref: "mailto:support@mellowvault.com?subject=CodeGen%20Box%20Academic%20Enterprise%20Inquiry",
     features: [
       "Everything in Pro Campus, plus:",
       "Unlimited student seats, multi-campus support",

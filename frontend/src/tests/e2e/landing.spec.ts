@@ -75,7 +75,7 @@ test.describe("CodeGen Box Landing Page E2E", () => {
   });
 
   test("footer should offer a real contact method, not a fake newsletter form", async ({ page }) => {
-    const contactLink = page.locator('a[href="mailto:campus@mellow.ai"]');
+    const contactLink = page.locator('a[href="mailto:support@mellowvault.com"]');
     await expect(contactLink.first()).toBeVisible();
   });
 });

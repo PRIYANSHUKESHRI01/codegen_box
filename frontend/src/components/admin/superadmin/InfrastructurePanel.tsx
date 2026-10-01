@@ -118,7 +118,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
             <h2 className="text-lg font-bold text-primary flex items-center gap-2">
               <Cpu className="w-5 h-5 text-accent-primary" />
               <span>Code Execution Pool</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-status-success/15 text-status-success border border-status-success/30 font-bold uppercase tracking-wide">Live</span>
+              <span className="text-3xs px-1.5 py-0.5 rounded bg-status-success/15 text-status-success border border-status-success/30 font-bold uppercase tracking-wide">Live</span>
             </h2>
             <p className="text-xs text-text-muted">
               Measured right now from the real Piston nodes and judge queues — refreshes every {TELEMETRY_REFRESH_MS / 1000}s.
@@ -157,14 +157,14 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
                 },
               ].map((c) => (
                 <div key={c.label} className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-                  <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">{c.label}</span>
+                  <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">{c.label}</span>
                   <span className="text-xl font-black text-primary font-mono mt-1 block">{c.value}</span>
-                  <span className="text-[10px] text-text-muted">{c.sub}</span>
+                  <span className="text-3xs text-text-muted">{c.sub}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 text-2xs">
               <span className="text-text-muted font-semibold uppercase tracking-wider">Queues</span>
               {Object.entries(telemetry.queues).map(([key, q]) => (
                 <span key={key} className="px-2 py-1 rounded-control bg-elevated border border-border-subtle text-text-secondary">
@@ -191,7 +191,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
                         </div>
                         <span
                           className={cn(
-                            "px-2 py-0.5 text-[10px] font-bold rounded-full uppercase",
+                            "px-2 py-0.5 text-3xs font-bold rounded-full uppercase",
                             node.status === "healthy" && "bg-status-success/15 text-status-success",
                             node.status === "busy" && "bg-status-warning/15 text-status-warning",
                             (node.status === "degraded" || node.status === "offline") && "bg-status-danger/15 text-status-danger"
@@ -202,7 +202,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
                       </div>
 
                       <div className="space-y-1">
-                        <div className="flex justify-between text-[11px] text-text-secondary">
+                        <div className="flex justify-between text-2xs text-text-secondary">
                           <span>Execution slots</span>
                           <span className="font-mono font-medium">
                             {node.in_flight} / {node.max_jobs}
@@ -213,7 +213,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
                         </div>
                       </div>
 
-                      <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-[11px] text-text-muted">
+                      <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-2xs text-text-muted">
                         <span>
                           Runtimes: <strong className="text-primary">{node.runtimes.length}</strong>
                           {node.breaker_open && <span className="ml-2 text-status-danger font-bold">circuit open</span>}
@@ -237,7 +237,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
             <Sliders className="w-4 h-4 text-accent-primary" />
             <span>Platform Feature Flags</span>
           </h2>
-          <p className="text-[11px] text-text-muted mt-1">
+          <p className="text-2xs text-text-muted mt-1">
             Real, persisted toggles — they survive a reload. Application code doesn't branch on these yet; that wiring is a separate initiative.
           </p>
         </div>
@@ -254,11 +254,11 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-primary truncate">{flag.name}</span>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-surface text-text-muted border border-border-subtle font-mono">{flag.category}</span>
+                    <span className="text-3xs px-1.5 py-0.2 rounded bg-surface text-text-muted border border-border-subtle font-mono">{flag.category}</span>
                   </div>
-                  <p className="text-[11px] text-text-muted mt-0.5 leading-snug">{flag.description}</p>
+                  <p className="text-2xs text-text-muted mt-0.5 leading-snug">{flag.description}</p>
                   {flag.updated_by_name && (
-                    <p className="text-[10px] text-text-muted mt-1">Last changed by {flag.updated_by_name}</p>
+                    <p className="text-3xs text-text-muted mt-1">Last changed by {flag.updated_by_name}</p>
                   )}
                 </div>
 

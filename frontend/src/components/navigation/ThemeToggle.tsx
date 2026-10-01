@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { motion } from "framer-motion";
 import { Sun, Moon, Monitor } from "lucide-react";
 import { ThemeMode } from "@/types/common";
 import { cn } from "@/lib/utils";
@@ -14,6 +15,12 @@ interface ThemeToggleProps {
 export function ThemeToggle({ className, showLabels = false, compact = false }: ThemeToggleProps) {
   const [theme, setTheme] = useState<ThemeMode>("light");
   const [mounted, setMounted] = useState(false);
+  // Unique per mounted instance — several ThemeToggles can be in the DOM at
+  // once (desktop nav + mobile nav/menu, each just hidden by CSS at a given
+  // breakpoint). A shared layoutId across instances would make framer-motion
+  // treat them as the same element and animate the pill teleporting between
+  // them; keying it to this instance keeps the slide animation local.
+  const uid = useId();
 
   useEffect(() => {
     setMounted(true);
@@ -100,17 +107,32 @@ export function ThemeToggle({ className, showLabels = false, compact = false }: 
             type="button"
             onClick={() => handleSelect(opt.mode)}
             className={cn(
-              "flex items-center justify-center transition-all duration-150 focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:outline-none touch-manipulation cursor-pointer active:scale-95",
+              "relative flex items-center justify-center transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:outline-none touch-manipulation cursor-pointer active:scale-95",
               compact
                 ? "h-7 w-7 rounded-[6px] text-xs"
                 : "min-h-[32px] px-2.5 py-1.5 rounded-[7px] text-xs font-medium gap-1.5",
-              isActive
-                ? "bg-elevated text-primary shadow-sm border border-border-strong font-bold"
-                : "text-muted hover:text-primary hover:bg-surface-hover"
+              !isActive && "text-muted hover:text-primary hover:bg-surface-hover"
             )}
           >
-            <Icon className="w-3.5 h-3.5" />
-            {!compact && showLabels && <span>{opt.label}</span>}
+            {isActive && (
+              <motion.span
+                layoutId={`theme-pill-${uid}`}
+                className={cn(
+                  "absolute inset-0 bg-accent-primary/12 border border-accent-primary/30 shadow-sm",
+                  compact ? "rounded-[6px]" : "rounded-[7px]"
+                )}
+                transition={{ type: "spring", stiffness: 500, damping: 34 }}
+              />
+            )}
+            <span
+              className={cn(
+                "relative z-10 flex items-center justify-center gap-1.5",
+                isActive ? "text-accent-primary font-bold" : "text-inherit"
+              )}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              {!compact && showLabels && <span>{opt.label}</span>}
+            </span>
           </button>
         );
       })}

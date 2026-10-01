@@ -152,7 +152,7 @@ function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div className="text-center">
       <div className="text-xl font-black text-primary tabular-nums">{value}</div>
-      <div className="text-[10px] font-semibold text-text-muted uppercase tracking-wide mt-0.5">{label}</div>
+      <div className="text-3xs font-semibold text-text-muted uppercase tracking-wide mt-0.5">{label}</div>
     </div>
   );
 }
@@ -477,7 +477,7 @@ function InterviewSessionPageContent() {
             <div className="max-w-2xl mx-auto w-full p-4 sm:p-6 space-y-5 overflow-y-auto">
               {totalQuestions > 0 && phase !== "complete" && (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-semibold text-text-muted">
+                  <div className="flex items-center justify-between text-2xs font-semibold text-text-muted">
                     <span>
                       Question {Math.min(answeredCount + 1, totalQuestions)} of {totalQuestions}
                     </span>
@@ -586,7 +586,7 @@ function InterviewSessionPageContent() {
                           {result.passed !== null && (
                             <div
                               className={cn(
-                                "flex items-center gap-1 text-[11px] font-semibold mt-0.5",
+                                "flex items-center gap-1 text-2xs font-semibold mt-0.5",
                                 result.passed ? "text-status-success" : "text-status-danger"
                               )}
                             >
@@ -599,12 +599,12 @@ function InterviewSessionPageContent() {
 
                       {result.responses.length > 0 && (
                         <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted">Per-question feedback</p>
+                          <p className="text-3xs font-bold uppercase tracking-wide text-text-muted">Per-question feedback</p>
                           {result.responses.map((r, i) => (
                             <div key={i} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-[11px] font-semibold text-primary line-clamp-1">{r.question_text}</span>
-                                <span className="text-[11px] font-bold text-accent-primary shrink-0">{r.score}/100</span>
+                                <span className="text-2xs font-semibold text-primary line-clamp-1">{r.question_text}</span>
+                                <span className="text-2xs font-bold text-accent-primary shrink-0">{r.score}/100</span>
                               </div>
                               <p className="text-[10.5px] text-text-secondary mt-1 leading-relaxed">{r.feedback}</p>
                             </div>
@@ -612,11 +612,11 @@ function InterviewSessionPageContent() {
                         </div>
                       )}
 
-                      <p className="text-[10px] text-text-muted text-center">Scored by AI — a human reviewer can still adjust this.</p>
+                      <p className="text-3xs text-text-muted text-center">Scored by AI — a human reviewer can still adjust this.</p>
                     </div>
                   ) : (
                     <div className="text-left max-w-xs mx-auto space-y-3">
-                      <p className="text-[10px] font-bold uppercase tracking-wide text-text-muted">What happens next</p>
+                      <p className="text-3xs font-bold uppercase tracking-wide text-text-muted">What happens next</p>
                       <div className="flex items-start gap-2.5">
                         <div className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center shrink-0 mt-0.5">
                           <UserCheck className="w-3.5 h-3.5 text-accent-primary" />
@@ -657,14 +657,14 @@ function InterviewSessionPageContent() {
                   >
                     <div className="p-6 sm:p-7 space-y-5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border", CATEGORY_COLORS[question.category])}>
+                        <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", CATEGORY_COLORS[question.category])}>
                           {CATEGORY_LABELS[question.category]}
                         </span>
-                        <span className={cn("px-1.5 py-0.5 text-[9px] font-bold rounded capitalize", DIFFICULTY_COLORS[question.difficulty])}>
+                        <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", DIFFICULTY_COLORS[question.difficulty])}>
                           {question.difficulty}
                         </span>
                         {phase === "speaking" && (
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-accent-primary ml-auto">
+                          <span className="flex items-center gap-1 text-3xs font-semibold text-accent-primary ml-auto">
                             <Volume2 className="w-3 h-3 animate-pulse" />
                             Reading question aloud...
                           </span>
@@ -681,7 +681,7 @@ function InterviewSessionPageContent() {
                           </div>
                           <div>
                             <p className="text-sm font-bold text-primary">Get ready to answer</p>
-                            <p className="text-[11px] text-text-muted mt-0.5">Recording starts automatically — or jump in now.</p>
+                            <p className="text-2xs text-text-muted mt-0.5">Recording starts automatically — or jump in now.</p>
                           </div>
                           <motion.button
                             whileTap={{ scale: 0.96 }}
@@ -730,10 +730,10 @@ function InterviewSessionPageContent() {
                               <span>{interimCaption.length > 180 ? `…${interimCaption.slice(-180)}` : interimCaption}</span>
                             </p>
                           ) : (
-                            <p className="text-[11px] text-text-muted italic">Listening — start speaking whenever you&apos;re ready.</p>
+                            <p className="text-2xs text-text-muted italic">Listening — start speaking whenever you&apos;re ready.</p>
                           )}
 
-                          {listenHint && <p className="text-[10px] font-semibold text-status-warning">{listenHint}</p>}
+                          {listenHint && <p className="text-3xs font-semibold text-status-warning">{listenHint}</p>}
 
                           <button
                             onClick={() => handleStopAnswering(false)}
@@ -748,19 +748,19 @@ function InterviewSessionPageContent() {
                       {phase === "text_fallback" && (
                         <div className="pt-2 space-y-2">
                           {micErrorMessage && (
-                            <div className="flex items-start gap-2 px-3 py-2.5 rounded-control bg-status-warning/10 border border-status-warning/25 text-[11px] text-text-secondary">
+                            <div className="flex items-start gap-2 px-3 py-2.5 rounded-control bg-status-warning/10 border border-status-warning/25 text-2xs text-text-secondary">
                               <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0 mt-0.5" />
                               <span>{micErrorMessage}</span>
                             </div>
                           )}
                           <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-semibold text-text-secondary flex items-center gap-1.5">
+                            <label className="text-2xs font-semibold text-text-secondary flex items-center gap-1.5">
                               <Edit3 className="w-3.5 h-3.5" />
                               Type your answer
                             </label>
                             <span
                               className={cn(
-                                "text-[11px] font-mono font-bold tabular-nums flex items-center gap-1",
+                                "text-2xs font-mono font-bold tabular-nums flex items-center gap-1",
                                 typingSecondsLeft <= responseSeconds * 0.15 ? "text-status-danger" : "text-text-muted"
                               )}
                             >
@@ -798,12 +798,12 @@ function InterviewSessionPageContent() {
                       {(phase === "reviewing_answer" || phase === "submitting") && (
                         <div className="pt-2 space-y-3">
                           {timedOut && (
-                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-warning/10 border border-status-warning/25 text-[11px] font-semibold text-status-warning">
+                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-warning/10 border border-status-warning/25 text-2xs font-semibold text-status-warning">
                               <Clock3 className="w-3.5 h-3.5" />
                               Time&apos;s up — here&apos;s what was captured. Review and submit, or re-record.
                             </div>
                           )}
-                          <label className="text-[11px] font-semibold text-text-secondary flex items-center gap-1.5">
+                          <label className="text-2xs font-semibold text-text-secondary flex items-center gap-1.5">
                             <Edit3 className="w-3.5 h-3.5" />
                             Review your answer (edit if needed)
                           </label>
@@ -816,11 +816,11 @@ function InterviewSessionPageContent() {
                           />
                           {audioUrl && (
                             <div>
-                              <p className="text-[10px] font-semibold text-text-muted mb-1">Your recording</p>
+                              <p className="text-3xs font-semibold text-text-muted mb-1">Your recording</p>
                               <audio controls src={audioUrl} className="w-full h-9" />
                             </div>
                           )}
-                          {errorMessage && <p className="text-[11px] text-status-danger">{errorMessage}</p>}
+                          {errorMessage && <p className="text-2xs text-status-danger">{errorMessage}</p>}
                           <div className="flex items-center gap-2">
                             <motion.button
                               whileTap={{ scale: 0.96 }}
@@ -855,7 +855,7 @@ function InterviewSessionPageContent() {
                       )}
                     </div>
 
-                    <div className="px-6 py-3 bg-elevated/40 border-t border-border-subtle flex items-center gap-1.5 text-[10px] text-text-muted">
+                    <div className="px-6 py-3 bg-elevated/40 border-t border-border-subtle flex items-center gap-1.5 text-3xs text-text-muted">
                       <CheckCircle2 className="w-3 h-3" />
                       Nothing here is auto-scored — a real person reviews your recorded answer.
                     </div>

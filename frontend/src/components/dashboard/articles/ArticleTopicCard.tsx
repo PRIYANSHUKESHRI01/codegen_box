@@ -24,7 +24,7 @@ export function ArticleTopicCard({ topic }: { topic: ArticleTopicSummary }) {
             <TopicIcon name={topic.icon} className="w-5 h-5" />
           </div>
           {total > 0 && read >= total && (
-            <span className="flex items-center gap-1 text-[10px] font-bold text-status-success">
+            <span className="flex items-center gap-1 text-3xs font-bold text-status-success">
               <BookOpenCheck className="w-3.5 h-3.5" />
               Complete
             </span>
@@ -36,7 +36,7 @@ export function ArticleTopicCard({ topic }: { topic: ArticleTopicSummary }) {
           {topic.description && <p className="text-xs text-text-muted mt-1 leading-relaxed line-clamp-2">{topic.description}</p>}
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-text-muted pt-1">
+        <div className="flex items-center justify-between text-2xs text-text-muted pt-1">
           <span>
             {total} article{total === 1 ? "" : "s"}
             {topic.total_reading_minutes ? <> · {topic.total_reading_minutes} min</> : null}

@@ -146,9 +146,9 @@ export function AuditLogPanel() {
               <div key={log.id} className="p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs space-y-1.5 hover:bg-surface-hover transition-colors">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-primary truncate">{log.actor_name}</span>
-                  <span className="text-[10px] font-mono text-text-muted shrink-0">{formatDateTime(log.created_at)}</span>
+                  <span className="text-3xs font-mono text-text-muted shrink-0">{formatDateTime(log.created_at)}</span>
                 </div>
-                <p className="text-text-secondary text-[11px] leading-relaxed">
+                <p className="text-text-secondary text-2xs leading-relaxed">
                   {log.action}
                   {log.target_label && (
                     <>
@@ -157,7 +157,7 @@ export function AuditLogPanel() {
                     </>
                   )}
                 </p>
-                <div className="flex items-center justify-between text-[10px] text-text-muted font-mono pt-1 border-t border-border-subtle/50">
+                <div className="flex items-center justify-between text-3xs text-text-muted font-mono pt-1 border-t border-border-subtle/50">
                   <span>{ROLE_LABEL[log.actor_role as PlatformRole] ?? log.actor_role}</span>
                   {log.target_type && <span>Target: {log.target_type}</span>}
                 </div>

@@ -58,7 +58,7 @@ function ArticleTopicPageContent() {
     <DashboardShell role="user" title="Articles">
       <button
         onClick={() => router.push("/dashboard/articles")}
-        className="flex items-center gap-1 text-[11px] font-semibold text-text-muted hover:text-primary transition-colors -mt-2"
+        className="flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors -mt-2"
       >
         <ChevronLeft className="w-3.5 h-3.5" />
         All Topics
@@ -87,7 +87,7 @@ function ArticleTopicPageContent() {
             <div>
               <h2 className="text-lg font-extrabold text-primary">{topic.name}</h2>
               {topic.description && <p className="text-xs text-text-muted mt-0.5 max-w-2xl">{topic.description}</p>}
-              <p className="text-[11px] text-text-muted mt-1">
+              <p className="text-2xs text-text-muted mt-1">
                 {readCount} of {articles.length} read
               </p>
             </div>

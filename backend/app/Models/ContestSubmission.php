@@ -21,10 +21,14 @@ class ContestSubmission extends Model
         'user_id',
         'judge_token',
         'language',
+        'code',
         'status',
         'submitted_at',
         'points_awarded',
     ];
+
+    /** Same "excluded from JSON, not from the query" convention as Submission::$hidden — see that model's docblock. */
+    protected $hidden = ['code'];
 
     protected function casts(): array
     {

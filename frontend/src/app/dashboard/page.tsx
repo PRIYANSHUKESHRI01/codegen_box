@@ -209,6 +209,35 @@ export default function UserDashboardPage() {
   const peakRating = chartData.length > 0 ? Math.max(...chartData.map((d) => d.rating)) : null;
   const latestChange = chartData[chartData.length - 1]?.change ?? 0;
 
+  // Readiness tiers are the three the backend actually emits (see
+  // ReadinessStats["tier"]). Each gets its own chip colour and a sentence
+  // saying what the number means — a bare "13%" with no verdict next to it
+  // is a score without a diagnosis.
+  const readinessTone = ((): { chip: string; blurb: string } => {
+    switch (stats?.readiness.tier) {
+      case "Placement Ready":
+        return {
+          chip: "bg-status-success/10 text-status-success",
+          blurb: "You're clearing the bar your placement cell screens on. Keep the streak going.",
+        };
+      case "In Progress":
+        return {
+          chip: "bg-status-warning/10 text-status-warning",
+          blurb: "Close. More consistent problem solving will move you into the ready band.",
+        };
+      case "Needs Training":
+        return {
+          chip: "bg-status-danger/10 text-status-danger",
+          blurb: "Keep practicing to improve your problem solving, DSA and system design skills.",
+        };
+      default:
+        return {
+          chip: "bg-elevated text-text-muted",
+          blurb: "Solve a few problems to generate your readiness score.",
+        };
+    }
+  })();
+
   return (
     <DashboardShell
       role="user"
@@ -240,45 +269,65 @@ export default function UserDashboardPage() {
       {!contestsLoading && !drivesLoading && (priorityIsContest ? nextContest : nextDrive) && (
         <section
           id="priority"
-          className="relative overflow-hidden rounded-panel border border-accent-primary/30 bg-gradient-to-br from-accent-primary/10 via-surface to-accent-secondary/10 shadow-subtle"
+          className={cn(
+            // The one genuinely urgent thing on the page, so it gets the only
+            // saturated surface: a wash of the accent across a white card.
+            // Everything else on the dashboard stays white-on-tint, which is
+            // what lets this read as "look here first" without needing to
+            // shout in a heavier colour.
+            "relative overflow-hidden rounded-panel border bg-surface bg-gradient-to-r shadow-card",
+            priorityIsContest && contestIsLive
+              ? "border-status-danger/25 from-status-danger/[0.13] via-status-danger/[0.05] to-accent-primary/[0.07]"
+              : "border-accent-primary/20 from-accent-primary/[0.15] via-accent-primary/[0.07] to-accent-secondary/[0.10]"
+          )}
         >
-          <div className="absolute -top-20 -right-16 w-72 h-72 bg-accent-primary/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="relative p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
-            <div className="flex items-start gap-4 flex-1 min-w-0">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-accent-primary/10 blur-3xl"
+          />
+
+          <div className="relative flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+            <div className="flex min-w-0 items-start gap-4">
               <div
                 className={cn(
-                  "w-12 h-12 rounded-panel border flex items-center justify-center shrink-0",
+                  "flex h-14 w-14 shrink-0 items-center justify-center rounded-panel border shadow-subtle",
                   priorityIsContest && contestIsLive
-                    ? "bg-status-danger/15 border-status-danger/30 text-status-danger"
-                    : "bg-accent-primary/15 border-accent-primary/30 text-accent-primary"
+                    ? "border-status-danger/25 bg-surface text-status-danger"
+                    : "border-accent-primary/20 bg-surface text-accent-primary"
                 )}
               >
-                {priorityIsContest ? <Swords className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                {priorityIsContest ? <Swords className="h-7 w-7" /> : <Briefcase className="h-7 w-7" />}
               </div>
+
               <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span
-                    className={cn(
-                      "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border flex items-center gap-1.5 w-fit",
-                      priorityIsContest && contestIsLive
-                        ? "bg-status-danger/15 text-status-danger border-status-danger/30"
-                        : "bg-accent-primary/15 text-accent-primary border-accent-primary/30"
-                    )}
-                  >
-                    {priorityIsContest && contestIsLive && <span className="w-1.5 h-1.5 rounded-full bg-status-danger animate-pulse" />}
-                    {priorityIsContest
-                      ? contestIsLive
-                        ? "Live Now"
-                        : nextContest!.is_rated
-                          ? "Rated Contest"
-                          : "Contest"
-                      : "Placement Drive"}
-                  </span>
-                </div>
-                <h2 className="text-base sm:text-lg font-bold text-primary leading-snug">
+                {/* Solid ink chip rather than another tinted pastel. Against
+                    a tinted panel a tinted badge disappears; `bg-primary
+                    text-surface` inverts cleanly in both themes (navy-on-
+                    white in light, white-on-dark in dark). */}
+                <span
+                  className={cn(
+                    "inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-1 text-3xs font-extrabold uppercase tracking-[0.1em]",
+                    priorityIsContest && contestIsLive
+                      ? "bg-status-danger text-white"
+                      : "bg-primary text-surface"
+                  )}
+                >
+                  {priorityIsContest && contestIsLive && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" />
+                  )}
+                  {priorityIsContest
+                    ? contestIsLive
+                      ? "Live Now"
+                      : nextContest!.is_rated
+                        ? "Rated Contest"
+                        : "Contest"
+                    : "Placement Drive"}
+                </span>
+
+                <h2 className="mt-2.5 truncate text-xl font-extrabold leading-tight tracking-tight text-primary sm:text-2xl">
                   {priorityIsContest ? nextContest!.title : nextDrive!.company.name}
                 </h2>
-                <p className="text-xs text-text-secondary mt-1">
+                <p className="mt-1.5 text-13 font-medium text-text-secondary">
                   {priorityIsContest
                     ? `${nextContest!.problem_count} problems · ${nextContest!.total_points} points${nextContest!.is_rated ? " · Rated" : ""}`
                     : `${nextDrive!.roleTitle} · ${nextDrive!.ctcRange ?? "CTC not disclosed"}`}
@@ -286,32 +335,42 @@ export default function UserDashboardPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center gap-3 shrink-0">
-              <div className="text-center lg:text-left">
-                <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold block mb-1.5">
+            <div className="flex shrink-0 flex-col gap-4 sm:flex-row sm:items-end lg:flex-col lg:items-end xl:flex-row xl:items-end">
+              <div>
+                <span className="mb-2 block text-3xs font-bold uppercase tracking-[0.12em] text-text-muted">
                   {priorityIsContest && contestIsLive ? "Ends in" : "Starts in"}
                 </span>
-                <CountdownTimer minutesFromNow={priorityIsContest ? nextContestMinutes : nextDrive!.minutesFromNow} />
+                <CountdownTimer
+                  variant="raised"
+                  minutesFromNow={priorityIsContest ? nextContestMinutes : nextDrive!.minutesFromNow}
+                />
               </div>
-              <div className="flex items-center gap-2">
-                {priorityIsContest ? (
-                  <Link
-                    href={`/dashboard/contests/view?slug=${nextContest!.slug}`}
-                    className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <span>{nextContest!.is_registered ? (contestIsLive ? "Start Contest" : "View Contest") : "Register"}</span>
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Link>
-                ) : (
-                  <Link
-                    href={`/dashboard/drives?driveId=${nextDrive!.id}`}
-                    className="px-4 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    <span>Prepare</span>
-                    <ArrowUpRight className="w-4 h-4" />
-                  </Link>
+
+              <Link
+                href={
+                  priorityIsContest
+                    ? `/dashboard/contests/view?slug=${nextContest!.slug}`
+                    : `/dashboard/drives?driveId=${nextDrive!.id}`
+                }
+                className={cn(
+                  "flex h-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[12px] px-5 text-13 font-bold shadow-subtle transition-all hover:shadow-card active:scale-95",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+                  priorityIsContest && contestIsLive
+                    ? "bg-status-danger text-white hover:brightness-110"
+                    : "bg-primary text-surface hover:opacity-90"
                 )}
-              </div>
+              >
+                <span>
+                  {priorityIsContest
+                    ? nextContest!.is_registered
+                      ? contestIsLive
+                        ? "Start Contest"
+                        : "View Contest"
+                      : "Register"
+                    : "Prepare"}
+                </span>
+                <ArrowUpRight className="h-4 w-4" />
+              </Link>
             </div>
           </div>
         </section>
@@ -321,6 +380,11 @@ export default function UserDashboardPage() {
       {/* 2. KPI strip — every value real                              */}
       {/* ------------------------------------------------------------ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Each tile ends in the one action that actually moves its number,
+            so the strip reads as four next steps rather than four dead
+            readouts. The label changes with state where the useful action
+            does — an unrated student needs a contest, a rated one needs
+            their history. */}
         <StatTile
           label="Rating"
           value={stats?.rating.display_rating ?? "—"}
@@ -331,6 +395,11 @@ export default function UserDashboardPage() {
               ? `${latestChange >= 0 ? "+" : ""}${latestChange} from last contest`
               : "Enter a contest to get rated"
           }
+          action={
+            isRated
+              ? { label: "View rating history", href: "/dashboard/reports" }
+              : { label: "Enter a contest", href: "/dashboard/contests" }
+          }
         />
         <StatTile
           label="Global Rank"
@@ -338,6 +407,7 @@ export default function UserDashboardPage() {
           icon={Gauge}
           tone="secondary"
           hint={user?.college?.name ? "See college rank on the leaderboard" : undefined}
+          action={{ label: "View leaderboard", href: "/dashboard/leaderboard" }}
         />
         <StatTile
           label="Problems Solved"
@@ -345,6 +415,7 @@ export default function UserDashboardPage() {
           icon={CheckCircle2}
           tone="success"
           hint={`${stats?.solved.hard.solved ?? 0} hard problems cracked`}
+          action={{ label: "Solve problems", href: "/dashboard/practice" }}
         />
         <StatTile
           label="Current Streak"
@@ -353,6 +424,7 @@ export default function UserDashboardPage() {
           icon={Flame}
           tone="warning"
           hint={`Personal best: ${stats?.streak.max ?? 0} days`}
+          action={{ label: "Start practicing", href: "/dashboard/practice" }}
         />
       </div>
 
@@ -377,7 +449,7 @@ export default function UserDashboardPage() {
             </div>
             <Link
               href="/dashboard/reports"
-              className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1 shrink-0"
+              className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1 shrink-0"
             >
               <span>Full report</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -389,18 +461,18 @@ export default function UserDashboardPage() {
               <RatingChart data={chartData} height={250} />
               <div className="grid grid-cols-3 gap-3 mt-5 pt-5 border-t border-border-subtle text-center">
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">Peak</div>
+                  <div className="text-3xs uppercase tracking-wider text-text-muted font-semibold">Peak</div>
                   <div className="text-sm font-bold text-primary font-mono mt-1">{peakRating}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">Last Delta</div>
+                  <div className="text-3xs uppercase tracking-wider text-text-muted font-semibold">Last Delta</div>
                   <div className={cn("text-sm font-bold font-mono mt-1", latestChange >= 0 ? "text-status-success" : "text-status-danger")}>
                     {latestChange >= 0 ? "+" : ""}
                     {latestChange}
                   </div>
                 </div>
                 <div>
-                  <div className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">
+                  <div className="text-3xs uppercase tracking-wider text-text-muted font-semibold">
                     {nextTier ? `To ${nextTier.next.label}` : "Max Tier"}
                   </div>
                   <div className="text-sm font-bold text-accent-primary font-mono mt-1">{nextTier ? `+${nextTier.gap}` : "—"}</div>
@@ -424,28 +496,57 @@ export default function UserDashboardPage() {
           )}
         </div>
 
-        <div className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-bold text-sm text-primary flex items-center gap-2">
-              <Target className="w-4 h-4 text-accent-secondary" />
-              <span>Placement Readiness</span>
-            </h3>
-          </div>
+        <div className="flex flex-col rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-primary">
+            <Target className="h-4 w-4 text-accent-secondary" />
+            <span>Placement Readiness</span>
+          </h3>
 
-          <div className="flex justify-center py-2">
-            <ReadinessRing value={stats?.readiness.score ?? 0} label={stats?.readiness.tier ?? "Ready"} />
+          {/* Ring and verdict side by side rather than the ring centred on
+              its own row: the number needs the words next to it to mean
+              anything, and stacking them pushed the actual guidance below
+              the fold of this column. */}
+          <div className="mt-4 flex items-center gap-4">
+            <ReadinessRing
+              value={stats?.readiness.score ?? 0}
+              label={stats?.readiness.tier ?? "Ready"}
+              size={112}
+              stroke={9}
+              showLabel={false}
+            />
+            <div className="min-w-0">
+              <span
+                className={cn(
+                  "inline-flex w-fit rounded-full px-2.5 py-1 text-3xs font-extrabold uppercase tracking-[0.08em]",
+                  readinessTone.chip
+                )}
+              >
+                {stats?.readiness.tier ?? "—"}
+              </span>
+              <p className="mt-2 text-xs font-medium leading-relaxed text-text-secondary">
+                {readinessTone.blurb}
+              </p>
+            </div>
           </div>
 
           {stats && stats.readiness.components.length > 0 && (
-            <div className="mt-4 flex-1">
+            <div className="mt-5 flex-1">
               <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} compact />
             </div>
           )}
 
-          <div className="mt-4 pt-4 border-t border-border-subtle flex items-start gap-2 text-[11px] text-text-muted">
-            <ShieldCheck className="w-3.5 h-3.5 text-status-success shrink-0 mt-0.5" />
+          <Link
+            href="/dashboard/reports"
+            className="group mt-5 flex items-center gap-1.5 border-t border-border-subtle pt-4 text-2xs font-bold text-accent-primary transition-colors"
+          >
+            <span>View roadmap</span>
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
+          </Link>
+
+          <p className="mt-3 flex items-start gap-2 text-2xs text-text-muted">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-success" />
             <span>The same score your placement cell sees on your profile.</span>
-          </div>
+          </p>
         </div>
       </div>
 
@@ -573,13 +674,13 @@ export default function UserDashboardPage() {
                     <span className="text-2xl shrink-0">{drive.company.logo ?? "🏢"}</span>
                     <div className="min-w-0">
                       <h4 className="text-sm font-bold text-primary truncate">{drive.company.name}</h4>
-                      <p className="text-[11px] text-text-muted truncate">{drive.roleTitle}</p>
+                      <p className="text-2xs text-text-muted truncate">{drive.roleTitle}</p>
                     </div>
                   </div>
                   {drive.myApplication ? (
                     <span
                       className={cn(
-                        "shrink-0 px-1.5 py-0.5 rounded-full border text-[9px] font-bold whitespace-nowrap",
+                        "shrink-0 px-1.5 py-0.5 rounded-full border text-3xs font-bold whitespace-nowrap",
                         drive.myApplication.stage === "offer_accepted"
                           ? "bg-status-success/15 text-status-success border-status-success/30"
                           : drive.myApplication.stage === "rejected" || drive.myApplication.stage === "withdrawn"
@@ -592,12 +693,12 @@ export default function UserDashboardPage() {
                   ) : (
                     <>
                       {drive.studentEligibility.status === "eligible" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-[9px] font-bold whitespace-nowrap">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-3xs font-bold whitespace-nowrap">
                           Eligible
                         </span>
                       )}
                       {drive.studentEligibility.status === "not_eligible" && (
-                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-status-danger/15 text-status-danger border border-status-danger/30 text-[9px] font-bold whitespace-nowrap">
+                        <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-status-danger/15 text-status-danger border border-status-danger/30 text-3xs font-bold whitespace-nowrap">
                           Not Eligible
                         </span>
                       )}
@@ -605,7 +706,7 @@ export default function UserDashboardPage() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-2xs">
                   <span className="font-mono font-bold text-primary">{drive.ctcRange ?? "Not disclosed"}</span>
                   {drive.minutesFromNow > 0 ? (
                     <CountdownTimer minutesFromNow={drive.minutesFromNow} compact className="text-accent-primary font-bold" />
@@ -642,7 +743,7 @@ export default function UserDashboardPage() {
             </div>
             <Link
               href="/dashboard/reports"
-              className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1 shrink-0"
+              className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1 shrink-0"
             >
               <span>All topics</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -659,7 +760,7 @@ export default function UserDashboardPage() {
                       <AlertCircle className="w-3.5 h-3.5 text-status-warning shrink-0" />
                       <span>Focus on {weakestTopic.topic}</span>
                     </div>
-                    <p className="text-[11px] text-text-secondary leading-relaxed">
+                    <p className="text-2xs text-text-secondary leading-relaxed">
                       {weakestTopic.accuracy}% accuracy so far · {weakestTopic.solved}/{weakestTopic.total} solved in the catalog.
                     </p>
                   </div>
@@ -679,7 +780,7 @@ export default function UserDashboardPage() {
               <CalendarClock className="w-4 h-4 text-accent-secondary" />
               <span>Upcoming Contests</span>
             </h3>
-            <span className="text-[10px] text-text-muted font-mono">{upcomingContests.length} scheduled</span>
+            <span className="text-3xs text-text-muted font-mono">{upcomingContests.length} scheduled</span>
           </div>
 
           {contestsLoading ? (
@@ -705,7 +806,7 @@ export default function UserDashboardPage() {
                     <div className="flex items-start justify-between gap-2">
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border flex items-center gap-1",
+                          "px-1.5 py-0.5 text-3xs font-bold uppercase rounded border flex items-center gap-1",
                           isLive
                             ? "bg-status-danger/10 text-status-danger border-status-danger/25"
                             : "bg-accent-primary/10 text-accent-primary border-accent-primary/25"
@@ -715,7 +816,7 @@ export default function UserDashboardPage() {
                         {isLive ? "Live Now" : contest.is_rated ? "Rated Contest" : "Contest"}
                       </span>
                       {contest.is_registered && (
-                        <span className="text-[9px] font-bold text-status-success flex items-center gap-1 shrink-0">
+                        <span className="text-3xs font-bold text-status-success flex items-center gap-1 shrink-0">
                           <CheckCircle2 className="w-3 h-3" />
                           Registered
                         </span>
@@ -724,7 +825,7 @@ export default function UserDashboardPage() {
 
                     <h4 className="text-xs font-bold text-primary leading-snug">{contest.title}</h4>
 
-                    <div className="flex items-center justify-between text-[10px] text-text-muted">
+                    <div className="flex items-center justify-between text-3xs text-text-muted">
                       <span>
                         {contest.problem_count} problems · {contest.total_points} pts
                       </span>
@@ -785,7 +886,7 @@ export default function UserDashboardPage() {
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">Problem</th>
                   <th className="px-4 py-3">Language</th>
@@ -815,7 +916,7 @@ export default function UserDashboardPage() {
                         <div className="font-semibold text-primary">{sub.problem_title}</div>
                         <div
                           className={cn(
-                            "text-[10px] font-bold mt-0.5 capitalize",
+                            "text-3xs font-bold mt-0.5 capitalize",
                             sub.difficulty === "easy" ? "text-status-success" : sub.difficulty === "medium" ? "text-status-warning" : "text-status-danger"
                           )}
                         >
@@ -826,7 +927,7 @@ export default function UserDashboardPage() {
                       <td className="px-4 py-3">
                         <span
                           className={cn(
-                            "px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap capitalize",
+                            "px-2 py-0.5 text-3xs font-bold rounded-full border whitespace-nowrap capitalize",
                             sub.status === "accepted"
                               ? "bg-status-success/15 text-status-success border-status-success/30"
                               : sub.status === "wrong_answer"

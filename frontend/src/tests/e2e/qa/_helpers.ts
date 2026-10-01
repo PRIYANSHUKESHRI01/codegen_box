@@ -31,10 +31,17 @@ export function watchForErrors(page: Page) {
 
 export async function login(page: Page, role: keyof typeof DEMO) {
   const creds = DEMO[role];
-  await page.goto("/login");
-  await page.getByPlaceholder("name@domain.com").fill(creds.email);
+  // superadmin/admin_internal are Mellow-internal-only roles — they no
+  // longer have any UI affordance on the customer-facing /login page (see
+  // that page's own comment on LoginRole), so exercise the real path staff
+  // actually use: the unlisted /mellow-internal sign-in.
+  const isInternal = role === "superadmin" || role === "admin_internal";
+  await page.goto(isInternal ? "/mellow-internal" : "/login");
+  await page.getByPlaceholder(isInternal ? "you@mellowvault.com" : "name@domain.com").fill(creds.email);
   await page.getByPlaceholder("Enter your password").fill(creds.password);
-  await page.getByRole("button", { name: /Access Master Console|Enter Admin Portal|Launch Candidate Arena/ }).click();
+  await page
+    .getByRole("button", { name: /Enter Internal Console|Enter Admin Portal|Launch Candidate Arena/ })
+    .click();
   await page.waitForURL((url) => url.pathname.startsWith(creds.home), { timeout: 15000 });
   await expect(page.locator("body")).toBeVisible();
 }

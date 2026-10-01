@@ -21,6 +21,7 @@ class Subscription extends Model
         'status',
         'started_at',
         'current_period_end',
+        'is_trial',
         'auto_renew',
         'canceled_at',
         'meta',
@@ -31,6 +32,7 @@ class Subscription extends Model
         return [
             'started_at' => 'datetime',
             'current_period_end' => 'datetime',
+            'is_trial' => 'boolean',
             'auto_renew' => 'boolean',
             'canceled_at' => 'datetime',
             'meta' => 'array',

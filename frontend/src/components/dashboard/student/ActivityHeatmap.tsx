@@ -41,7 +41,7 @@ export function ActivityHeatmap({ weeks }: ActivityHeatmapProps) {
             {monthMarkers.map((label, idx) => (
               <div key={idx} className="w-[11px] shrink-0">
                 {label && (
-                  <span className="text-[10px] text-text-muted font-mono whitespace-nowrap">{label}</span>
+                  <span className="text-3xs text-text-muted font-mono whitespace-nowrap">{label}</span>
                 )}
               </div>
             ))}
@@ -51,7 +51,7 @@ export function ActivityHeatmap({ weeks }: ActivityHeatmapProps) {
             {/* Weekday gutter */}
             <div className="flex flex-col gap-[3px] pr-1.5 w-[26px] shrink-0">
               {["", "Mon", "", "Wed", "", "Fri", ""].map((d, i) => (
-                <div key={i} className="h-[11px] text-[9px] leading-[11px] text-text-muted font-mono">
+                <div key={i} className="h-[11px] text-3xs leading-[11px] text-text-muted font-mono">
                   {d}
                 </div>
               ))}
@@ -80,7 +80,7 @@ export function ActivityHeatmap({ weeks }: ActivityHeatmapProps) {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 text-[11px] text-text-muted">
+      <div className="flex items-center justify-between gap-4 text-2xs text-text-muted">
         <span className="font-mono min-h-[16px]">
           {hovered
             ? `${hovered.count} submission${hovered.count === 1 ? "" : "s"} · ${new Date(hovered.date).toLocaleDateString(

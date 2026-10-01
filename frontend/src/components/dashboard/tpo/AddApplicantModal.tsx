@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { X, Search, Loader2, UserPlus, CheckCircle2 } from "lucide-react";
+import { Search, Loader2, UserPlus, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { DriveApplication } from "@/types/placement";
+import { Modal } from "@/components/ui/Modal";
 
 interface RosterStudent {
   id: number;
@@ -78,24 +79,42 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 my-8">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-accent-secondary" />
-            <span>Add Applicant — {companyName}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={`Add Applicant — ${companyName}`}
+      icon={UserPlus}
+      iconClassName="bg-accent-secondary/10 text-accent-secondary"
+      size="md"
+      footer={
+        <>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50 text-xs font-semibold"
+          >
+            Cancel
           </button>
-        </div>
-
-        <p className="text-[11px] text-text-muted">
+          <button
+            onClick={handleSubmit}
+            disabled={!selected || submitting}
+            className={cn(
+              "px-4 py-2 rounded-control text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5",
+              "bg-accent-primary hover:bg-accent-primary-hover"
+            )}
+          >
+            {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>{submitting ? "Adding..." : "Add Applicant"}</span>
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-2xs text-text-muted">
           For a student a company approved outside the standard eligibility cutoffs — most students should come in via
           &quot;Register Eligible Students&quot; instead.
         </p>
 
-        {error && <p className="text-[11px] text-status-danger">{error}</p>}
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
 
         {selected ? (
           <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-control bg-elevated border border-accent-primary/30">
@@ -103,7 +122,7 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
               <CheckCircle2 className="w-3.5 h-3.5 text-status-success shrink-0" />
               <span className="min-w-0">
                 <span className="font-semibold text-primary truncate block">{selected.name}</span>
-                <span className="text-[10px] text-text-muted truncate block">
+                <span className="text-3xs text-text-muted truncate block">
                   {selected.roll_number ?? "No roll number"} · {selected.branch ?? "No branch"}
                 </span>
               </span>
@@ -111,7 +130,7 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="text-[11px] font-bold text-accent-primary hover:underline shrink-0"
+              className="text-2xs font-bold text-accent-primary hover:underline shrink-0"
             >
               Change
             </button>
@@ -140,7 +159,7 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
                   >
                     <span className="min-w-0">
                       <span className="text-xs font-semibold text-primary block truncate">{s.name}</span>
-                      <span className="text-[10px] text-text-muted block truncate">
+                      <span className="text-3xs text-text-muted block truncate">
                         {s.roll_number ?? "—"} · {s.branch ?? "—"} · {s.email}
                       </span>
                     </span>
@@ -150,34 +169,13 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
             )}
 
             {query.trim().length > 0 && results.length === 0 && !loadingRoster && (
-              <p className="mt-2 text-[11px] text-text-muted text-center py-3">
+              <p className="mt-2 text-2xs text-text-muted text-center py-3">
                 No matching student, or they&apos;re already registered for this drive.
               </p>
             )}
           </div>
         )}
-
-        <div className="pt-2 flex justify-end gap-2">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50 text-xs font-semibold"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!selected || submitting}
-            className={cn(
-              "px-4 py-2 rounded-control text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5",
-              "bg-accent-primary hover:bg-accent-primary-hover"
-            )}
-          >
-            {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            <span>{submitting ? "Adding..." : "Add Applicant"}</span>
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }

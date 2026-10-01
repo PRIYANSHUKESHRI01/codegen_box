@@ -50,6 +50,7 @@ class CompanyDriveController extends Controller
             'interview_date' => ['nullable', 'date'],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             'is_open_to_all' => ['sometimes', 'boolean'],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
         ]);
 
         $companyId = $request->user()->company_id;
@@ -63,6 +64,7 @@ class CompanyDriveController extends Controller
             'drive_date' => $validated['drive_date'],
             'interview_date' => $validated['interview_date'] ?? null,
             'duration_minutes' => $validated['duration_minutes'] ?? null,
+            'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
             'status' => PlacementDrive::STATUS_DRAFT,
             'source' => PlacementDrive::SOURCE_COMPANY_DIRECT,
             'is_open_to_all' => $validated['is_open_to_all'] ?? false,
@@ -101,6 +103,7 @@ class CompanyDriveController extends Controller
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             'status' => ['sometimes', Rule::in(PlacementDrive::STATUSES)],
             'is_open_to_all' => ['sometimes', 'boolean'],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
         ]);
 
         $placementDrive->update($validated);

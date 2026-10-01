@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Download,
@@ -15,6 +16,11 @@ import {
   Code2,
   Flame,
   Gauge,
+  Mic,
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
@@ -24,11 +30,15 @@ import { VerdictDonut } from "@/components/dashboard/student/VerdictDonut";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
-import { cn } from "@/lib/utils";
+import { SubmissionHistoryList } from "@/components/dashboard/student/SubmissionHistoryList";
+import { CodeViewModal, type CodeViewData } from "@/components/dashboard/CodeViewModal";
+import { cn, withMinDelay } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useMyStats } from "@/lib/useMyStats";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { RatingHistoryPoint } from "@/types/studentStats";
+import type { SubmissionHistoryRow, StudentReportInterview } from "@/types/studentReport";
+import type { SoftSkillHistoryEntry } from "@/types/softSkill";
 
 interface ApiDriveSummary {
   company: { name: string };
@@ -37,11 +47,25 @@ interface ApiDriveSummary {
   student_eligibility: { status: "eligible" | "not_eligible" | "unknown" };
 }
 
+const INTERVIEW_STATUS_LABEL: Record<string, string> = {
+  invited: "Invited",
+  in_progress: "In Progress",
+  completed: "Completed",
+};
+
+/** Collapsed default for a catalog-wide list — matches the same instinct as SubmissionHistoryList's internal max-height, just for a flat count instead of a scroll area. */
+const TOPIC_MASTERY_COLLAPSED_COUNT = 20;
+
 export default function PerformanceReportPage() {
   const { user, status } = useAuthGuard(["user"]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [ratingHistory, setRatingHistory] = useState<RatingHistoryPoint[]>([]);
   const [drives, setDrives] = useState<ApiDriveSummary[]>([]);
+  const [submissions, setSubmissions] = useState<SubmissionHistoryRow[]>([]);
+  const [interviews, setInterviews] = useState<StudentReportInterview[]>([]);
+  const [softSkills, setSoftSkills] = useState<SoftSkillHistoryEntry[]>([]);
+  const [viewingCode, setViewingCode] = useState<CodeViewData | null>(null);
+  const [showAllTopics, setShowAllTopics] = useState(false);
 
   const { stats, loading: statsLoading } = useMyStats(status === "ready");
 
@@ -60,10 +84,70 @@ export default function PerformanceReportPage() {
       .get<{ drives: ApiDriveSummary[] }>("/drives")
       .then((res) => setDrives(res.drives))
       .catch(() => setDrives([]));
+    api
+      .get<{ submissions: SubmissionHistoryRow[] }>("/submissions")
+      .then((res) => setSubmissions(res.submissions))
+      .catch(() => setSubmissions([]));
+    api
+      .get<{ interviews: StudentReportInterview[] }>("/me/interviews")
+      .then((res) => setInterviews(res.interviews))
+      .catch(() => setInterviews([]));
+    api
+      .get<{ soft_skills: SoftSkillHistoryEntry[] }>("/me/soft-skills")
+      .then((res) => setSoftSkills(res.soft_skills))
+      .catch(() => setSoftSkills([]));
   }, [status]);
 
-  if (status !== "ready" || statsLoading || !stats) {
-    return <SessionLoader label={status !== "ready" ? undefined : "Loading your report..."} />;
+  // Same instant-open-then-fetch shape as the TPO/Admin/Coordinator report
+  // page's openSubmissionCode() — the modal opens immediately with every
+  // field the row already carries, and only the code itself (deliberately
+  // excluded from Submission::$hidden's default JSON) is fetched separately.
+  const openSubmissionCode = async (row: SubmissionHistoryRow) => {
+    setViewingCode({
+      title: row.problem_title,
+      subtitle: row.contest_title ? `${row.contest_title} — contest submission` : "Practice submission",
+      language: row.language,
+      status: row.status,
+      submittedAt: row.submitted_at,
+      runtimeMs: row.runtime_ms,
+      memoryKb: row.memory_kb,
+      code: undefined,
+    });
+
+    try {
+      const path = row.kind === "practice" ? `/submissions/${row.id}` : `/contest-submissions/${row.id}`;
+      const res = await withMinDelay(api.get<{ submission: { code: string | null } }>(path), 350);
+      setViewingCode((prev) => (prev ? { ...prev, code: res.submission.code } : prev));
+    } catch (err) {
+      setViewingCode(null);
+      window.alert(err instanceof ApiError ? err.message : "Failed to load submitted code.");
+    }
+  };
+
+  // Split deliberately: `status !== "ready"` is the shared, app-wide session
+  // check (SessionLoader's own docblock) — no user/role known yet, so a
+  // bare full-screen loader is correct there, same as everywhere else.
+  // But once THAT'S resolved, this page has its own extra data to wait on
+  // (useMyStats + 4 more calls above), and blocking the whole shell behind
+  // those too made every navigation to this specific page look like a full
+  // browser reload — the entire sidebar/header vanish behind that same
+  // bare loader, since this app has no persistent layout across /dashboard/*
+  // routes (each page mounts DashboardShell itself). Once role/user are
+  // known, the shell renders immediately and only the content area waits —
+  // exactly the pattern admin/students/report/page.tsx already uses.
+  if (status !== "ready") {
+    return <SessionLoader />;
+  }
+
+  if (statsLoading || !stats) {
+    return (
+      <DashboardShell role="user" title="Performance Report">
+        <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-10 text-xs text-text-muted">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading your report...
+        </div>
+      </DashboardShell>
+    );
   }
 
   const isRated = stats.rating.rated_contests_count > 0;
@@ -81,6 +165,8 @@ export default function PerformanceReportPage() {
   const acceptanceRate = totalSubs > 0 ? Math.round((accepted / totalSubs) * 100) : 0;
 
   const eligibleCount = drives.filter((d) => d.student_eligibility.status === "eligible").length;
+
+  const visibleTopics = showAllTopics ? stats.topic_mastery : stats.topic_mastery.slice(0, TOPIC_MASTERY_COLLAPSED_COUNT);
 
   // Simple, real insights generated from the already-fetched topic mastery —
   // no backend round trip needed, and no fabricated strength/focus copy.
@@ -122,7 +208,7 @@ export default function PerformanceReportPage() {
     <DashboardShell
       role="user"
       title="Performance Report"
-      subtitle="A full breakdown of your real solved history, accuracy, topic mastery and placement eligibility."
+      subtitle="A full breakdown of your real solved history, accuracy, topic mastery, interview performance and submitted code."
       actionButton={{ label: "Download PDF", icon: Download, onClick: handleDownload }}
     >
       <AnimatePresence>
@@ -187,7 +273,7 @@ export default function PerformanceReportPage() {
           </div>
           <div className="text-right shrink-0">
             <div className="text-2xl font-black text-primary font-mono leading-none">{stats.readiness.score}%</div>
-            <div className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mt-1">{stats.readiness.tier}</div>
+            <div className="text-3xs uppercase tracking-wider text-text-muted font-semibold mt-1">{stats.readiness.tier}</div>
           </div>
         </div>
 
@@ -233,7 +319,7 @@ export default function PerformanceReportPage() {
           {stats.verdict_stats.length > 0 ? (
             <>
               <VerdictDonut data={stats.verdict_stats} />
-              <p className="mt-5 pt-4 border-t border-border-subtle text-[11px] text-text-muted">
+              <p className="mt-5 pt-4 border-t border-border-subtle text-2xs text-text-muted">
                 Based on all {totalSubs} of your submissions.
               </p>
             </>
@@ -289,10 +375,21 @@ export default function PerformanceReportPage() {
         </div>
 
         {stats.topic_mastery.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-            <TopicMasteryList topics={stats.topic_mastery.slice(0, Math.ceil(stats.topic_mastery.length / 2))} />
-            <TopicMasteryList topics={stats.topic_mastery.slice(Math.ceil(stats.topic_mastery.length / 2))} />
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+              <TopicMasteryList topics={visibleTopics.slice(0, Math.ceil(visibleTopics.length / 2))} />
+              <TopicMasteryList topics={visibleTopics.slice(Math.ceil(visibleTopics.length / 2))} />
+            </div>
+            {stats.topic_mastery.length > TOPIC_MASTERY_COLLAPSED_COUNT && (
+              <button
+                onClick={() => setShowAllTopics((v) => !v)}
+                className="mt-5 w-full py-2 rounded-btn bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-bold text-primary transition-colors flex items-center justify-center gap-1.5"
+              >
+                <span>{showAllTopics ? "Show Less" : `See All ${stats.topic_mastery.length} Topics`}</span>
+                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showAllTopics && "rotate-180")} />
+              </button>
+            )}
+          </>
         ) : (
           <p className="text-xs text-text-muted text-center py-8">No problems in the catalog yet.</p>
         )}
@@ -311,7 +408,7 @@ export default function PerformanceReportPage() {
                 <CheckCircle2 className="w-4 h-4 text-status-success shrink-0 mt-0.5" />
                 <div>
                   <div className="text-xs font-bold text-primary">{strongest.topic}</div>
-                  <p className="text-[11px] text-text-secondary leading-relaxed mt-0.5">
+                  <p className="text-2xs text-text-secondary leading-relaxed mt-0.5">
                     {strongest.accuracy}% accuracy, {strongest.solved}/{strongest.total} solved — your strongest topic so far.
                   </p>
                 </div>
@@ -329,7 +426,7 @@ export default function PerformanceReportPage() {
                 <Target className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
                 <div>
                   <div className="text-xs font-bold text-primary">{weakest.topic}</div>
-                  <p className="text-[11px] text-text-secondary leading-relaxed mt-0.5">
+                  <p className="text-2xs text-text-secondary leading-relaxed mt-0.5">
                     {weakest.accuracy}% accuracy, {weakest.solved}/{weakest.total} solved — worth extra practice here.
                   </p>
                 </div>
@@ -339,57 +436,99 @@ export default function PerformanceReportPage() {
         </section>
       )}
 
-      {/* Placement drive eligibility — reuses the real per-drive eligibility already computed by EligibilityService */}
-      <section className="space-y-4">
-        <div>
-          <h2 className="text-base font-bold text-primary flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-accent-secondary" />
-            <span>Placement Drive Eligibility</span>
-          </h2>
-          <p className="text-xs text-text-muted mt-0.5">Drives your TPO has mapped, checked against your academic profile.</p>
+      {/* Interview performance — every interview invited to or taken, with
+          the score the plain /interviews list deliberately never shows (see
+          InterviewController::history()'s docblock). Each row links straight
+          into the existing per-interview page, which already renders the
+          full question-by-question transcript once completed — no separate
+          transcript UI duplicated here. */}
+      <section className="overflow-hidden rounded-panel border border-border-subtle bg-surface shadow-subtle">
+        <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3 sm:px-5">
+          <Mic className="h-4 w-4 text-accent-primary" />
+          <h2 className="text-sm font-bold text-primary">Interview Performance</h2>
+          <span className="rounded-full bg-elevated px-2 py-0.5 font-mono text-3xs font-bold text-text-muted">{interviews.length}</span>
         </div>
 
-        {drives.length === 0 ? (
-          <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-            No placement drives are mapped to your college yet.
-          </div>
+        {interviews.length === 0 ? (
+          <p className="px-4 py-6 text-center text-2xs text-text-muted sm:px-5">You haven&apos;t taken any interview yet.</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {drives.map((drive, i) => (
-              <div
-                key={i}
-                className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-border-strong transition-colors space-y-2"
+          <div className="divide-y divide-border-subtle">
+            {interviews.map((iv) => (
+              <Link
+                key={iv.session_id}
+                href={`/dashboard/interviews/view?slug=${iv.slug}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/60 sm:px-5"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-bold text-primary truncate">{drive.company.name}</div>
-                    <div className="text-[11px] text-text-muted truncate">{drive.role_title}</div>
-                  </div>
-                  <span
-                    className={cn(
-                      "px-2 py-0.5 text-[10px] font-bold rounded-full border whitespace-nowrap shrink-0",
-                      drive.student_eligibility.status === "eligible"
-                        ? "bg-status-success/15 text-status-success border-status-success/30"
-                        : drive.student_eligibility.status === "not_eligible"
-                        ? "bg-status-danger/15 text-status-danger border-status-danger/30"
-                        : "bg-status-warning/15 text-status-warning border-status-warning/30"
-                    )}
-                  >
-                    {drive.student_eligibility.status === "eligible"
-                      ? "Eligible"
-                      : drive.student_eligibility.status === "not_eligible"
-                      ? "Not Eligible"
-                      : "Unknown"}
-                  </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-primary">{iv.title}</p>
+                  <p className="mt-0.5 text-3xs text-text-muted">
+                    {INTERVIEW_STATUS_LABEL[iv.status] ?? iv.status}
+                    {iv.round_name ? ` · ${iv.round_name}` : ""}
+                    {iv.company_name ? ` · ${iv.company_name}` : ""}
+                    {iv.question_count > 0 && ` · ${iv.answered_count}/${iv.question_count} answered`}
+                  </p>
                 </div>
-                <div className="pt-2 border-t border-border-subtle text-[11px] text-text-muted font-mono">
-                  {drive.ctc_range ?? "CTC not disclosed"}
+                <div className="flex shrink-0 items-center gap-2">
+                  {iv.has_score ? (
+                    <p className="font-mono text-xs font-bold text-primary">{iv.composite_score_percent}%</p>
+                  ) : iv.status === "completed" ? (
+                    <p className="text-3xs text-text-muted">Awaiting score</p>
+                  ) : (
+                    <p className="text-3xs text-text-muted">{INTERVIEW_STATUS_LABEL[iv.status] ?? iv.status}</p>
+                  )}
+                  <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
       </section>
+
+      {/* Soft Skills performance — every completed aptitude/reasoning/
+          English/situational-judgment attempt, most recent first. Mirrors
+          the Interview Performance section above exactly; each row links
+          into the same per-attempt review screen the student sees right
+          after finishing (question-by-question, with explanations). */}
+      <section className="overflow-hidden rounded-panel border border-border-subtle bg-surface shadow-subtle">
+        <div className="flex items-center gap-2 border-b border-border-subtle px-4 py-3 sm:px-5">
+          <Brain className="h-4 w-4 text-accent-primary" />
+          <h2 className="text-sm font-bold text-primary">Soft Skills Performance</h2>
+          <span className="rounded-full bg-elevated px-2 py-0.5 font-mono text-3xs font-bold text-text-muted">{softSkills.length}</span>
+        </div>
+
+        {softSkills.length === 0 ? (
+          <p className="px-4 py-6 text-center text-2xs text-text-muted sm:px-5">You haven&apos;t completed a Soft Skills test yet.</p>
+        ) : (
+          <div className="divide-y divide-border-subtle">
+            {softSkills.map((s) => (
+              <Link
+                key={s.session_id}
+                href={`/dashboard/soft-skills/view?sessionId=${s.session_id}`}
+                className="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-surface-hover/60 sm:px-5"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-primary">{s.title}</p>
+                  <p className="mt-0.5 text-3xs text-text-muted">{new Date(s.completed_at).toLocaleDateString()}</p>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <p className={cn("font-mono text-xs font-bold", s.passed ? "text-status-success" : "text-primary")}>
+                    {Math.round(s.score_percent)}%
+                  </p>
+                  <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Every practice + contest submission you've ever made, and the
+          actual code behind any of them — the same detailed view a TPO/
+          coordinator/Mellow staff member sees when looking at your report,
+          just for yourself. See SubmissionHistoryList's docblock. */}
+      <SubmissionHistoryList submissions={submissions} onOpenCode={openSubmissionCode} maxHeightClassName="max-h-[640px]" />
+
+      <CodeViewModal data={viewingCode} onClose={() => setViewingCode(null)} />
     </DashboardShell>
   );
 }

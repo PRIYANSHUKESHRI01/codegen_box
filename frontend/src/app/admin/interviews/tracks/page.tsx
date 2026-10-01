@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Layers, Plus, Loader2, Trash2, ClipboardList, Users, X } from "lucide-react";
+import { ArrowLeft, Layers, Plus, Loader2, Trash2, ClipboardList, Users } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -15,6 +15,7 @@ import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewRoleTemplate, InterviewTrackSummary, TrackRound } from "@/types/interviewTrack";
+import { Modal } from "@/components/ui/Modal";
 
 const TRACKS_PATH = "/admin/interview-tracks";
 const TEMPLATES_PATH = "/admin/interview-role-templates";
@@ -116,7 +117,7 @@ export default function AdminInterviewTracksPage() {
         </div>
       )}
 
-      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary hover:underline mb-1">
+      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-1">
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to AI Interviews
       </Link>
@@ -139,7 +140,7 @@ export default function AdminInterviewTracksPage() {
                   setEditingTemplate(null);
                   setShowTemplateModal(true);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Template
@@ -163,7 +164,7 @@ export default function AdminInterviewTracksPage() {
                   >
                     <div className="text-xs font-bold text-primary">{t.name}</div>
                     {t.tech_stack_tags && t.tech_stack_tags.length > 0 && (
-                      <div className="text-[10px] text-text-muted mt-0.5">{t.tech_stack_tags.join(" · ")}</div>
+                      <div className="text-3xs text-text-muted mt-0.5">{t.tech_stack_tags.join(" · ")}</div>
                     )}
                     <div className="text-[10.5px] text-text-secondary mt-1.5 space-y-0.5">
                       {t.rounds_config.map((r) => (
@@ -186,7 +187,7 @@ export default function AdminInterviewTracksPage() {
               </h2>
               <button
                 onClick={() => setShowCreateTrack(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 New Final Interview
@@ -204,7 +205,7 @@ export default function AdminInterviewTracksPage() {
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-primary">{track.title}</span>
-                        <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", STATUS_COLOR[track.status])}>{track.status}</span>
+                        <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", STATUS_COLOR[track.status])}>{track.status}</span>
                         {track.role_template && <span className="text-[10.5px] text-text-muted">{track.role_template.name}</span>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -240,10 +241,10 @@ export default function AdminInterviewTracksPage() {
                         .sort((a, b) => a.round_number - b.round_number)
                         .map((round) => (
                           <div key={round.id} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle space-y-1.5">
-                            <div className="text-[11px] font-bold text-primary">
+                            <div className="text-2xs font-bold text-primary">
                               R{round.round_number} — {round.round_name}
                             </div>
-                            <div className="text-[10px] text-text-muted">
+                            <div className="text-3xs text-text-muted">
                               {round.sessions_count ?? 0} candidate{round.sessions_count === 1 ? "" : "s"} · qualifying {round.qualifying_score_percent}%
                             </div>
                             <button
@@ -342,23 +343,13 @@ function ManageTrackVisibilityModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <div>
-            <h3 className="text-base font-bold text-primary">College Visibility</h3>
-            <p className="text-[11px] text-text-muted mt-0.5">{track.title}</p>
-          </div>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <DriveVisibilityPanel
-          driveId={track.placement_drive!.id}
-          onToast={onToast}
-          targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
-        />
-        <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
+    <Modal
+      onClose={onClose}
+      title="College Visibility"
+      subtitle={track.title}
+      size="md"
+      footer={
+        <>
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
             Cancel
           </button>
@@ -370,8 +361,14 @@ function ManageTrackVisibilityModal({
           >
             {saving ? "Saving..." : "Save Targeting"}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+        <DriveVisibilityPanel
+          driveId={track.placement_drive!.id}
+          onToast={onToast}
+          targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
+        />
+    </Modal>
   );
 }

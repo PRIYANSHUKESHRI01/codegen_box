@@ -131,7 +131,7 @@ export function RecommendedProblemsPanel({ companies, onCompaniesChanged }: Reco
           <span>Add</span>
         </button>
       </form>
-      {error && <p className="text-[11px] text-status-danger">{error}</p>}
+      {error && <p className="text-2xs text-status-danger">{error}</p>}
 
       {loading ? (
         <div className="p-8 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
@@ -153,7 +153,7 @@ export function RecommendedProblemsPanel({ companies, onCompaniesChanged }: Reco
                 <div key={r.id} className="p-3.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-primary truncate">{problem?.title ?? r.problem_slug}</p>
-                    <p className="text-[10px] text-text-muted font-mono">
+                    <p className="text-3xs text-text-muted font-mono">
                       Priority {r.priority} · {r.topic_tag ?? problem?.difficulty ?? "—"}
                     </p>
                   </div>

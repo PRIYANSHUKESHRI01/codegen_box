@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Briefcase, Plus, X, Loader2, Calendar, Building2 } from "lucide-react";
+import { Briefcase, Plus, Loader2, Calendar, Building2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 import { localDatetimeInputToUtcIso, utcIsoToLocalDatetimeInput } from "@/lib/datetime";
 import { AdminCompanyRow, AdminDriveRow, BRANCH_OPTIONS, DRIVE_STATUSES, inputClass } from "./types";
 import { MapCollegesModal } from "./MapCollegesModal";
@@ -22,6 +23,7 @@ const emptyForm = {
   duration_minutes: "",
   min_cgpa: "",
   max_backlogs: "",
+  terms_and_conditions: "",
   status: "draft" as (typeof DRIVE_STATUSES)[number],
 };
 
@@ -82,6 +84,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
       duration_minutes: drive.duration_minutes ? String(drive.duration_minutes) : "",
       min_cgpa: drive.min_cgpa ?? "",
       max_backlogs: drive.max_backlogs !== null ? String(drive.max_backlogs) : "",
+      terms_and_conditions: drive.terms_and_conditions ?? "",
       status: drive.status,
     });
     setAllBranches(!drive.eligible_branches || drive.eligible_branches.length === 0);
@@ -110,6 +113,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
         min_cgpa: form.min_cgpa ? Number(form.min_cgpa) : null,
         max_backlogs: form.max_backlogs ? Number(form.max_backlogs) : null,
         eligible_branches: allBranches ? null : branches,
+        terms_and_conditions: form.terms_and_conditions.trim() || null,
         status: form.status,
       };
       if (editingId) {
@@ -133,7 +137,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
         <button
           onClick={startCreate}
           disabled={companies.length === 0}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
         >
           <Plus className="w-3.5 h-3.5" />
           Schedule Drive
@@ -174,7 +178,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                       <h4 className="text-sm font-bold text-primary">{d.title}</h4>
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                          "px-2 py-0.5 rounded-full text-3xs font-bold uppercase",
                           d.status === "published"
                             ? "bg-status-success/15 text-status-success"
                             : d.status === "draft"
@@ -187,7 +191,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                         {d.status}
                       </span>
                     </div>
-                    <p className="text-[11px] text-text-muted flex items-center gap-1.5 mt-0.5">
+                    <p className="text-2xs text-text-muted flex items-center gap-1.5 mt-0.5">
                       <Calendar className="w-3 h-3" />
                       {new Date(d.drive_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       {" · "}
@@ -200,7 +204,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                             key={m.id}
                             title={m.college.name}
                             className={cn(
-                              "px-1.5 py-0.5 rounded-full text-[9px] font-bold whitespace-nowrap",
+                              "px-1.5 py-0.5 rounded-full text-3xs font-bold whitespace-nowrap",
                               m.status === "approved"
                                 ? "bg-status-success/15 text-status-success"
                                 : m.status === "pending"
@@ -219,13 +223,13 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                   {d.status === "published" && (
                     <button
                       onClick={() => setMappingDrive(d)}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-accent-secondary/10 hover:bg-accent-secondary/20 border border-accent-secondary/25 text-[11px] font-bold text-accent-secondary transition-colors"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-accent-secondary/10 hover:bg-accent-secondary/20 border border-accent-secondary/25 text-2xs font-bold text-accent-secondary transition-colors"
                     >
                       <Building2 className="w-3.5 h-3.5" />
                       <span>Map to Colleges</span>
                     </button>
                   )}
-                  <button onClick={() => startEdit(d)} className="text-[11px] font-bold text-accent-primary hover:underline">
+                  <button onClick={() => startEdit(d)} className="text-2xs font-bold text-accent-primary hover:underline">
                     Edit
                   </button>
                 </div>
@@ -236,20 +240,34 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h3 className="text-base font-bold text-primary flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-accent-primary" />
-                <span>{editingId ? "Edit Drive" : "Schedule Drive"}</span>
-              </h3>
-              <button onClick={() => setShowForm(false)} className="p-1 rounded text-text-muted hover:text-primary">
-                <X className="w-5 h-5" />
+        <Modal
+          onClose={() => setShowForm(false)}
+          title={editingId ? "Edit Drive" : "Schedule Drive"}
+          icon={Briefcase}
+          size="lg"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+              >
+                Cancel
               </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              {saveError && <p className="text-[11px] text-status-danger">{saveError}</p>}
+              <button
+                type="submit"
+                form="drive-form"
+                disabled={saving}
+                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{editingId ? "Save Changes" : "Schedule Drive"}</span>
+              </button>
+            </>
+          }
+        >
+          <form id="drive-form" onSubmit={handleSubmit} className="space-y-3">
+            {saveError && <p className="text-2xs text-status-danger">{saveError}</p>}
 
               <div>
                 <label className="block font-semibold text-text-secondary mb-1">Company *</label>
@@ -333,7 +351,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                   onChange={(e) => setForm({ ...form, interview_date: e.target.value })}
                   className={inputClass}
                 />
-                <p className="text-[10px] text-text-muted mt-1">
+                <p className="text-3xs text-text-muted mt-1">
                   When the technical/HR round actually happens for shortlisted candidates — separate from the drive date above. Set
                   this once shortlisting is underway to get a mock/final AI interview reminder as it approaches.
                 </p>
@@ -394,6 +412,20 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
               </div>
 
               <div>
+                <label className="block font-semibold text-text-secondary mb-1">Terms & Conditions</label>
+                <textarea
+                  value={form.terms_and_conditions}
+                  onChange={(e) => setForm({ ...form, terms_and_conditions: e.target.value })}
+                  placeholder="Eligibility conditions, service/bond terms, offer conditions, selection process rules, etc. Shown to every college and student this drive is mapped to."
+                  rows={5}
+                  className={cn(inputClass, "resize-y")}
+                />
+                <p className="text-3xs text-text-muted mt-1">
+                  Optional, but strongly recommended — this is the binding text students and TPOs will see for this drive.
+                </p>
+              </div>
+
+              <div>
                 <label className="block font-semibold text-text-secondary mb-1">Status</label>
                 <select
                   value={form.status}
@@ -406,29 +438,10 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                     </option>
                   ))}
                 </select>
-                <p className="text-[10px] text-text-muted mt-1">Only &quot;published&quot; drives are visible to TPOs for mapping.</p>
+                <p className="text-3xs text-text-muted mt-1">Only &quot;published&quot; drives are visible to TPOs for mapping.</p>
               </div>
-
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{editingId ? "Save Changes" : "Schedule Drive"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
 
       {mappingDrive && (

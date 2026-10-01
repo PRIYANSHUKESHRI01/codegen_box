@@ -70,7 +70,7 @@ export function VerdictDonut({ data, size = 148 }: VerdictDonutProps) {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-xl font-black font-mono text-primary leading-none">{acceptanceRate}%</span>
-          <span className="text-[10px] uppercase tracking-wider text-text-muted mt-1">Accepted</span>
+          <span className="text-3xs uppercase tracking-wider text-text-muted mt-1">Accepted</span>
         </div>
       </div>
 

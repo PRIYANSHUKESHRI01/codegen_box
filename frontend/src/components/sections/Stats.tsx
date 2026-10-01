@@ -141,7 +141,7 @@ export function Stats() {
                   </div>
                 </div>
 
-                <div className="text-[11px] sm:text-xs text-secondary mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-border-subtle/80 line-clamp-1 sm:line-clamp-2 leading-relaxed">
+                <div className="text-2xs sm:text-xs text-secondary mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-border-subtle/80 line-clamp-1 sm:line-clamp-2 leading-relaxed">
                   {card.sublabel}
                 </div>
               </div>

@@ -414,23 +414,23 @@ export default function CampusDrivesPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Mapped to {collegeName}</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Mapped to {collegeName}</span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{mappedDrives.length}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Upcoming</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Upcoming</span>
           <div className="text-2xl font-black text-status-success font-mono mt-2">{upcomingCount}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Available to Map</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Available to Map</span>
           <div className="text-2xl font-black text-accent-primary font-mono mt-2">{availableDrives.length}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Pending Approvals</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Pending Approvals</span>
           <div className="text-2xl font-black text-status-warning font-mono mt-2">{pendingMappings.length}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Completed</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Completed</span>
           <div className="text-2xl font-black text-text-muted font-mono mt-2">{completedCount}</div>
         </div>
       </div>
@@ -441,7 +441,7 @@ export default function CampusDrivesPage() {
           <button
             onClick={() => setActiveTab("mapped")}
             className={cn(
-              "px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all",
+              "px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all",
               activeTab === "mapped" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
             )}
           >
@@ -450,7 +450,7 @@ export default function CampusDrivesPage() {
           <button
             onClick={() => setActiveTab("available")}
             className={cn(
-              "px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all",
+              "px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all",
               activeTab === "available" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
             )}
           >
@@ -459,7 +459,7 @@ export default function CampusDrivesPage() {
           <button
             onClick={() => setActiveTab("pending")}
             className={cn(
-              "px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all flex items-center gap-1.5",
+              "px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all flex items-center gap-1.5",
               activeTab === "pending" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
             )}
           >
@@ -482,7 +482,7 @@ export default function CampusDrivesPage() {
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-secondary hover:bg-accent-secondary-hover text-white text-[11px] font-bold transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-secondary hover:bg-accent-secondary-hover text-white text-2xs font-bold transition-colors shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>New Company&apos;s Drive</span>
@@ -541,27 +541,27 @@ export default function CampusDrivesPage() {
                           <h3 className="font-bold text-sm text-primary">{drv.companyName}</h3>
                           <span
                             className={cn(
-                              "px-2 py-0.5 rounded-full text-[10px] font-bold",
+                              "px-2 py-0.5 rounded-full text-3xs font-bold",
                               drv.isPast ? "bg-elevated text-text-muted" : "bg-status-success/15 text-status-success"
                             )}
                           >
                             {drv.isPast ? "Completed" : "Upcoming"}
                           </span>
                         </div>
-                        <div className="text-[11px] text-text-muted mt-0.5">{drv.role}</div>
+                        <div className="text-2xs text-text-muted mt-0.5">{drv.role}</div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-5 shrink-0 text-xs">
                       <div className="text-center">
                         <div className="font-mono font-bold text-primary">{drv.ctcRange}</div>
-                        <div className="text-[9px] text-text-muted uppercase">Package</div>
+                        <div className="text-3xs text-text-muted uppercase">Package</div>
                       </div>
                       <div className="text-center hidden md:block">
                         <div className="font-mono font-bold text-primary">
                           {drv.minCgpa !== null ? `${drv.minCgpa}+ CGPA` : "No CGPA cutoff"}
                         </div>
-                        <div className="text-[9px] text-text-muted uppercase">Eligibility</div>
+                        <div className="text-3xs text-text-muted uppercase">Eligibility</div>
                       </div>
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4 text-text-muted" />
@@ -581,7 +581,7 @@ export default function CampusDrivesPage() {
                         className="overflow-hidden"
                       >
                         <div className="px-5 pb-5 pt-1 border-t border-border-subtle space-y-4">
-                          <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-text-muted pt-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2 text-2xs text-text-muted pt-4">
                             <span className="flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5" />
                               {formatDriveDate(drv.driveDateIso)}
@@ -594,7 +594,7 @@ export default function CampusDrivesPage() {
                           </div>
 
                           <div>
-                            <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2.5">
+                            <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2.5">
                               Selection Pipeline
                             </h4>
                             {isLoadingApps ? (
@@ -603,7 +603,7 @@ export default function CampusDrivesPage() {
                                 Loading applicants...
                               </div>
                             ) : applications.length === 0 ? (
-                              <div className="p-4 text-center text-[11px] text-text-muted rounded-control bg-elevated/60 border border-border-subtle">
+                              <div className="p-4 text-center text-2xs text-text-muted rounded-control bg-elevated/60 border border-border-subtle">
                                 No applicants yet. Click &quot;Register Eligible Students&quot; below to seed the pipeline.
                               </div>
                             ) : (
@@ -615,7 +615,7 @@ export default function CampusDrivesPage() {
                             <button
                               onClick={() => handleRegisterEligible(drv)}
                               disabled={registeringDriveId === drv.driveId}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/25 text-[11px] font-semibold text-accent-primary transition-colors disabled:opacity-50"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary/10 hover:bg-accent-primary/20 border border-accent-primary/25 text-2xs font-semibold text-accent-primary transition-colors disabled:opacity-50"
                             >
                               {registeringDriveId === drv.driveId ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -626,21 +626,21 @@ export default function CampusDrivesPage() {
                             </button>
                             <button
                               onClick={() => setAddApplicantFor(drv)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
                             >
                               <UserPlus className="w-3.5 h-3.5" />
                               <span>Add Applicant</span>
                             </button>
                             <button
                               onClick={() => openNotifyApplicants(drv)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
                             >
                               <Mail className="w-3.5 h-3.5" />
                               <span>Notify Applicants</span>
                             </button>
                             <button
                               onClick={() => handleExportApplicants(drv)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
                             >
                               <Download className="w-3.5 h-3.5" />
                               <span>Export Applicants</span>
@@ -648,7 +648,7 @@ export default function CampusDrivesPage() {
                             <button
                               onClick={() => handleUnmap(drv)}
                               disabled={pendingDriveId === drv.driveId}
-                              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/25 text-[11px] font-semibold text-status-danger transition-colors disabled:opacity-50"
+                              className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/25 text-2xs font-semibold text-status-danger transition-colors disabled:opacity-50"
                             >
                               <Unlink className="w-3.5 h-3.5" />
                               <span>Unmap from {collegeName}</span>
@@ -657,7 +657,7 @@ export default function CampusDrivesPage() {
 
                           {applications.length > 0 && (
                             <div>
-                              <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2.5">
+                              <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2.5">
                                 Applicants ({applications.length})
                               </h4>
                               <div className="space-y-2 max-h-[360px] overflow-y-auto pr-1">
@@ -672,7 +672,7 @@ export default function CampusDrivesPage() {
                                     >
                                       <div className="min-w-0">
                                         <div className="text-xs font-bold text-primary truncate">{app.user.name}</div>
-                                        <div className="text-[10px] text-text-muted truncate">
+                                        <div className="text-3xs text-text-muted truncate">
                                           {app.user.roll_number ?? "No roll #"} · {app.user.branch ?? "No branch"}
                                           {app.ctc_offered && (
                                             <span className="text-status-success font-mono font-bold"> · {app.ctc_offered} LPA</span>
@@ -691,7 +691,7 @@ export default function CampusDrivesPage() {
                                               value={ctcPrompt.value}
                                               onChange={(e) => setCtcPrompt({ ...ctcPrompt, value: e.target.value })}
                                               placeholder="CTC (LPA)"
-                                              className="w-24 px-2 py-1 rounded-control bg-surface border border-border-subtle text-primary text-[11px] outline-none focus:border-accent-primary"
+                                              className="w-24 px-2 py-1 rounded-control bg-surface border border-border-subtle text-primary text-2xs outline-none focus:border-accent-primary"
                                             />
                                             <button
                                               onClick={() => {
@@ -702,13 +702,13 @@ export default function CampusDrivesPage() {
                                                 submitStageMove(ctcPrompt.app, ctcPrompt.newStage, ctcPrompt.value);
                                               }}
                                               disabled={movingAppId === app.id}
-                                              className="px-2 py-1 rounded-control bg-accent-primary text-white text-[10px] font-bold disabled:opacity-50"
+                                              className="px-2 py-1 rounded-control bg-accent-primary text-white text-3xs font-bold disabled:opacity-50"
                                             >
                                               Confirm
                                             </button>
                                             <button
                                               onClick={() => setCtcPrompt(null)}
-                                              className="px-2 py-1 rounded-control border border-border-subtle text-text-muted text-[10px] font-bold"
+                                              className="px-2 py-1 rounded-control border border-border-subtle text-text-muted text-3xs font-bold"
                                             >
                                               Cancel
                                             </button>
@@ -716,7 +716,7 @@ export default function CampusDrivesPage() {
                                         ) : isTerminal ? (
                                           <span
                                             className={cn(
-                                              "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap",
+                                              "flex items-center gap-1 px-2 py-1 rounded-full text-3xs font-bold whitespace-nowrap",
                                               app.stage === "offer_accepted"
                                                 ? "bg-status-success/15 text-status-success border border-status-success/30"
                                                 : "bg-elevated text-text-muted border border-border-subtle"
@@ -729,7 +729,7 @@ export default function CampusDrivesPage() {
                                           <>
                                             <span
                                               className={cn(
-                                                "px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap",
+                                                "px-2 py-1 rounded-full text-3xs font-bold whitespace-nowrap",
                                                 app.stage === "offer_extended"
                                                   ? "bg-status-warning/15 text-status-warning border border-status-warning/30"
                                                   : "bg-accent-secondary/15 text-accent-secondary border border-accent-secondary/30"
@@ -745,7 +745,7 @@ export default function CampusDrivesPage() {
                                                 if (val) handleStageSelect(app, val);
                                                 e.target.value = "";
                                               }}
-                                              className="text-[10px] px-1.5 py-1 rounded-control bg-surface border border-border-subtle text-text-secondary outline-none focus:border-accent-primary disabled:opacity-50"
+                                              className="text-3xs px-1.5 py-1 rounded-control bg-surface border border-border-subtle text-text-secondary outline-none focus:border-accent-primary disabled:opacity-50"
                                             >
                                               <option value="">Move to...</option>
                                               {DRIVE_APPLICATION_STAGES.filter((s) => s !== app.stage).map((s) => (
@@ -791,8 +791,8 @@ export default function CampusDrivesPage() {
                   <span className="text-2xl shrink-0">{drv.logo}</span>
                   <div className="min-w-0">
                     <h3 className="font-bold text-sm text-primary">{drv.companyName}</h3>
-                    <div className="text-[11px] text-text-muted mt-0.5">{drv.role}</div>
-                    <div className="text-[11px] text-text-muted mt-1 flex items-center gap-1.5">
+                    <div className="text-2xs text-text-muted mt-0.5">{drv.role}</div>
+                    <div className="text-2xs text-text-muted mt-1 flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" />
                       {formatDriveDate(drv.driveDateIso)}
                     </div>
@@ -802,18 +802,18 @@ export default function CampusDrivesPage() {
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-center text-xs">
                     <div className="font-mono font-bold text-primary">{drv.ctcRange}</div>
-                    <div className="text-[9px] text-text-muted uppercase">Package</div>
+                    <div className="text-3xs text-text-muted uppercase">Package</div>
                   </div>
                   <div className="text-center text-xs hidden md:block">
                     <div className="font-mono font-bold text-primary">
                       {drv.minCgpa !== null ? `${drv.minCgpa}+ CGPA` : "Open"}
                     </div>
-                    <div className="text-[9px] text-text-muted uppercase">Cutoff</div>
+                    <div className="text-3xs text-text-muted uppercase">Cutoff</div>
                   </div>
                   <button
                     onClick={() => handleMap(drv)}
                     disabled={pendingDriveId === drv.driveId}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
                   >
                     <Link2 className="w-3.5 h-3.5" />
                     <span>Map to {collegeName}</span>
@@ -843,13 +843,13 @@ export default function CampusDrivesPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-bold text-sm text-primary">{row.companyName}</h3>
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-status-warning/15 text-status-warning">
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-bold uppercase bg-status-warning/15 text-status-warning">
                           <Clock className="w-2.5 h-2.5" />
                           Awaiting Your Approval
                         </span>
                       </div>
-                      <div className="text-[11px] text-text-muted mt-0.5">{row.role}</div>
-                      <div className="text-[11px] text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
+                      <div className="text-2xs text-text-muted mt-0.5">{row.role}</div>
+                      <div className="text-2xs text-text-muted mt-1 flex items-center gap-1.5 flex-wrap">
                         <Calendar className="w-3 h-3" />
                         {formatDriveDate(row.driveDateIso)}
                         <span>· Proposed by {row.proposedByName}</span>
@@ -860,18 +860,18 @@ export default function CampusDrivesPage() {
                   <div className="flex items-center gap-4 shrink-0">
                     <div className="text-center text-xs">
                       <div className="font-mono font-bold text-primary">{row.ctcRange}</div>
-                      <div className="text-[9px] text-text-muted uppercase">Package</div>
+                      <div className="text-3xs text-text-muted uppercase">Package</div>
                     </div>
                     <div className="text-center text-xs hidden md:block">
                       <div className="font-mono font-bold text-primary">
                         {row.minCgpa !== null ? `${row.minCgpa}+ CGPA` : "Open"}
                       </div>
-                      <div className="text-[9px] text-text-muted uppercase">Cutoff</div>
+                      <div className="text-3xs text-text-muted uppercase">Cutoff</div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle text-[11px] text-text-muted">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border-subtle text-2xs text-text-muted">
                   <span>
                     Max backlogs: {row.maxBacklogs ?? "No limit"} · Branches:{" "}
                     {row.eligibleBranches?.length ? row.eligibleBranches.join(", ") : "All"}
@@ -880,7 +880,7 @@ export default function CampusDrivesPage() {
                     <button
                       onClick={() => handleRespond(row, "decline")}
                       disabled={respondingMappingId === row.mappingId}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/25 text-[11px] font-bold text-status-danger transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/25 text-2xs font-bold text-status-danger transition-colors disabled:opacity-50"
                     >
                       <XCircle className="w-3.5 h-3.5" />
                       <span>Decline</span>
@@ -888,7 +888,7 @@ export default function CampusDrivesPage() {
                     <button
                       onClick={() => handleRespond(row, "approve")}
                       disabled={respondingMappingId === row.mappingId}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
                     >
                       {respondingMappingId === row.mappingId ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />

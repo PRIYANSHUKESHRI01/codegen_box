@@ -60,8 +60,10 @@ class AdminProblemController extends Controller
             'id' => $p->id,
             'slug' => $p->slug,
             'title' => $p->title,
+            'serial_number' => $p->display_order + 100,
             'difficulty' => $p->difficulty,
             'tags' => $p->tags,
+            'companies' => $p->companies,
             'created_at' => $p->created_at,
             'submissions_count' => $p->submissions_count,
             'accepted_submissions_count' => $p->accepted_submissions_count,
@@ -92,6 +94,35 @@ class AdminProblemController extends Controller
      */
     public function store(Request $request)
     {
+        $validated = $this->validateProblem($request);
+
+        $problem = new Problem([
+            'slug' => $this->uniqueSlug($validated['title']),
+            'display_order' => (int) (Problem::max('display_order') ?? 0) + 1,
+        ]);
+
+        return $this->persist($request, $problem, $validated, 'Created', 201);
+    }
+
+    /**
+     * Same validation and the same reference-solution verification gate as
+     * store() — a problem's test cases can only ever be replaced as a whole,
+     * verified set, never hand-edited field by field into a possibly-broken
+     * state.
+     */
+    public function update(Request $request, Problem $problem)
+    {
+        $validated = $this->validateProblem($request);
+
+        if ($validated['title'] !== $problem->title) {
+            $problem->slug = $this->uniqueSlug($validated['title'], $problem->id);
+        }
+
+        return $this->persist($request, $problem, $validated, 'Updated', 200);
+    }
+
+    private function validateProblem(Request $request): array
+    {
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'difficulty' => ['required', Rule::in(Problem::DIFFICULTIES)],
@@ -109,7 +140,10 @@ class AdminProblemController extends Controller
             'return_type' => ['required', Rule::in(ProblemType::ALL)],
             'comparison_mode' => ['nullable', Rule::in(Problem::COMPARISON_MODES)],
             'comparison_epsilon' => ['nullable', 'numeric'],
-            'test_cases' => ['required', 'array', 'min:1'],
+            // Exactly 10 per problem — 3 public samples, then 7 hidden — is a platform-wide
+            // rule, not just a convention: see JudgeService's reveal policy, which assumes the
+            // first 3 test cases (by submitted order) are the samples.
+            'test_cases' => ['required', 'array', 'size:10'],
             'test_cases.*.inputs' => ['required', 'array'],
             'test_cases.*.expected_output' => ['required'],
             'test_cases.*.is_sample' => ['nullable', 'boolean'],
@@ -119,12 +153,24 @@ class AdminProblemController extends Controller
             'reference_solution.code' => ['required', 'string'],
         ]);
 
-        $slug = $this->uniqueSlug($validated['title']);
+        $this->assertSamplesFirst($validated['test_cases']);
 
-        DB::beginTransaction();
+        return $validated;
+    }
 
-        $problem = Problem::create([
-            'slug' => $slug,
+    /** The first 3 test cases (in submitted order) must be the samples, the remaining 7 hidden — see JudgeService. */
+    private function assertSamplesFirst(array $testCases): void
+    {
+        $samples = collect($testCases)->take(3)->every(fn (array $tc) => $tc['is_sample'] ?? false);
+        $hidden = collect($testCases)->skip(3)->every(fn (array $tc) => ! ($tc['is_sample'] ?? false));
+
+        abort_unless($samples && $hidden, 422, 'test_cases must list exactly 3 sample cases (is_sample: true) first, followed by exactly 7 hidden cases (is_sample: false).');
+    }
+
+    /** @return \Illuminate\Http\JsonResponse */
+    private function persist(Request $request, Problem $problem, array $validated, string $verb, int $successStatus)
+    {
+        $problem->fill([
             'title' => $validated['title'],
             'difficulty' => $validated['difficulty'],
             'tags' => $validated['tags'] ?? [],
@@ -136,8 +182,12 @@ class AdminProblemController extends Controller
             'comparison_epsilon' => $validated['comparison_epsilon'] ?? null,
             'constraints' => $validated['constraints'] ?? [],
             'hints' => $validated['hints'] ?? [],
-            'display_order' => (int) (Problem::max('display_order') ?? 0) + 1,
         ]);
+
+        DB::beginTransaction();
+
+        $problem->save();
+        $problem->testCases()->delete();
 
         foreach ($validated['test_cases'] as $index => $testCase) {
             $problem->testCases()->create([
@@ -167,21 +217,21 @@ class AdminProblemController extends Controller
 
         DB::commit();
 
-        ActivityLog::record($request->user(), 'Created problem', 'Problem', $problem->title, ['slug' => $problem->slug]);
+        ActivityLog::record($request->user(), "{$verb} problem", 'Problem', $problem->title, ['slug' => $problem->slug]);
 
         return response()->json([
             'problem' => $problem->fresh('testCases'),
             'verification' => $outcome['body'],
-        ], 201);
+        ], $successStatus);
     }
 
-    private function uniqueSlug(string $title): string
+    private function uniqueSlug(string $title, ?int $exceptId = null): string
     {
         $base = Str::slug($title);
         $slug = $base;
         $suffix = 1;
 
-        while (Problem::where('slug', $slug)->exists()) {
+        while (Problem::where('slug', $slug)->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))->exists()) {
             $slug = $base.'-'.(++$suffix);
         }
 

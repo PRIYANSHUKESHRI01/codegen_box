@@ -23,6 +23,7 @@ import {
   Inbox,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { Modal } from "@/components/ui/Modal";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { LeadDetailDrawer } from "@/components/leads/LeadDetailDrawer";
 import { LeadPipelineBar } from "@/components/leads/LeadPipelineBar";
@@ -73,7 +74,7 @@ function StatCard({
   return (
     <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-accent-primary/30 transition-colors">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">{label}</span>
+        <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">{label}</span>
         <div className={cn("w-7 h-7 rounded-control flex items-center justify-center", accent)}>
           <Icon className="w-3.5 h-3.5" />
         </div>
@@ -304,7 +305,7 @@ function MarketingLeadsPageContent() {
               <button
                 onClick={() => setViewMode("board")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                   viewMode === "board" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                 )}
               >
@@ -314,7 +315,7 @@ function MarketingLeadsPageContent() {
               <button
                 onClick={() => setViewMode("table")}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                   viewMode === "table" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                 )}
               >
@@ -328,7 +329,7 @@ function MarketingLeadsPageContent() {
                 <button
                   onClick={() => setStatusFilter(null)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all whitespace-nowrap",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
                     !statusFilter ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -339,7 +340,7 @@ function MarketingLeadsPageContent() {
                     key={s}
                     onClick={() => setStatusFilter(s)}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-all whitespace-nowrap",
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
                       statusFilter === s ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                     )}
                   >
@@ -375,13 +376,13 @@ function MarketingLeadsPageContent() {
               {hasOutreachAccess ? (
                 <button
                   onClick={() => setNotifyConfirmOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors shadow-subtle"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors shadow-subtle"
                 >
                   <Mail className="w-3.5 h-3.5" />
                   <span>Email Selected ({selectedIds.size})</span>
                 </button>
               ) : (
-                <span className="text-[11px] text-text-muted">Bulk email isn&apos;t granted to your account.</span>
+                <span className="text-2xs text-text-muted">Bulk email isn&apos;t granted to your account.</span>
               )}
             </motion.div>
           )}
@@ -441,7 +442,7 @@ function MarketingLeadsPageContent() {
           <div className="rounded-panel bg-surface border border-border-subtle shadow-subtle overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+                <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                   <tr>
                     <th className="px-4 py-3 w-8">
                       <input
@@ -483,7 +484,7 @@ function MarketingLeadsPageContent() {
                         <div className="flex items-center gap-2.5">
                           <div
                             className={cn(
-                              "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0",
+                              "w-7 h-7 rounded-full flex items-center justify-center text-3xs font-bold shrink-0",
                               avatarColorClass(lead.name)
                             )}
                           >
@@ -491,7 +492,7 @@ function MarketingLeadsPageContent() {
                           </div>
                           <div className="min-w-0">
                             <div className="font-bold text-primary group-hover:text-accent-primary transition-colors truncate">{lead.name}</div>
-                            <div className="text-[10px] text-text-muted truncate">{lead.email}</div>
+                            <div className="text-3xs text-text-muted truncate">{lead.email}</div>
                           </div>
                         </div>
                       </td>
@@ -510,7 +511,7 @@ function MarketingLeadsPageContent() {
                       <td className="px-4 py-3">
                         <span
                           className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap",
+                            "px-2 py-0.5 rounded-full text-3xs font-bold border whitespace-nowrap",
                             LEAD_STATUS_BADGE_CLASS[lead.lead_status]
                           )}
                         >
@@ -531,22 +532,14 @@ function MarketingLeadsPageContent() {
       )}
 
       {notifyConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-sm rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4"
-          >
-            <div className="w-10 h-10 rounded-full bg-accent-primary/10 flex items-center justify-center">
-              <Send className="w-4.5 h-4.5 text-accent-primary" />
-            </div>
-            <div>
-              <h3 className="text-base font-bold text-primary">Send Check-in Email</h3>
-              <p className="text-xs text-text-secondary mt-1">
-                Send a check-in email to <strong className="text-primary">{selectedIds.size}</strong> lead(s)?
-              </p>
-            </div>
-            <div className="flex justify-end gap-2">
+        <Modal
+          onClose={() => setNotifyConfirmOpen(false)}
+          title="Send Check-in Email"
+          icon={Send}
+          iconClassName="bg-accent-primary/10 text-accent-primary"
+          size="sm"
+          footer={
+            <>
               <button
                 onClick={() => setNotifyConfirmOpen(false)}
                 disabled={sendingNotify}
@@ -562,9 +555,13 @@ function MarketingLeadsPageContent() {
                 {sendingNotify && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                 <span>{sendingNotify ? "Sending..." : "Send"}</span>
               </button>
-            </div>
-          </motion.div>
-        </div>
+            </>
+          }
+        >
+          <p className="text-xs text-text-secondary">
+            Send a check-in email to <strong className="text-primary">{selectedIds.size}</strong> lead(s)?
+          </p>
+        </Modal>
       )}
     </DashboardShell>
   );

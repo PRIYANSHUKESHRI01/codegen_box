@@ -27,6 +27,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import type { TpoReportsData, ReportPreview } from "@/lib/generateTpoReports";
 import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
+import { Modal } from "@/components/ui/Modal";
 
 // jsPDF + jspdf-autotable + ExcelJS (~500kB combined) live behind this one
 // dynamic import instead of a top-level one — every REPORTS entry below
@@ -352,7 +353,7 @@ export default function PlacementReportsPage() {
             ] as [string, string, string][]
           ).map(([label, value, tone]) => (
             <div key={label} className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">{label}</span>
+              <span className="text-3xs font-semibold text-text-muted uppercase tracking-wider">{label}</span>
               <div className={cn("text-xl font-black font-mono mt-1.5", tone)}>{value}</div>
             </div>
           ))}
@@ -367,14 +368,14 @@ export default function PlacementReportsPage() {
       {sectionStats.length > 0 && (
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+            <h3 className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
               <Trophy className="w-3.5 h-3.5 text-accent-primary" />
               Section Performance
             </h3>
             {sectionFilter && (
               <button
                 onClick={() => setSectionFilter(null)}
-                className="text-[10px] font-bold text-accent-primary hover:underline flex items-center gap-1"
+                className="text-3xs font-bold text-accent-primary hover:underline flex items-center gap-1"
               >
                 <X className="w-3 h-3" />
                 Clear filter ({sectionFilter})
@@ -393,11 +394,11 @@ export default function PlacementReportsPage() {
                     : "bg-elevated/50 border-border-subtle hover:border-border-strong"
                 )}
               >
-                <span className="w-5 text-center text-[11px] font-black text-text-muted font-mono shrink-0">#{i + 1}</span>
+                <span className="w-5 text-center text-2xs font-black text-text-muted font-mono shrink-0">#{i + 1}</span>
                 <span className="text-xs font-bold text-primary w-24 shrink-0 truncate">
                   {s.section === "Unassigned" ? "No Section" : `Section ${s.section}`}
                 </span>
-                <span className="text-[11px] text-text-muted font-mono w-20 shrink-0">{s.studentCount} students</span>
+                <span className="text-2xs text-text-muted font-mono w-20 shrink-0">{s.studentCount} students</span>
                 <span className="flex-1 flex items-center gap-2 min-w-[80px]">
                   <span className="flex-1 h-1.5 rounded-full bg-background/60 overflow-hidden">
                     <span
@@ -408,14 +409,14 @@ export default function PlacementReportsPage() {
                       style={{ width: `${s.avgReadiness}%` }}
                     />
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-text-secondary w-16 text-right shrink-0">
+                  <span className="text-2xs font-mono font-bold text-text-secondary w-16 text-right shrink-0">
                     {s.avgReadiness}/100
                   </span>
                 </span>
-                <span className="text-[11px] text-text-muted font-mono w-16 shrink-0 text-right">
+                <span className="text-2xs text-text-muted font-mono w-16 shrink-0 text-right">
                   {s.avgCgpa !== null ? `CGPA ${s.avgCgpa.toFixed(2)}` : "—"}
                 </span>
-                <span className="w-52 shrink-0 flex items-center justify-end gap-2 text-[11px]" onClick={(e) => e.stopPropagation()}>
+                <span className="w-52 shrink-0 flex items-center justify-end gap-2 text-2xs" onClick={(e) => e.stopPropagation()}>
                   {s.coordinator ? (
                     <>
                       <span className="font-semibold text-text-secondary truncate">{s.coordinator.name}</span>
@@ -456,7 +457,7 @@ export default function PlacementReportsPage() {
             key={f}
             onClick={() => setCategoryFilter(f)}
             className={cn(
-              "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all border",
+              "px-3 py-1.5 rounded-control text-2xs font-bold transition-all border",
               categoryFilter === f
                 ? "bg-accent-primary text-white border-accent-primary shadow-subtle"
                 : "bg-surface text-text-secondary border-border-subtle hover:border-border-strong hover:text-primary"
@@ -484,7 +485,7 @@ export default function PlacementReportsPage() {
                 <div className="w-11 h-11 rounded-control bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border", FORMAT_STYLE[report.format])}>
+                <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", FORMAT_STYLE[report.format])}>
                   {report.format}
                 </span>
               </div>
@@ -492,7 +493,7 @@ export default function PlacementReportsPage() {
               <h3 className="text-sm font-bold text-primary mb-1.5 flex items-center gap-1.5 flex-wrap">
                 <span>{report.name}</span>
                 {report.sectionAware && sectionFilter && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-accent-primary/15 text-accent-primary">
+                  <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-accent-primary/15 text-accent-primary">
                     Section {sectionFilter}
                   </span>
                 )}
@@ -558,60 +559,39 @@ export default function PlacementReportsPage() {
       </div>
 
       {/* Preview modal for tabular (Excel/CSV) reports */}
-      <AnimatePresence>
-        {previewReport && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              className="w-full max-w-4xl max-h-[85vh] rounded-panel bg-surface border border-border-strong shadow-card flex flex-col"
-            >
-              <div className="flex items-center justify-between p-4 border-b border-border-subtle shrink-0">
-                <h3 className="text-sm font-bold text-primary flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-accent-primary" />
-                  <span>{previewReport.name}</span>
-                  <span className="text-[10px] font-normal text-text-muted">
-                    ({previewReport.preview.rows.length} row{previewReport.preview.rows.length === 1 ? "" : "s"})
-                  </span>
-                </h3>
-                <button onClick={() => setPreviewReport(null)} className="p-1 rounded text-text-muted hover:text-primary">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="overflow-auto p-4">
-                <table className="w-full text-left text-xs whitespace-nowrap">
-                  <thead className="bg-elevated/70 text-text-muted font-bold uppercase tracking-wider text-[10px] sticky top-0">
-                    <tr>
-                      {previewReport.preview.headers.map((h) => (
-                        <th key={h} className="px-3 py-2">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
-                    {previewReport.preview.rows.map((row, i) => (
-                      <tr key={i} className="hover:bg-surface-hover/60">
-                        {row.map((cell, j) => (
-                          <td key={j} className="px-3 py-2 text-text-secondary">
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {previewReport && (
+        <Modal
+          onClose={() => setPreviewReport(null)}
+          title={previewReport.name}
+          subtitle={`${previewReport.preview.rows.length} row${previewReport.preview.rows.length === 1 ? "" : "s"}`}
+          icon={FileText}
+          size="4xl"
+          bodyClassName="p-4"
+        >
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-elevated/70 text-text-muted font-bold uppercase tracking-wider text-3xs sticky top-0">
+              <tr>
+                {previewReport.preview.headers.map((h) => (
+                  <th key={h} className="px-3 py-2">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {previewReport.preview.rows.map((row, i) => (
+                <tr key={i} className="hover:bg-surface-hover/60">
+                  {row.map((cell, j) => (
+                    <td key={j} className="px-3 py-2 text-text-secondary">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
     </DashboardShell>
   );
 }

@@ -215,6 +215,17 @@ class SuperAdminController extends Controller
         // isn't consuming a student seat.
         if ($validated['role'] === User::ROLE_USER && ! empty($validated['college_id'])) {
             $college = College::find($validated['college_id']);
+
+            // See StudentImportService::import() for why this must come
+            // before the seat-cap check below — a null studentLimit() means
+            // EITHER "active and unlimited" OR "no active subscription",
+            // and those can't share one null check.
+            if (! $college->hasActiveSubscription()) {
+                throw ValidationException::withMessages([
+                    'college_id' => ["{$college->name}'s subscription has expired. Assign a plan before adding more students."],
+                ]);
+            }
+
             $limit = $college->studentLimit();
 
             if ($limit !== null && $college->studentCount() >= $limit) {

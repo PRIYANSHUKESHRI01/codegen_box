@@ -41,7 +41,7 @@ export function SkillsTagInput({ value, onChange, max = 20 }: SkillsTagInputProp
       {value.map((skill) => (
         <span
           key={skill}
-          className="flex items-center gap-1 px-2 py-1 rounded-control bg-accent-primary/10 border border-accent-primary/25 text-[11px] font-semibold text-accent-primary"
+          className="flex items-center gap-1 px-2 py-1 rounded-control bg-accent-primary/10 border border-accent-primary/25 text-2xs font-semibold text-accent-primary"
         >
           {skill}
           <button

@@ -81,7 +81,7 @@ export default function PlacementsAdminPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all",
                 activeTab === tab.id ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
               )}
             >

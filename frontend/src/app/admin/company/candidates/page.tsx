@@ -171,7 +171,7 @@ function CandidatesPageContent() {
         {selectedDriveId && (
           <button
             onClick={() => setShowImportPanel((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>{showImportPanel ? "Hide Bulk Import" : "Bulk Import"}</span>
@@ -217,7 +217,7 @@ function CandidatesPageContent() {
                   <div key={app.id} className="p-4 flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-primary truncate">{app.user.name}</div>
-                      <div className="text-[10px] text-text-muted truncate">
+                      <div className="text-3xs text-text-muted truncate">
                         {app.user.email}
                         {app.user.phone && ` · ${app.user.phone}`}
                         {app.ctc_offered && <span className="text-status-success font-mono font-bold"> · {app.ctc_offered} LPA</span>}
@@ -235,7 +235,7 @@ function CandidatesPageContent() {
                             value={ctcPrompt.value}
                             onChange={(e) => setCtcPrompt({ ...ctcPrompt, value: e.target.value })}
                             placeholder="CTC (LPA)"
-                            className="w-24 px-2 py-1 rounded-control bg-elevated border border-border-subtle text-primary text-[11px] outline-none focus:border-teal-500"
+                            className="w-24 px-2 py-1 rounded-control bg-elevated border border-border-subtle text-primary text-2xs outline-none focus:border-teal-500"
                           />
                           <button
                             onClick={() => {
@@ -246,13 +246,13 @@ function CandidatesPageContent() {
                               submitStageMove(ctcPrompt.app, ctcPrompt.newStage, ctcPrompt.value);
                             }}
                             disabled={movingAppId === app.id}
-                            className="px-2 py-1 rounded-control bg-teal-500 text-white text-[10px] font-bold disabled:opacity-50"
+                            className="px-2 py-1 rounded-control bg-teal-500 text-white text-3xs font-bold disabled:opacity-50"
                           >
                             Confirm
                           </button>
                           <button
                             onClick={() => setCtcPrompt(null)}
-                            className="px-2 py-1 rounded-control border border-border-subtle text-text-muted text-[10px] font-bold"
+                            className="px-2 py-1 rounded-control border border-border-subtle text-text-muted text-3xs font-bold"
                           >
                             Cancel
                           </button>
@@ -260,7 +260,7 @@ function CandidatesPageContent() {
                       ) : isTerminal ? (
                         <span
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap",
+                            "flex items-center gap-1 px-2 py-1 rounded-full text-3xs font-bold whitespace-nowrap",
                             app.stage === "offer_accepted"
                               ? "bg-status-success/15 text-status-success border border-status-success/30"
                               : "bg-elevated text-text-muted border border-border-subtle"
@@ -273,7 +273,7 @@ function CandidatesPageContent() {
                         <>
                           <span
                             className={cn(
-                              "px-2 py-1 rounded-full text-[10px] font-bold whitespace-nowrap",
+                              "px-2 py-1 rounded-full text-3xs font-bold whitespace-nowrap",
                               app.stage === "offer_extended"
                                 ? "bg-status-warning/15 text-status-warning border border-status-warning/30"
                                 : "bg-teal-500/15 text-teal-500 border border-teal-500/30"
@@ -289,7 +289,7 @@ function CandidatesPageContent() {
                               if (val) handleStageSelect(app, val);
                               e.target.value = "";
                             }}
-                            className="text-[10px] px-1.5 py-1 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500 disabled:opacity-50"
+                            className="text-3xs px-1.5 py-1 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500 disabled:opacity-50"
                           >
                             <option value="">Move to...</option>
                             {DRIVE_APPLICATION_STAGES.filter((s) => s !== app.stage).map((s) => (

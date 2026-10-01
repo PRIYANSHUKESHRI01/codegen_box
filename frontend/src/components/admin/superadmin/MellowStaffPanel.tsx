@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Users2, Search, Plus, Ban, CheckCircle2, X, ShieldCheck } from "lucide-react";
+import { Users2, Search, Plus, Ban, CheckCircle2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { Modal } from "@/components/ui/Modal";
 import { ROLE_LABEL, ROLE_BADGE_CLASS, formatDateTime, type ApiPage, type ApiPlatformUser, type ApiCollege } from "./types";
 import { permissionCatalogForRole, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS, type Permission } from "@/types/permissions";
 
@@ -198,7 +199,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">Staff Member</th>
                   <th className="px-4 py-3">Team</th>
@@ -217,9 +218,9 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                         </div>
                         <div>
                           <div className="font-bold text-primary">
-                            {usr.name} {usr.id === meId && <span className="text-[10px] text-text-muted font-normal">(You)</span>}
+                            {usr.name} {usr.id === meId && <span className="text-3xs text-text-muted font-normal">(You)</span>}
                           </div>
-                          <div className="text-[10px] font-mono text-text-muted">
+                          <div className="text-3xs font-mono text-text-muted">
                             {usr.handle ? `@${usr.handle} • ` : ""}
                             {usr.email}
                           </div>
@@ -227,7 +228,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border", ROLE_BADGE_CLASS[usr.role])}>
+                      <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", ROLE_BADGE_CLASS[usr.role])}>
                         {ROLE_LABEL[usr.role]}
                       </span>
                     </td>
@@ -235,7 +236,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full",
+                          "inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full",
                           usr.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success"
                         )}
                       >
@@ -258,7 +259,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                           </button>
                         )}
                         {usr.id === meId ? (
-                          <span className="text-[10px] text-text-muted italic">This is you</span>
+                          <span className="text-3xs text-text-muted italic">This is you</span>
                         ) : (
                           <button
                             onClick={() => handleToggleStatus(usr)}
@@ -294,19 +295,31 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
       )}
 
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h3 className="text-base font-bold text-primary flex items-center gap-2">
-                <Users2 className="w-5 h-5 text-accent-primary" />
-                <span>Create Staff or Student Account</span>
-              </h3>
-              <button onClick={() => setShowAddModal(false)} className="p-1 rounded text-text-muted hover:text-primary">
-                <X className="w-5 h-5" />
+        <Modal
+          onClose={() => setShowAddModal(false)}
+          title="Create Staff or Student Account"
+          icon={Users2}
+          size="lg"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+              >
+                Cancel
               </button>
-            </div>
-
-            <form onSubmit={handleAddUser} className="space-y-3 text-xs">
+              <button
+                type="submit"
+                form="add-staff-form"
+                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors"
+              >
+                Create Account
+              </button>
+            </>
+          }
+        >
+          <form id="add-staff-form" onSubmit={handleAddUser} className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-text-secondary mb-1">Full Name *</label>
                 <input
@@ -408,14 +421,14 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                             />
                             <span>
                               <span className="block font-semibold text-primary">{PERMISSION_LABELS[perm]}</span>
-                              <span className="block text-[11px] text-text-muted">{PERMISSION_DESCRIPTIONS[perm]}</span>
+                              <span className="block text-2xs text-text-muted">{PERMISSION_DESCRIPTIONS[perm]}</span>
                             </span>
                           </label>
                         );
                       })}
                     </div>
                     {newPermissions.length === 0 && (
-                      <p className="mt-1.5 text-[11px] text-status-warning">
+                      <p className="mt-1.5 text-2xs text-status-warning">
                         No access granted — this employee will only see the read-only Overview until you grant something.
                       </p>
                     )}
@@ -444,39 +457,42 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                 </div>
               )}
 
-              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted">
+              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-2xs text-text-muted">
                 A secure temporary password is generated automatically and shown once after creation.
               </div>
 
-              <div className="pt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-                  Cancel
-                </button>
-                <button type="submit" className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors">
-                  Create Account
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
 
       {accessModalTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <div>
-                <h3 className="text-base font-bold text-primary flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-accent-primary" />
-                  <span>Manage Access — {accessModalTarget.name}</span>
-                </h3>
-                <p className="text-[11px] text-text-muted mt-0.5">{ROLE_LABEL[accessModalTarget.role]}</p>
-              </div>
-              <button onClick={() => setAccessModalTarget(null)} className="p-1 rounded text-text-muted hover:text-primary">
-                <X className="w-5 h-5" />
+        <Modal
+          onClose={() => setAccessModalTarget(null)}
+          title={`Manage Access — ${accessModalTarget.name}`}
+          subtitle={ROLE_LABEL[accessModalTarget.role]}
+          icon={ShieldCheck}
+          size="lg"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setAccessModalTarget(null)}
+                disabled={savingAccess}
+                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
+              >
+                Cancel
               </button>
-            </div>
-
+              <button
+                type="button"
+                onClick={handleSaveAccess}
+                disabled={savingAccess}
+                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50"
+              >
+                {savingAccess ? "Saving..." : "Save Access"}
+              </button>
+            </>
+          }
+        >
             <div className="space-y-1.5">
               {permissionCatalogForRole(accessModalTarget.role === "admin_marketing" ? "admin_marketing" : "admin_internal").map((perm) => {
                 const checked = accessPermissions.includes(perm);
@@ -498,38 +514,18 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                     />
                     <span>
                       <span className="block font-semibold text-primary">{PERMISSION_LABELS[perm]}</span>
-                      <span className="block text-[11px] text-text-muted">{PERMISSION_DESCRIPTIONS[perm]}</span>
+                      <span className="block text-2xs text-text-muted">{PERMISSION_DESCRIPTIONS[perm]}</span>
                     </span>
                   </label>
                 );
               })}
             </div>
             {accessPermissions.length === 0 && (
-              <p className="text-[11px] text-status-warning">
+              <p className="text-2xs text-status-warning">
                 No access granted — {accessModalTarget.name} will only see the read-only Overview.
               </p>
             )}
-
-            <div className="pt-3 flex justify-end gap-2 border-t border-border-subtle">
-              <button
-                type="button"
-                onClick={() => setAccessModalTarget(null)}
-                disabled={savingAccess}
-                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveAccess}
-                disabled={savingAccess}
-                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50"
-              >
-                {savingAccess ? "Saving..." : "Save Access"}
-              </button>
-            </div>
-          </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

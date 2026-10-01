@@ -32,14 +32,14 @@ function KpiCard({
   return (
     <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col justify-between hover:border-accent-primary/30 transition-colors">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">{label}</span>
+        <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">{label}</span>
         <div className={`w-7 h-7 rounded-control flex items-center justify-center ${accent}`}>
           <Icon className="w-3.5 h-3.5" />
         </div>
       </div>
       <div className="mt-3">
         <div className="text-2xl font-black text-primary tracking-tight font-mono">{value}</div>
-        {sub && <div className="text-[11px] text-text-muted mt-1 font-medium">{sub}</div>}
+        {sub && <div className="text-2xs text-text-muted mt-1 font-medium">{sub}</div>}
       </div>
     </div>
   );

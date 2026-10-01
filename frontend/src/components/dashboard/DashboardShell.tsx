@@ -81,7 +81,7 @@ export function DashboardShell({
           build fails. The fallback is only ever visible for a frame during
           initial hydration in the real browser. */}
       {!hideChrome && (
-        <Suspense fallback={<div className={cn("hidden md:block flex-shrink-0", collapsed ? "md:w-20" : "md:w-64")} />}>
+        <Suspense fallback={<div className={cn("hidden md:block flex-shrink-0", collapsed ? "md:w-rail-collapsed" : "md:w-rail")} />}>
           <DashboardSidebar
             currentRole={role}
             currentTpoView={currentTpoView}
@@ -99,7 +99,12 @@ export function DashboardShell({
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-[padding] duration-300",
           hideChrome && "min-h-0",
-          hideChrome ? "" : collapsed ? "md:pl-20" : "md:pl-64"
+          // rail / rail-collapsed are the SAME tokens the panel itself is
+          // sized from (RAIL_WIDTH / RAIL_COLLAPSED_WIDTH in
+          // DashboardSidebar). These were hard-coded as pl-64 (256px) against
+          // a 280px panel, so the fixed-position rail overlapped the first
+          // 24px of the content column on every dashboard page.
+          hideChrome ? "" : collapsed ? "md:pl-rail-collapsed" : "md:pl-rail"
         )}
       >
         {/* Sticky Dashboard Topbar Header */}

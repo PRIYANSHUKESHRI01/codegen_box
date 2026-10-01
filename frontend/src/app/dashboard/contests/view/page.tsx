@@ -129,7 +129,7 @@ function ContestDetailPageContent() {
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
               {contest.is_rated && (
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/25">
+                <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/25">
                   Rated
                 </span>
               )}
@@ -148,7 +148,7 @@ function ContestDetailPageContent() {
         <div className="flex items-center gap-3 shrink-0">
           {!contest.has_ended && (
             <div className="text-center">
-              <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold block mb-1">
+              <span className="text-3xs uppercase tracking-wider text-text-muted font-semibold block mb-1">
                 {contest.has_started ? "Ends in" : "Starts in"}
               </span>
               <CountdownTimer minutesFromNow={contest.has_started ? minutesToEnd : minutesFromNow} />
@@ -240,7 +240,7 @@ function ContestDetailPageContent() {
                 <div className="flex items-center gap-3 min-w-0">
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize shrink-0",
+                      "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
                       cp.problem.difficulty === "easy"
                         ? "bg-status-success/15 text-status-success"
                         : cp.problem.difficulty === "medium"
@@ -265,7 +265,7 @@ function ContestDetailPageContent() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-elevated/80 border-b border-border-subtle text-[11px] font-mono uppercase tracking-wider text-text-muted">
+                <tr className="bg-elevated/80 border-b border-border-subtle text-2xs font-mono uppercase tracking-wider text-text-muted">
                   <th className="py-3 px-4">Rank</th>
                   <th className="py-3 px-4">Coder</th>
                   <th className="py-3 px-4">Score</th>
@@ -286,7 +286,7 @@ function ContestDetailPageContent() {
                       <td className="py-3 px-4 font-mono font-bold text-sm">#{row.rank}</td>
                       <td className="py-3 px-4">
                         <div className="font-bold text-primary text-sm">{row.user.name}</div>
-                        <div className="text-[11px] text-text-muted font-mono">@{row.user.handle}</div>
+                        <div className="text-2xs text-text-muted font-mono">@{row.user.handle}</div>
                       </td>
                       <td className="py-3 px-4 font-mono font-bold text-primary">{row.score}</td>
                       <td className="py-3 px-4 font-mono text-text-secondary">{row.penalty_minutes}m</td>

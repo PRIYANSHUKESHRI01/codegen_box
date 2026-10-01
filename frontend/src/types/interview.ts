@@ -145,6 +145,11 @@ export type InterviewResultStatus = "scoring" | "scored" | "needs_human_review";
 export interface InterviewResultQuestion {
   question_text: string;
   category: QuestionCategory;
+  /** The candidate's own answer, in full — what they actually said/typed. */
+  transcript_text: string;
+  has_audio: boolean;
+  /** Needed to fetch the audio recording — GET /interviews/{slug}/responses/{response_id}/audio. */
+  response_id: number;
   score: number;
   feedback: string;
 }

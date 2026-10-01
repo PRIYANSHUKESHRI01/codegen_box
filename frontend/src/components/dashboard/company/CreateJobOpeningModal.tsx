@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, X, Loader2, Globe2, Users2 } from "lucide-react";
+import { Briefcase, Loader2, Globe2, Users2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
+import { Modal } from "@/components/ui/Modal";
 
 interface CreateJobOpeningModalProps {
   companyName: string;
@@ -35,6 +36,7 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
   const [interviewDate, setInterviewDate] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [audience, setAudience] = useState<Audience>("invite_only");
+  const [termsAndConditions, setTermsAndConditions] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +54,7 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
         interview_date: interviewDate ? localDatetimeInputToUtcIso(interviewDate) : null,
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         is_open_to_all: audience === "open_to_all",
+        terms_and_conditions: termsAndConditions.trim() || null,
       });
       onCreated(title);
     } catch (err) {
@@ -62,20 +65,35 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 my-8">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-teal-500" />
-            <span>Post a Job Opening — {companyName}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={`Post a Job Opening — ${companyName}`}
+      icon={Briefcase}
+      iconClassName="bg-teal-500/10 text-teal-500"
+      size="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+          >
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
+          <button
+            type="submit"
+            form="create-job-opening-form"
+            disabled={saving}
+            className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>Post Opening</span>
+          </button>
+        </>
+      }
+    >
+      <form id="create-job-opening-form" onSubmit={handleSubmit} className="space-y-4">
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
 
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Opening Title *</label>
@@ -135,7 +153,7 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
               onChange={(e) => setInterviewDate(e.target.value)}
               className={inputClass}
             />
-            <p className="text-[10px] text-text-muted mt-1">
+            <p className="text-3xs text-text-muted mt-1">
               When the actual technical/HR round happens — separate from your target close date above. Set this once
               you're shortlisting so we can remind you to publish a mock or final AI interview in time.
             </p>
@@ -158,7 +176,7 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
                   <Users2 className="w-3.5 h-3.5 text-teal-500" />
                   Invite Only
                 </span>
-                <span className="text-[10px] text-text-muted leading-relaxed">
+                <span className="text-3xs text-text-muted leading-relaxed">
                   You invite candidates directly, or propose it to specific colleges for their TPO to approve.
                 </span>
               </button>
@@ -176,38 +194,31 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
                   <Globe2 className="w-3.5 h-3.5 text-teal-500" />
                   All Candidates
                 </span>
-                <span className="text-[10px] text-text-muted leading-relaxed">
+                <span className="text-3xs text-text-muted leading-relaxed">
                   Open to every registered candidate platform-wide the instant you publish — no approval needed.
                 </span>
               </button>
             </div>
           </div>
 
-          <p className="text-[10px] text-text-muted leading-relaxed">
+          <div>
+            <label className="block font-semibold text-text-secondary mb-1">Terms & Conditions</label>
+            <textarea
+              value={termsAndConditions}
+              onChange={(e) => setTermsAndConditions(e.target.value)}
+              placeholder="Eligibility conditions, service/bond terms, offer conditions, selection process rules, etc. Shown to every candidate this opening is visible to."
+              rows={4}
+              className={cn(inputClass, "resize-y")}
+            />
+            <p className="text-3xs text-text-muted mt-1">Optional, but recommended — candidates will see this before applying.</p>
+          </div>
+
+          <p className="text-3xs text-text-muted leading-relaxed">
             {audience === "open_to_all"
               ? "Every registered candidate on CodeGen Box — every college's students, plus candidates with no college — will be able to see and self-register for this opening's assessment once it's published and the assessment is live. No TPO approval, no invite step."
               : "This opening is only visible to your own hiring team by default — candidates see it once you invite or import them into its pipeline, or once a college you propose it to approves it."}
           </p>
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Post Opening</span>
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+      </Modal>
   );
 }

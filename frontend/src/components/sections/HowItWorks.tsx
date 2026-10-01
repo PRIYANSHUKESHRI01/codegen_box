@@ -54,7 +54,7 @@ export function HowItWorks() {
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-3 border-t border-border-subtle/50 text-[11px] font-mono text-text-muted">
+                  <div className="mt-6 pt-3 border-t border-border-subtle/50 text-2xs font-mono text-text-muted">
                     Phase {idx + 1} of 4
                   </div>
                 </div>

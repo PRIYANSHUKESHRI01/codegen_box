@@ -26,7 +26,7 @@ class ProblemController extends Controller
     {
         $problems = Problem::orderBy('display_order')
             ->orderBy('id')
-            ->get(['id', 'slug', 'title', 'difficulty', 'tags', 'acceptance_rate', 'total_submissions']);
+            ->get(['id', 'slug', 'title', 'difficulty', 'tags', 'companies', 'acceptance_rate', 'total_submissions', 'display_order']);
 
         // Not $problems->each(fn ($p) => $p->solved = ...) — Collection::each()
         // stops iterating the moment a callback returns exactly `false`, and
@@ -36,7 +36,14 @@ class ProblemController extends Controller
         $solvedProblemIds = $this->solvedProblemIds($request);
         foreach ($problems as $p) {
             $p->solved = $solvedProblemIds->contains($p->id);
+            // The LeetCode-style "101. Two Sum" display number — stable
+            // because display_order itself never changes once assigned
+            // (each seed batch only ever appends). Offset by 100 per
+            // product decision, not a technical constraint. `display_order`
+            // itself is an internal sequencing detail, not a public field.
+            $p->serial_number = $p->display_order + 100;
         }
+        $problems->makeHidden('display_order');
 
         return response()->json(['problems' => $problems]);
     }
@@ -60,15 +67,17 @@ class ProblemController extends Controller
                 'id' => $problem->id,
                 'slug' => $problem->slug,
                 'title' => $problem->title,
+                'serial_number' => $problem->display_order + 100,
                 'difficulty' => $problem->difficulty,
                 'tags' => $problem->tags,
+                'companies' => $problem->companies,
                 'acceptance_rate' => $problem->acceptance_rate,
                 'total_submissions' => $problem->total_submissions,
                 'solved' => $solved,
                 'description' => $problem->description,
                 'constraints' => $problem->constraints,
                 'hints' => $problem->hints,
-                'examples' => $problem->sampleTestCases()->get()->map(fn (ProblemTestCase $tc) => [
+                'examples' => $problem->sampleTestCases()->take(3)->get()->map(fn (ProblemTestCase $tc) => [
                     'input' => $tc->prettyInput($problem->params),
                     'output' => json_encode($tc->expected_output),
                     'explanation' => $tc->explanation,

@@ -12,7 +12,21 @@ import { OverviewPanel } from "@/components/admin/superadmin/OverviewPanel";
 import { StudentsPanel } from "@/components/admin/superadmin/StudentsPanel";
 import { LeadsPanel } from "@/components/admin/superadmin/LeadsPanel";
 import { MarketingPerformancePanel } from "@/components/admin/superadmin/MarketingPerformancePanel";
-import { CollegesPanel } from "@/components/admin/superadmin/CollegesPanel";
+// Reuses the exact same component Mellow Ops uses at /admin?tab=colleges
+// (PartnerCollegesPanel) rather than the superadmin-only CollegesPanel that
+// used to live here — that second implementation had quietly drifted out of
+// feature parity (no demo onboarding, no live seat adjustment, no
+// Renew/Change Plan, no Coordinators) since nothing forced the two to stay
+// in sync. The backend already treats superadmin and admin_internal
+// identically for every college-management route (role:admin_internal,
+// superadmin on POST /admin/colleges and friends), so there was never a
+// reason for the frontend to maintain two copies of the same screen. This
+// keeps the single "Colleges & TPOs" nav entry superadmin already has
+// (deliberately NOT a second link into the Mellow Ops toolset — see
+// DashboardSidebar's comment on why that was rejected before) while
+// guaranteeing superadmin can never again fall behind on a feature added
+// here.
+import { PartnerCollegesPanel } from "@/components/admin/mellow/PartnerCollegesPanel";
 import { MellowStaffPanel } from "@/components/admin/superadmin/MellowStaffPanel";
 import { InfrastructurePanel } from "@/components/admin/superadmin/InfrastructurePanel";
 import { AuditLogPanel } from "@/components/admin/superadmin/AuditLogPanel";
@@ -116,7 +130,7 @@ function SuperAdminPageContent() {
               key={tab.id}
               onClick={() => goToTab(tab.id)}
               className={cn(
-                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all whitespace-nowrap",
+                "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
                 activeTab === tab.id ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
               )}
             >
@@ -131,7 +145,7 @@ function SuperAdminPageContent() {
       {activeTab === "students" && <StudentsPanel triggerToast={triggerToast} />}
       {activeTab === "leads" && <LeadsPanel triggerToast={triggerToast} />}
       {activeTab === "marketing" && <MarketingPerformancePanel />}
-      {activeTab === "colleges" && <CollegesPanel triggerToast={triggerToast} />}
+      {activeTab === "colleges" && <PartnerCollegesPanel triggerToast={triggerToast} />}
       {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}
       {activeTab === "infrastructure" && <InfrastructurePanel triggerToast={triggerToast} />}
       {activeTab === "audit" && <AuditLogPanel />}

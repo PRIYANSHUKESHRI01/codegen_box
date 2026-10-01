@@ -85,6 +85,9 @@ class User extends Authenticatable
     /** Author Talent Pool scouting assessments and oversee the shared candidate marketplace — see App\Models\TalentPoolCandidate. */
     public const PERM_TALENT_POOL = 'talent_pool';
 
+    /** Author Mellow-curated (general) Soft Skills tests and manage the shared question bank — see App\Models\SoftSkillAssessment. */
+    public const PERM_SOFT_SKILLS = 'soft_skills';
+
     public const PERMISSIONS_INTERNAL = [
         self::PERM_COLLEGES,
         self::PERM_PLATFORM_USERS,
@@ -95,6 +98,7 @@ class User extends Authenticatable
         self::PERM_CUSTOMERS,
         self::PERM_ARTICLES,
         self::PERM_TALENT_POOL,
+        self::PERM_SOFT_SKILLS,
     ];
 
     public const PERM_LEADS = 'leads';
@@ -574,14 +578,14 @@ class User extends Authenticatable
      * reads from, so the "college pays for its students" rule lives in one
      * place rather than being re-derived per caller.
      *
-     * @return array{source: string, subscription: ?Subscription, plan: ?Plan, days_remaining: ?int}
+     * @return array{source: string, subscription: ?Subscription, plan: ?Plan, days_remaining: ?int, is_trial: bool}
      */
     public function subscriptionCoverage(): array
     {
         $subscription = $this->effectiveSubscription();
 
         if ($subscription === null) {
-            return ['source' => 'none', 'subscription' => null, 'plan' => null, 'days_remaining' => null];
+            return ['source' => 'none', 'subscription' => null, 'plan' => null, 'days_remaining' => null, 'is_trial' => false];
         }
 
         $source = $subscription->subscriber_type === self::class ? 'individual' : 'institution';
@@ -591,6 +595,7 @@ class User extends Authenticatable
             'subscription' => $subscription,
             'plan' => $subscription->plan,
             'days_remaining' => $subscription->isActive() ? $subscription->daysRemaining() : 0,
+            'is_trial' => $subscription->is_trial,
         ];
     }
 
@@ -618,6 +623,7 @@ class User extends Authenticatable
         return [
             'max_practice_problems_per_day' => $plan?->max_practice_problems_per_day,
             'max_mock_interviews_per_day' => $plan?->max_mock_interviews_per_day,
+            'max_learning_centre_ai_attempts_per_day' => $plan?->max_learning_centre_ai_attempts_per_day,
             'drive_access' => $plan?->drive_access ?? true,
         ];
     }

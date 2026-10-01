@@ -14,12 +14,12 @@ test.describe("Auth + role gating", () => {
 
   test("wrong password is rejected with a visible error, no crash", async ({ page }) => {
     const issues = watchForErrors(page);
-    await page.goto("/login");
-    await page.getByRole("button", { name: "Super Admin" }).click();
-    await page.getByPlaceholder("name@domain.com").fill("aryan@mellow.ai");
+    // Superadmin has no UI affordance on /login at all anymore — exercise
+    // the real (unlisted) /mellow-internal sign-in instead.
+    await page.goto("/mellow-internal");
+    await page.getByPlaceholder("you@mellowvault.com").fill("aryan@mellow.ai");
     await page.getByPlaceholder("Enter your password").fill("wrong_password_123");
-    await page.getByRole("button", { name: "Access Master Console" }).click();
-    await expect(page.locator("text=/Access Master Console/")).toBeVisible();
+    await page.getByRole("button", { name: "Enter Internal Console" }).click();
     await page.waitForTimeout(1500);
     const bodyText = await page.locator("body").innerText();
     expect(bodyText.toLowerCase()).toMatch(/invalid|incorrect|unauthorized|unable to sign in|credentials/);

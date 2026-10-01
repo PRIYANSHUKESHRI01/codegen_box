@@ -16,6 +16,7 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
+  FileText,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
@@ -39,6 +40,7 @@ interface ApiDriveDetailResponse {
     student_eligibility: { status: "eligible" | "not_eligible" | "unknown"; reasons: string[] };
     my_application: MyDriveApplication | null;
     status: DriveStatus;
+    terms_and_conditions: string | null;
   };
   company: {
     id: number;
@@ -84,6 +86,7 @@ function mapDriveDetailFromApi(res: ApiDriveDetailResponse): PlacementDriveDetai
       studentEligibility: res.drive.student_eligibility,
       myApplication: res.drive.my_application,
       status: res.drive.status,
+      termsAndConditions: res.drive.terms_and_conditions,
     },
     company: {
       id: res.company.id,
@@ -243,7 +246,7 @@ function PlacementDrivePreparePageContent() {
                 <h2 className="text-lg font-bold text-primary">{company.name}</h2>
                 <span
                   className={cn(
-                    "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border inline-flex items-center gap-1",
+                    "px-2 py-0.5 text-3xs font-bold uppercase rounded-full border inline-flex items-center gap-1",
                     isOpen
                       ? "bg-status-success/10 text-status-success border-status-success/25"
                       : "bg-elevated text-text-muted border-border-subtle"
@@ -255,7 +258,7 @@ function PlacementDrivePreparePageContent() {
                 {drive.myApplication && (
                   <span
                     className={cn(
-                      "px-2 py-0.5 text-[10px] font-bold uppercase rounded-full border inline-flex items-center gap-1",
+                      "px-2 py-0.5 text-3xs font-bold uppercase rounded-full border inline-flex items-center gap-1",
                       drive.myApplication.stage === "offer_accepted"
                         ? "bg-status-success/10 text-status-success border-status-success/25"
                         : drive.myApplication.stage === "rejected" || drive.myApplication.stage === "withdrawn"
@@ -292,7 +295,7 @@ function PlacementDrivePreparePageContent() {
               <p className="text-sm font-bold text-text-muted">This drive has concluded</p>
             ) : (
               <>
-                <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold block mb-1.5">
+                <span className="text-3xs uppercase tracking-wider text-text-muted font-semibold block mb-1.5">
                   Starts in
                 </span>
                 <CountdownTimer minutesFromNow={minutesFromNow} />
@@ -321,12 +324,12 @@ function PlacementDrivePreparePageContent() {
               <div className="space-y-2.5">
                 {company.hiringProcess.map((round, i) => (
                   <div key={round.name} className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 text-accent-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+                    <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 text-accent-primary text-2xs font-bold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
                     <div>
                       <p className="text-xs font-bold text-primary">{round.name}</p>
-                      {round.description && <p className="text-[11px] text-text-muted mt-0.5">{round.description}</p>}
+                      {round.description && <p className="text-2xs text-text-muted mt-0.5">{round.description}</p>}
                     </div>
                   </div>
                 ))}
@@ -353,7 +356,7 @@ function PlacementDrivePreparePageContent() {
                 <XCircle className="w-4 h-4 text-status-danger shrink-0 mt-0.5" />
                 <p className="text-xs font-bold text-status-danger">You don&apos;t currently meet every requirement.</p>
               </div>
-              <ul className="pl-6 space-y-1 list-disc text-[11px] text-text-secondary">
+              <ul className="pl-6 space-y-1 list-disc text-2xs text-text-secondary">
                 {drive.studentEligibility.reasons.map((reason) => (
                   <li key={reason}>{reason}</li>
                 ))}
@@ -363,7 +366,7 @@ function PlacementDrivePreparePageContent() {
           {drive.studentEligibility.status === "unknown" && (
             <div className="mb-4 p-3 rounded-control bg-status-warning/10 border border-status-warning/25 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-              <p className="text-[11px] text-text-secondary">
+              <p className="text-2xs text-text-secondary">
                 Part of your academic profile (CGPA/branch/backlogs) isn&apos;t on file yet, so we can&apos;t confirm your
                 eligibility — check with your TPO.
               </p>
@@ -390,7 +393,7 @@ function PlacementDrivePreparePageContent() {
                   {drive.eligibility.eligibleBranches.map((b) => (
                     <span
                       key={b}
-                      className="px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-[10px] font-bold text-text-secondary"
+                      className="px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-3xs font-bold text-text-secondary"
                     >
                       {b}
                     </span>
@@ -401,12 +404,27 @@ function PlacementDrivePreparePageContent() {
               )}
             </div>
           </div>
-          <p className="mt-4 pt-4 border-t border-border-subtle text-[10px] text-text-muted leading-relaxed">
+          <p className="mt-4 pt-4 border-t border-border-subtle text-3xs text-text-muted leading-relaxed">
             Checked against the academic record your placement cell has on file for you. Spotted an error in your
             CGPA, branch or backlog count? Contact your TPO to get it corrected.
           </p>
         </div>
       </div>
+
+      {/* Terms & Conditions */}
+      <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
+        <h3 className="font-bold text-sm text-primary flex items-center gap-2 mb-3">
+          <FileText className="w-4 h-4 text-accent-primary" />
+          <span>Terms & Conditions</span>
+        </h3>
+        {drive.termsAndConditions ? (
+          <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-wrap">{drive.termsAndConditions}</p>
+        ) : (
+          <p className="text-xs text-text-muted">
+            No specific terms have been published for this drive yet — your placement cell&apos;s standard policies apply.
+          </p>
+        )}
+      </section>
 
       {/* Previous Year Questions */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
@@ -415,7 +433,7 @@ function PlacementDrivePreparePageContent() {
             <BookOpen className="w-4 h-4 text-accent-primary" />
             <span>Previous Year Questions</span>
           </h3>
-          <span className="text-[10px] text-text-muted font-mono">{detail.prepQuestions.length} questions archived</span>
+          <span className="text-3xs text-text-muted font-mono">{detail.prepQuestions.length} questions archived</span>
         </div>
 
         {detail.prepQuestions.length === 0 ? (
@@ -427,7 +445,7 @@ function PlacementDrivePreparePageContent() {
                 <button
                   onClick={() => setYearFilter(YEAR_FILTER_ALL)}
                   className={cn(
-                    "px-2.5 py-1 rounded-control text-[11px] font-bold border transition-colors",
+                    "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
                     yearFilter === YEAR_FILTER_ALL
                       ? "bg-accent-primary text-white border-accent-primary"
                       : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
@@ -440,7 +458,7 @@ function PlacementDrivePreparePageContent() {
                     key={y}
                     onClick={() => setYearFilter(String(y))}
                     className={cn(
-                      "px-2.5 py-1 rounded-control text-[11px] font-bold border transition-colors",
+                      "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
                       yearFilter === String(y)
                         ? "bg-accent-primary text-white border-accent-primary"
                         : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
@@ -454,7 +472,7 @@ function PlacementDrivePreparePageContent() {
                 <button
                   onClick={() => setCategoryFilter(CATEGORY_FILTER_ALL)}
                   className={cn(
-                    "px-2.5 py-1 rounded-control text-[11px] font-bold border transition-colors",
+                    "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
                     categoryFilter === CATEGORY_FILTER_ALL
                       ? "bg-accent-secondary text-white border-accent-secondary"
                       : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
@@ -467,7 +485,7 @@ function PlacementDrivePreparePageContent() {
                     key={c}
                     onClick={() => setCategoryFilter(c)}
                     className={cn(
-                      "px-2.5 py-1 rounded-control text-[11px] font-bold border transition-colors",
+                      "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
                       categoryFilter === c
                         ? "bg-accent-secondary text-white border-accent-secondary"
                         : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
@@ -483,16 +501,16 @@ function PlacementDrivePreparePageContent() {
               {filteredQuestions.map((q) => (
                 <div key={q.id} className="p-4 rounded-control bg-elevated/60 border border-border-subtle">
                   <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-[9px] font-bold">
+                    <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-3xs font-bold">
                       {q.category}
                     </span>
-                    <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-[9px] font-bold">
+                    <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-3xs font-bold">
                       {q.askedYear}
                     </span>
-                    {q.roundName && <span className="text-[10px] text-text-muted">{q.roundName}</span>}
+                    {q.roundName && <span className="text-3xs text-text-muted">{q.roundName}</span>}
                   </div>
                   <p className="text-xs font-semibold text-primary leading-relaxed">{q.question}</p>
-                  {q.answerNotes && <p className="text-[11px] text-text-secondary mt-1.5 leading-relaxed">{q.answerNotes}</p>}
+                  {q.answerNotes && <p className="text-2xs text-text-secondary mt-1.5 leading-relaxed">{q.answerNotes}</p>}
                 </div>
               ))}
             </div>
@@ -510,7 +528,7 @@ function PlacementDrivePreparePageContent() {
           {availableRecommendedProblems.length > 0 && (
             <button
               onClick={() => router.push(practiceHref)}
-              className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1"
+              className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1"
             >
               <span>Practice all {availableRecommendedProblems.length} recommended problems</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -541,10 +559,10 @@ function PlacementDrivePreparePageContent() {
                   {problem.difficulty ? (
                     <DifficultyBadge difficulty={problem.difficulty} size="sm" />
                   ) : (
-                    <span className="text-[11px] text-text-muted">Difficulty TBD</span>
+                    <span className="text-2xs text-text-muted">Difficulty TBD</span>
                   )}
                   {!problem.available && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
+                    <span className="text-3xs font-bold px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
                       Coming Soon
                     </span>
                   )}
@@ -553,7 +571,7 @@ function PlacementDrivePreparePageContent() {
                   {problem.title ?? problem.problemSlug}
                 </h4>
                 {problem.topicTag && (
-                  <span className="inline-block text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted">
+                  <span className="inline-block text-2xs font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted">
                     {problem.topicTag}
                   </span>
                 )}

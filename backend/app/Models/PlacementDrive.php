@@ -53,6 +53,7 @@ class PlacementDrive extends Model
         'min_cgpa',
         'max_backlogs',
         'eligible_branches',
+        'terms_and_conditions',
         'status',
         'source',
         'is_open_to_all',

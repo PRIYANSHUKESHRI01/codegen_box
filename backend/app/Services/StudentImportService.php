@@ -20,6 +20,18 @@ class StudentImportService
 {
     public function import(College $college, UploadedFile $file, ?User $uploadedBy): StudentImport
     {
+        // A college with no active subscription at all (never had one, or
+        // it expired/was canceled) must be blocked outright here — without
+        // this, $college->studentLimit() below resolves to null exactly
+        // the same way it would for a genuinely unlimited active plan, and
+        // the `$limit !== null` check further down would wrongly let an
+        // expired college import without limit.
+        if (! $college->hasActiveSubscription()) {
+            throw ValidationException::withMessages([
+                'file' => ["{$college->name}'s subscription has expired. Contact Mellow Vault to renew before importing more students."],
+            ]);
+        }
+
         // Fast, upfront rejection when the college is already at (or past) its
         // plan's seat cap — no point queuing a job that will just fail every
         // row. A batch that crosses the cap mid-way (college has room for

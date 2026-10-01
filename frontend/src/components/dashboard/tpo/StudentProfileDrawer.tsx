@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Mail, Phone, GraduationCap, Trophy, AlertTriangle, ShieldCheck, ShieldAlert, FileDown, Loader2 } from "lucide-react";
+import { X, Mail, Phone, GraduationCap, Trophy, AlertTriangle, ShieldCheck, ShieldAlert, FileDown, Loader2, BarChart3 } from "lucide-react";
 import type { CohortStudent } from "@/types/cohort";
 import { EligibilityBadge } from "../EligibilityBadge";
 import { cn } from "@/lib/utils";
@@ -90,7 +91,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                   </p>
                   <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                     {student.eligible_for_active_drive === null ? (
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-elevated text-text-muted border border-border-subtle">
+                      <span className="px-1.5 py-0.5 text-3xs font-bold rounded-full bg-elevated text-text-muted border border-border-subtle">
                         No Active Drives
                       </span>
                     ) : (
@@ -98,7 +99,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                         <EligibilityBadge eligible={student.eligible_for_active_drive} size="sm" />
                         {student.active_drive_count > 1 && (
                           <span
-                            className="text-[10px] font-mono text-text-muted"
+                            className="text-3xs font-mono text-text-muted"
                             title={`Eligible for ${student.eligible_drive_count} of ${student.active_drive_count} currently active drives`}
                           >
                             {student.eligible_drive_count}/{student.active_drive_count} drives
@@ -108,7 +109,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                     )}
                     <span
                       className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-bold rounded-full",
+                        "px-1.5 py-0.5 text-3xs font-bold rounded-full",
                         student.is_blocked
                           ? "bg-status-danger/15 text-status-danger"
                           : "bg-status-success/15 text-status-success"
@@ -133,7 +134,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-border-subtle">
                   <span className="flex items-center gap-2 text-text-secondary">
                     <Phone className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                    <span className="text-[10px] text-text-muted uppercase font-bold">Parent</span>
+                    <span className="text-3xs text-text-muted uppercase font-bold">Parent</span>
                   </span>
                   <span className={cn("font-mono", student.parent_phone ? "text-primary" : "text-text-muted italic")}>
                     {student.parent_phone ?? "Not on file"}
@@ -143,7 +144,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
 
               {/* Readiness tier */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   Placement Readiness
                 </h4>
                 <div className={cn("p-3 rounded-control border text-xs", TIER_STYLE[student.readiness_tier])}>
@@ -154,7 +155,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                   <p className="text-text-secondary mt-1">
                     Computed from CGPA, active backlogs, academic profile completeness, and daily practice consistency.
                   </p>
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-current/10 text-[11px]">
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-current/10 text-2xs">
                     <span className="text-text-secondary">7-Day Practice Streak</span>
                     <span className="font-mono font-bold text-primary">{student.practice_score}%</span>
                   </div>
@@ -163,26 +164,26 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
 
               {/* Academic profile */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   Academic Profile
                 </h4>
                 <div className="grid grid-cols-2 gap-2.5">
                   <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                    <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                    <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                       <GraduationCap className="w-3 h-3" />
                       <span>CGPA</span>
                     </div>
                     <div className="text-base font-black text-primary font-mono">{student.cgpa ?? "—"}</div>
                   </div>
                   <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                    <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                    <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                       <Trophy className="w-3 h-3" />
                       <span>Readiness</span>
                     </div>
                     <div className="text-base font-black text-primary font-mono">{student.readiness_score}%</div>
                   </div>
                   <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle col-span-2">
-                    <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                    <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                       <AlertTriangle className="w-3 h-3" />
                       <span>Active Backlogs</span>
                     </div>
@@ -200,7 +201,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
 
               {/* Account status */}
               <div>
-                <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">
+                <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">
                   Account Status
                 </h4>
                 <div className="flex items-center gap-2 p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs">
@@ -216,14 +217,30 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
               </div>
 
               {/* Individual report */}
-              <button
-                onClick={handleDownloadReport}
-                disabled={downloading}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-70"
-              >
-                {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                <span>{downloading ? "Preparing..." : "Download Report"}</span>
-              </button>
+              <div className="space-y-2">
+                {/* The actual drill-down this drawer never had: every
+                    contest/interview/drive this student has been in, a
+                    day-by-day activity calendar, and the real code behind
+                    any of their submissions — see StudentReportService on
+                    the backend. This card above stays a quick-glance
+                    summary; that's now a separate, fuller page rather than
+                    something crammed into a side panel. */}
+                <Link
+                  href={`/admin/students/report?studentId=${student.id}`}
+                  className="flex w-full items-center justify-center gap-2 rounded-control bg-accent-primary py-2.5 text-xs font-bold text-white transition-colors hover:bg-accent-primary-hover"
+                >
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  <span>View Full Activity Report</span>
+                </Link>
+                <button
+                  onClick={handleDownloadReport}
+                  disabled={downloading}
+                  className="flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle bg-elevated py-2.5 text-xs font-bold text-text-secondary transition-colors hover:text-primary disabled:opacity-70"
+                >
+                  {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
+                  <span>{downloading ? "Preparing..." : "Download PDF Summary"}</span>
+                </button>
+              </div>
             </div>
           </motion.div>
         </>

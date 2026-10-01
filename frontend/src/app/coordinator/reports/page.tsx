@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ShieldCheck, Users2, Download, Eye, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
+import { ShieldCheck, Users2, Download, Eye, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -11,6 +11,7 @@ import { api, ApiError } from "@/lib/api";
 import type { CohortStudent } from "@/types/cohort";
 import type { ReportPreview } from "@/lib/generateTpoReports";
 import type { CoordinatorReportsData } from "@/lib/generateCoordinatorReports";
+import { Modal } from "@/components/ui/Modal";
 
 const AT_RISK_THRESHOLD = 60;
 
@@ -249,7 +250,7 @@ export default function CoordinatorReportsPage() {
             ] as [string, string, string][]
           ).map(([label, value, tone]) => (
             <div key={label} className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">{label}</span>
+              <span className="text-3xs font-semibold text-text-muted uppercase tracking-wider">{label}</span>
               <div className={cn("text-xl font-black font-mono mt-1.5", tone)}>{value}</div>
             </div>
           ))}
@@ -273,7 +274,7 @@ export default function CoordinatorReportsPage() {
                 <div className="w-11 h-11 rounded-control bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
                   <Icon className="w-5 h-5" />
                 </div>
-                <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border", FORMAT_STYLE[report.format])}>
+                <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", FORMAT_STYLE[report.format])}>
                   {report.format}
                 </span>
               </div>
@@ -340,60 +341,39 @@ export default function CoordinatorReportsPage() {
       </div>
 
       {/* Preview modal for the tabular (Excel) report */}
-      <AnimatePresence>
-        {previewReport && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-          >
-            <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 8, scale: 0.98 }}
-              className="w-full max-w-4xl max-h-[85vh] rounded-panel bg-surface border border-border-strong shadow-card flex flex-col"
-            >
-              <div className="flex items-center justify-between p-4 border-b border-border-subtle shrink-0">
-                <h3 className="text-sm font-bold text-primary flex items-center gap-2">
-                  <FileText className="w-4 h-4 text-accent-primary" />
-                  <span>{previewReport.name}</span>
-                  <span className="text-[10px] font-normal text-text-muted">
-                    ({previewReport.preview.rows.length} row{previewReport.preview.rows.length === 1 ? "" : "s"})
-                  </span>
-                </h3>
-                <button onClick={() => setPreviewReport(null)} className="p-1 rounded text-text-muted hover:text-primary">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="overflow-auto p-4">
-                <table className="w-full text-left text-xs whitespace-nowrap">
-                  <thead className="bg-elevated/70 text-text-muted font-bold uppercase tracking-wider text-[10px] sticky top-0">
-                    <tr>
-                      {previewReport.preview.headers.map((h) => (
-                        <th key={h} className="px-3 py-2">
-                          {h}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-subtle">
-                    {previewReport.preview.rows.map((row, i) => (
-                      <tr key={i} className="hover:bg-surface-hover/60">
-                        {row.map((cell, j) => (
-                          <td key={j} className="px-3 py-2 text-text-secondary">
-                            {cell}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {previewReport && (
+        <Modal
+          onClose={() => setPreviewReport(null)}
+          title={previewReport.name}
+          subtitle={`${previewReport.preview.rows.length} row${previewReport.preview.rows.length === 1 ? "" : "s"}`}
+          icon={FileText}
+          size="4xl"
+          bodyClassName="p-4"
+        >
+          <table className="w-full text-left text-xs whitespace-nowrap">
+            <thead className="bg-elevated/70 text-text-muted font-bold uppercase tracking-wider text-3xs sticky top-0">
+              <tr>
+                {previewReport.preview.headers.map((h) => (
+                  <th key={h} className="px-3 py-2">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {previewReport.preview.rows.map((row, i) => (
+                <tr key={i} className="hover:bg-surface-hover/60">
+                  {row.map((cell, j) => (
+                    <td key={j} className="px-3 py-2 text-text-secondary">
+                      {cell}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Modal>
+      )}
     </DashboardShell>
   );
 }

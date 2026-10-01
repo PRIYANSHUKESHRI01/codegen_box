@@ -26,7 +26,7 @@ export function RatingBadge({
         "inline-flex items-center gap-1.5 rounded-full border font-bold whitespace-nowrap",
         tier.bg,
         tier.border,
-        size === "sm" ? "px-2 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
+        size === "sm" ? "px-2 py-0.5 text-3xs" : "px-2.5 py-1 text-xs",
         className
       )}
     >

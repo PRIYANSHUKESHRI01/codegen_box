@@ -97,7 +97,7 @@ function Field({
         {Icon && <Icon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />}
         {children}
       </div>
-      {hint && <p className="text-[11px] text-text-muted mt-1.5">{hint}</p>}
+      {hint && <p className="text-2xs text-text-muted mt-1.5">{hint}</p>}
     </div>
   );
 }
@@ -250,7 +250,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
         <SkillsTagInput value={skills} onChange={setSkills} />
       </Field>
 
-      {error && <p className="text-[11px] text-status-danger">{error}</p>}
+      {error && <p className="text-2xs text-status-danger">{error}</p>}
 
       <div className="flex justify-end pt-2 border-t border-border-subtle">
         <button
@@ -275,7 +275,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
               <div className="min-w-0">
                 <div className="text-xs font-semibold text-primary truncate">Resume on file</div>
                 {user.resume_uploaded_at && (
-                  <div className="text-[10px] text-text-muted">
+                  <div className="text-3xs text-text-muted">
                     Uploaded{" "}
                     {new Date(user.resume_uploaded_at).toLocaleDateString("en-IN", {
                       day: "numeric",
@@ -698,7 +698,7 @@ export default function SettingsPage() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-primary">{user.name}</h2>
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
+            <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
               {ROLE_LABEL[user.role] ?? user.role}
             </span>
           </div>
@@ -713,15 +713,15 @@ export default function SettingsPage() {
           <div className="flex items-center gap-5 sm:border-l sm:border-border-subtle sm:pl-6 shrink-0">
             <div className="text-center">
               <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.rating}</div>
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Rating</div>
+              <div className="text-3xs uppercase tracking-wider text-text-muted">Rating</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.totalSolved}</div>
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Solved</div>
+              <div className="text-3xs uppercase tracking-wider text-text-muted">Solved</div>
             </div>
             <div className="text-center">
               <RatingBadge rating={STUDENT_PROFILE.rating} size="md" />
-              <div className="text-[10px] uppercase tracking-wider text-text-muted mt-1.5">
+              <div className="text-3xs uppercase tracking-wider text-text-muted mt-1.5">
                 Div {getRatingTier(STUDENT_PROFILE.rating).division}
               </div>
             </div>
@@ -734,7 +734,7 @@ export default function SettingsPage() {
               >
                 {user.profile_completion_percent}%
               </div>
-              <div className="text-[10px] uppercase tracking-wider text-text-muted">Profile</div>
+              <div className="text-3xs uppercase tracking-wider text-text-muted">Profile</div>
             </div>
           </div>
         )}
@@ -801,7 +801,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-2 mb-1.5">
                   <label className="block text-xs font-semibold text-text-secondary">Phone Number</label>
                   {user.phone_verified_at && (
-                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-status-success/15 text-status-success">
+                    <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold bg-status-success/15 text-status-success">
                       <BadgeCheck className="w-3 h-3" />
                       Verified
                     </span>
@@ -820,7 +820,7 @@ export default function SettingsPage() {
                 </div>
 
                 {user.phone_verified_at ? (
-                  <p className="text-[11px] text-text-muted mt-1.5">
+                  <p className="text-2xs text-text-muted mt-1.5">
                     Verified on {new Date(user.phone_verified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}. Contact support to change it.
                   </p>
                 ) : (
@@ -830,7 +830,7 @@ export default function SettingsPage() {
                         type="button"
                         onClick={handleSendPhoneOtp}
                         disabled={sendingOtp || !toE164IndianNumber(phone)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {sendingOtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5" />}
                         {sendingOtp ? "Sending code..." : "Verify Number"}
@@ -856,7 +856,7 @@ export default function SettingsPage() {
                             type="button"
                             onClick={handleConfirmPhoneOtp}
                             disabled={verifyingOtp || otpValue.length !== 6}
-                            className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-2xs font-bold transition-colors disabled:opacity-50"
                           >
                             {verifyingOtp ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                             Confirm
@@ -865,21 +865,21 @@ export default function SettingsPage() {
                             type="button"
                             onClick={handleSendPhoneOtp}
                             disabled={sendingOtp}
-                            className="text-[11px] font-semibold text-accent-primary hover:underline disabled:opacity-50"
+                            className="text-2xs font-semibold text-accent-primary hover:underline disabled:opacity-50"
                           >
                             Resend
                           </button>
                           <button
                             type="button"
                             onClick={handleCancelPhoneOtp}
-                            className="text-[11px] font-semibold text-text-muted hover:text-primary"
+                            className="text-2xs font-semibold text-text-muted hover:text-primary"
                           >
                             Cancel
                           </button>
                         </motion.div>
                       </AnimatePresence>
                     )}
-                    {phoneVerifyError && <p className="text-[11px] text-status-danger">{phoneVerifyError}</p>}
+                    {phoneVerifyError && <p className="text-2xs text-status-danger">{phoneVerifyError}</p>}
                     {/* Firebase's invisible reCAPTCHA attaches here — must exist before Verify Number is clicked, so it's always rendered, just visually empty. */}
                     <div id={RECAPTCHA_CONTAINER_ID} />
                   </div>
@@ -900,7 +900,7 @@ export default function SettingsPage() {
               </Field>
             </div>
 
-            {profileError && <p className="text-[11px] text-status-danger">{profileError}</p>}
+            {profileError && <p className="text-2xs text-status-danger">{profileError}</p>}
 
             <div className="flex justify-end pt-2 border-t border-border-subtle">
               <button
@@ -926,21 +926,21 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                  <div className="flex items-center gap-1.5 text-3xs uppercase tracking-wider text-text-muted font-semibold mb-1.5">
                     <Hash className="w-3 h-3" />
                     <span>Roll Number</span>
                   </div>
                   <div className="text-sm font-bold text-primary font-mono truncate">{user.roll_number ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                  <div className="flex items-center gap-1.5 text-3xs uppercase tracking-wider text-text-muted font-semibold mb-1.5">
                     <GraduationCap className="w-3 h-3" />
                     <span>Branch</span>
                   </div>
                   <div className="text-sm font-bold text-primary truncate">{user.branch ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                  <div className="flex items-center gap-1.5 text-3xs uppercase tracking-wider text-text-muted font-semibold mb-1.5">
                     <Award className="w-3 h-3" />
                     <span>CGPA</span>
                   </div>
@@ -949,7 +949,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">
+                  <div className="flex items-center gap-1.5 text-3xs uppercase tracking-wider text-text-muted font-semibold mb-1.5">
                     <AlertTriangle className="w-3 h-3" />
                     <span>Backlogs</span>
                   </div>
@@ -958,7 +958,7 @@ export default function SettingsPage() {
               </div>
 
               {user.cgpa === null && user.branch === null && user.backlogs === null && (
-                <p className="text-[11px] text-text-muted">
+                <p className="text-2xs text-text-muted">
                   Your academic profile hasn&apos;t been imported yet — drive eligibility checks will show as
                   &quot;unknown&quot; until your TPO uploads your roster record.
                 </p>
@@ -1009,7 +1009,7 @@ export default function SettingsPage() {
               </Field>
             </div>
 
-            {passwordError && <p className="text-[11px] text-status-danger">{passwordError}</p>}
+            {passwordError && <p className="text-2xs text-status-danger">{passwordError}</p>}
 
             <div className="flex justify-end pt-2 border-t border-border-subtle">
               <button
@@ -1028,7 +1028,7 @@ export default function SettingsPage() {
               <div className="min-w-0">
                 <h3 className="text-sm font-bold text-primary flex items-center gap-2">
                   <span>Two-Factor Authentication</span>
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
+                  <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
                     Coming Soon
                   </span>
                 </h3>
@@ -1067,12 +1067,12 @@ export default function SettingsPage() {
                       <div className="text-xs font-bold text-primary flex items-center gap-2">
                         <span className="truncate">Signed in {formatDateTime(session.created_at)}</span>
                         {session.is_current && (
-                          <span className="px-1.5 py-0.5 text-[9px] font-bold rounded bg-status-success/15 text-status-success border border-status-success/30 shrink-0">
+                          <span className="px-1.5 py-0.5 text-3xs font-bold rounded bg-status-success/15 text-status-success border border-status-success/30 shrink-0">
                             This device
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] text-text-muted">
+                      <div className="text-2xs text-text-muted">
                         {session.last_used_at ? `Last active ${formatDateTime(session.last_used_at)}` : "Never used"}
                       </div>
                     </div>
@@ -1081,7 +1081,7 @@ export default function SettingsPage() {
                     <button
                       onClick={() => handleRevokeSession(session.id)}
                       disabled={revokingId === session.id}
-                      className="px-3 py-1.5 rounded-control border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-status-danger hover:border-status-danger/40 transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-control border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-status-danger hover:border-status-danger/40 transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50"
                     >
                       {revokingId === session.id ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -1129,7 +1129,7 @@ export default function SettingsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-base font-bold text-primary">{coverage.plan?.name}</span>
-                  <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded-full bg-elevated text-text-muted border border-border-subtle">
+                  <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-elevated text-text-muted border border-border-subtle">
                     {coverage.source === "institution" ? `Via ${user.college?.name ?? "your college"}` : "Personal plan"}
                   </span>
                 </div>
@@ -1154,7 +1154,7 @@ export default function SettingsPage() {
                   Change Plan
                 </Link>
               ) : (
-                <span className="text-[11px] text-text-muted shrink-0 max-w-[220px] text-right">
+                <span className="text-2xs text-text-muted shrink-0 max-w-[220px] text-right">
                   Only Mellow staff can change your institution&apos;s plan — contact support to upgrade or renew.
                 </span>
               )}
@@ -1176,7 +1176,7 @@ export default function SettingsPage() {
               />
               {!entitlements.drive_access && (
                 <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
-                  <span className="text-[11px] text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
+                  <span className="text-2xs text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
                   <Link href="/dashboard/billing" className="text-[10.5px] font-bold text-accent-primary hover:underline shrink-0">
                     Upgrade →
                   </Link>
@@ -1198,7 +1198,7 @@ export default function SettingsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-border-subtle">
             <div>
               <div className="text-xs font-bold text-primary">Appearance</div>
-              <p className="text-[11px] text-text-muted mt-0.5">Applies instantly across every dashboard.</p>
+              <p className="text-2xs text-text-muted mt-0.5">Applies instantly across every dashboard.</p>
             </div>
             <ThemeToggle showLabels />
           </div>
@@ -1239,7 +1239,7 @@ export default function SettingsPage() {
             </Field>
           </div>
 
-          <p className="text-[11px] text-text-muted">
+          <p className="text-2xs text-text-muted">
             These apply to the in-browser code editor, which is launching alongside proctored assessments — saved
             locally on this device for now.
           </p>
@@ -1262,7 +1262,7 @@ export default function SettingsPage() {
           <div className="mb-4">
             <h3 className="text-sm font-bold text-primary">
               Notification Preferences{" "}
-              <span className="align-middle px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
+              <span className="align-middle px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
                 Early Access
               </span>
             </h3>
@@ -1308,7 +1308,7 @@ export default function SettingsPage() {
             >
               <div className="min-w-0">
                 <div className="text-xs font-bold text-primary">{row.title}</div>
-                <p className="text-[11px] text-text-muted mt-0.5 leading-relaxed">{row.detail}</p>
+                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{row.detail}</p>
               </div>
               <Toggle
                 checked={notifs[row.key]}

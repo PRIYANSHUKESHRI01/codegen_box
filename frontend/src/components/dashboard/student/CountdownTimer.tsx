@@ -8,13 +8,24 @@ interface CountdownTimerProps {
   minutesFromNow: number;
   className?: string;
   compact?: boolean;
+  /**
+   * "raised" gives each unit a solid white (surface) tile with a real
+   * shadow, for sitting on top of a tinted panel — the default `elevated`
+   * fill is itself a faint tint and goes muddy against one.
+   */
+  variant?: "default" | "raised";
 }
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
 }
 
-export function CountdownTimer({ minutesFromNow, className, compact = false }: CountdownTimerProps) {
+export function CountdownTimer({
+  minutesFromNow,
+  className,
+  compact = false,
+  variant = "default",
+}: CountdownTimerProps) {
   // Resolve the target once on mount so the ticking is stable across renders
   // (and never runs during SSR, avoiding hydration mismatch).
   const [target, setTarget] = useState<number | null>(null);
@@ -56,14 +67,24 @@ export function CountdownTimer({ minutesFromNow, className, compact = false }: C
   ];
 
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
+    <div className={cn("flex items-center gap-2", className)}>
       {blocks.map((b) => (
         <div
           key={b.unit}
-          className="px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-center min-w-[46px]"
+          className={cn(
+            "min-w-[52px] rounded-[10px] px-2.5 py-2 text-center",
+            variant === "raised"
+              ? "border border-white/70 bg-surface shadow-subtle dark:border-white/10"
+              : "border border-border-subtle bg-elevated"
+          )}
         >
-          <div className="text-base font-black font-mono tabular-nums text-primary leading-none">{pad(b.value)}</div>
-          <div className="text-[9px] uppercase tracking-wider text-text-muted mt-0.5">{b.unit}</div>
+          {/* tabular-nums matters more here than anywhere else on the page:
+              without it the tile visibly jitters every single second as the
+              glyph widths change. */}
+          <div className="font-mono text-lg font-black leading-none tabular-nums text-primary">
+            {pad(b.value)}
+          </div>
+          <div className="mt-1 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">{b.unit}</div>
         </div>
       ))}
     </div>

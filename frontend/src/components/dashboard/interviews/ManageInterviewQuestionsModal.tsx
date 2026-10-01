@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { X, Loader2, Trash2, Mic, Search, Sparkles, Library } from "lucide-react";
+import { Loader2, Trash2, Mic, Search, Sparkles, Library } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 import { GenerateQuestionsPanel } from "./GenerateQuestionsPanel";
 import {
   CATEGORY_COLORS,
@@ -117,19 +118,9 @@ export function ManageInterviewQuestionsModal({
   }, [bank, attached, search]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Mic className="w-4 h-4 text-accent-primary" />
-            <span>Questions — {interviewTitle}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {restrictedToCompanyNote && <p className="text-[11px] text-text-muted">{restrictedToCompanyNote}</p>}
+    <Modal onClose={onClose} title={`Questions — ${interviewTitle}`} icon={Mic} size="2xl">
+      <div className="space-y-4">
+        {restrictedToCompanyNote && <p className="text-2xs text-text-muted">{restrictedToCompanyNote}</p>}
 
         {loading ? (
           <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
@@ -151,10 +142,10 @@ export function ManageInterviewQuestionsModal({
                       className="flex items-center justify-between gap-3 p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs"
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[10px] font-mono text-text-muted shrink-0">#{idx + 1}</span>
+                        <span className="text-3xs font-mono text-text-muted shrink-0">#{idx + 1}</span>
                         <span
                           className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border shrink-0",
+                            "px-1.5 py-0.5 text-3xs font-bold uppercase rounded border shrink-0",
                             CATEGORY_COLORS[q.question_bank.category]
                           )}
                         >
@@ -162,7 +153,7 @@ export function ManageInterviewQuestionsModal({
                         </span>
                         <span
                           className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-bold rounded capitalize shrink-0",
+                            "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
                             DIFFICULTY_COLORS[q.question_bank.difficulty]
                           )}
                         >
@@ -187,7 +178,7 @@ export function ManageInterviewQuestionsModal({
                   type="button"
                   onClick={() => setSource("ai")}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     source === "ai" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -198,7 +189,7 @@ export function ManageInterviewQuestionsModal({
                   type="button"
                   onClick={() => setSource("bank")}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     source === "bank" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -247,10 +238,10 @@ export function ManageInterviewQuestionsModal({
                           className="flex items-center justify-between gap-3 p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-xs"
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border shrink-0", CATEGORY_COLORS[q.category])}>
+                            <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border shrink-0", CATEGORY_COLORS[q.category])}>
                               {CATEGORY_LABELS[q.category]}
                             </span>
-                            <span className={cn("px-1.5 py-0.5 text-[9px] font-bold rounded capitalize shrink-0", DIFFICULTY_COLORS[q.difficulty])}>
+                            <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0", DIFFICULTY_COLORS[q.difficulty])}>
                               {q.difficulty}
                             </span>
                             <span className="text-primary truncate">{q.question_text}</span>
@@ -272,6 +263,6 @@ export function ManageInterviewQuestionsModal({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

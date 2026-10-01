@@ -120,7 +120,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3">College</th>
@@ -140,14 +140,14 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
                   >
                     <td className="px-4 py-3">
                       <div className="font-bold text-primary">{s.name}</div>
-                      <div className="text-[10px] font-mono text-text-muted">{s.email}</div>
+                      <div className="text-3xs font-mono text-text-muted">{s.email}</div>
                     </td>
                     <td className="px-4 py-3 text-text-secondary font-medium">{s.college?.name ?? "—"}</td>
                     <td className="px-4 py-3 text-text-secondary">{s.branch ?? "—"}</td>
                     <td className="px-4 py-3 text-text-secondary">{s.subscription_plan_name ?? "—"}</td>
                     <td className="px-4 py-3">
                       {s.readiness_tier ? (
-                        <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border", TIER_BADGE_CLASS[s.readiness_tier])}>
+                        <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", TIER_BADGE_CLASS[s.readiness_tier])}>
                           {s.readiness_tier}
                         </span>
                       ) : (
@@ -158,7 +158,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full",
+                          "inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full",
                           s.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success"
                         )}
                       >

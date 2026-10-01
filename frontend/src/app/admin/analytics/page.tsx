@@ -85,25 +85,25 @@ export default function ReadinessAnalyticsPage() {
           {/* KPI strip */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Avg Readiness</span>
+              <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Avg Readiness</span>
               <div className="text-2xl font-black text-primary font-mono mt-2">
                 {branchReadiness.length > 0 ? Math.round(branchReadiness.reduce((s, b) => s + b.avgReadiness, 0) / branchReadiness.length) : 0}
                 <span className="text-sm text-text-muted">/100</span>
               </div>
             </div>
             <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Companies Hired</span>
+              <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Companies Hired</span>
               <div className="text-2xl font-black text-accent-secondary font-mono mt-2">{placements.company_summary.length}</div>
             </div>
             <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Offers Accepted</span>
+              <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Total Offers Accepted</span>
               <div className="text-2xl font-black text-status-success font-mono mt-2">{placements.funnel.accepted}</div>
             </div>
             <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-              <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Current Placement %</span>
+              <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Current Placement %</span>
               <div className="text-2xl font-black text-status-success font-mono mt-2">{placements.target.current_percent}%</div>
               {placements.target.target_percent && (
-                <p className="text-[10px] text-text-muted mt-1">Target: {placements.target.target_percent}%</p>
+                <p className="text-3xs text-text-muted mt-1">Target: {placements.target.target_percent}%</p>
               )}
             </div>
           </div>
@@ -116,7 +116,7 @@ export default function ReadinessAnalyticsPage() {
                 <span>Needs Your Attention</span>
               </h2>
               {placements.action_items.map((item, i) => (
-                <p key={i} className="text-[11px] text-text-secondary pl-5">• {item.message}</p>
+                <p key={i} className="text-2xs text-text-secondary pl-5">• {item.message}</p>
               ))}
             </section>
           )}
@@ -138,7 +138,7 @@ export default function ReadinessAnalyticsPage() {
               ] as [string, number][]).map(([label, value]) => (
                 <div key={label} className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
                   <div className="text-lg font-black text-primary font-mono">{value}</div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider mt-1">{label}</div>
+                  <div className="text-3xs text-text-muted uppercase tracking-wider mt-1">{label}</div>
                 </div>
               ))}
             </div>
@@ -210,7 +210,7 @@ export default function ReadinessAnalyticsPage() {
                     suffix=""
                     maxValue={Math.max(4, Math.ceil(Math.max(...placements.package_distribution.map((b) => b.count)) / 2) * 2)}
                   />
-                  <p className="mt-4 pt-4 border-t border-border-subtle text-[11px] text-text-muted text-center">
+                  <p className="mt-4 pt-4 border-t border-border-subtle text-2xs text-text-muted text-center">
                     {placements.package_distribution.reduce((s, b) => s + b.count, 0)} total accepted offers.
                   </p>
                 </>
@@ -233,7 +233,7 @@ export default function ReadinessAnalyticsPage() {
               <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+                    <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                       <tr>
                         <th className="px-4 py-3">Company</th>
                         <th className="px-4 py-3">Offers Accepted</th>

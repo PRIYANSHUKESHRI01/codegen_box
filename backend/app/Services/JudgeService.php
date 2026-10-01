@@ -32,7 +32,15 @@ class JudgeService
     ) {}
 
     /**
-     * @param  Collection<int, ProblemTestCase>  $testCases  In display order; judged in that order, stopping at (and revealing) the first failure.
+     * @param  Collection<int, ProblemTestCase>  $testCases  In display order — the first 3 must be the public
+     *                                            samples (`is_sample=true`), the rest hidden. Samples are always
+     *                                            judged and revealed in full, pass or fail. Hidden cases are
+     *                                            judged in order and revealed as pass/fail only (never their
+     *                                            input/expected/actual) — revealing stops at the first hidden
+     *                                            failure, with every case after it marked `not_run` instead, so
+     *                                            a student can never learn more from a submission than "which
+     *                                            hidden case failed first", the same budget fail-fast gave
+     *                                            before, just without leaking that case's content.
      * @param  bool  $propagateExecutionFailures  When true, an execution-infrastructure failure (no Piston node
      *                                            reachable, node error, timeout) is rethrown instead of being
      *                                            turned into a 502 "verdict". The queued judge path sets this:
@@ -100,8 +108,15 @@ class JudgeService
 
         $killedBySignal = $result['signal'] !== null;
         $nonZeroExit = $result['exitCode'] !== null && $result['exitCode'] !== 0;
+        $stopped = $killedBySignal || $nonZeroExit;
 
-        if ($killedBySignal || $nonZeroExit) {
+        // One stdout line per test case that actually finished (the harness wraps every case
+        // in a try/catch, so a case throwing still prints its line — only a process-level kill
+        // like a TLE leaves later cases with no line at all; see HarnessGenerator).
+        $printedLines = trim($result['stdout']) === '' ? [] : preg_split('/\r?\n/', trim($result['stdout']));
+        [$results, $allPassed] = $this->buildResults($testCases, $printedLines, $problem);
+
+        if ($stopped) {
             // Piston says why it stopped the run; a limit kill is a SIGKILL either way, but
             // "Time Limit Exceeded" is what a student (and an operator reading the logs) needs.
             $status = match (true) {
@@ -115,7 +130,7 @@ class JudgeService
                 'body' => [
                     'runtime_error' => trim($result['stderr']) ?: ($result['runMessage'] ?? $status),
                     'status' => $status,
-                    'results' => [],
+                    'results' => $results,
                     'all_passed' => false,
                 ],
                 'status' => 200,
@@ -123,36 +138,6 @@ class JudgeService
                 'runtimeMs' => $runtimeMs,
                 'memoryKb' => $memoryKb,
             ];
-        }
-
-        $actualLines = preg_split('/\r?\n/', trim($result['stdout']));
-        $results = [];
-        $allPassed = true;
-
-        foreach ($testCases as $index => $testCase) {
-            $actualRaw = trim($actualLines[$index] ?? '');
-            $actualDecoded = json_decode($actualRaw, true);
-            $actualIsValidJson = json_last_error() === JSON_ERROR_NONE;
-
-            $passed = $actualIsValidJson && $this->compare(
-                $actualDecoded,
-                $testCase->expected_output,
-                $problem->comparison_mode,
-                $problem->comparison_epsilon !== null ? (float) $problem->comparison_epsilon : null,
-            );
-
-            $results[] = [
-                'case' => $index + 1,
-                'input' => $testCase->prettyInput($problem->params),
-                'expected' => json_encode($testCase->expected_output),
-                'actual' => $actualRaw,
-                'passed' => $passed,
-            ];
-
-            if (! $passed) {
-                $allPassed = false;
-                break; // Fail-fast: reveal exactly one concrete failing case, not the whole (possibly hidden) suite.
-            }
         }
 
         return [
@@ -167,6 +152,67 @@ class JudgeService
             'runtimeMs' => $runtimeMs,
             'memoryKb' => $memoryKb,
         ];
+    }
+
+    /**
+     * @param  Collection<int, ProblemTestCase>  $testCases
+     * @param  list<string>  $printedLines  One stdout line per test case that finished running, in order.
+     *                                      Shorter than $testCases when a case never completed (crash/TLE).
+     * @return array{0: list<array<string, mixed>>, 1: bool}
+     */
+    private function buildResults(Collection $testCases, array $printedLines, Problem $problem): array
+    {
+        $results = [];
+        $allPassed = true;
+        // Once true, every remaining case is reported as `not_run` instead of judged — either
+        // because execution never reached it (crash/TLE) or because a hidden case just failed
+        // and nothing past that point should be revealed (see this method's caller's docblock).
+        $stopRevealing = false;
+
+        foreach ($testCases as $index => $testCase) {
+            if ($stopRevealing || ! array_key_exists($index, $printedLines)) {
+                $results[] = ['case' => $index + 1, 'passed' => false, 'hidden' => ! $testCase->is_sample, 'not_run' => true];
+                $allPassed = false;
+                $stopRevealing = true;
+
+                continue;
+            }
+
+            $actualRaw = trim($printedLines[$index]);
+            $actualDecoded = json_decode($actualRaw, true);
+            $actualIsValidJson = json_last_error() === JSON_ERROR_NONE;
+
+            $passed = $actualIsValidJson && $this->compare(
+                $actualDecoded,
+                $testCase->expected_output,
+                $problem->comparison_mode,
+                $problem->comparison_epsilon !== null ? (float) $problem->comparison_epsilon : null,
+            );
+
+            if (! $passed) {
+                $allPassed = false;
+            }
+
+            if ($testCase->is_sample) {
+                $results[] = [
+                    'case' => $index + 1,
+                    'input' => $testCase->prettyInput($problem->params),
+                    'expected' => json_encode($testCase->expected_output),
+                    'actual' => $actualRaw,
+                    'passed' => $passed,
+                ];
+
+                continue;
+            }
+
+            $results[] = ['case' => $index + 1, 'passed' => $passed, 'hidden' => true];
+
+            if (! $passed) {
+                $stopRevealing = true;
+            }
+        }
+
+        return [$results, $allPassed];
     }
 
     /**

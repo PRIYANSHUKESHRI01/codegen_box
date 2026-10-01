@@ -40,14 +40,14 @@ export function Languages() {
                       <h3 className="font-bold text-base text-primary group-hover:text-accent-primary transition-colors">
                         {lang.name}
                       </h3>
-                      <span className="text-[11px] font-mono text-text-muted">
+                      <span className="text-2xs font-mono text-text-muted">
                         {lang.version}
                       </span>
                     </div>
                   </div>
 
                   <span
-                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
+                    className={`text-3xs font-mono font-bold px-2 py-0.5 rounded border ${
                       lang.speedTier === "Fastest"
                         ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
                         : "bg-cyan-500/10 text-cyan-400 border-cyan-500/20"
@@ -58,7 +58,7 @@ export function Languages() {
                 </div>
 
                 <div className="bg-elevated rounded-control p-3 border border-border-subtle mb-4">
-                  <div className="text-[10px] font-mono text-text-muted uppercase mb-1">
+                  <div className="text-3xs font-mono text-text-muted uppercase mb-1">
                     Compiler Flag:
                   </div>
                   <code className="text-xs font-mono text-accent-primary block truncate">

@@ -60,6 +60,11 @@ export interface TopicMastery {
 }
 
 export interface RecentSubmission {
+  /** Lets a caller with permission to see this student's code (the TPO/admin
+   * Student Report page) fetch it via GET .../submissions/{id} — the code
+   * itself is never included in this list (see Submission::$hidden on the
+   * backend), only ever in that single-submission detail response. */
+  id: number;
   problem_title: string;
   problem_slug: string;
   difficulty: string;

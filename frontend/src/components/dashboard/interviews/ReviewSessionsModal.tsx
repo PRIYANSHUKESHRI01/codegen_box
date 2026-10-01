@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X, Loader2, User, PlayCircle, FileText, ShieldAlert, ShieldCheck, RotateCcw, Award, CheckCircle2, XCircle, Sparkles } from "lucide-react";
+import { Loader2, User, PlayCircle, FileText, ShieldAlert, ShieldCheck, RotateCcw, Award, CheckCircle2, XCircle, Sparkles } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
@@ -19,6 +20,14 @@ interface ReviewSessionsModalProps {
   listEndpoint: "sessions" | "invited";
   interviewSlug: string;
   interviewTitle: string;
+  /**
+   * Opens straight into one candidate's transcript instead of the picker
+   * list — the entry point from the Student Report page, which already
+   * knows exactly which session it wants (as opposed to Mock
+   * Interviews/Contests' own "Responses" button, which has no session in
+   * mind yet and always starts on the list).
+   */
+  initialSessionId?: number;
   onClose: () => void;
 }
 
@@ -42,7 +51,14 @@ const STATUS_COLOR: Record<string, string> = {
  * InterviewTrackAdvancementService's finalizeAndAdvance()/
  * finalizeStandaloneScoring().
  */
-export function ReviewSessionsModal({ basePath, listEndpoint, interviewSlug, interviewTitle, onClose }: ReviewSessionsModalProps) {
+export function ReviewSessionsModal({
+  basePath,
+  listEndpoint,
+  interviewSlug,
+  interviewTitle,
+  initialSessionId,
+  onClose,
+}: ReviewSessionsModalProps) {
   const [sessions, setSessions] = useState<InterviewSessionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<InterviewSessionRow | null>(null);
@@ -50,24 +66,23 @@ export function ReviewSessionsModal({ basePath, listEndpoint, interviewSlug, int
   useEffect(() => {
     api
       .get<{ sessions: InterviewSessionRow[] }>(`${basePath}/${interviewSlug}/${listEndpoint}`)
-      .then((res) => setSessions(res.sessions))
+      .then((res) => {
+        setSessions(res.sessions);
+        if (initialSessionId !== undefined) {
+          setSelected(res.sessions.find((s) => s.id === initialSessionId) ?? null);
+        }
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
+    // initialSessionId is read once, on the modal's first load — a prop
+    // change afterward isn't a real scenario (a fresh modal instance is
+    // mounted per student/interview via `key` at the call site instead).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basePath, interviewSlug, listEndpoint]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-3xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <FileText className="w-4 h-4 text-accent-primary" />
-            <span>Candidate Responses — {interviewTitle}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title={`Candidate Responses — ${interviewTitle}`} icon={FileText} size="3xl">
+      <div className="space-y-4">
         {loading ? (
           <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -96,14 +111,14 @@ export function ReviewSessionsModal({ basePath, listEndpoint, interviewSlug, int
                   </div>
                   <div className="min-w-0">
                     <div className="font-semibold text-primary truncate">{s.user.name}</div>
-                    <div className="text-[10px] text-text-muted truncate">{s.user.email}</div>
+                    <div className="text-3xs text-text-muted truncate">{s.user.email}</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {s.proctoring_session && s.proctoring_session.violation_count > 0 && (
                     <span
                       className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded flex items-center gap-1",
+                        "px-1.5 py-0.5 text-3xs font-bold uppercase rounded flex items-center gap-1",
                         s.proctoring_session.status === "locked"
                           ? "bg-status-danger/15 text-status-danger"
                           : "bg-status-warning/15 text-status-warning"
@@ -113,7 +128,7 @@ export function ReviewSessionsModal({ basePath, listEndpoint, interviewSlug, int
                       {s.proctoring_session.status === "locked" ? "Locked" : `${s.proctoring_session.violation_count} flag`}
                     </span>
                   )}
-                  <span className={cn("px-2 py-0.5 text-[9px] font-bold uppercase rounded", STATUS_COLOR[s.status])}>
+                  <span className={cn("px-2 py-0.5 text-3xs font-bold uppercase rounded", STATUS_COLOR[s.status])}>
                     {STATUS_LABEL[s.status]}
                   </span>
                 </div>
@@ -122,7 +137,7 @@ export function ReviewSessionsModal({ basePath, listEndpoint, interviewSlug, int
           </div>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -165,7 +180,19 @@ function SessionResponses({
       );
       setResponses(res.responses);
       setProctoring(res.session.proctoring_session ?? null);
-      setSession(res.session);
+      // The backend's own responses() payload never eager-loads `user` (see
+      // TpoInterviewController::responses() — it only adds
+      // proctoringSession.violations and interview to this same session
+      // row) — a plain `setSession(res.session)` was therefore DELETING
+      // `.user` the instant this fetch resolved, and the header just below
+      // renders `session.user.name` unconditionally. That crashed this
+      // modal for every reviewer on every candidate, in every role
+      // (Tpo/Admin/Company all hit this same code), with no error boundary
+      // above it to contain the blast radius — carrying `user` forward
+      // from the session the picker list already gave us, which is the
+      // right data anyway (a candidate's identity doesn't need refreshing
+      // from this endpoint).
+      setSession((prev) => ({ ...res.session, user: prev.user }));
       setScoreDrafts((prev) => {
         const next = { ...prev };
         for (const r of res.responses) {
@@ -276,12 +303,12 @@ function SessionResponses({
 
   return (
     <div className="space-y-3">
-      <button onClick={onBack} className="text-[11px] font-semibold text-accent-primary hover:underline">
+      <button onClick={onBack} className="text-2xs font-semibold text-accent-primary hover:underline">
         ← Back to candidates
       </button>
       <div className="flex items-center gap-2">
         <span className="text-sm font-bold text-primary">{session.user.name}</span>
-        <span className="text-[10px] text-text-muted">{session.user.email}</span>
+        <span className="text-3xs text-text-muted">{session.user.email}</span>
       </div>
 
       {proctoring && (proctoring.violation_count > 0 || proctoring.status === "locked") && (
@@ -352,7 +379,7 @@ function SessionResponses({
             ) : (
               <XCircle className="w-4 h-4 text-status-danger shrink-0" />
             )}
-            <div className="text-[11px] text-text-secondary flex-1">
+            <div className="text-2xs text-text-secondary flex-1">
               <span className="font-bold text-primary">{compositePercent?.toFixed(1)}%</span> composite score
               {threshold != null && (passed === null ? "" : passed ? " — passed" : " — did not meet")}
               {threshold != null ? " the round's qualifying threshold" : ""}
@@ -360,7 +387,7 @@ function SessionResponses({
               {finalizeResult?.partial_composite && " (one or more weighted categories had no scored questions — composite renormalized.)"}
             </div>
             {!humanReviewed && session.ai_scored_at && (
-              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-accent-primary/10 text-accent-primary shrink-0">
+              <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold uppercase bg-accent-primary/10 text-accent-primary shrink-0">
                 <Sparkles className="w-2.5 h-2.5" />
                 AI-scored
               </span>
@@ -386,10 +413,10 @@ function SessionResponses({
             .map((r, idx) => (
               <div key={r.id} className="p-3.5 rounded-control bg-elevated/60 border border-border-subtle space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono text-text-muted">Q{idx + 1}</span>
+                  <span className="text-3xs font-mono text-text-muted">Q{idx + 1}</span>
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border",
+                      "px-1.5 py-0.5 text-3xs font-bold uppercase rounded border",
                       CATEGORY_COLORS[r.interview_question.question_bank.category]
                     )}
                   >
@@ -407,7 +434,7 @@ function SessionResponses({
                     ) : (
                       <button
                         onClick={() => handlePlay(r.id)}
-                        className="flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary hover:underline"
+                        className="flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline"
                       >
                         <PlayCircle className="w-3.5 h-3.5" />
                         Play recording
@@ -419,7 +446,7 @@ function SessionResponses({
                 {session.status === "completed" && (
                   <div className="pt-1.5 border-t border-border-subtle flex items-start gap-2 flex-wrap">
                     <div className="flex items-center gap-1.5">
-                      <label className="text-[10px] font-semibold text-text-secondary">Score</label>
+                      <label className="text-3xs font-semibold text-text-secondary">Score</label>
                       <input
                         type="number"
                         min={0}
@@ -428,9 +455,9 @@ function SessionResponses({
                         onChange={(e) =>
                           setScoreDrafts((prev) => ({ ...prev, [r.id]: { score: e.target.value, notes: prev[r.id]?.notes ?? "" } }))
                         }
-                        className="w-16 px-2 py-1 rounded-control bg-surface border border-border-subtle text-[11px] text-primary outline-none focus:border-accent-primary"
+                        className="w-16 px-2 py-1 rounded-control bg-surface border border-border-subtle text-2xs text-primary outline-none focus:border-accent-primary"
                       />
-                      <span className="text-[10px] text-text-muted">/ 100</span>
+                      <span className="text-3xs text-text-muted">/ 100</span>
                     </div>
                     <input
                       value={scoreDrafts[r.id]?.notes ?? ""}
@@ -438,7 +465,7 @@ function SessionResponses({
                         setScoreDrafts((prev) => ({ ...prev, [r.id]: { score: prev[r.id]?.score ?? "", notes: e.target.value } }))
                       }
                       placeholder="Review notes (optional)"
-                      className="flex-1 min-w-[160px] px-2.5 py-1 rounded-control bg-surface border border-border-subtle text-[11px] text-primary outline-none focus:border-accent-primary"
+                      className="flex-1 min-w-[160px] px-2.5 py-1 rounded-control bg-surface border border-border-subtle text-2xs text-primary outline-none focus:border-accent-primary"
                     />
                     <button
                       onClick={() => handleSaveScore(r)}
@@ -448,14 +475,14 @@ function SessionResponses({
                       {savingScoreId === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : r.score != null ? "Update" : "Save"}
                     </button>
                     {r.score != null && (
-                      <span className="flex items-center gap-1 text-[10px] font-bold text-status-success">
+                      <span className="flex items-center gap-1 text-3xs font-bold text-status-success">
                         <CheckCircle2 className="w-3 h-3" />
                         Scored {r.score}/100
                       </span>
                     )}
                     {r.ai_scored && (
                       <span
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-accent-primary/10 text-accent-primary"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded text-3xs font-bold uppercase bg-accent-primary/10 text-accent-primary"
                         title="Scored by Gemini — edit and save to override with your own score."
                       >
                         <Sparkles className="w-2.5 h-2.5" />
@@ -471,7 +498,7 @@ function SessionResponses({
 
       {session.status === "completed" && responses.length > 0 && (
         <div className="pt-2 border-t border-border-subtle space-y-2">
-          {actionError && <p className="text-[11px] text-status-danger">{actionError}</p>}
+          {actionError && <p className="text-2xs text-status-danger">{actionError}</p>}
           <button
             onClick={handleFinalize}
             disabled={!allScored || finalizing || !!session.reviewed_at}

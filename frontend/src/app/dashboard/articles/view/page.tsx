@@ -130,7 +130,7 @@ function ArticleReaderPageContent() {
           <div className="max-w-[720px] mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
             <button
               onClick={() => router.push(`/dashboard/articles/topic?topicSlug=${article.article_topic.slug}`)}
-              className="flex items-center gap-1 text-[11px] font-semibold text-text-muted hover:text-primary transition-colors"
+              className="flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               {article.article_topic.name}

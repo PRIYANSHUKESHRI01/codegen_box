@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, Headphones, MessageSquare, CheckCircle2, ArrowLeft, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles } from "lucide-react";
+import { Mic, Headphones, MessageSquare, CheckCircle2, ArrowLeft, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -35,6 +35,8 @@ function InterviewDetailPageContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InterviewResult | null>(null);
+  const [playingId, setPlayingId] = useState<number | null>(null);
+  const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -57,6 +59,31 @@ function InterviewDetailPageContent() {
       .catch(() => setResult(null));
   }, [status, slug, interview?.my_session_status]);
 
+  // Revoke every object URL on unmount — same cleanup ReviewSessionsModal
+  // does for the reviewer-side player, since these blobs otherwise leak for
+  // the life of the tab.
+  useEffect(() => {
+    return () => {
+      Object.values(audioUrls).forEach((url) => URL.revokeObjectURL(url));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handlePlay = async (responseId: number) => {
+    if (audioUrls[responseId]) {
+      setPlayingId(responseId);
+      return;
+    }
+    try {
+      const blob = await api.getFile(`/interviews/${slug}/responses/${responseId}/audio`);
+      const url = URL.createObjectURL(blob);
+      setAudioUrls((prev) => ({ ...prev, [responseId]: url }));
+      setPlayingId(responseId);
+    } catch {
+      // Non-fatal — the rest of the transcript is still readable without audio.
+    }
+  };
+
   if (status !== "ready") return <SessionLoader />;
 
   const ttsSupported = hasSpeechSynthesis();
@@ -65,7 +92,7 @@ function InterviewDetailPageContent() {
 
   return (
     <DashboardShell role="user" title="AI Interview">
-      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary hover:underline mb-4">
+      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-4">
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to Interviews
       </Link>
@@ -90,7 +117,7 @@ function InterviewDetailPageContent() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-lg font-bold text-primary">{interview.title}</h1>
                   {interview.is_mock && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border bg-amber-500/10 text-amber-500 border-amber-500/25">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-amber-500/10 text-amber-500 border-amber-500/25">
                       Practice Round
                     </span>
                   )}
@@ -100,7 +127,7 @@ function InterviewDetailPageContent() {
             </div>
 
             {interview.is_mock && (
-              <p className="text-[11px] text-amber-600 bg-amber-500/[0.06] border border-amber-500/20 rounded-control px-3 py-2">
+              <p className="text-2xs text-amber-600 bg-amber-500/[0.06] border border-amber-500/20 rounded-control px-3 py-2">
                 This is a practice round to help you prepare — it&apos;s never part of the actual hiring decision.
               </p>
             )}
@@ -175,18 +202,43 @@ function InterviewDetailPageContent() {
                       <Sparkles className="w-3.5 h-3.5 text-accent-primary" />
                       Your Result
                     </div>
-                    <p className="text-[11px] text-text-muted mt-0.5">Scored by AI — a human reviewer can still adjust this.</p>
+                    <p className="text-2xs text-text-muted mt-0.5">Scored by AI — a human reviewer can still adjust this.</p>
                   </div>
                 </div>
                 {result.responses.length > 0 && (
-                  <div className="space-y-2 pt-2 border-t border-border-subtle">
-                    {result.responses.map((r, i) => (
-                      <div key={i} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-semibold text-primary line-clamp-1">{r.question_text}</span>
-                          <span className="text-[11px] font-bold text-accent-primary shrink-0">{r.score}/100</span>
+                  <div className="space-y-2.5 pt-2 border-t border-border-subtle">
+                    <h3 className="text-2xs font-bold uppercase tracking-wide text-text-muted">Full Transcript</h3>
+                    {result.responses.map((r) => (
+                      <div key={r.response_id} className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-2xs font-semibold text-primary">{r.question_text}</span>
+                          <span className="text-2xs font-bold text-accent-primary shrink-0">{r.score}/100</span>
                         </div>
-                        <p className="text-[10.5px] text-text-secondary mt-1 leading-relaxed">{r.feedback}</p>
+                        <div className="pl-2.5 border-l-2 border-accent-primary/25">
+                          <p className="text-3xs font-bold uppercase tracking-wide text-text-muted mb-0.5">Your answer</p>
+                          <p className="text-2xs text-text-secondary leading-relaxed whitespace-pre-wrap">
+                            {r.transcript_text || <span className="italic text-text-muted">No transcript captured.</span>}
+                          </p>
+                        </div>
+                        {r.has_audio && (
+                          <div>
+                            {playingId === r.response_id && audioUrls[r.response_id] ? (
+                              <audio controls autoPlay src={audioUrls[r.response_id]} className="w-full h-8" />
+                            ) : (
+                              <button
+                                onClick={() => handlePlay(r.response_id)}
+                                className="flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline"
+                              >
+                                <PlayCircle className="w-3.5 h-3.5" />
+                                Play my recording
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <p className="text-[10.5px] text-text-secondary leading-relaxed pt-1 border-t border-border-subtle">
+                          <span className="font-bold text-text-muted">Feedback: </span>
+                          {r.feedback}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -218,7 +270,7 @@ function InterviewDetailPageContent() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] font-bold uppercase tracking-wide text-text-muted">{label}</div>
+      <div className="text-3xs font-bold uppercase tracking-wide text-text-muted">{label}</div>
       <div className="text-sm font-bold text-primary mt-0.5">{value}</div>
     </div>
   );

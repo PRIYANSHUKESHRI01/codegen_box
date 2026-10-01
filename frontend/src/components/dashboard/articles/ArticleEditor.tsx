@@ -99,7 +99,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
           <select
             value={articleTopicId}
             onChange={(e) => setArticleTopicId(e.target.value)}
-            className="px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary text-[11px] font-semibold outline-none focus:border-accent-primary"
+            className="px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary text-2xs font-semibold outline-none focus:border-accent-primary"
           >
             <option value="">Select topic...</option>
             {topics.map((t) => (
@@ -114,7 +114,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
             value={displayOrder}
             onChange={(e) => setDisplayOrder(e.target.value)}
             title="Order within topic"
-            className="w-16 px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary text-[11px] font-semibold outline-none focus:border-accent-primary"
+            className="w-16 px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary text-2xs font-semibold outline-none focus:border-accent-primary"
           />
           <div className="flex gap-1 p-0.5 rounded-control bg-elevated border border-border-subtle">
             {(["draft", "published"] as const).map((s) => (
@@ -139,7 +139,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
             type="button"
             onClick={() => handleSave()}
             disabled={saving || !canSave}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
           >
             {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
             {mode === "create" ? "Create Article" : "Save Changes"}
@@ -153,7 +153,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
           maxLength={500}
           className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary resize-none"
         />
-        {error && <p className="text-[11px] text-status-danger">{error}</p>}
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
       </div>
 
       {/* Source / Preview toggle (mobile) */}
@@ -162,7 +162,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
           type="button"
           onClick={() => setView("source")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-control text-[11px] font-bold transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-control text-2xs font-bold transition-colors",
             view === "source" ? "bg-accent-primary text-white" : "bg-elevated text-text-secondary"
           )}
         >
@@ -173,7 +173,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
           type="button"
           onClick={() => setView("preview")}
           className={cn(
-            "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-control text-[11px] font-bold transition-colors",
+            "flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-control text-2xs font-bold transition-colors",
             view === "preview" ? "bg-accent-primary text-white" : "bg-elevated text-text-secondary"
           )}
         >
@@ -189,7 +189,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
             value={content}
             onChange={(e) => setContent(e.target.value)}
             placeholder="Write in Markdown — # headings, **bold**, `code`, ```language fenced code blocks```, tables, lists..."
-            className="w-full h-full min-h-[60vh] p-4 sm:p-6 bg-transparent text-[13px] font-mono text-primary leading-relaxed outline-none resize-none"
+            className="w-full h-full min-h-[60vh] p-4 sm:p-6 bg-transparent text-13 font-mono text-primary leading-relaxed outline-none resize-none"
             spellCheck={false}
           />
         </div>

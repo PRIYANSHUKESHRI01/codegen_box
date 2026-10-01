@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Building2, Plus, X, ExternalLink, Loader2, Lock, Unlock, Briefcase } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 import { AdminCompanyRow, inputClass } from "./types";
 
 interface CompaniesPanelProps {
@@ -130,7 +131,7 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
         <p className="text-xs text-text-muted">{companies.length} companies in the catalog</p>
         <button
           onClick={startCreate}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Company
@@ -152,23 +153,23 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                     <h4 className="text-sm font-bold text-primary truncate">{c.name}</h4>
                     {c.account_type === "hiring_tenant" && (
                       <span
-                        className="px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase bg-accent-primary/15 text-accent-primary shrink-0"
+                        className="px-1.5 py-0.5 rounded-full text-3xs font-bold uppercase bg-accent-primary/15 text-accent-primary shrink-0"
                         title="Has a provisioned dashboard login"
                       >
                         Dashboard
                       </span>
                     )}
                   </div>
-                  <p className="text-[11px] text-text-muted truncate">{c.industry ?? "—"}</p>
+                  <p className="text-2xs text-text-muted truncate">{c.industry ?? "—"}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 text-[10px] text-text-muted font-mono">
+              <div className="flex items-center gap-3 text-3xs text-text-muted font-mono">
                 <span>{c.placement_drives_count ?? 0} drives</span>
                 <span>{c.prep_questions_count ?? 0} questions</span>
                 <span>{c.recommended_problems_count ?? 0} problems</span>
               </div>
               <div className="flex items-center gap-3 pt-2 border-t border-border-subtle">
-                <button onClick={() => startEdit(c)} className="text-[11px] font-bold text-accent-primary hover:underline">
+                <button onClick={() => startEdit(c)} className="text-2xs font-bold text-accent-primary hover:underline">
                   Edit
                 </button>
                 {c.website_url && (
@@ -176,7 +177,7 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                     href={c.website_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-[11px] text-text-muted hover:text-primary flex items-center gap-1 ml-auto"
+                    className="text-2xs text-text-muted hover:text-primary flex items-center gap-1 ml-auto"
                   >
                     <ExternalLink className="w-3 h-3" />
                     Website
@@ -189,20 +190,34 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-          <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h3 className="text-base font-bold text-primary flex items-center gap-2">
-                <Building2 className="w-5 h-5 text-accent-primary" />
-                <span>{editingId ? "Edit Company" : "Add Company"}</span>
-              </h3>
-              <button onClick={() => setShowForm(false)} className="p-1 rounded text-text-muted hover:text-primary">
-                <X className="w-5 h-5" />
+        <Modal
+          onClose={() => setShowForm(false)}
+          title={editingId ? "Edit Company" : "Add Company"}
+          icon={Building2}
+          size="lg"
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+              >
+                Cancel
               </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-              {error && <p className="text-[11px] text-status-danger">{error}</p>}
+              <button
+                type="submit"
+                form="company-form"
+                disabled={saving}
+                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{editingId ? "Save Changes" : "Create Company"}</span>
+              </button>
+            </>
+          }
+        >
+          <form id="company-form" onSubmit={handleSubmit} className="space-y-3 text-xs">
+              {error && <p className="text-2xs text-status-danger">{error}</p>}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-text-secondary mb-1">Name *</label>
@@ -266,14 +281,14 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                       <div key={admin.id} className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-control bg-surface border border-border-subtle">
                         <span className="min-w-0">
                           <span className="block font-semibold text-primary truncate">{admin.name}</span>
-                          <span className="block text-[10px] text-text-muted truncate">{admin.email}</span>
+                          <span className="block text-3xs text-text-muted truncate">{admin.email}</span>
                         </span>
                         <button
                           type="button"
                           onClick={() => handleToggleAdminBlock(admin.id)}
                           disabled={togglingAdminId === admin.id}
                           className={cn(
-                            "flex items-center gap-1 px-2 py-1 rounded-control text-[10px] font-bold shrink-0 transition-colors disabled:opacity-50",
+                            "flex items-center gap-1 px-2 py-1 rounded-control text-3xs font-bold shrink-0 transition-colors disabled:opacity-50",
                             admin.is_blocked
                               ? "bg-status-success/15 text-status-success hover:bg-status-success/25"
                               : "bg-status-danger/15 text-status-danger hover:bg-status-danger/25"
@@ -293,14 +308,14 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                   </div>
                 ) : (
                   <>
-                    <p className="text-[10px] text-text-muted">
+                    <p className="text-3xs text-text-muted">
                       {editingId
                         ? "This company has no dashboard login yet — provision one now (optional)."
                         : "Every new company gets a dashboard login the moment it's added — they'll receive their credentials by email."}
                     </p>
                     <div className="grid grid-cols-2 gap-2.5">
                       <div>
-                        <label className="block text-[11px] font-semibold text-text-secondary mb-1">Admin Name {editingId ? "" : "*"}</label>
+                        <label className="block text-2xs font-semibold text-text-secondary mb-1">Admin Name {editingId ? "" : "*"}</label>
                         <input
                           required={!editingId}
                           value={form.admin_name}
@@ -309,7 +324,7 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-[11px] font-semibold text-text-secondary mb-1">Admin Email {editingId ? "" : "*"}</label>
+                        <label className="block text-2xs font-semibold text-text-secondary mb-1">Admin Email {editingId ? "" : "*"}</label>
                         <input
                           required={!editingId}
                           type="email"
@@ -367,26 +382,8 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                 </div>
               </div>
 
-              <div className="pt-3 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowForm(false)}
-                  className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{editingId ? "Save Changes" : "Create Company"}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+          </form>
+        </Modal>
       )}
     </div>
   );

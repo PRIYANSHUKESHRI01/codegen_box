@@ -46,13 +46,13 @@ export function HeroContent() {
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
         </span>
-        <span className="font-semibold text-primary font-mono text-[10px] sm:text-[11px] tracking-wide uppercase truncate">
+        <span className="font-semibold text-primary font-mono text-3xs sm:text-2xs tracking-wide uppercase truncate">
           <span className="sm:hidden">Real Judge · AI-Scored Interviews</span>
           <span className="hidden sm:inline">Real Code Execution &amp; AI-Scored Interviews, Live Now</span>
         </span>
         <span className="text-border-strong shrink-0">&bull;</span>
         <span
-          className="text-accent-primary font-mono text-[10px] sm:text-[11px] hover:underline cursor-pointer flex items-center gap-1 shrink-0"
+          className="text-accent-primary font-mono text-3xs sm:text-2xs hover:underline cursor-pointer flex items-center gap-1 shrink-0"
           onClick={() => scrollToSection("platform-preview")}
         >
           See How <ArrowRight className="w-3 h-3" />

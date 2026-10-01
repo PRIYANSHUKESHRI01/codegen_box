@@ -83,28 +83,28 @@ export function MarketingPerformancePanel() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <Users2 className="w-3.5 h-3.5" /> Marketing Employees
           </span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{totals.employee_count}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <UserPlus className="w-3.5 h-3.5" /> Total Assigned
           </span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{totals.total_assigned}</div>
           {totals.unassigned_leads > 0 && (
-            <div className="text-[10px] text-status-warning font-medium mt-1">{totals.unassigned_leads} unassigned</div>
+            <div className="text-3xs text-status-warning font-medium mt-1">{totals.unassigned_leads} unassigned</div>
           )}
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> Total Converted
           </span>
           <div className="text-2xl font-black text-status-success font-mono mt-2">{totals.total_converted}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> Overall Conversion Rate
           </span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{totals.overall_conversion_rate}%</div>
@@ -119,7 +119,7 @@ export function MarketingPerformancePanel() {
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">Employee</th>
                   <th className="px-4 py-3 text-right">Assigned</th>
@@ -140,7 +140,7 @@ export function MarketingPerformancePanel() {
                         </div>
                         <div>
                           <div className="font-bold text-primary">{e.name}</div>
-                          <div className="text-[10px] font-mono text-text-muted">{e.email}</div>
+                          <div className="text-3xs font-mono text-text-muted">{e.email}</div>
                         </div>
                       </div>
                     </td>
@@ -151,7 +151,7 @@ export function MarketingPerformancePanel() {
                     <td className="px-4 py-3 text-right">
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-bold border font-mono",
+                          "px-2 py-0.5 rounded-full text-3xs font-bold border font-mono",
                           e.conversion_rate >= 20
                             ? "bg-status-success/15 text-status-success border-status-success/30"
                             : e.conversion_rate >= 5
@@ -165,7 +165,7 @@ export function MarketingPerformancePanel() {
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full",
+                          "inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full",
                           e.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success"
                         )}
                       >

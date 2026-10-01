@@ -28,7 +28,7 @@ export function ArticleListRow({ article, index }: { article: ArticleListItem; i
       </div>
 
       <div className="shrink-0 flex items-center gap-3">
-        <span className="flex items-center gap-1 text-[11px] text-text-muted">
+        <span className="flex items-center gap-1 text-2xs text-text-muted">
           <Clock3 className="w-3 h-3" />
           {article.reading_time_minutes} min
         </span>

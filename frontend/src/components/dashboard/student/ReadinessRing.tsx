@@ -5,9 +5,22 @@ interface ReadinessRingProps {
   size?: number;
   stroke?: number;
   label?: string;
+  /**
+   * Hide the caption under the percentage. `label` is still required and
+   * still drives the accessible name — callers that turn this off are
+   * showing the tier as a badge beside the ring, so printing it inside as
+   * well would just say the same word twice.
+   */
+  showLabel?: boolean;
 }
 
-export function ReadinessRing({ value, size = 132, stroke = 10, label = "Ready" }: ReadinessRingProps) {
+export function ReadinessRing({
+  value,
+  size = 132,
+  stroke = 10,
+  label = "Ready",
+  showLabel = true,
+}: ReadinessRingProps) {
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, value));
@@ -43,8 +56,10 @@ export function ReadinessRing({ value, size = 132, stroke = 10, label = "Ready" 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-black text-primary font-mono leading-none">{clamped}%</span>
-        <span className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mt-1">{label}</span>
+        <span className="font-mono text-2xl font-black leading-none text-primary">{clamped}%</span>
+        {showLabel && (
+          <span className="mt-1 text-3xs font-semibold uppercase tracking-wider text-text-muted">{label}</span>
+        )}
       </div>
     </div>
   );

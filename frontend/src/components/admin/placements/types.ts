@@ -58,6 +58,7 @@ export interface AdminDriveRow {
   min_cgpa: string | null;
   max_backlogs: number | null;
   eligible_branches: string[] | null;
+  terms_and_conditions: string | null;
   status: "draft" | "published" | "completed" | "cancelled";
   company?: { id: number; name: string; slug: string; logo: string | null };
   /** Every college this drive has ever been proposed/mapped to, whatever the outcome — see AdminPlacementDriveController::index()'s eager load. */

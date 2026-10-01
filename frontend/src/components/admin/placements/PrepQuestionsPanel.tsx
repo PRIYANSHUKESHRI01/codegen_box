@@ -146,7 +146,7 @@ export function PrepQuestionsPanel({ companies, onCompaniesChanged }: PrepQuesti
             className={inputClass}
           />
         </div>
-        {error && <p className="text-[11px] text-status-danger">{error}</p>}
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
         <div className="flex justify-end">
           <button
             type="submit"
@@ -174,16 +174,16 @@ export function PrepQuestionsPanel({ companies, onCompaniesChanged }: PrepQuesti
             <div key={q.id} className="p-4 rounded-control bg-surface border border-border-subtle flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-[9px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-3xs font-bold">
                     {q.category}
                   </span>
-                  <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-[9px] font-bold">
+                  <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-3xs font-bold">
                     {q.asked_year}
                   </span>
-                  {q.round_name && <span className="text-[10px] text-text-muted">{q.round_name}</span>}
+                  {q.round_name && <span className="text-3xs text-text-muted">{q.round_name}</span>}
                 </div>
                 <p className="text-xs font-semibold text-primary">{q.question}</p>
-                {q.answer_notes && <p className="text-[11px] text-text-secondary mt-1">{q.answer_notes}</p>}
+                {q.answer_notes && <p className="text-2xs text-text-secondary mt-1">{q.answer_notes}</p>}
               </div>
               <button
                 onClick={() => handleDelete(q.id)}

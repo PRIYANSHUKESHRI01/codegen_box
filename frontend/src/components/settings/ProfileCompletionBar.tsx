@@ -36,7 +36,7 @@ export function ProfileCompletionBar({ user }: { user: AuthUser }) {
         />
       </div>
 
-      <p className="text-[11px] text-text-secondary leading-relaxed">{tierCopy(percent)}</p>
+      <p className="text-2xs text-text-secondary leading-relaxed">{tierCopy(percent)}</p>
     </div>
   );
 }

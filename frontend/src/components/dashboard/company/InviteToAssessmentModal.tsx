@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Send, Loader2, CheckCircle2 } from "lucide-react";
+import { Send, Loader2, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import type { DriveApplication } from "@/types/placement";
+import { Modal } from "@/components/ui/Modal";
 
 interface InviteToAssessmentModalProps {
   /** Contest::getRouteKeyName() is 'slug' — every /company/contests/{contest}/* route binds by slug, never the numeric id. */
@@ -75,19 +76,35 @@ export function InviteToAssessmentModal({ contestSlug, contestTitle, placementDr
   const invitable = candidates.filter((c) => !invitedUserIds.has(c.user_id));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Send className="w-4 h-4 text-teal-500" />
-            <span>Invite Candidates — {contestTitle}</span>
-          </h3>
-          <button onClick={onClose} disabled={sending} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={`Invite Candidates — ${contestTitle}`}
+      icon={Send}
+      iconClassName="bg-teal-500/10 text-teal-500"
+      size="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={sending}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
+          >
+            Cancel
           </button>
-        </div>
-
-        <p className="text-[11px] text-text-muted">
+          <button
+            onClick={handleSend}
+            disabled={sending || selected.size === 0}
+            className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            <span>Invite {selected.size > 0 ? `(${selected.size})` : ""}</span>
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-2xs text-text-muted">
           Only candidates already in this opening&apos;s pipeline can be invited. They&apos;ll see this assessment
           the moment you invite them — no separate registration step on their end.
         </p>
@@ -113,34 +130,15 @@ export function InviteToAssessmentModal({ contestSlug, contestTitle, placementDr
                 <input type="checkbox" checked={selected.has(c.user_id)} onChange={() => toggle(c.user_id)} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold text-primary truncate">{c.user.name}</span>
-                  <span className="block text-[10px] text-text-muted truncate">{c.user.email}</span>
+                  <span className="block text-3xs text-text-muted truncate">{c.user.email}</span>
                 </span>
               </label>
             ))}
           </div>
         )}
 
-        {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-        <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={sending}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={sending || selected.size === 0}
-            className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-          >
-            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-            <span>Invite {selected.size > 0 ? `(${selected.size})` : ""}</span>
-          </button>
-        </div>
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
       </div>
-    </div>
+    </Modal>
   );
 }

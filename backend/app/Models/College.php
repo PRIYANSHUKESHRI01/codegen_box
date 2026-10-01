@@ -48,10 +48,33 @@ class College extends Model
         return $this->hasMany(DriveApplication::class);
     }
 
-    /** The plan actually governing this college right now, or null if it has no active subscription. */
+    /**
+     * The plan actually governing this college right now, or null if it has
+     * no active subscription. `activeSubscription()` only filters on
+     * `status`, not on whether `current_period_end` has actually passed
+     * (see its own docblock) — this is the one place on College that does
+     * the full `isActive()` check, mirroring User::effectiveSubscription().
+     */
     public function activePlan(): ?Plan
     {
-        return $this->activeSubscription()?->plan;
+        $subscription = $this->activeSubscription();
+
+        return ($subscription !== null && $subscription->isActive()) ? $subscription->plan : null;
+    }
+
+    /**
+     * Whether this college is currently entitled to add/import students at
+     * all. Deliberately a separate method from `studentLimit() === null`,
+     * which means something different ("active, but an unlimited-seat
+     * plan") — every seat-cap enforcement call site must check this FIRST,
+     * because a null limit from a plan that simply doesn't exist (no active
+     * subscription) must block, not allow unlimited imports.
+     */
+    public function hasActiveSubscription(): bool
+    {
+        $subscription = $this->activeSubscription();
+
+        return $subscription !== null && $subscription->isActive();
     }
 
     /** Student headcount counted against the plan's seat cap — TPOs/coordinators don't consume a seat. */

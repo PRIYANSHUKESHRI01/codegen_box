@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The one write path for subscription state, mirroring ActivityLog::record()
@@ -92,10 +93,15 @@ class SubscriptionService
      * only ever called by Mellow staff (AdminController), never self-serve.
      * Also syncs College::tier so every existing UI that already reads
      * college->tier keeps showing the right label.
+     *
+     * $trialDays, when given, overrides the plan's own `duration_days` with
+     * a superadmin-chosen demo length and flags the resulting subscription
+     * `is_trial` — see SubscriptionService::activate(). Omit it (the
+     * default) for a normal paid/renewed assignment.
      */
-    public function assignInstitutionPlan(College $college, Plan $plan, User $actor): Subscription
+    public function assignInstitutionPlan(College $college, Plan $plan, User $actor, ?int $trialDays = null): Subscription
     {
-        $subscription = $this->activate($college, $plan);
+        $subscription = $this->activate($college, $plan, $trialDays);
 
         if ($college->tier !== $plan->name) {
             $college->tier = $plan->name;
@@ -104,10 +110,12 @@ class SubscriptionService
 
         ActivityLog::record(
             $actor,
-            'Assigned an institution plan',
+            $trialDays !== null ? 'Started a demo subscription' : 'Assigned an institution plan',
             'College',
             $college->name,
-            ['plan_code' => $plan->code]
+            $trialDays !== null
+                ? ['plan_code' => $plan->code, 'trial_days' => $trialDays]
+                : ['plan_code' => $plan->code]
         );
 
         return $subscription;
@@ -123,8 +131,10 @@ class SubscriptionService
      * dedicated row per college via updateOrCreate rather than a fresh row
      * every time — re-adjusting a college's custom seat count later reuses
      * the same plan instead of leaving orphaned rows behind.
+     *
+     * See assignInstitutionPlan() for what $trialDays does.
      */
-    public function assignCustomInstitutionPlan(College $college, int $maxStudents, ?int $annualPrice, User $actor): Subscription
+    public function assignCustomInstitutionPlan(College $college, int $maxStudents, ?int $annualPrice, User $actor, ?int $trialDays = null): Subscription
     {
         $plan = Plan::updateOrCreate(
             ['code' => "custom-college-{$college->id}"],
@@ -139,7 +149,69 @@ class SubscriptionService
             ]
         );
 
-        return $this->assignInstitutionPlan($college, $plan, $actor);
+        return $this->assignInstitutionPlan($college, $plan, $actor, $trialDays);
+    }
+
+    /**
+     * Live-adjusts ONLY a college's seat cap — does not call activate(), so
+     * it never touches started_at/current_period_end/is_trial. A superadmin
+     * nudging a seat count up or down from the dashboard should never reset
+     * someone's renewal date or quietly cancel a running demo countdown,
+     * which is exactly what assignCustomInstitutionPlan()/activate() would
+     * do if reused here.
+     *
+     * Converts the college onto its own dedicated custom plan row (same
+     * "custom-college-{id}" convention as assignCustomInstitutionPlan),
+     * cloning every entitlement field off whatever plan currently governs
+     * the college — not hardcoded — so only max_students actually changes.
+     */
+    public function adjustSeatLimit(College $college, int $maxStudents, User $actor): Subscription
+    {
+        return DB::transaction(function () use ($college, $maxStudents, $actor) {
+            $subscription = $college->activeSubscription();
+
+            if ($subscription === null || ! $subscription->isActive()) {
+                throw ValidationException::withMessages([
+                    'max_students' => ["{$college->name} has no active subscription to adjust. Assign a plan first."],
+                ]);
+            }
+
+            $currentPlan = $subscription->plan;
+            $previousMax = $currentPlan->max_students;
+
+            $plan = Plan::updateOrCreate(
+                ['code' => "custom-college-{$college->id}"],
+                [
+                    'name' => 'Custom',
+                    'audience' => Plan::AUDIENCE_INSTITUTION,
+                    'annual_price' => $currentPlan->annual_price,
+                    'duration_days' => $currentPlan->duration_days,
+                    'is_active' => true,
+                    'max_students' => $maxStudents,
+                    'drive_access' => $currentPlan->drive_access,
+                    'max_practice_problems_per_day' => $currentPlan->max_practice_problems_per_day,
+                    'max_mock_interviews_per_day' => $currentPlan->max_mock_interviews_per_day,
+                    'max_learning_centre_ai_attempts_per_day' => $currentPlan->max_learning_centre_ai_attempts_per_day,
+                ]
+            );
+
+            $subscription->update(['plan_id' => $plan->id]);
+
+            if ($college->tier !== 'Custom') {
+                $college->tier = 'Custom';
+                $college->save();
+            }
+
+            ActivityLog::record(
+                $actor,
+                "Adjusted a college's seat limit",
+                'College',
+                $college->name,
+                ['previous_max_students' => $previousMax, 'max_students' => $maxStudents]
+            );
+
+            return $subscription->fresh('plan');
+        });
     }
 
     /**
@@ -167,10 +239,16 @@ class SubscriptionService
      * creates the new one. Shared by both the individual and institutional
      * paths above — a college and a user are activated identically, they
      * just differ in who is allowed to call it and what happens alongside.
+     *
+     * $trialDays overrides the plan's own `duration_days` with a shorter,
+     * superadmin-chosen window and flags the row `is_trial` — used for demo
+     * college onboarding (AdminController::storeCollege). Null (the
+     * default) keeps the existing behavior exactly: period end derived from
+     * the plan, not flagged as a trial.
      */
-    private function activate(Model $subscriber, Plan $plan): Subscription
+    private function activate(Model $subscriber, Plan $plan, ?int $trialDays = null): Subscription
     {
-        return DB::transaction(function () use ($subscriber, $plan) {
+        return DB::transaction(function () use ($subscriber, $plan, $trialDays) {
             $subscriber->subscriptions()
                 ->where('status', Subscription::STATUS_ACTIVE)
                 ->update(['status' => Subscription::STATUS_CANCELED, 'canceled_at' => now()]);
@@ -179,7 +257,10 @@ class SubscriptionService
                 'plan_id' => $plan->id,
                 'status' => Subscription::STATUS_ACTIVE,
                 'started_at' => now(),
-                'current_period_end' => $plan->duration_days !== null ? now()->addDays($plan->duration_days) : null,
+                'current_period_end' => $trialDays !== null
+                    ? now()->addDays($trialDays)
+                    : ($plan->duration_days !== null ? now()->addDays($plan->duration_days) : null),
+                'is_trial' => $trialDays !== null,
             ]);
         });
     }
@@ -187,8 +268,13 @@ class SubscriptionService
     /**
      * Flips past-due active subscriptions to expired. The days-remaining
      * countdown shown to users is computed live from dates regardless of
-     * this — it exists for eventual access-gating, run daily via the
-     * subscriptions:expire artisan command.
+     * this. Enforcement itself (blocking new student creation once a
+     * college has no active subscription) reads `Subscription::isActive()`
+     * directly — see College::hasActiveSubscription() and its call
+     * sites — so it takes effect immediately on the date, not only once
+     * this daily job flips the status row; this command exists to keep
+     * `status`/admin reporting accurate, not as the enforcement mechanism
+     * itself.
      */
     public function expireDue(): int
     {

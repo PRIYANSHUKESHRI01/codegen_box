@@ -39,6 +39,7 @@ import { api, ApiError } from "@/lib/api";
 import type { TpoReportsData } from "@/lib/generateTpoReports";
 import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
 import type { CompanyReportsData } from "@/types/hiring";
+import type { SubscriptionCoverage } from "@/types/subscription";
 
 type MellowTab = "overview" | "colleges" | "users" | "problems";
 
@@ -139,6 +140,12 @@ function AdminPageContent() {
     };
   }
   const [tpoMappedDrives, setTpoMappedDrives] = useState<TpoMappedDrive[]>([]);
+  // Institutional subscription status — GET /me/subscription already
+  // returns this correctly (isActive()-aware) for admin_tpo, but nothing in
+  // this dashboard rendered it before now, so a TPO had zero visibility
+  // into their own college's demo countdown or an expired subscription
+  // until an import/add silently started failing.
+  const [subscriptionCoverage, setSubscriptionCoverage] = useState<SubscriptionCoverage | null>(null);
   const [editingTarget, setEditingTarget] = useState(false);
   const [targetPercentInput, setTargetPercentInput] = useState("");
   const [targetDeadlineInput, setTargetDeadlineInput] = useState("");
@@ -180,6 +187,11 @@ function AdminPageContent() {
       .get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators")
       .then((res) => setTpoCoordinators(res.coordinators))
       .catch(() => setTpoCoordinators([]));
+
+    api
+      .get<{ scope: string; coverage: SubscriptionCoverage }>("/me/subscription")
+      .then((res) => setSubscriptionCoverage(res.coverage))
+      .catch(() => setSubscriptionCoverage(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userRole, status]);
 
@@ -285,7 +297,7 @@ function AdminPageContent() {
             <div className="flex-1 md:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-btn text-xs font-bold bg-indigo-600 text-white shadow-glow">
               <FileCode2 className="w-3.5 h-3.5" />
               <span>Mellow Platform Ops</span>
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-white/20 text-white font-mono">
+              <span className="px-1.5 py-0.2 rounded-full text-3xs bg-white/20 text-white font-mono">
                 Internal
               </span>
             </div>
@@ -322,7 +334,7 @@ function AdminPageContent() {
                   key={tab.id}
                   onClick={() => goToMellowTab(tab.id)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-[11px] font-bold transition-all whitespace-nowrap",
+                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
                     mellowTab === tab.id ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -369,7 +381,7 @@ function AdminPageContent() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-primary">{user?.college?.name ?? "Your College"}</h2>
                     {user?.college?.tier && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-status-success/15 text-status-success border border-status-success/30">
+                      <span className="px-2 py-0.5 text-3xs font-bold rounded-full bg-status-success/15 text-status-success border border-status-success/30">
                         {user.college.tier}
                       </span>
                     )}
@@ -398,6 +410,47 @@ function AdminPageContent() {
                 </Link>
               </div>
             </div>
+
+            {/* Subscription status strip — closes the gap where a TPO
+                previously had zero visibility into their own college's
+                demo countdown or an expired subscription; GET
+                /me/subscription already resolved this correctly, nothing
+                here rendered it. */}
+            {subscriptionCoverage && (() => {
+              if (subscriptionCoverage.days_remaining === null) {
+                return (
+                  <div className="relative z-10 mt-4 pt-4 border-t border-border-subtle flex items-center gap-2 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-status-danger shrink-0" />
+                    <span className="text-status-danger font-semibold">
+                      No active subscription — new students can&apos;t be imported or added. Contact Mellow Vault to renew.
+                    </span>
+                  </div>
+                );
+              }
+              if (subscriptionCoverage.is_trial) {
+                return (
+                  <div className="relative z-10 mt-4 pt-4 border-t border-border-subtle flex items-center gap-2 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-status-warning shrink-0" />
+                    <span className="text-status-warning font-semibold">
+                      Demo plan — {subscriptionCoverage.days_remaining} day{subscriptionCoverage.days_remaining === 1 ? "" : "s"} remaining
+                      before you&apos;ll need to subscribe.
+                    </span>
+                  </div>
+                );
+              }
+              if (subscriptionCoverage.days_remaining <= 14) {
+                return (
+                  <div className="relative z-10 mt-4 pt-4 border-t border-border-subtle flex items-center gap-2 text-xs">
+                    <AlertTriangle className="w-4 h-4 text-status-warning shrink-0" />
+                    <span className="text-status-warning font-semibold">
+                      Renewing soon — {subscriptionCoverage.days_remaining} day{subscriptionCoverage.days_remaining === 1 ? "" : "s"} left on
+                      your current plan.
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
 
           {tpoDataLoading ? (
@@ -491,11 +544,11 @@ function AdminPageContent() {
                           <button
                             onClick={handleSaveTarget}
                             disabled={savingTarget}
-                            className="px-3 py-1.5 rounded-control bg-accent-primary text-white text-[11px] font-bold disabled:opacity-60"
+                            className="px-3 py-1.5 rounded-control bg-accent-primary text-white text-2xs font-bold disabled:opacity-60"
                           >
                             Save
                           </button>
-                          <button onClick={() => setEditingTarget(false)} className="px-3 py-1.5 rounded-control border border-border-subtle text-text-muted text-[11px] font-bold">
+                          <button onClick={() => setEditingTarget(false)} className="px-3 py-1.5 rounded-control border border-border-subtle text-text-muted text-2xs font-bold">
                             Cancel
                           </button>
                         </div>
@@ -516,7 +569,7 @@ function AdminPageContent() {
                               setTargetDeadlineInput(tpoReportsData.placements.target.target_deadline?.slice(0, 10) ?? "");
                               setEditingTarget(true);
                             }}
-                            className="text-[11px] font-bold text-accent-primary hover:underline mt-0.5"
+                            className="text-2xs font-bold text-accent-primary hover:underline mt-0.5"
                           >
                             {tpoReportsData.placements.target.target_percent ? "Change target" : "Set a target"}
                           </button>
@@ -526,7 +579,7 @@ function AdminPageContent() {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-2xl font-black text-primary font-mono">{tpoReportsData.placements.target.current_percent}%</div>
-                    <div className="text-[10px] text-text-muted uppercase tracking-wider">Current</div>
+                    <div className="text-3xs text-text-muted uppercase tracking-wider">Current</div>
                   </div>
                 </div>
                 {tpoReportsData.placements.target.target_percent && (
@@ -539,7 +592,7 @@ function AdminPageContent() {
                         }}
                       />
                     </div>
-                    <div className="flex justify-between mt-1.5 text-[10px] text-text-muted font-mono">
+                    <div className="flex justify-between mt-1.5 text-3xs text-text-muted font-mono">
                       <span>0%</span>
                       <span>Target: {tpoReportsData.placements.target.target_percent}%</span>
                     </div>
@@ -555,7 +608,7 @@ function AdminPageContent() {
                       <Filter className="w-4 h-4 text-accent-primary" />
                       <span>Placement Funnel</span>
                     </h3>
-                    <Link href="/admin/analytics" className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1">
+                    <Link href="/admin/analytics" className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1">
                       <span>Full analytics</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -571,7 +624,7 @@ function AdminPageContent() {
                     ] as [string, number][]).map(([label, value]) => (
                       <div key={label} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                         <div className="text-base font-black text-primary font-mono">{value}</div>
-                        <div className="text-[9px] text-text-muted uppercase tracking-wider mt-1">{label}</div>
+                        <div className="text-3xs text-text-muted uppercase tracking-wider mt-1">{label}</div>
                       </div>
                     ))}
                   </div>
@@ -583,13 +636,13 @@ function AdminPageContent() {
                       <AlertTriangle className="w-4 h-4 text-status-warning" />
                       <span>Needs Your Attention</span>
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
+                    <span className="text-3xs font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
                       {tpoReportsData.placements.action_items.length}
                     </span>
                   </div>
                   <div className="space-y-2.5 max-h-[320px] overflow-y-auto pr-1">
                     {tpoReportsData.placements.action_items.length === 0 ? (
-                      <p className="text-[11px] text-text-muted text-center py-4">Nothing needs your attention right now.</p>
+                      <p className="text-2xs text-text-muted text-center py-4">Nothing needs your attention right now.</p>
                     ) : (
                       tpoReportsData.placements.action_items.map((item, i) => (
                         <div key={i} className="p-3 rounded-control border text-xs space-y-1.5 bg-elevated/60 border-border-subtle">
@@ -609,7 +662,7 @@ function AdminPageContent() {
                       <Briefcase className="w-5 h-5 text-accent-secondary" />
                       <span>Active Campus Drives</span>
                     </h2>
-                    <Link href="/admin/drives" className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1">
+                    <Link href="/admin/drives" className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1">
                       <span>Manage all</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -631,11 +684,11 @@ function AdminPageContent() {
                               <span className="text-xl">{m.placement_drive.company.logo ?? "🏢"}</span>
                               <div>
                                 <h3 className="font-bold text-sm text-primary">{m.placement_drive.company.name}</h3>
-                                <div className="text-[11px] text-text-muted">{m.placement_drive.role_title}</div>
+                                <div className="text-2xs text-text-muted">{m.placement_drive.role_title}</div>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-[11px] text-text-muted pt-1">
+                          <div className="flex items-center justify-between text-2xs text-text-muted pt-1">
                             <span>📅 {new Date(m.placement_drive.drive_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                           </div>
                         </div>
@@ -650,7 +703,7 @@ function AdminPageContent() {
                       <Sparkles className="w-5 h-5 text-status-success" />
                       <span>Recent Placement Wins</span>
                     </h2>
-                    <Link href="/admin/students" className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1">
+                    <Link href="/admin/students" className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1">
                       <span>View cohort</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -666,13 +719,13 @@ function AdminPageContent() {
                         <div key={i} className="p-3.5 flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-primary truncate">{p.student_name}</div>
-                            <div className="text-[10px] text-text-muted truncate">
+                            <div className="text-3xs text-text-muted truncate">
                               {p.company} · {p.role_title}
                             </div>
                           </div>
                           <div className="text-right shrink-0">
                             <div className="text-xs font-mono font-bold text-status-success">{p.ctc_offered} LPA</div>
-                            <div className="text-[9px] text-text-muted">
+                            <div className="text-3xs text-text-muted">
                               {new Date(p.placed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                             </div>
                           </div>
@@ -690,7 +743,7 @@ function AdminPageContent() {
                     <BarChart3 className="w-5 h-5 text-accent-secondary" />
                     <span>Branch-wise Readiness Snapshot</span>
                   </h2>
-                  <Link href="/admin/analytics" className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1">
+                  <Link href="/admin/analytics" className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1">
                     <span>Full analytics</span>
                     <ChevronRight className="w-3.5 h-3.5" />
                   </Link>
@@ -709,7 +762,7 @@ function AdminPageContent() {
                   ).map(([branch, g]) => (
                     <div key={branch} className="p-4 rounded-control bg-surface border border-border-subtle space-y-3 shadow-subtle">
                       <div className="font-bold text-xs text-primary">{branch}</div>
-                      <div className="space-y-1 text-[11px]">
+                      <div className="space-y-1 text-2xs">
                         <div className="flex justify-between text-text-secondary">
                           <span>Avg Readiness:</span>
                           <strong className="text-primary font-mono">
@@ -717,7 +770,7 @@ function AdminPageContent() {
                           </strong>
                         </div>
                       </div>
-                      <div className="text-[10px] text-text-muted font-mono pt-2 border-t border-border-subtle">{g.count} Candidates</div>
+                      <div className="text-3xs text-text-muted font-mono pt-2 border-t border-border-subtle">{g.count} Candidates</div>
                     </div>
                   ))}
                 </div>
@@ -740,7 +793,7 @@ function AdminPageContent() {
                         <Trophy className="w-5 h-5 text-accent-primary" />
                         <span>Section Performance</span>
                       </h2>
-                      <Link href="/admin/reports" className="text-[11px] font-semibold text-accent-primary hover:underline flex items-center gap-1">
+                      <Link href="/admin/reports" className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1">
                         <span>Full reports</span>
                         <ChevronRight className="w-3.5 h-3.5" />
                       </Link>
@@ -751,7 +804,7 @@ function AdminPageContent() {
                         <div key={s.section} className="flex items-center gap-3 p-3.5 flex-wrap sm:flex-nowrap">
                           <span
                             className={cn(
-                              "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shrink-0",
+                              "w-6 h-6 rounded-full flex items-center justify-center text-3xs font-black shrink-0",
                               i === 0 ? "bg-amber-500/20 text-amber-500" : "bg-elevated text-text-muted"
                             )}
                           >
@@ -760,7 +813,7 @@ function AdminPageContent() {
                           <span className="text-xs font-bold text-primary w-28 shrink-0">
                             {s.section === "Unassigned" ? "No Section" : `Section ${s.section}`}
                           </span>
-                          <span className="text-[11px] text-text-muted font-mono w-20 shrink-0">{s.studentCount} students</span>
+                          <span className="text-2xs text-text-muted font-mono w-20 shrink-0">{s.studentCount} students</span>
                           <span className="flex-1 flex items-center gap-2 min-w-[100px]">
                             <span className="flex-1 h-1.5 rounded-full bg-background/60 overflow-hidden">
                               <span
@@ -771,11 +824,11 @@ function AdminPageContent() {
                                 style={{ width: `${s.avgReadiness}%` }}
                               />
                             </span>
-                            <span className="text-[11px] font-mono font-bold text-text-secondary w-14 text-right shrink-0">
+                            <span className="text-2xs font-mono font-bold text-text-secondary w-14 text-right shrink-0">
                               {s.avgReadiness}/100
                             </span>
                           </span>
-                          <span className="w-56 shrink-0 flex items-center justify-end gap-2 text-[11px]">
+                          <span className="w-56 shrink-0 flex items-center justify-end gap-2 text-2xs">
                             {s.coordinator ? (
                               <>
                                 <span className="font-semibold text-text-secondary truncate">{s.coordinator.name}</span>
@@ -843,7 +896,7 @@ function AdminPageContent() {
                   <div className="flex items-center gap-2">
                     <h2 className="text-xl font-bold text-primary">{user?.company?.name ?? "Your Company"}</h2>
                     {user?.company?.industry && (
-                      <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-teal-500/15 text-teal-500 border border-teal-500/30">
+                      <span className="px-2 py-0.5 text-3xs font-bold rounded-full bg-teal-500/15 text-teal-500 border border-teal-500/30">
                         {user.company.industry}
                       </span>
                     )}
@@ -956,7 +1009,7 @@ function AdminPageContent() {
                       <Filter className="w-4 h-4 text-teal-500" />
                       <span>Hiring Funnel</span>
                     </h3>
-                    <Link href="/admin/company/reports" className="text-[11px] font-semibold text-teal-500 hover:underline flex items-center gap-1">
+                    <Link href="/admin/company/reports" className="text-2xs font-semibold text-teal-500 hover:underline flex items-center gap-1">
                       <span>Full reports</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -971,7 +1024,7 @@ function AdminPageContent() {
                     ] as [string, number][]).map(([label, value]) => (
                       <div key={label} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                         <div className="text-base font-black text-primary font-mono">{value}</div>
-                        <div className="text-[9px] text-text-muted uppercase tracking-wider mt-1">{label}</div>
+                        <div className="text-3xs text-text-muted uppercase tracking-wider mt-1">{label}</div>
                       </div>
                     ))}
                   </div>
@@ -983,13 +1036,13 @@ function AdminPageContent() {
                       <AlertTriangle className="w-4 h-4 text-status-warning" />
                       <span>Needs Your Attention</span>
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
+                    <span className="text-3xs font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
                       {companyReportsData?.hiring.action_items.length ?? 0}
                     </span>
                   </div>
                   <div className="space-y-2.5 max-h-[240px] overflow-y-auto pr-1">
                     {(companyReportsData?.hiring.action_items.length ?? 0) === 0 ? (
-                      <p className="text-[11px] text-text-muted text-center py-4">Nothing needs your attention right now.</p>
+                      <p className="text-2xs text-text-muted text-center py-4">Nothing needs your attention right now.</p>
                     ) : (
                       companyReportsData!.hiring.action_items.map((item, i) => (
                         <div key={i} className="p-3 rounded-control border text-xs space-y-1.5 bg-elevated/60 border-border-subtle">
@@ -1009,7 +1062,7 @@ function AdminPageContent() {
                       <Briefcase className="w-5 h-5 text-teal-500" />
                       <span>Job Openings</span>
                     </h2>
-                    <Link href="/admin/company/drives" className="text-[11px] font-semibold text-teal-500 hover:underline flex items-center gap-1">
+                    <Link href="/admin/company/drives" className="text-2xs font-semibold text-teal-500 hover:underline flex items-center gap-1">
                       <span>Manage all</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -1020,9 +1073,9 @@ function AdminPageContent() {
                       <div key={d.id} className="p-4 rounded-panel bg-surface border border-border-subtle hover:border-border-strong transition-all shadow-subtle space-y-1">
                         <div className="flex items-center justify-between">
                           <h3 className="font-bold text-sm text-primary">{d.title}</h3>
-                          <span className="text-[10px] text-text-muted">{d.applications_count} candidates</span>
+                          <span className="text-3xs text-text-muted">{d.applications_count} candidates</span>
                         </div>
-                        <div className="text-[11px] text-text-muted">{d.role_title}</div>
+                        <div className="text-2xs text-text-muted">{d.role_title}</div>
                       </div>
                     ))}
                   </div>
@@ -1034,7 +1087,7 @@ function AdminPageContent() {
                       <Sparkles className="w-5 h-5 text-status-success" />
                       <span>Recent Hires</span>
                     </h2>
-                    <Link href="/admin/company/reports" className="text-[11px] font-semibold text-teal-500 hover:underline flex items-center gap-1">
+                    <Link href="/admin/company/reports" className="text-2xs font-semibold text-teal-500 hover:underline flex items-center gap-1">
                       <span>View reports</span>
                       <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
@@ -1050,7 +1103,7 @@ function AdminPageContent() {
                         <div key={i} className="p-3.5 flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-xs font-bold text-primary truncate">{h.candidate_name}</div>
-                            <div className="text-[10px] text-text-muted truncate">
+                            <div className="text-3xs text-text-muted truncate">
                               {h.opening} · {h.role_title}
                             </div>
                           </div>

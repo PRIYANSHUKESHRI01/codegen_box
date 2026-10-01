@@ -94,27 +94,27 @@ function ContestSection({
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {contest.contest_type === "daily" && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
                       Daily
                     </span>
                   )}
                   {contest.company && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-accent-secondary/10 text-accent-secondary border border-accent-secondary/25">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-accent-secondary/10 text-accent-secondary border border-accent-secondary/25">
                       {contest.company.name}
                     </span>
                   )}
                   {contest.contest_type === "tpo_mock" && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
                       Mock
                     </span>
                   )}
                   {contest.is_rated && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500/10 text-amber-500 border border-amber-500/25">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/10 text-amber-500 border border-amber-500/25">
                       Rated
                     </span>
                   )}
                   {contest.is_registered && (
-                    <span className="text-[9px] font-bold text-status-success flex items-center gap-1">
+                    <span className="text-3xs font-bold text-status-success flex items-center gap-1">
                       <CheckCircle2 className="w-3 h-3" />
                       Registered
                     </span>
@@ -127,7 +127,7 @@ function ContestSection({
                 <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{contest.description}</p>
               )}
 
-              <div className="flex items-center justify-between text-[11px] text-text-muted mt-auto pt-2 border-t border-border-subtle">
+              <div className="flex items-center justify-between text-2xs text-text-muted mt-auto pt-2 border-t border-border-subtle">
                 <span>
                   {contest.problem_count} problems · {contest.total_points} pts
                 </span>

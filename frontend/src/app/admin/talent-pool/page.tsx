@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Award,
   Plus,
-  X,
   Loader2,
   Trash2,
   CheckCircle2,
@@ -24,6 +23,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
+import { Modal } from "@/components/ui/Modal";
 
 type AudienceScope = "all" | "college" | "direct";
 
@@ -271,7 +271,7 @@ function AssessmentsTab({ onToast }: { onToast: (msg: string) => void }) {
           </h2>
           <button
             onClick={() => setShowCreateContest(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-[11px] font-bold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-2xs font-bold transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             New Coding Test
@@ -296,20 +296,20 @@ function AssessmentsTab({ onToast }: { onToast: (msg: string) => void }) {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-primary">{c.title}</span>
-                      <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", c.status === "published" ? "bg-status-success/15 text-status-success" : c.status === "draft" ? "bg-elevated text-text-muted" : "bg-status-danger/15 text-status-danger")}>
+                      <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", c.status === "published" ? "bg-status-success/15 text-status-success" : c.status === "draft" ? "bg-elevated text-text-muted" : "bg-status-danger/15 text-status-danger")}>
                         {c.status}
                       </span>
                       {c.finalized_at && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
                           <CheckCircle2 className="w-2.5 h-2.5" />
                           Finalized
                         </span>
                       )}
-                      <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-accent-secondary/15 text-accent-secondary">
+                      <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-accent-secondary/15 text-accent-secondary">
                         {c.audience_scope ? AUDIENCE_LABEL[c.audience_scope] : "All Users"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-text-muted mt-1">
+                    <div className="text-2xs text-text-muted mt-1">
                       Qualify at <strong className="text-primary">{c.qualifying_score_percent ?? 90}%</strong> ·{" "}
                       {new Date(c.start_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                       {" – "}
@@ -326,16 +326,16 @@ function AssessmentsTab({ onToast }: { onToast: (msg: string) => void }) {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <button onClick={() => setManagingContest(c)} className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors">
+                    <button onClick={() => setManagingContest(c)} className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
                       Manage Problems
                     </button>
                     {c.status === "draft" && (
-                      <button onClick={() => handlePublishContest(c)} className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-[11px] font-bold transition-colors">
+                      <button onClick={() => handlePublishContest(c)} className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-2xs font-bold transition-colors">
                         Publish
                       </button>
                     )}
                     {c.status === "published" && hasEnded && !c.finalized_at && (
-                      <button onClick={() => handleFinalizeContest(c)} className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[11px] font-bold text-status-success transition-colors">
+                      <button onClick={() => handleFinalizeContest(c)} className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors">
                         Finalize &amp; Qualify
                       </button>
                     )}
@@ -351,11 +351,11 @@ function AssessmentsTab({ onToast }: { onToast: (msg: string) => void }) {
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h2 className="text-sm font-bold text-primary flex items-center gap-2">
             <Mic className="w-4 h-4 text-accent-primary" />
-            Interviews <span className="text-[10px] font-normal text-text-muted normal-case">(optional second stage)</span>
+            Interviews <span className="text-3xs font-normal text-text-muted normal-case">(optional second stage)</span>
           </h2>
           <button
             onClick={() => setShowCreateInterview(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             New Interview
@@ -373,21 +373,21 @@ function AssessmentsTab({ onToast }: { onToast: (msg: string) => void }) {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-primary">{i.title}</span>
-                    <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", i.status === "published" ? "bg-status-success/15 text-status-success" : i.status === "draft" ? "bg-elevated text-text-muted" : "bg-status-danger/15 text-status-danger")}>
+                    <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", i.status === "published" ? "bg-status-success/15 text-status-success" : i.status === "draft" ? "bg-elevated text-text-muted" : "bg-status-danger/15 text-status-danger")}>
                       {i.status}
                     </span>
-                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-accent-secondary/15 text-accent-secondary">
+                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-accent-secondary/15 text-accent-secondary">
                       {i.audience_scope ? AUDIENCE_LABEL[i.audience_scope] : "All Users"}
                     </span>
                   </div>
-                  <div className="text-[11px] text-text-muted mt-1">{i.sessions_count} session(s)</div>
+                  <div className="text-2xs text-text-muted mt-1">{i.sessions_count} session(s)</div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <button onClick={() => setManagingInterview(i)} className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors">
+                  <button onClick={() => setManagingInterview(i)} className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
                     Manage Questions
                   </button>
                   {i.status === "draft" && (
-                    <button onClick={() => handlePublishInterview(i)} className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-[11px] font-bold transition-colors">
+                    <button onClick={() => handlePublishInterview(i)} className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-2xs font-bold transition-colors">
                       Publish
                     </button>
                   )}
@@ -453,19 +453,23 @@ function CreateContestModal({ colleges, onClose, onCreated }: { colleges: Colleg
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Swords className="w-4 h-4 text-accent-primary" />
-            New Talent Pool Coding Test
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Talent Pool Coding Test"
+      icon={Swords}
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <button type="submit" form="create-talent-pool-contest-form" disabled={saving || (audienceScope === "college" && collegeIds.length === 0)} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+      <form id="create-talent-pool-contest-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Title *</label>
             <input required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Q4 Talent Pool Screening" className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary" />
@@ -498,7 +502,7 @@ function CreateContestModal({ colleges, onClose, onCreated }: { colleges: Colleg
                   type="button"
                   onClick={() => setAudienceScope(scope)}
                   className={cn(
-                    "px-2 py-2 rounded-control border text-[11px] font-bold transition-colors",
+                    "px-2 py-2 rounded-control border text-2xs font-bold transition-colors",
                     audienceScope === scope ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated border-border-subtle text-text-secondary hover:text-primary"
                   )}
                 >
@@ -526,19 +530,9 @@ function CreateContestModal({ colleges, onClose, onCreated }: { colleges: Colleg
             </div>
           )}
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || (audienceScope === "college" && collegeIds.length === 0)} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -575,19 +569,23 @@ function CreateInterviewModal({ colleges, onClose, onCreated }: { colleges: Coll
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Mic className="w-4 h-4 text-accent-primary" />
-            New Talent Pool Interview
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Talent Pool Interview"
+      icon={Mic}
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <button type="submit" form="create-talent-pool-interview-form" disabled={saving || (audienceScope === "college" && collegeIds.length === 0)} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+      <form id="create-talent-pool-interview-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Title *</label>
             <input required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary" />
@@ -600,7 +598,7 @@ function CreateInterviewModal({ colleges, onClose, onCreated }: { colleges: Coll
             <label className="block font-semibold text-text-secondary mb-1">Audience *</label>
             <div className="grid grid-cols-3 gap-2">
               {(["all", "college", "direct"] as const).map((scope) => (
-                <button key={scope} type="button" onClick={() => setAudienceScope(scope)} className={cn("px-2 py-2 rounded-control border text-[11px] font-bold transition-colors", audienceScope === scope ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated border-border-subtle text-text-secondary hover:text-primary")}>
+                <button key={scope} type="button" onClick={() => setAudienceScope(scope)} className={cn("px-2 py-2 rounded-control border text-2xs font-bold transition-colors", audienceScope === scope ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated border-border-subtle text-text-secondary hover:text-primary")}>
                   {AUDIENCE_LABEL[scope]}
                 </button>
               ))}
@@ -620,18 +618,9 @@ function CreateInterviewModal({ colleges, onClose, onCreated }: { colleges: Coll
               </div>
             </div>
           )}
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving || (audienceScope === "college" && collegeIds.length === 0)} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -693,15 +682,7 @@ function ManageContestProblemsModal({ contest, onClose, onToast }: { contest: Ta
   }, [catalog, problems, search]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary">Problems — {contest.title}</h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title={`Problems — ${contest.title}`} size="2xl" bodyClassName="px-6 py-5 text-xs space-y-4">
         {loading ? (
           <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -716,7 +697,7 @@ function ManageContestProblemsModal({ contest, onClose, onToast }: { contest: Ta
                 problems.map((cp) => (
                   <div key={cp.id} className="flex items-center justify-between gap-3 p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className={cn("px-1.5 py-0.5 text-[10px] font-bold rounded capitalize", cp.problem.difficulty === "easy" ? "bg-status-success/15 text-status-success" : cp.problem.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger")}>
+                      <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", cp.problem.difficulty === "easy" ? "bg-status-success/15 text-status-success" : cp.problem.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger")}>
                         {cp.problem.difficulty}
                       </span>
                       <span className="font-semibold text-primary truncate">{cp.problem.title}</span>
@@ -753,8 +734,7 @@ function ManageContestProblemsModal({ contest, onClose, onToast }: { contest: Ta
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -809,15 +789,7 @@ function ManageInterviewQuestionsModal({ interview, onClose, onToast }: { interv
   const available = useMemo(() => bank.filter((b) => !questions.some((q) => q.question_bank.id === b.id)), [bank, questions]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary">Questions — {interview.title}</h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title={`Questions — ${interview.title}`} size="2xl" bodyClassName="px-6 py-5 text-xs space-y-4">
         {loading ? (
           <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -851,8 +823,7 @@ function ManageInterviewQuestionsModal({ interview, onClose, onToast }: { interv
             </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -923,7 +894,7 @@ function CandidatesTab({ onToast }: { onToast: (msg: string) => void }) {
       ) : (
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden">
           <table className="w-full text-xs">
-            <thead className="bg-elevated/60 text-text-muted uppercase text-[10px] font-bold">
+            <thead className="bg-elevated/60 text-text-muted uppercase text-3xs font-bold">
               <tr>
                 <th className="text-left px-4 py-2.5">Candidate</th>
                 <th className="text-left px-4 py-2.5">College</th>
@@ -945,10 +916,10 @@ function CandidatesTab({ onToast }: { onToast: (msg: string) => void }) {
                   <td className="px-4 py-3 font-mono font-bold text-accent-primary">{row.score_percent}%</td>
                   <td className="px-4 py-3 text-text-secondary truncate max-w-[160px]">{row.source_contest?.title ?? "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={cn("px-1.5 py-0.5 text-[10px] font-bold rounded", VISIBILITY_BADGE[row.visibility_status] ?? "bg-elevated text-text-muted")}>
+                    <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded", VISIBILITY_BADGE[row.visibility_status] ?? "bg-elevated text-text-muted")}>
                       {VISIBILITY_LABEL[row.visibility_status] ?? row.visibility_status}
                     </span>
-                    {row.hired_by_company && <div className="text-[10px] text-text-muted mt-0.5">by {row.hired_by_company.name}</div>}
+                    {row.hired_by_company && <div className="text-3xs text-text-muted mt-0.5">by {row.hired_by_company.name}</div>}
                   </td>
                   <td className="px-4 py-3 text-text-secondary">
                     <span className="flex items-center gap-1"><Users2 className="w-3 h-3" />{row.inquiries_count}</span>

@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Plus, X, Loader2, ArrowLeft, EyeOff, Eye } from "lucide-react";
+import { BookOpen, Plus, Loader2, ArrowLeft, EyeOff, Eye } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -17,6 +17,7 @@ import {
   type QuestionCategory,
   type QuestionDifficulty,
 } from "@/types/interview";
+import { Modal } from "@/components/ui/Modal";
 
 interface BankRow {
   id: number;
@@ -100,7 +101,7 @@ export default function InterviewQuestionBankPage() {
         </div>
       )}
 
-      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary hover:underline">
+      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline">
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to AI Interviews
       </Link>
@@ -109,7 +110,7 @@ export default function InterviewQuestionBankPage() {
         <button
           onClick={() => setCategoryFilter("")}
           className={cn(
-            "px-3 py-1.5 rounded-control text-[11px] font-bold border transition-colors",
+            "px-3 py-1.5 rounded-control text-2xs font-bold border transition-colors",
             categoryFilter === "" ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
           )}
         >
@@ -120,7 +121,7 @@ export default function InterviewQuestionBankPage() {
             key={c}
             onClick={() => setCategoryFilter(c)}
             className={cn(
-              "px-3 py-1.5 rounded-control text-[11px] font-bold border transition-colors",
+              "px-3 py-1.5 rounded-control text-2xs font-bold border transition-colors",
               categoryFilter === c ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
             )}
           >
@@ -150,14 +151,14 @@ export default function InterviewQuestionBankPage() {
             >
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border", CATEGORY_COLORS[q.category])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", CATEGORY_COLORS[q.category])}>
                     {CATEGORY_LABELS[q.category]}
                   </span>
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold rounded capitalize", DIFFICULTY_COLORS[q.difficulty])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", DIFFICULTY_COLORS[q.difficulty])}>
                     {q.difficulty}
                   </span>
-                  <span className="text-[10px] text-text-muted">~{Math.round(q.expected_duration_seconds / 60)} min</span>
-                  {!q.is_active && <span className="text-[9px] font-bold uppercase text-text-muted">Inactive</span>}
+                  <span className="text-3xs text-text-muted">~{Math.round(q.expected_duration_seconds / 60)} min</span>
+                  {!q.is_active && <span className="text-3xs font-bold uppercase text-text-muted">Inactive</span>}
                 </div>
                 <p className="text-xs font-medium text-primary">{q.question_text}</p>
                 {q.notes_for_reviewer && (
@@ -224,19 +225,23 @@ function CreateQuestionModal({ onClose, onCreated }: { onClose: () => void; onCr
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-accent-primary" />
-            <span>New Interview Question</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Interview Question"
+      icon={BookOpen}
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <button type="submit" form="create-question-form" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Adding..." : "Add Question"}
+          </button>
+        </>
+      }
+    >
+        <form id="create-question-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Question *</label>
             <textarea
@@ -308,18 +313,8 @@ function CreateQuestionModal({ onClose, onCreated }: { onClose: () => void; onCr
             />
           </div>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Adding..." : "Add Question"}
-            </button>
-          </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

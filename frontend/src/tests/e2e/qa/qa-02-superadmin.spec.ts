@@ -19,13 +19,17 @@ test.describe("Superadmin dashboard", () => {
   test("onboard a new partner college + TPO", async ({ page }) => {
     const issues = watchForErrors(page);
     await login(page, "superadmin");
-    await page.locator("#colleges").getByRole("button", { name: "Add College" }).click();
-    await page.getByPlaceholder(/Indian Institute of Technology/).fill(NEW_COLLEGE);
-    await page.getByPlaceholder(/Dr\. Ramesh Gupta/).fill("QA Test TPO Officer");
-    await page.getByPlaceholder("tpo@iitm.ac.in").fill(NEW_TPO_EMAIL);
-    await page.getByRole("button", { name: "Confirm & Provision TPO Portal" }).click();
-    await expect(page.locator("body")).not.toContainText("Onboard New Partner College", { timeout: 10000 });
-    await page.locator("#colleges").getByPlaceholder("Search college or TPO...").fill(NEW_COLLEGE);
+    // Superadmin's "Colleges & TPOs" tab now renders the same
+    // PartnerCollegesPanel component Mellow Ops uses at /admin?tab=colleges
+    // (previously a separate, drifted-out-of-parity implementation) — these
+    // strings match that shared component's actual UI.
+    await page.locator("#colleges").getByRole("button", { name: "Onboard University" }).click();
+    await page.getByPlaceholder(/Indian Institute of Tech/).fill(NEW_COLLEGE);
+    await page.getByPlaceholder(/Dr\. Ananya Sen/).fill("QA Test TPO Officer");
+    await page.getByPlaceholder(/tpo@iitb\.ac\.in/).fill(NEW_TPO_EMAIL);
+    await page.getByRole("button", { name: "Provision TPO & Partner University" }).click();
+    await expect(page.locator("body")).not.toContainText("Onboard Partner University & TPO", { timeout: 10000 });
+    await page.locator("#colleges").getByPlaceholder(/Search university or TPO/).fill(NEW_COLLEGE);
     await page.waitForTimeout(600);
     await expect(page.locator("#colleges")).toContainText(NEW_COLLEGE, { timeout: 10000 });
     await expect(page.locator("#colleges")).toContainText(NEW_TPO_EMAIL);
@@ -41,12 +45,12 @@ test.describe("Superadmin dashboard", () => {
       [dupeName1, `qa.dupe1.${stamp}@testcollege.edu`],
       [dupeName2, `qa.dupe2.${stamp}@testcollege.edu`],
     ]) {
-      await page.locator("#colleges").getByRole("button", { name: "Add College" }).click();
-      await page.getByPlaceholder(/Indian Institute of Technology/).fill(name);
-      await page.getByPlaceholder(/Dr\. Ramesh Gupta/).fill("QA Dupe TPO");
-      await page.getByPlaceholder("tpo@iitm.ac.in").fill(email);
-      await page.getByRole("button", { name: "Confirm & Provision TPO Portal" }).click();
-      await expect(page.locator("body")).not.toContainText("Onboard New Partner College", { timeout: 10000 });
+      await page.locator("#colleges").getByRole("button", { name: "Onboard University" }).click();
+      await page.getByPlaceholder(/Indian Institute of Tech/).fill(name);
+      await page.getByPlaceholder(/Dr\. Ananya Sen/).fill("QA Dupe TPO");
+      await page.getByPlaceholder(/tpo@iitb\.ac\.in/).fill(email);
+      await page.getByRole("button", { name: "Provision TPO & Partner University" }).click();
+      await expect(page.locator("body")).not.toContainText("Onboard Partner University & TPO", { timeout: 10000 });
     }
     reportIssues("duplicate short_code collision", issues);
   });

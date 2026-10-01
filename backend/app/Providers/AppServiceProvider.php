@@ -58,6 +58,19 @@ class AppServiceProvider extends ServiceProvider
             ];
         });
 
+        // /login itself — same dual-key reasoning as the OTP limiters above,
+        // and had zero throttling at all before this despite guarding every
+        // account on the platform, superadmin included. 5/minute per email is
+        // generous enough for a real user fat-fingering their password a
+        // couple of times; 20/minute per IP stops a script from brute-forcing
+        // its way through many accounts from one source.
+        RateLimiter::for('login', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by('login-email:'.Str::lower((string) $request->input('email'))),
+                Limit::perMinute(20)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
         // The public "Talk to Our Team" form — same dual-key reasoning as
         // password-reset-request above (email-only misses many IPs hitting
         // one victim's inbox; IP-only misses one bot rotating through many

@@ -25,6 +25,7 @@ class Plan extends Model
         'sort_order',
         'max_practice_problems_per_day',
         'max_mock_interviews_per_day',
+        'max_learning_centre_ai_attempts_per_day',
         'drive_access',
         'max_students',
     ];
@@ -39,6 +40,7 @@ class Plan extends Model
             'sort_order' => 'integer',
             'max_practice_problems_per_day' => 'integer',
             'max_mock_interviews_per_day' => 'integer',
+            'max_learning_centre_ai_attempts_per_day' => 'integer',
             'drive_access' => 'boolean',
             'max_students' => 'integer',
         ];

@@ -8,7 +8,9 @@ use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
+use App\Services\StudentReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Student-facing interview browsing and the voice-taking flow. Only ever
@@ -50,6 +52,20 @@ class InterviewController extends Controller
                 fn (Interview $interview) => $this->interviewSummary($interview, $sessionsByInterviewId->get($interview->id))
             ),
         ]);
+    }
+
+    /**
+     * The candidate's own interview performance — every interview they've
+     * been invited to or taken, with the score index() deliberately never
+     * includes (that endpoint is for browsing/starting, not reviewing).
+     * Reuses StudentReportService::interviewHistory() unchanged — the exact
+     * same computation TpoStudentReportController/CoordinatorStudentReportController/
+     * AdminStudentReportController already run against a student who isn't
+     * the caller; here the caller looks at themselves.
+     */
+    public function history(Request $request, StudentReportService $service)
+    {
+        return response()->json(['interviews' => $service->interviewHistory($request->user())]);
     }
 
     public function show(Request $request, Interview $interview)
@@ -221,6 +237,16 @@ class InterviewController extends Controller
                 ->map(fn (InterviewResponse $r) => [
                     'question_text' => $r->interviewQuestion->questionBank->question_text,
                     'category' => $r->interviewQuestion->questionBank->category,
+                    // The candidate's own answer, in full — previously
+                    // omitted here even though InterviewResponse has always
+                    // stored it; a student could see their score and AI
+                    // feedback but never what they actually said. Reviewers
+                    // (Tpo/Admin/CompanyInterviewController::responses())
+                    // have always seen this; there's no reason the person who
+                    // said it shouldn't.
+                    'transcript_text' => $r->transcript_text,
+                    'has_audio' => $r->audio_path !== null,
+                    'response_id' => $r->id,
                     'score' => $r->score,
                     'feedback' => $r->review_notes,
                 ]);
@@ -234,6 +260,24 @@ class InterviewController extends Controller
                 : null,
             'responses' => $responses,
         ]);
+    }
+
+    /**
+     * Streams the candidate's OWN answer recording back to them — mirrors
+     * TpoInterviewController::responseAudio() exactly, just scoped to "this
+     * response belongs to my own completed session" instead of reviewer
+     * ownership of the interview. Private `local` disk, never a public URL.
+     */
+    public function responseAudio(Request $request, Interview $interview, InterviewResponse $interviewResponse)
+    {
+        abort_unless(
+            $interviewResponse->interviewQuestion?->interview_id === $interview->id
+                && $interviewResponse->session?->user_id === $request->user()->id
+                && $interviewResponse->audio_path,
+            404
+        );
+
+        return Storage::disk('local')->response($interviewResponse->audio_path);
     }
 
     /** Explicit early-exit if the candidate bails mid-interview. Idempotent no-op if already complete. */

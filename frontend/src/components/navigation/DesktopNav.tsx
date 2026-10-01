@@ -29,7 +29,7 @@ export function DesktopNav({ onOpenSearch }: DesktopNavProps) {
             <>
               <span>{link.label}</span>
               {link.badge && (
-                <span className="ml-1.5 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
+                <span className="ml-1.5 px-1.5 py-0.5 text-3xs font-bold uppercase rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
                   {link.badge}
                 </span>
               )}
@@ -60,7 +60,7 @@ export function DesktopNav({ onOpenSearch }: DesktopNavProps) {
       >
         <Search className="w-3.5 h-3.5 shrink-0" />
         <span className="hidden 2xl:inline whitespace-nowrap">Search problems...</span>
-        <kbd className="hidden sm:inline-block whitespace-nowrap px-1.5 py-0.5 text-[10px] font-mono bg-elevated border border-border-subtle rounded text-text-muted">
+        <kbd className="hidden sm:inline-block whitespace-nowrap px-1.5 py-0.5 text-3xs font-mono bg-elevated border border-border-subtle rounded text-text-muted">
           ⌘K
         </kbd>
       </button>

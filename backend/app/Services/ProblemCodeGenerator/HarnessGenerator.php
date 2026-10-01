@@ -49,6 +49,14 @@ class HarnessGenerator
     static String toJson(int[][] a) { StringBuilder sb = new StringBuilder("["); for (int i = 0; i < a.length; i++) { if (i > 0) sb.append(","); sb.append(toJson(a[i])); } sb.append("]"); return sb.toString(); }
 JAVA;
 
+    /**
+     * One line of stdout per test case is load-bearing: JudgeService lines up printed output
+     * with test cases by index. Each case is therefore its own try/catch — a case that throws
+     * (bad input assumption, deep recursion, division by zero...) prints the sentinel instead of
+     * crashing the process, so every later case still gets to run and print its own line.
+     */
+    private const RUNTIME_ERROR_SENTINEL = '__RUNTIME_ERROR__';
+
     public function __construct(private readonly LiteralEmitter $literals) {}
 
     public function generate(Problem $problem, string $language, Collection $testCases): string
@@ -67,7 +75,7 @@ JAVA;
         $lines = [];
         foreach ($testCases as $tc) {
             $args = implode(', ', $this->argLiterals($problem, $tc, 'javascript'));
-            $lines[] = "console.log(JSON.stringify({$problem->function_name}({$args})));";
+            $lines[] = 'try { console.log(JSON.stringify('.$problem->function_name."({$args}))); } catch (e) { console.log(\"".self::RUNTIME_ERROR_SENTINEL.'"); }';
         }
 
         return implode("\n", $lines)."\n";
@@ -75,10 +83,20 @@ JAVA;
 
     private function generatePython(Problem $problem, Collection $testCases): string
     {
+        // flush=True on every print: stdout is block-buffered (not line-buffered) when it isn't
+        // a TTY, which it never is under Piston. Without it, a case that finishes in milliseconds
+        // can still have its output sitting in Python's userspace buffer, unflushed, when a LATER
+        // case's infinite loop gets SIGKILLed — losing even cases that genuinely already passed.
         $lines = ['_sol = Solution()'];
         foreach ($testCases as $tc) {
             $args = implode(', ', $this->argLiterals($problem, $tc, 'python'));
-            $lines[] = "print(json.dumps(_sol.{$problem->function_name}({$args})))";
+            $lines[] = 'try:';
+            $lines[] = "    print(json.dumps(_sol.{$problem->function_name}({$args})), flush=True)";
+            // BaseException, not Exception: a stack-overflow-deep recursive student solution
+            // raises RecursionError (an Exception, caught either way), but this also guards
+            // against the rarer case of a student catching/re-raising SystemExit etc.
+            $lines[] = 'except BaseException:';
+            $lines[] = '    print("'.self::RUNTIME_ERROR_SENTINEL.'", flush=True)';
         }
 
         return implode("\n", $lines)."\n";
@@ -89,7 +107,7 @@ JAVA;
         $lines = ['public class Main {', self::JAVA_JSON_HELPERS, '', '    public static void main(String[] args) {', '        Solution sol = new Solution();'];
         foreach ($testCases as $tc) {
             $args = implode(', ', $this->argLiterals($problem, $tc, 'java'));
-            $lines[] = "        System.out.println(toJson(sol.{$problem->function_name}({$args})));";
+            $lines[] = '        try { System.out.println(toJson(sol.'.$problem->function_name."({$args}))); } catch (Throwable t) { System.out.println(\"".self::RUNTIME_ERROR_SENTINEL.'"); }';
         }
         $lines[] = '    }';
         $lines[] = '}';
@@ -113,6 +131,7 @@ JAVA;
 
         foreach ($testCases as $tc) {
             $lines[] = '    {';
+            $lines[] = '    try {';
             $callArgs = [];
 
             foreach ($params as $i => $p) {
@@ -129,6 +148,10 @@ JAVA;
 
             $args = implode(', ', $callArgs);
             $lines[] = "        cout << toJson(sol.{$problem->function_name}({$args})) << endl;";
+            // catch(...) rather than catch (const std::exception&): also catches a thrown
+            // non-exception type. A segfault/UB from unchecked indexing still can't be caught
+            // here (it never throws in the first place) — an accepted, documented gap.
+            $lines[] = '    } catch (...) { cout << "'.self::RUNTIME_ERROR_SENTINEL.'" << endl; }';
             $lines[] = '    }';
         }
 

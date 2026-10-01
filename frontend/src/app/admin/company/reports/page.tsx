@@ -132,7 +132,7 @@ export default function HiringReportsPage() {
               {funnelSteps.map(([label, value]) => (
                 <div key={label} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                   <div className="text-base font-black text-primary font-mono">{value}</div>
-                  <div className="text-[9px] text-text-muted uppercase tracking-wider mt-1">{label}</div>
+                  <div className="text-3xs text-text-muted uppercase tracking-wider mt-1">{label}</div>
                 </div>
               ))}
             </div>
@@ -146,13 +146,13 @@ export default function HiringReportsPage() {
                   <AlertTriangle className="w-4 h-4 text-status-warning" />
                   <span>Needs Your Attention</span>
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
+                <span className="text-3xs font-mono px-2 py-0.5 rounded-full bg-status-danger/10 text-status-danger border border-status-danger/25">
                   {data.hiring.action_items.length}
                 </span>
               </div>
               <div className="space-y-2.5">
                 {data.hiring.action_items.length === 0 ? (
-                  <p className="text-[11px] text-text-muted text-center py-4">Nothing needs your attention right now.</p>
+                  <p className="text-2xs text-text-muted text-center py-4">Nothing needs your attention right now.</p>
                 ) : (
                   data.hiring.action_items.map((item, i) => (
                     <div key={i} className="p-3 rounded-control border text-xs space-y-1.5 bg-elevated/60 border-border-subtle">
@@ -200,9 +200,9 @@ export default function HiringReportsPage() {
                   <div key={i} className="p-3.5 flex items-center justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-primary truncate">{d.opening}</div>
-                      <div className="text-[10px] text-text-muted truncate">{d.role_title}</div>
+                      <div className="text-3xs text-text-muted truncate">{d.role_title}</div>
                     </div>
-                    <div className="flex items-center gap-4 text-[11px] shrink-0">
+                    <div className="flex items-center gap-4 text-2xs shrink-0">
                       <span className="text-text-muted">{d.candidates} candidates</span>
                       <span className="text-status-success font-semibold">{d.offers_accepted} hired</span>
                       {d.avg_ctc !== null && <span className="font-mono font-bold text-primary">{d.avg_ctc} LPA avg</span>}
@@ -226,13 +226,13 @@ export default function HiringReportsPage() {
                   <div key={i} className="p-3.5 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs font-bold text-primary truncate">{h.candidate_name}</div>
-                      <div className="text-[10px] text-text-muted truncate">
+                      <div className="text-3xs text-text-muted truncate">
                         {h.opening} · {h.role_title}
                       </div>
                     </div>
                     <div className="text-right shrink-0">
                       <div className="text-xs font-mono font-bold text-status-success">{h.ctc_offered} LPA</div>
-                      <div className="text-[9px] text-text-muted">
+                      <div className="text-3xs text-text-muted">
                         {new Date(h.hired_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                       </div>
                     </div>

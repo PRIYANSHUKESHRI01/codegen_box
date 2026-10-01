@@ -113,7 +113,7 @@ class SubscriptionController extends Controller
     private function coverageFromSubscription(?Subscription $subscription, string $sourceWhenActive): array
     {
         if ($subscription === null || ! $subscription->isActive()) {
-            return ['source' => 'none', 'subscription' => null, 'plan' => null, 'days_remaining' => null];
+            return ['source' => 'none', 'subscription' => null, 'plan' => null, 'days_remaining' => null, 'is_trial' => false];
         }
 
         return [
@@ -121,6 +121,7 @@ class SubscriptionController extends Controller
             'subscription' => $subscription,
             'plan' => $subscription->plan,
             'days_remaining' => $subscription->daysRemaining(),
+            'is_trial' => $subscription->is_trial,
         ];
     }
 
@@ -132,6 +133,7 @@ class SubscriptionController extends Controller
         return [
             'source' => $coverage['source'],
             'days_remaining' => $coverage['days_remaining'],
+            'is_trial' => $coverage['is_trial'] ?? false,
             'status' => $subscription?->status,
             'started_at' => $subscription?->started_at,
             'current_period_end' => $subscription?->current_period_end,

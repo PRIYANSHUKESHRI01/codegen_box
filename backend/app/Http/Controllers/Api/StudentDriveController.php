@@ -88,6 +88,10 @@ class StudentDriveController extends Controller
             'drive' => [
                 ...$this->formatDriveSummary($mapping, $user),
                 'status' => $mapping->placementDrive->status,
+                // Only on the single-drive detail response, never the list —
+                // this can run long, and a student has no reason to see it
+                // until they've opened the drive they're actually preparing for.
+                'terms_and_conditions' => $mapping->placementDrive->terms_and_conditions,
             ],
             'company' => [
                 'id' => $company->id,

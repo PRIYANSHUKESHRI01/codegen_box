@@ -25,7 +25,7 @@ export function LeadPipelineBar({ byStatus, total }: { byStatus: Record<LeadStat
     <div className="p-4 sm:p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-3">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-primary uppercase tracking-wider">Pipeline Distribution</h3>
-        <span className="text-[11px] text-text-muted font-mono">{total} total</span>
+        <span className="text-2xs text-text-muted font-mono">{total} total</span>
       </div>
 
       <div className="flex h-2.5 w-full rounded-full overflow-hidden bg-elevated">
@@ -48,7 +48,7 @@ export function LeadPipelineBar({ byStatus, total }: { byStatus: Record<LeadStat
 
       <div className="flex flex-wrap gap-x-4 gap-y-1.5">
         {LEAD_STATUSES.map((status) => (
-          <div key={status} className="flex items-center gap-1.5 text-[11px]">
+          <div key={status} className="flex items-center gap-1.5 text-2xs">
             <span className={cn("w-2 h-2 rounded-full shrink-0", SEGMENT_CLASS[status])} />
             <span className="text-text-secondary font-medium">{LEAD_STATUS_LABELS[status]}</span>
             <span className="text-text-muted font-mono">{byStatus[status] ?? 0}</span>

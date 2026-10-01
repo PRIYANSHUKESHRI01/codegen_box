@@ -57,7 +57,7 @@ export function ProductPreview() {
               key={v.id}
               type="button"
               onClick={() => setView(v.id)}
-              className={`px-2.5 py-1 rounded-[6px] text-[10px] sm:text-[11px] font-bold transition-colors ${
+              className={`px-2.5 py-1 rounded-[6px] text-3xs sm:text-2xs font-bold transition-colors ${
                 view === v.id ? "bg-accent-primary text-white" : "text-text-muted hover:text-primary"
               }`}
             >
@@ -97,7 +97,7 @@ export function ProductPreview() {
                       <p className="text-xs text-text-muted truncate">Systems Engineer &bull; ₹3.6 - 6.25 LPA</p>
                     </div>
                   </div>
-                  <span className="shrink-0 px-2 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-[10px] font-bold whitespace-nowrap">
+                  <span className="shrink-0 px-2 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-3xs font-bold whitespace-nowrap">
                     Eligible
                   </span>
                 </div>
@@ -110,7 +110,7 @@ export function ProductPreview() {
                   ].map((stat) => (
                     <div key={stat.label} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-center">
                       <div className="text-sm font-bold text-primary font-mono">{stat.value}</div>
-                      <div className="text-[9px] uppercase tracking-wide text-text-muted mt-0.5">{stat.label}</div>
+                      <div className="text-3xs uppercase tracking-wide text-text-muted mt-0.5">{stat.label}</div>
                     </div>
                   ))}
                 </div>
@@ -121,7 +121,7 @@ export function ProductPreview() {
                 </button>
               </div>
 
-              <p className="text-center text-[11px] text-text-muted mt-4">
+              <p className="text-center text-2xs text-text-muted mt-4">
                 Company overview, hiring rounds, and previous-year interview questions — all in one place.
               </p>
             </motion.div>
@@ -141,7 +141,7 @@ export function ProductPreview() {
                     Campus Drives &bull; Apex Institute
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-text-muted">12 Mapped &bull; 3 Available</span>
+                <span className="text-3xs font-mono text-text-muted">12 Mapped &bull; 3 Available</span>
               </div>
 
               <div className="rounded-panel bg-surface border border-border-subtle shadow-subtle divide-y divide-border-subtle overflow-hidden">
@@ -152,10 +152,10 @@ export function ProductPreview() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-primary">Nova Systems</div>
-                      <div className="text-[11px] text-text-muted">Systems Engineer &bull; Sept 16</div>
+                      <div className="text-2xs text-text-muted">Systems Engineer &bull; Sept 16</div>
                     </div>
                   </div>
-                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-[10px] font-bold">
+                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-status-success/15 text-status-success border border-status-success/30 text-3xs font-bold">
                     <Check className="w-3 h-3" />
                     Mapped
                   </span>
@@ -168,10 +168,10 @@ export function ProductPreview() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-primary">Quantica Labs</div>
-                      <div className="text-[11px] text-text-muted">Software Engineer &bull; CTC 7 LPA</div>
+                      <div className="text-2xs text-text-muted">Software Engineer &bull; CTC 7 LPA</div>
                     </div>
                   </div>
-                  <button className="shrink-0 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors">
+                  <button className="shrink-0 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors">
                     Map to College
                   </button>
                 </div>
@@ -183,16 +183,16 @@ export function ProductPreview() {
                     </div>
                     <div className="min-w-0">
                       <div className="text-sm font-bold text-primary">Orbit Technologies</div>
-                      <div className="text-[11px] text-text-muted">Project Engineer &bull; CTC 4.5 LPA</div>
+                      <div className="text-2xs text-text-muted">Project Engineer &bull; CTC 4.5 LPA</div>
                     </div>
                   </div>
-                  <button className="shrink-0 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors">
+                  <button className="shrink-0 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors">
                     Map to College
                   </button>
                 </div>
               </div>
 
-              <p className="text-center text-[11px] text-text-muted mt-4 flex items-center justify-center gap-1.5">
+              <p className="text-center text-2xs text-text-muted mt-4 flex items-center justify-center gap-1.5">
                 <Sparkles className="w-3 h-3 text-accent-primary" />
                 Opt into a recruiter, set eligibility, and it's live for your students instantly.
               </p>

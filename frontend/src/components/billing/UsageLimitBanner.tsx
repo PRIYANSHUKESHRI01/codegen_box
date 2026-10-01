@@ -42,7 +42,7 @@ export function UsageLimitBanner({ label, used, max }: UsageLimitBannerProps) {
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] font-bold text-primary">
+          <span className="text-2xs font-bold text-primary">
             {used} of {max} {label} used today
           </span>
           {atLimit && (

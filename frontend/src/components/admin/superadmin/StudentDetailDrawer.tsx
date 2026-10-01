@@ -119,11 +119,11 @@ export function StudentDetailDrawer({ userId, onClose, onChanged, triggerToast }
                 <p className="text-xs text-text-muted font-mono">
                   {detail.user.roll_number ?? "No roll number on file"} · {detail.user.branch ?? "Branch not on file"}
                 </p>
-                <p className="text-[11px] text-text-muted mt-1">{detail.user.college?.name ?? "No college — Mellow Direct lead"}</p>
+                <p className="text-2xs text-text-muted mt-1">{detail.user.college?.name ?? "No college — Mellow Direct lead"}</p>
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 text-[9px] font-bold rounded-full",
+                      "px-1.5 py-0.5 text-3xs font-bold rounded-full",
                       detail.user.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success"
                     )}
                   >
@@ -147,20 +147,20 @@ export function StudentDetailDrawer({ userId, onClose, onChanged, triggerToast }
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.solved_score}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Solved Score</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Solved Score</div>
               </div>
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.solved_by_difficulty.total_solved}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Problems Solved</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Problems Solved</div>
               </div>
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.streak.current}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Day Streak</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Day Streak</div>
               </div>
             </div>
 
             <div>
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Placement Readiness</h4>
+              <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">Placement Readiness</h4>
               <div className={cn("p-3 rounded-control border text-xs", TIER_STYLE[detail.user.readiness_tier])}>
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-primary">{detail.user.readiness_tier}</span>
@@ -173,24 +173,24 @@ export function StudentDetailDrawer({ userId, onClose, onChanged, triggerToast }
             </div>
 
             <div>
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Academic Profile</h4>
+              <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">Academic Profile</h4>
               <div className="grid grid-cols-2 gap-2.5">
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                  <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                     <GraduationCap className="w-3 h-3" />
                     <span>CGPA</span>
                   </div>
                   <div className="text-base font-black text-primary font-mono">{detail.user.cgpa ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                  <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                     <Trophy className="w-3 h-3" />
                     <span>Readiness</span>
                   </div>
                   <div className="text-base font-black text-primary font-mono">{detail.user.readiness_score}%</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle col-span-2">
-                  <div className="flex items-center gap-1.5 text-text-muted text-[10px] mb-1">
+                  <div className="flex items-center gap-1.5 text-text-muted text-3xs mb-1">
                     <AlertTriangle className="w-3 h-3" />
                     <span>Active Backlogs</span>
                   </div>
@@ -217,7 +217,7 @@ export function StudentDetailDrawer({ userId, onClose, onChanged, triggerToast }
             </div>
 
             <div>
-              <h4 className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Account Status</h4>
+              <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">Account Status</h4>
               <div className="flex items-center gap-2 p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs mb-2">
                 {detail.user.is_blocked ? (
                   <ShieldAlert className="w-4 h-4 text-status-danger shrink-0" />

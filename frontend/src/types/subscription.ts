@@ -14,6 +14,8 @@ export interface CoveragePlan {
 export interface SubscriptionCoverage {
   source: CoverageSource;
   days_remaining: number | null;
+  /** True when this period's length was a superadmin-chosen demo length rather than the plan's normal duration — see SubscriptionService::activate()'s $trialDays param. */
+  is_trial: boolean;
   status: "active" | "expired" | "canceled" | null;
   started_at: string | null;
   current_period_end: string | null;

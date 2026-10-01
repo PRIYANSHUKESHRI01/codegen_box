@@ -152,6 +152,9 @@ class DatabaseSeeder extends Seeder
         $this->call(DsaHundredProblemSeederV4::class);
         $this->call(DsaHundredProblemSeederV5::class);
         $this->call(DsaHundredProblemSeederV6::class);
+        $this->call(DsaHundredProblemSeederV7::class);
+        $this->call(DsaHundredProblemSeederV8::class);
+        $this->call(CompanyTagSeeder::class);
         // InterviewQuestionBankSeeder before CampusRosterSeeder: both
         // CompanyHiringSeeder and InterviewSeeder below attach real
         // InterviewQuestionBank rows to their demo interviews.
@@ -163,6 +166,15 @@ class DatabaseSeeder extends Seeder
         // ArticleTopicSeeder before ArticleSeeder: articles attach to a real topic.
         $this->call(ArticleTopicSeeder::class);
         $this->call(ArticleSeeder::class);
+        // Learning Centre's other two content-bank modules — independent of
+        // Articles/interviews, no ordering dependency on anything above.
+        $this->call(SpeakingPromptSeeder::class);
+        $this->call(ListeningLessonSeeder::class);
+        // Soft Skills — the question bank, then the default published
+        // general assessment built from it (requires priya@mellow.ai,
+        // already seeded above).
+        $this->call(SoftSkillQuestionSeeder::class);
+        $this->call(SoftSkillAssessmentSeeder::class);
         $this->call(FeatureFlagSeeder::class);
 
         $this->subscribeSeededDemoData();

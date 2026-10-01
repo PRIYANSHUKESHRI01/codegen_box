@@ -76,10 +76,10 @@ export function InterviewSessionHud({
           <video ref={videoRef} muted playsInline className="w-full aspect-video object-cover -scale-x-100" />
           <div className="absolute top-2 left-2 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-sm">
             <span className="w-1.5 h-1.5 rounded-full bg-status-danger animate-pulse" aria-hidden="true" />
-            <span className="text-[9px] font-bold text-white tracking-wide">REC</span>
+            <span className="text-3xs font-bold text-white tracking-wide">REC</span>
           </div>
           <div className="absolute inset-x-0 bottom-0 px-2 py-1 bg-gradient-to-t from-black/70 to-transparent">
-            <span className="text-[9px] font-semibold text-white truncate block">{candidateName}</span>
+            <span className="text-3xs font-semibold text-white truncate block">{candidateName}</span>
           </div>
         </div>
       )}
@@ -88,7 +88,7 @@ export function InterviewSessionHud({
           "you're on camera," so this drops the redundant "Recording" label
           ProctoringOverlay shows and keeps just the security-relevant count. */}
       {session && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-surface border border-border-strong shadow-card text-[11px] font-bold">
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-surface border border-border-strong shadow-card text-2xs font-bold">
           <ShieldAlert className={session.violation_count > 0 ? "w-3.5 h-3.5 text-status-warning" : "w-3.5 h-3.5 text-text-muted"} />
           <span className="text-text-secondary">
             {session.violation_count}/{session.max_violations} strikes
@@ -102,7 +102,7 @@ export function InterviewSessionHud({
             <AlertTriangle className="w-3.5 h-3.5" />
             Warning {toast.count}/{toast.max}
           </p>
-          <p className="text-[11px] text-text-secondary mt-1">
+          <p className="text-2xs text-text-secondary mt-1">
             {VIOLATION_LABEL[toast.type]}. {toast.max - toast.count > 0 ? `${toast.max - toast.count} more strike${toast.max - toast.count === 1 ? "" : "s"} and your interview ends.` : ""}
           </p>
         </div>

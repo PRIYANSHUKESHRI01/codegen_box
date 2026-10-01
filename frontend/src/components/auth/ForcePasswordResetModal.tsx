@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { ShieldAlert, Key, Lock, Eye, EyeOff } from "lucide-react";
 import { FormField, authInputClass } from "./FormField";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { AuthUser } from "@/lib/auth";
+import { Modal } from "@/components/ui/Modal";
 
 type Step = "intro" | "code" | "password";
 
@@ -140,30 +140,25 @@ export function ForcePasswordResetModal({ open, email, onCancel, onComplete }: F
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-          className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-            <h3 className="text-base font-bold text-primary flex items-center gap-2">
-              <ShieldAlert className="w-4 h-4 text-accent-primary" />
-              <span>{titleForStep[step]}</span>
-            </h3>
-          </div>
+    <Modal
+      onClose={onCancel}
+      title={titleForStep[step]}
+      icon={ShieldAlert}
+      iconClassName="bg-accent-primary/10 text-accent-primary"
+      size="md"
+      closeOnBackdrop={false}
+      // This flow was never meant to be dismissible once the user has
+      // committed to it (see the doc comment above): the original markup
+      // had no close button at all, and only the "intro" step rendered an
+      // explicit "Cancel and go back" affordance. Rather than leave a close
+      // button that's visible but does nothing on the code/password steps,
+      // hide it outright — matching the original exactly.
+      showCloseButton={step === "intro"}
+    >
+      <div className="space-y-4">
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          {step === "intro" && (
+        {step === "intro" && (
             <form onSubmit={handleIntroSubmit} className="space-y-4">
               <p className="text-xs text-text-secondary leading-relaxed">
                 The password you just used was a one-time credential emailed to you — it can&apos;t be reused to sign
@@ -174,7 +169,7 @@ export function ForcePasswordResetModal({ open, email, onCancel, onComplete }: F
               <button
                 type="button"
                 onClick={onCancel}
-                className="w-full text-center text-[11px] text-text-muted hover:text-primary transition-colors"
+                className="w-full text-center text-2xs text-text-muted hover:text-primary transition-colors"
               >
                 Cancel and go back
               </button>
@@ -194,7 +189,7 @@ export function ForcePasswordResetModal({ open, email, onCancel, onComplete }: F
                     type="button"
                     onClick={handleResend}
                     disabled={resendCooldown > 0 || loading}
-                    className="text-[11px] text-accent-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
+                    className="text-2xs text-accent-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
                   >
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
                   </button>
@@ -254,8 +249,7 @@ export function ForcePasswordResetModal({ open, email, onCancel, onComplete }: F
               <AuthSubmitButton loading={loading}>Set Password &amp; Continue</AuthSubmitButton>
             </form>
           )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </Modal>
   );
 }

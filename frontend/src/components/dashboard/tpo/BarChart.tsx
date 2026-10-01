@@ -37,7 +37,7 @@ export function BarChart({ categories, series, height = 220, suffix = "%", maxVa
               const pct = Math.min(100, (value / max) * 100);
               return (
                 <div key={s.label} className="flex flex-col items-center justify-end h-full flex-1 relative">
-                  <span className="text-[10px] font-mono font-bold text-primary mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">
+                  <span className="text-3xs font-mono font-bold text-primary mb-1 opacity-0 group-hover:opacity-100 transition-opacity absolute -top-5">
                     {value}
                     {suffix}
                   </span>
@@ -53,7 +53,7 @@ export function BarChart({ categories, series, height = 220, suffix = "%", maxVa
       </div>
       <div className="flex items-start gap-0 mt-2 pt-2 border-t border-border-subtle">
         {categories.map((cat) => (
-          <div key={cat} className="flex-1 text-center text-[10px] font-semibold text-text-muted truncate px-0.5">
+          <div key={cat} className="flex-1 text-center text-3xs font-semibold text-text-muted truncate px-0.5">
             {cat}
           </div>
         ))}
@@ -62,7 +62,7 @@ export function BarChart({ categories, series, height = 220, suffix = "%", maxVa
       {series.length > 1 && (
         <div className="flex items-center justify-center gap-4 mt-3">
           {series.map((s) => (
-            <div key={s.label} className="flex items-center gap-1.5 text-[11px] text-text-secondary">
+            <div key={s.label} className="flex items-center gap-1.5 text-2xs text-text-secondary">
               <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
               <span>{s.label}</span>
             </div>

@@ -41,6 +41,20 @@
 #     PID 1 into a sub-cgroup; with an init shim as PID 1 the entrypoint script
 #     stays behind and the controller setup fails with "Device or resource busy"
 #     (the container exits at start-up).
+#
+#  `command` below patches Piston's own request body size limit before its real
+#  entrypoint runs. Our harness embeds every test case's input as a source-code
+#  literal (App\Services\ProblemCodeGenerator\HarnessGenerator) — a problem with
+#  a large/adversarial hidden case (the kind that actually stresses O(n) vs
+#  O(n^2) solutions) can make that generated source itself several hundred KB.
+#  Piston's API hardcodes `body_parser.json()` with no size limit override and
+#  no env var for it (confirmed by reading /piston_api/src/index.js in the
+#  image, Piston 3.1.1) — body-parser's default is 100 KB, so any such problem
+#  fails EVERY submission with a 400 "request entity too large" before a single
+#  line of student code ever runs. Patching the one line raises it to 20 MB
+#  (comfortably above anything this platform generates) while the real
+#  entrypoint (cgroup v2 setup, then `exec su -- piston ...`) still runs
+#  completely unchanged afterwards.
 
 x-piston-node: &piston-node
   image: ghcr.io/engineer-man/piston:latest   # pin to a digest in production
@@ -58,6 +72,11 @@ x-piston-node: &piston-node
     PISTON_MAX_PROCESS_COUNT: 256
     PISTON_DISABLE_NETWORKING: "true"
     PISTON_LOG_LEVEL: INFO
+  # Patch-then-delegate to Piston's real entrypoint — see the body_parser note above.
+  # The stock image's ENTRYPOINT is a generic wrapper that execs whatever CMD it's given
+  # verbatim (prepending `node` only if the first token isn't itself a valid command), so
+  # overriding just `command` here is enough; nothing about image's own ENTRYPOINT changes.
+  command: ["sh", "-c", "sed -i \"s/body_parser.json()/body_parser.json({ limit: '20mb' })/\" /piston_api/src/index.js && exec /piston_api/src/docker-entrypoint.sh"]
   healthcheck:
     # The Piston image has neither curl nor wget, and Node 15 has no fetch().
     test: ["CMD", "node", "-e", "require('http').get('http://localhost:2000/api/v2/runtimes',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]

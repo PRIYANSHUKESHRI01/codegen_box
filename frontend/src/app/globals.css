@@ -4,16 +4,35 @@
 
 :root,
 html.light {
-  /* Default: Light mode values */
-  --bg-background: #F7F8FC;
-  --bg-surface: #FFFFFF;
-  --bg-elevated: #FFFFFF;
-  --bg-surface-hover: #F0F2F8;
-  --text-primary: #111827;
-  --text-secondary: #4B5563;
-  --text-muted: #6B7280;
-  --border-subtle: rgba(15, 23, 42, 0.10);
-  --border-strong: rgba(15, 23, 42, 0.22);
+  /* ── Light theme ───────────────────────────────────────────────────────
+     Pulled into the navy/indigo hue family the dark nav rail lives in, but
+     kept at very low intensity so this stays unambiguously a LIGHT theme.
+     The two halves of the app are tied together by shared HUE, never by
+     shared lightness: the rail is #0E1117 graphite, everything here is a
+     whisper of the same blue at 95%+ lightness.
+
+     Four places carry that hue, and no others: the page tint, the heading
+     ink, the hairlines, and the shadows. Cards stay pure #FFFFFF, and every
+     pastel status colour (emerald / amber / orange badges and stat tints)
+     is deliberately untouched. */
+  --bg-background: #F4F6FB;   /* page — a cool indigo whisper, not grey */
+  --bg-surface: #FFFFFF;      /* cards stay pure white, on purpose */
+  /* Was also #FFFFFF, i.e. invisible against a card. Several pages build
+     skeleton loaders out of `bg-elevated` blocks (see marketing/page.tsx,
+     dashboard/practice/view), so white-on-white meant those loading states
+     rendered as nothing at all. A faint indigo lift both fixes that and
+     gives inputs/kbd chips definition on a white card. */
+  --bg-elevated: #F2F4FB;
+  --bg-surface-hover: #EEF0FB;
+  --text-primary: #12141F;    /* navy ink, not pure black — 18.5:1 on white */
+  --text-secondary: #4A5069;  /*  7.9:1 on white */
+  --text-muted: #6B7285;      /*  4.8:1 on white — AA */
+  /* Opaque indigo hairlines rather than the old neutral-grey rgba(). The
+     light theme's surfaces are all white or the near-white page tint, so
+     these never needed to blend over a dark backdrop — and the nav rail is
+     insulated on its own --sb-* border tokens either way. */
+  --border-subtle: #E8EAF2;
+  --border-strong: #D2D7E8;
   --accent-primary: #4F46E5;
   --accent-primary-hover: #4338CA;
   --accent-primary-light: rgba(79, 70, 229, 0.10);
@@ -30,13 +49,13 @@ html.light {
      `var(--x)` color value can't have opacity injected into it). Border
      tokens are intentionally excluded — they're already pre-baked
      translucent rgba() constants meant to be used unmodified. */
-  --bg-background-rgb: 247 248 252;
+  --bg-background-rgb: 244 246 251;
   --bg-surface-rgb: 255 255 255;
-  --bg-elevated-rgb: 255 255 255;
-  --bg-surface-hover-rgb: 240 242 248;
-  --text-primary-rgb: 17 24 39;
-  --text-secondary-rgb: 75 85 99;
-  --text-muted-rgb: 107 114 128;
+  --bg-elevated-rgb: 242 244 251;
+  --bg-surface-hover-rgb: 238 240 251;
+  --text-primary-rgb: 18 20 31;
+  --text-secondary-rgb: 74 80 105;
+  --text-muted-rgb: 107 114 133;
   --accent-primary-rgb: 79 70 229;
   --accent-primary-hover-rgb: 67 56 202;
   --accent-secondary-rgb: 2 132 199;
@@ -45,9 +64,23 @@ html.light {
   --status-warning-rgb: 217 119 6;
   --status-danger-rgb: 220 38 38;
 
+  /* Shadows are theme-owned rather than one hardcoded black in the Tailwind
+     config, because the same value cannot serve both: a light theme wants a
+     soft, hue-matched tint, a dark theme wants real black. Light casts in
+     navy (39 47 92) — a grey drop shadow under a card sitting on an indigo
+     tint reads as dirt, the same hue reads as depth. The old `card` shadow
+     was black at 25%, which is a dark-theme value and far too heavy here. */
+  --shadow-subtle: 0 1px 2px 0 rgba(39, 47, 92, 0.06);
+  --shadow-card: 0 4px 16px -2px rgba(39, 47, 92, 0.10), 0 1px 3px -1px rgba(39, 47, 92, 0.05);
+
+  /* The thin white-to-tint wash along the top edge of the content column
+     (see .content-top-fade). Declared per theme so toggling doesn't leave a
+     white bloom sitting on a dark page. */
+  --content-fade: linear-gradient(to bottom, #FFFFFF 0%, rgba(255, 255, 255, 0) 100%);
+
   color-scheme: light;
-  --scrollbar-thumb: #CBD5E1;
-  --scrollbar-track: #F7F8FC;
+  --scrollbar-thumb: #C7CCE0;
+  --scrollbar-track: #F4F6FB;
 }
 
 html.dark {
@@ -85,9 +118,113 @@ html.dark {
   --status-warning-rgb: 245 158 11;
   --status-danger-rgb: 239 68 68;
 
+  /* Deliberately the exact values the Tailwind config hardcoded before these
+     moved into the theme, so the dark theme renders identically to how it
+     did — the light re-tint above is not supposed to touch it. */
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 20px -2px rgba(0, 0, 0, 0.25);
+
+  /* A breath of light instead of the light theme's white wash — the same
+     gesture, inverted, so the top of the content column doesn't read as a
+     flat edge in either theme. */
+  --content-fade: linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 100%);
+
   color-scheme: dark;
   --scrollbar-thumb: #2A3346;
   --scrollbar-track: #08090D;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Navigation rail tokens — deliberately DECLARED ONCE ON :root AND NEVER
+   REDEFINED UNDER html.dark.
+
+   The dashboard sidebar is a permanently dark graphite rail in BOTH themes
+   (the Stripe / Datadog / Retool / Sentry pattern). That is a design
+   decision, not an oversight: the rail is persistent chrome that frames a
+   changing content area, so it wants a fixed identity the page theme can't
+   wash out. In light mode it becomes the anchoring element the content sits
+   beside — the old rail was #FFFFFF against a #F7F8FC page, two whites
+   separated by a 10%-alpha hairline, which read as an accidental margin
+   rather than a navigation region.
+
+   Because nothing redefines these under html.dark, `var(--sb-*)` resolves
+   to the same value in every theme; the light/dark `--bg-*` / `--text-*`
+   tokens above are untouched and still drive the rest of the app.
+
+   Every foreground here was checked against --sb-bg (#0E1117) for WCAG AA
+   at small text sizes — the ratios are noted inline so future edits can't
+   silently drop one below 4.5:1.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --sb-bg: #0E1117;                            /* rail base — graphite, cool undertone, never pure #000 (pure black bands on wide gradients and reads as a hole in light mode) */
+  --sb-bg-raised: #141822;                     /* brand header + account footer bands, one step up so the scrollable nav reads as recessed between them */
+  --sb-bg-hover: rgba(255, 255, 255, 0.055);
+  --sb-bg-active: rgba(99, 102, 241, 0.15);
+  --sb-border: rgba(255, 255, 255, 0.08);
+  --sb-border-strong: rgba(255, 255, 255, 0.14);
+  --sb-text: #C7CFDD;                          /* idle nav label       — 12.1:1 */
+  --sb-text-strong: #FFFFFF;                   /* active label / name  — 17.4:1 */
+  --sb-text-dim: #97A1B5;                      /* secondary meta       —  7.2:1 */
+  --sb-text-faint: #7A8598;                    /* section eyebrows     —  5.1:1 */
+  --sb-icon: #98A2B6;                          /* idle icon            —  7.2:1 */
+  --sb-accent: #818CF8;                        /* active icon + rule   —  6.4:1 */
+  --sb-accent-soft: rgba(129, 140, 248, 0.16);
+  --sb-chip-bg: rgba(255, 255, 255, 0.07);
+  --sb-chip-text: #B4BECF;                     /* neutral count chip   — 10.0:1 */
+  --sb-scrollbar: rgba(255, 255, 255, 0.14);
+  --sb-scrollbar-hover: rgba(255, 255, 255, 0.24);
+}
+
+/* The rail owns its scrollbar rather than inheriting the global one, whose
+   light-mode thumb (#CBD5E1) would be a bright bar down a near-black panel. */
+.sb-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sb-scrollbar) transparent;
+}
+
+.sb-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sb-scroll::-webkit-scrollbar-thumb {
+  background: var(--sb-scrollbar);
+  border-radius: 999px;
+}
+
+.sb-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--sb-scrollbar-hover);
+}
+
+.sb-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* A thin white-to-page-tint wash across the top edge of the content column,
+   so the main area resolves out of the header instead of starting as a flat
+   slab of tint.
+
+   Painted as the element's own background-image rather than an absolutely
+   positioned ::before: a positioned pseudo-element paints in the positioned
+   layer, which is ABOVE in-flow block content, so the wash would sit on top
+   of the first heading and fade it out. As a background it sits behind
+   everything the element contains, with no stacking-context games. */
+.content-top-fade {
+  background-image: var(--content-fade);
+  background-repeat: no-repeat;
+  background-position: top center;
+  background-size: 100% 220px;
+}
+
+/* Focus ring for controls inside the rail. The global :focus-visible ring is
+   --accent-primary, which is #4F46E5 under html.light — far too dark to make
+   out against #0E1117, so a keyboard user tabbing the rail in light mode had
+   no visible focus at all. This lifts it to the rail's own lighter accent
+   (6.4:1 on the rail) and keeps the 2px offset so the ring still reads as a
+   ring when it lands on an already-tinted active row. */
+.sb-focus:focus-visible {
+  outline: 2px solid var(--sb-accent);
+  outline-offset: 2px;
+  border-radius: 10px;
 }
 
 /* Base resets & typography */

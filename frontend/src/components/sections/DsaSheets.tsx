@@ -67,10 +67,10 @@ export function DsaSheets() {
 
                 <div className="p-6 flex flex-col flex-1">
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className={cn("text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded border", style.badge)}>
+                    <span className={cn("text-3xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded border", style.badge)}>
                       {sheet.problemCount}
                     </span>
-                    <span className="text-[11px] text-text-muted font-mono">{sheet.creatorPlatform}</span>
+                    <span className="text-2xs text-text-muted font-mono">{sheet.creatorPlatform}</span>
                   </div>
 
                   <h3 className="text-lg font-bold text-primary mb-1">{sheet.name}</h3>

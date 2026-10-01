@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Briefcase, X, Search, Loader2, Building2, CheckCircle2 } from "lucide-react";
+import { Briefcase, Search, Loader2, Building2, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
+import { Modal } from "@/components/ui/Modal";
 
 interface CreateDriveModalProps {
   collegeName: string;
@@ -55,6 +56,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
   const [maxBacklogs, setMaxBacklogs] = useState("");
   const [allBranches, setAllBranches] = useState(true);
   const [branches, setBranches] = useState<string[]>([]);
+  const [termsAndConditions, setTermsAndConditions] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,6 +130,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
         min_cgpa: minCgpa ? Number(minCgpa) : null,
         max_backlogs: maxBacklogs ? Number(maxBacklogs) : null,
         eligible_branches: allBranches ? null : branches,
+        terms_and_conditions: termsAndConditions.trim() || null,
       };
 
       await api.post("/tpo/drives", payload);
@@ -142,20 +145,35 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
   const companyChosen = selectedCompany !== null || (addingNewCompany && companyQuery.trim().length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 my-8">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-accent-secondary" />
-            <span>Create a Drive for {collegeName}</span>
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={`Create a Drive for ${collegeName}`}
+      icon={Briefcase}
+      iconClassName="bg-accent-secondary/10 text-accent-secondary"
+      size="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+          >
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
+          <button
+            type="submit"
+            form="create-drive-form"
+            disabled={saving || !companyChosen}
+            className="px-4 py-2 rounded-control bg-accent-secondary hover:bg-accent-secondary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>Create & Add to {collegeName}</span>
+          </button>
+        </>
+      }
+    >
+      <form id="create-drive-form" onSubmit={handleSubmit} className="space-y-4">
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
 
           {/* Company picker */}
           <div>
@@ -199,7 +217,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                         <span className="text-base shrink-0">{c.logo ?? "🏢"}</span>
                         <span className="min-w-0">
                           <span className="block font-semibold text-primary truncate">{c.name}</span>
-                          {c.industry && <span className="block text-[10px] text-text-muted truncate">{c.industry}</span>}
+                          {c.industry && <span className="block text-3xs text-text-muted truncate">{c.industry}</span>}
                         </span>
                       </button>
                     ))}
@@ -221,10 +239,10 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
             {addingNewCompany && (
               <div className="mt-2 p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-text-secondary">
+                  <span className="text-2xs font-bold text-text-secondary">
                     New company: <span className="text-primary">{companyQuery.trim()}</span>
                   </span>
-                  <button type="button" onClick={clearCompanyChoice} className="text-[11px] font-bold text-accent-primary hover:underline">
+                  <button type="button" onClick={clearCompanyChoice} className="text-2xs font-bold text-accent-primary hover:underline">
                     Change
                   </button>
                 </div>
@@ -358,30 +376,23 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
             )}
           </div>
 
-          <p className="text-[10px] text-text-muted leading-relaxed">
+          <div>
+            <label className="block font-semibold text-text-secondary mb-1">Terms & Conditions</label>
+            <textarea
+              value={termsAndConditions}
+              onChange={(e) => setTermsAndConditions(e.target.value)}
+              placeholder="Eligibility conditions, service/bond terms, offer conditions, selection process rules, etc. Shown to every student this drive is visible to."
+              rows={4}
+              className={cn(inputClass, "resize-y")}
+            />
+            <p className="text-3xs text-text-muted mt-1">Optional, but recommended — students will see this before applying.</p>
+          </div>
+
+          <p className="text-3xs text-text-muted leading-relaxed">
             This drive is only ever visible to {collegeName} — it won&apos;t appear for other colleges to map, since it&apos;s
             specific to your campus.
           </p>
-
-          <div className="pt-2 flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !companyChosen}
-              className="px-4 py-2 rounded-control bg-accent-secondary hover:bg-accent-secondary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-            >
-              {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-              <span>Create & Add to {collegeName}</span>
-            </button>
-          </div>
         </form>
-      </div>
-    </div>
+      </Modal>
   );
 }

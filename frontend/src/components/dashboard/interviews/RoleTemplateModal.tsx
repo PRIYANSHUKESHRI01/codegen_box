@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { X, ClipboardList } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { Modal } from "@/components/ui/Modal";
 import { RoundConfigEditor } from "@/components/dashboard/interviews/RoundConfigEditor";
 import { categoryWeightsSum, type InterviewRoleTemplate, type RoundConfig } from "@/types/interviewTrack";
 
@@ -75,25 +76,39 @@ export function RoleTemplateModal({ basePath, template, onClose, onSaved, onToas
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-accent-primary" />
-            <span>{template ? "Edit Role Template" : "New Role Template"}</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={template ? "Edit Role Template" : "New Role Template"}
+      icon={ClipboardList}
+      size="2xl"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+          >
+            Cancel
           </button>
-        </div>
+          <button
+            type="submit"
+            form="role-template-form"
+            disabled={saving || !allValid}
+            className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-50"
+          >
+            {saving ? "Saving..." : template ? "Save Changes" : "Create Template"}
+          </button>
+        </>
+      }
+    >
+      <p className="text-2xs text-text-muted mb-3.5">
+        A reusable role definition (e.g. &quot;Backend Developer — Laravel &amp; Next.js&quot;) that drives
+        consistent AI question generation and scoring weights across every candidate&apos;s 3-round Final
+        Interview for this role.
+      </p>
 
-        <p className="text-[11px] text-text-muted">
-          A reusable role definition (e.g. &quot;Backend Developer — Laravel &amp; Next.js&quot;) that drives
-          consistent AI question generation and scoring weights across every candidate&apos;s 3-round Final
-          Interview for this role.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-3.5 text-xs">
+      <form id="role-template-form" onSubmit={handleSubmit} className="space-y-3.5 text-xs">
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block font-semibold text-text-secondary mb-1">Role Name *</label>
@@ -133,22 +148,8 @@ export function RoleTemplateModal({ basePath, template, onClose, onSaved, onToas
             ))}
           </div>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !allValid}
-              className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-50"
-            >
-              {saving ? "Saving..." : template ? "Save Changes" : "Create Template"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }

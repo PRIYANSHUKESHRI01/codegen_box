@@ -102,14 +102,14 @@ function TrackSection({ tracks }: { tracks: StudentInterviewTrackSummary[] }) {
                 <Layers className="w-5 h-5" />
               </div>
               {track.company && (
-                <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border bg-accent-secondary/10 text-accent-secondary border-accent-secondary/25">
+                <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-accent-secondary/10 text-accent-secondary border-accent-secondary/25">
                   {track.company.name}
                 </span>
               )}
             </div>
             <h3 className="text-sm font-bold text-primary leading-snug">{track.title}</h3>
             {track.role_title && <p className="text-xs text-text-secondary">{track.role_title}</p>}
-            <div className="flex items-center justify-between text-[11px] text-text-muted mt-auto pt-2 border-t border-border-subtle">
+            <div className="flex items-center justify-between text-2xs text-text-muted mt-auto pt-2 border-t border-border-subtle">
               <span>{track.round_count} rounds</span>
               <span className="font-bold text-accent-primary">
                 {track.my_round1_status === "in_progress" ? "Continue →" : track.my_round1_status === "completed" ? "View progress →" : "Start →"}
@@ -151,20 +151,20 @@ function InterviewSection({
               </div>
               <div className="flex flex-col items-end gap-1">
                 {interview.company && TYPE_BADGE[interview.interview_type] && (
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border", TYPE_BADGE[interview.interview_type].className)}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", TYPE_BADGE[interview.interview_type].className)}>
                     {interview.company.name}
                   </span>
                 )}
                 {interview.interview_type === "tpo_mock" && (
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border", TYPE_BADGE.tpo_mock.className)}>Mock</span>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", TYPE_BADGE.tpo_mock.className)}>Mock</span>
                 )}
                 {interview.is_mock && interview.interview_type !== "tpo_mock" && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border bg-amber-500/10 text-amber-500 border-amber-500/25">
+                  <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-amber-500/10 text-amber-500 border-amber-500/25">
                     Practice Round
                   </span>
                 )}
                 {interview.my_session_status === "completed" && (
-                  <span className="text-[9px] font-bold text-status-success flex items-center gap-1">
+                  <span className="text-3xs font-bold text-status-success flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" />
                     Completed
                   </span>
@@ -175,7 +175,7 @@ function InterviewSection({
             <h3 className="text-sm font-bold text-primary leading-snug">{interview.title}</h3>
             {interview.description && <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{interview.description}</p>}
 
-            <div className="flex items-center justify-between text-[11px] text-text-muted mt-auto pt-2 border-t border-border-subtle">
+            <div className="flex items-center justify-between text-2xs text-text-muted mt-auto pt-2 border-t border-border-subtle">
               <span>{interview.question_count} questions</span>
               {interview.my_session_status === "in_progress" ? (
                 <span className="font-bold text-status-warning flex items-center gap-1">

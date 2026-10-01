@@ -85,7 +85,18 @@ class TpoStudentController extends Controller
         }
 
         $college = $request->user()->college;
-        $limit = $college?->studentLimit();
+
+        // See StudentImportService::import() for why this must come before
+        // the seat-cap check: a null studentLimit() means EITHER "active
+        // and unlimited" OR "no active subscription at all" — those are
+        // opposite outcomes, so they can't share one null check.
+        if (! $college || ! $college->hasActiveSubscription()) {
+            throw ValidationException::withMessages([
+                'email' => ["Your college's subscription has expired. Contact Mellow Vault to renew before adding more students."],
+            ]);
+        }
+
+        $limit = $college->studentLimit();
 
         if ($limit !== null && $college->studentCount() >= $limit) {
             $planName = $college->activePlan()?->name ?? 'current';

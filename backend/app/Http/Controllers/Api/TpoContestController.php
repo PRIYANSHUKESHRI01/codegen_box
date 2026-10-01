@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Contest;
 use App\Models\ContestProblem;
 use App\Models\ContestSubmission;
+use App\Models\User;
 use App\Services\ContestFinalizeService;
+use App\Services\ContestReportService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -146,6 +148,38 @@ class TpoContestController extends Controller
         }
 
         return response()->json($service->finalize($contest));
+    }
+
+    /**
+     * The report a TPO opens to see how their own mock contest actually
+     * went — every registrant, ranked, with score and penalty. Previously
+     * nonexistent: the mock-contests list only ever showed a bare
+     * `participants_count`.
+     */
+    public function participants(Request $request, Contest $contest, ContestReportService $report)
+    {
+        $this->authorizeOwnership($request, $contest);
+
+        return response()->json(['participants' => $report->participants($contest)]);
+    }
+
+    /**
+     * One participant's full per-problem submission trail for this contest,
+     * including the actual code they submitted (see
+     * ContestReportService::participantSubmissions()'s docblock for why
+     * that's safe to include inline here but not in a multi-row listing).
+     * `$student` scoped to the SAME college as the contest — a TPO viewing
+     * a participant id that belongs to a different college's student (which
+     * shouldn't be possible via this UI, but ids are still guessable)
+     * quietly 404s rather than leaking that account exists.
+     */
+    public function participantSubmissions(Request $request, Contest $contest, User $student, ContestReportService $report)
+    {
+        $this->authorizeOwnership($request, $contest);
+
+        abort_unless($student->college_id === $contest->owning_college_id, 404);
+
+        return response()->json(['submissions' => $report->participantSubmissions($contest, $student)]);
     }
 
     private function ownedContests(Request $request)

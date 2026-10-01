@@ -18,7 +18,7 @@ export function PrevNextArticleNav({ previous, next }: { previous: ArticleAdjace
         >
           <ArrowLeft className="w-4 h-4 text-text-muted group-hover:-translate-x-0.5 group-hover:text-accent-primary transition-all shrink-0" />
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-text-muted">Previous</div>
+            <div className="text-3xs font-bold uppercase tracking-wide text-text-muted">Previous</div>
             <div className="text-xs font-bold text-primary truncate">{previous.title}</div>
           </div>
         </Link>
@@ -29,7 +29,7 @@ export function PrevNextArticleNav({ previous, next }: { previous: ArticleAdjace
           className="group flex items-center gap-3 p-4 rounded-panel bg-accent-primary/[0.06] border border-accent-primary/25 hover:border-accent-primary/50 hover:bg-accent-primary/10 transition-all text-right justify-end"
         >
           <div className="min-w-0">
-            <div className="text-[10px] font-bold uppercase tracking-wide text-accent-primary">Keep Reading</div>
+            <div className="text-3xs font-bold uppercase tracking-wide text-accent-primary">Keep Reading</div>
             <div className="text-xs font-bold text-primary truncate">{next.title}</div>
           </div>
           <TopicIcon name={next.icon} className="w-4 h-4 text-accent-primary shrink-0" />

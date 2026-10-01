@@ -133,7 +133,7 @@ export function DriveVisibilityPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-[11px] text-text-muted py-2">
+      <div className="flex items-center gap-2 text-2xs text-text-muted py-2">
         <Loader2 className="w-3.5 h-3.5 animate-spin" />
         Loading college visibility...
       </div>
@@ -145,7 +145,7 @@ export function DriveVisibilityPanel({
   return (
     <div className="space-y-2 p-3 rounded-control bg-elevated/60 border border-border-subtle">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wide">
+        <span className="text-2xs font-bold text-text-secondary uppercase tracking-wide">
           {targeting ? "Target Colleges" : "Visible To"}
         </span>
         <div className="flex items-center gap-2">
@@ -154,14 +154,14 @@ export function DriveVisibilityPanel({
               <button
                 type="button"
                 onClick={() => targeting.onChange(liveMappings.map((m) => m.college_id))}
-                className="text-[10px] font-bold text-text-muted hover:text-primary"
+                className="text-3xs font-bold text-text-muted hover:text-primary"
               >
                 All
               </button>
               <button
                 type="button"
                 onClick={() => targeting.onChange([])}
-                className="text-[10px] font-bold text-text-muted hover:text-primary"
+                className="text-3xs font-bold text-text-muted hover:text-primary"
               >
                 None
               </button>
@@ -170,7 +170,7 @@ export function DriveVisibilityPanel({
           <button
             type="button"
             onClick={openAddPanel}
-            className="flex items-center gap-1 text-[10px] font-bold text-accent-primary hover:text-accent-primary-hover"
+            className="flex items-center gap-1 text-3xs font-bold text-accent-primary hover:text-accent-primary-hover"
           >
             <Plus className="w-3 h-3" />
             Map colleges
@@ -197,7 +197,7 @@ export function DriveVisibilityPanel({
             const isTargeted = targeting?.selectedIds.includes(m.college_id) ?? false;
 
             return (
-              <li key={m.id} className="flex items-center justify-between text-[11px] px-2 py-1 rounded bg-surface/60">
+              <li key={m.id} className="flex items-center justify-between text-2xs px-2 py-1 rounded bg-surface/60">
                 <span className="flex items-center gap-2 text-text-secondary">
                   {targeting && isLive && (
                     <input
@@ -233,7 +233,7 @@ export function DriveVisibilityPanel({
       {showAdd && (
         <div className="pt-2 mt-1 border-t border-border-subtle space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-text-muted uppercase">Propose to colleges</span>
+            <span className="text-3xs font-bold text-text-muted uppercase">Propose to colleges</span>
             <button type="button" onClick={() => setShowAdd(false)} className="text-text-muted hover:text-primary">
               <X className="w-3.5 h-3.5" />
             </button>
@@ -244,7 +244,7 @@ export function DriveVisibilityPanel({
             <>
               <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
                 {pickableColleges.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-[11px] text-text-secondary cursor-pointer">
+                  <label key={c.id} className="flex items-center gap-2 text-2xs text-text-secondary cursor-pointer">
                     <input
                       type="checkbox"
                       checked={proposeSelectedIds.includes(c.id)}
@@ -262,7 +262,7 @@ export function DriveVisibilityPanel({
                 onClick={handlePropose}
                 disabled={proposeSelectedIds.length === 0 || proposing}
                 className={cn(
-                  "w-full px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                  "w-full px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
                 )}
               >
                 {proposing ? "Proposing..." : `Propose to ${proposeSelectedIds.length || ""} college(s)`}

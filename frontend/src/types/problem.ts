@@ -33,8 +33,12 @@ export interface ProblemSummary {
   id: number;
   slug: string;
   title: string;
+  /** Stable, LeetCode-style display number (e.g. 101 for the first problem ever created) — never reassigned once a problem exists. */
+  serial_number: number;
   difficulty: ApiDifficulty;
   tags: string[];
+  /** Real companies this problem's title matches in sourced interview-question data (see backend CompanyTagSeeder) — null/empty when no match was found, never a guess. */
+  companies: string[] | null;
   acceptance_rate: string | number | null;
   total_submissions: number;
   /** Real — true iff this user has ever gotten `accepted` on this problem. Re-attempting is always allowed regardless. */
@@ -53,10 +57,14 @@ export interface ProblemDetail extends ProblemSummary {
 
 export interface RunResultCase {
   case: number;
-  input: string;
-  expected: string;
-  actual: string;
   passed: boolean;
+  /** Hidden test case — input/expected/actual are never sent for these, pass or fail. */
+  hidden?: boolean;
+  /** Execution never reached this case (stopped by an earlier hidden failure, or a crash/TLE) — no verdict to show. */
+  not_run?: boolean;
+  input?: string;
+  expected?: string;
+  actual?: string;
 }
 
 export interface RunResponse {

@@ -76,7 +76,7 @@ export function LeadKanbanBoard({
                 <span className={cn("w-2 h-2 rounded-full", COLUMN_ACCENT[status])} />
                 <h3 className="text-xs font-bold text-primary">{LEAD_STATUS_LABELS[status]}</h3>
               </div>
-              <span className="text-[10px] font-mono font-bold text-text-muted bg-surface px-1.5 py-0.5 rounded-full border border-border-subtle">
+              <span className="text-3xs font-mono font-bold text-text-muted bg-surface px-1.5 py-0.5 rounded-full border border-border-subtle">
                 {columnLeads.length}
               </span>
             </div>
@@ -110,7 +110,7 @@ export function LeadKanbanBoard({
                       <div className="flex items-center gap-2 min-w-0">
                         <div
                           className={cn(
-                            "w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0",
+                            "w-6 h-6 rounded-full flex items-center justify-center text-3xs font-bold shrink-0",
                             avatarColorClass(lead.name)
                           )}
                         >
@@ -118,7 +118,7 @@ export function LeadKanbanBoard({
                         </div>
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-primary truncate">{lead.name}</div>
-                          <div className="text-[10px] text-text-muted truncate">{lead.email}</div>
+                          <div className="text-3xs text-text-muted truncate">{lead.email}</div>
                         </div>
                       </div>
 
@@ -134,7 +134,7 @@ export function LeadKanbanBoard({
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between mt-2.5 text-[10px] text-text-muted">
+                    <div className="flex items-center justify-between mt-2.5 text-3xs text-text-muted">
                       <span className="font-mono">{formatDate(lead.created_at)}</span>
                       <div className="flex items-center gap-2">
                         {lead.note_count > 0 && (
@@ -167,7 +167,7 @@ export function LeadKanbanBoard({
                                 setOpenMenuId(null);
                                 onMoveLead(lead.id, s);
                               }}
-                              className="w-full text-left px-3 py-2 text-[11px] font-semibold text-text-secondary hover:bg-surface-hover hover:text-primary transition-colors flex items-center gap-2"
+                              className="w-full text-left px-3 py-2 text-2xs font-semibold text-text-secondary hover:bg-surface-hover hover:text-primary transition-colors flex items-center gap-2"
                             >
                               <span className={cn("w-1.5 h-1.5 rounded-full", COLUMN_ACCENT[s])} />
                               Move to {LEAD_STATUS_LABELS[s]}
@@ -181,7 +181,7 @@ export function LeadKanbanBoard({
               </AnimatePresence>
 
               {columnLeads.length === 0 && (
-                <div className="h-full min-h-[80px] flex items-center justify-center text-[10px] text-text-muted/70 border border-dashed border-border-subtle rounded-control">
+                <div className="h-full min-h-[80px] flex items-center justify-center text-3xs text-text-muted/70 border border-dashed border-border-subtle rounded-control">
                   Drop here
                 </div>
               )}

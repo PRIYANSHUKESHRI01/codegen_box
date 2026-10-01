@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Key, Mail, Lock, X, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Key, Mail, Lock, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import { FormField, authInputClass } from "./FormField";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { Modal } from "@/components/ui/Modal";
 
 type Step = "email" | "code" | "password" | "success";
 
@@ -129,33 +129,17 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 16, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          transition={{ duration: 0.2 }}
-          className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-            <h3 className="text-base font-bold text-primary flex items-center gap-2">
-              <Key className="w-4 h-4 text-accent-primary" />
-              <span>{titleForStep[step]}</span>
-            </h3>
-            <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary transition-colors">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+    <Modal
+      onClose={onClose}
+      title={titleForStep[step]}
+      icon={Key}
+      iconClassName="bg-accent-primary/10 text-accent-primary"
+      size="md"
+    >
+      <div className="space-y-4">
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          {step === "email" && (
+        {step === "email" && (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <p className="text-xs text-text-secondary">
                 Enter your account&apos;s email address and we&apos;ll send you a verification code to reset your password.
@@ -187,7 +171,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
                     type="button"
                     onClick={handleResend}
                     disabled={resendCooldown > 0 || loading}
-                    className="text-[11px] text-accent-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
+                    className="text-2xs text-accent-primary hover:underline font-medium disabled:opacity-50 disabled:no-underline"
                   >
                     {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend code"}
                   </button>
@@ -261,8 +245,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
               </button>
             </div>
           )}
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
+    </Modal>
   );
 }

@@ -56,7 +56,7 @@ export function Features() {
                     >
                       <Icon className={isAnchor ? "w-7 h-7" : "w-6 h-6"} />
                     </div>
-                    <span className="text-[11px] font-mono uppercase tracking-wider font-semibold text-text-muted px-2.5 py-0.5 rounded bg-elevated border border-border-subtle">
+                    <span className="text-2xs font-mono uppercase tracking-wider font-semibold text-text-muted px-2.5 py-0.5 rounded bg-elevated border border-border-subtle">
                       {feat.tag}
                     </span>
                   </div>

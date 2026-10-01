@@ -96,6 +96,7 @@ class AdminController extends Controller
             $subscription = $college->activeSubscription();
             $college->subscription_days_remaining = $subscription?->isActive() ? $subscription->daysRemaining() : null;
             $college->subscription_status = $subscription?->status;
+            $college->subscription_is_trial = $subscription?->isActive() ? (bool) $subscription->is_trial : false;
             // Null legitimately means custom/Academic-Enterprise pricing with
             // no fixed number on file — never fabricated as a real figure.
             $college->plan_price = $subscription?->plan?->annual_price;
@@ -125,7 +126,16 @@ class AdminController extends Controller
             'custom_annual_price' => ['nullable', 'integer', 'min:0'],
             'tpo_name' => ['required', 'string', 'max:255'],
             'tpo_email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            // Demo onboarding — the chosen tier still governs WHAT the
+            // college gets (feature set, seat cap), only HOW LONG is
+            // overridden to this instead of the plan's normal 365-day
+            // duration_days. Capped at 90 days as a guardrail against an
+            // accidental unbounded "demo" (e.g. a typo'd day count).
+            'is_demo' => ['nullable', 'boolean'],
+            'demo_days' => [Rule::requiredIf($request->boolean('is_demo')), 'nullable', 'integer', 'min:1', 'max:90'],
         ]);
+
+        $trialDays = $request->boolean('is_demo') ? (int) $validated['demo_days'] : null;
 
         [$college, $tpo, $temporaryPassword] = DB::transaction(function () use ($validated) {
             $college = College::create([
@@ -159,12 +169,13 @@ class AdminController extends Controller
                 $college,
                 (int) $validated['custom_max_students'],
                 $validated['custom_annual_price'] ?? null,
-                $request->user()
+                $request->user(),
+                $trialDays
             );
         } else {
             $plan = Plan::where('audience', Plan::AUDIENCE_INSTITUTION)->where('name', $college->tier)->first();
             if ($plan !== null) {
-                $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+                $subscriptionService->assignInstitutionPlan($college, $plan, $request->user(), $trialDays);
             }
         }
 
@@ -173,7 +184,11 @@ class AdminController extends Controller
             'Onboarded a new partner college',
             'College',
             $college->name,
-            ['tier' => $college->tier, 'tpo_email' => $tpo->email]
+            [
+                'tier' => $college->tier,
+                'tpo_email' => $tpo->email,
+                ...($trialDays !== null ? ['is_demo' => true, 'demo_days' => $trialDays] : []),
+            ]
         );
 
         SendAccountCredentialsEmail::dispatch($tpo->id, $temporaryPassword);
@@ -260,6 +275,40 @@ class AdminController extends Controller
                 'plan' => ['code' => $plan->code, 'name' => $plan->name, 'max_students' => $plan->max_students],
                 'days_remaining' => $subscription->daysRemaining(),
                 'started_at' => $subscription->started_at,
+                'current_period_end' => $subscription->current_period_end,
+            ],
+        ]);
+    }
+
+    /**
+     * Live seat-count adjustment — deliberately separate from
+     * assignCollegeSubscription() above, which always cycles the whole
+     * subscription (cancels + creates fresh, resetting the renewal date).
+     * This only changes max_students, via
+     * SubscriptionService::adjustSeatLimit(), so nudging a college's seat
+     * cap up or down from the dashboard never resets a renewal date or a
+     * running demo countdown. 0 is a valid value here (freezes new imports
+     * without touching anyone already enrolled) — unlike every other
+     * seat-count input in this controller, which requires at least 1.
+     */
+    public function adjustCollegeSeats(Request $request, College $college, SubscriptionService $subscriptionService)
+    {
+        $validated = $request->validate([
+            'max_students' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $subscription = $subscriptionService->adjustSeatLimit($college, $validated['max_students'], $request->user());
+
+        return response()->json([
+            'college' => $college->fresh(),
+            'subscription' => [
+                'plan' => [
+                    'code' => $subscription->plan->code,
+                    'name' => $subscription->plan->name,
+                    'max_students' => $subscription->plan->max_students,
+                ],
+                'days_remaining' => $subscription->daysRemaining(),
+                'is_trial' => $subscription->is_trial,
                 'current_period_end' => $subscription->current_period_end,
             ],
         ]);
@@ -397,6 +446,17 @@ class AdminController extends Controller
         // assigning it a bigger (or custom) plan, not bypassing the check.
         if (! empty($validated['college_id'])) {
             $college = College::find($validated['college_id']);
+
+            // See StudentImportService::import() for why this must come
+            // before the seat-cap check below — a null studentLimit() means
+            // EITHER "active and unlimited" OR "no active subscription",
+            // and those can't share one null check.
+            if (! $college->hasActiveSubscription()) {
+                throw ValidationException::withMessages([
+                    'college_id' => ["{$college->name}'s subscription has expired. Assign a plan before adding more students."],
+                ]);
+            }
+
             $limit = $college->studentLimit();
 
             if ($limit !== null && $college->studentCount() >= $limit) {

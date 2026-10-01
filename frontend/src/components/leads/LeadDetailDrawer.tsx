@@ -120,7 +120,7 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
             </div>
 
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Status</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">Status</p>
               <div className="flex flex-wrap gap-1.5">
                 {LEAD_STATUSES.map((s) => (
                   <button
@@ -128,7 +128,7 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
                     disabled={savingStatus || readOnly}
                     onClick={() => handleSetStatus(s)}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors disabled:opacity-50",
+                      "px-2.5 py-1 rounded-full text-3xs font-bold border transition-colors disabled:opacity-50",
                       detail.lead.lead_status === s
                         ? LEAD_STATUS_BADGE_CLASS[s]
                         : "bg-elevated text-text-muted border-border-subtle hover:text-primary",
@@ -140,7 +140,7 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
                 ))}
               </div>
               {readOnly && (
-                <p className="text-[10px] text-text-muted mt-1.5">
+                <p className="text-3xs text-text-muted mt-1.5">
                   Status changes happen in the Marketing dashboard.
                 </p>
               )}
@@ -149,15 +149,15 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.solved_score}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Solved Score</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Solved Score</div>
               </div>
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.solved_by_difficulty.total_solved}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Problems Solved</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Problems Solved</div>
               </div>
               <div className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                 <div className="text-base font-black text-primary font-mono">{detail.stats.streak.current}</div>
-                <div className="text-[9px] text-text-muted uppercase mt-1">Day Streak</div>
+                <div className="text-3xs text-text-muted uppercase mt-1">Day Streak</div>
               </div>
             </div>
 
@@ -174,7 +174,7 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
 
             {!readOnly && (
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">Add Note</p>
+                <p className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">Add Note</p>
                 <textarea
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}
@@ -185,7 +185,7 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
                 <button
                   onClick={handleAddNote}
                   disabled={savingNote || !noteText.trim()}
-                  className="mt-2 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50"
+                  className="mt-2 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50"
                 >
                   {savingNote ? "Saving..." : "Save Note"}
                 </button>
@@ -193,15 +193,15 @@ export function LeadDetailDrawer({ leadId, onClose, onChanged, readOnly = false 
             )}
 
             <div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-text-muted mb-2">History</p>
+              <p className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">History</p>
               {detail.notes.length === 0 ? (
-                <p className="text-[11px] text-text-muted">No notes yet.</p>
+                <p className="text-2xs text-text-muted">No notes yet.</p>
               ) : (
                 <div className="space-y-2">
                   {detail.notes.map((n) => (
                     <div key={n.id} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
                       <p className="text-xs text-text-secondary">{n.note}</p>
-                      <p className="text-[10px] text-text-muted mt-1">
+                      <p className="text-3xs text-text-muted mt-1">
                         {n.author_name} · {formatDate(n.created_at)}
                       </p>
                     </div>

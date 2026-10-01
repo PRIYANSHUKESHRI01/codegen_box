@@ -38,7 +38,7 @@ export function AuthChrome({ altLabel, altHref, children }: AuthChromeProps) {
           <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.4)]" />
           <div className="flex flex-col">
             <Wordmark className="font-bold text-lg tracking-tight text-primary leading-none" />
-            <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase">
+            <span className="text-3xs font-mono text-text-muted tracking-wider uppercase">
               Placements &bull; Practice
             </span>
           </div>

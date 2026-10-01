@@ -19,6 +19,8 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
 import { StatTile } from "@/components/dashboard/student/StatTile";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
+import { CompanyBadgeList } from "@/components/problems/CompanyBadge";
+import { COMPANY_ICONS } from "@/components/icons/CompanyIcons";
 import { ProblemSummary } from "@/types/problem";
 import type { MySubscriptionResponse } from "@/types/subscription";
 import { api } from "@/lib/api";
@@ -80,6 +82,11 @@ function PracticeArenaPageContent() {
   // uses this debounced value.
   const debouncedQuery = useDebouncedValue(query, 250);
   const [difficultyFilter, setDifficultyFilter] = useState<DifficultyFilter>("all");
+  // "all" means no company filter applied — distinct from the pre-existing
+  // `companyParam`/`curatedSlugs` drive-recommendation feature below, which
+  // is a different concept (a placement drive's curated slug list) and
+  // must not be confused with this "asked at Google/Microsoft" tag filter.
+  const [companyTagFilter, setCompanyTagFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
   const [problems, setProblems] = useState<ProblemSummary[]>([]);
   const [problemsLoading, setProblemsLoading] = useState(true);
@@ -125,7 +132,16 @@ function PracticeArenaPageContent() {
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedQuery, difficultyFilter, slugsParam]);
+  }, [debouncedQuery, difficultyFilter, companyTagFilter, slugsParam]);
+
+  // Derived from the actually-loaded catalog rather than hardcoded, so a
+  // newly-tagged company (e.g. Amazon added later on the backend) shows up
+  // here automatically with zero frontend changes.
+  const availableCompanyTags = useMemo(() => {
+    const set = new Set<string>();
+    problems.forEach((p) => p.companies?.forEach((c) => set.add(c)));
+    return Array.from(set).sort();
+  }, [problems]);
 
   if (status !== "ready") {
     return (
@@ -136,10 +152,14 @@ function PracticeArenaPageContent() {
   const matchesQuery = (p: ProblemSummary) =>
     !debouncedQuery.trim() ||
     p.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
-    p.tags.some((t) => t.toLowerCase().includes(debouncedQuery.toLowerCase()));
+    p.tags.some((t) => t.toLowerCase().includes(debouncedQuery.toLowerCase())) ||
+    (p.companies?.some((c) => c.toLowerCase().includes(debouncedQuery.toLowerCase())) ?? false);
 
   const matchesDifficulty = (p: ProblemSummary) =>
     difficultyFilter === "all" || p.difficulty === difficultyFilter;
+
+  const matchesCompanyTag = (p: ProblemSummary) =>
+    companyTagFilter === "all" || (p.companies?.includes(companyTagFilter) ?? false);
 
   const recommended = curatedSlugs
     ? problems.filter((p) => curatedSlugs.has(p.slug) && matchesQuery(p))
@@ -148,7 +168,9 @@ function PracticeArenaPageContent() {
   // Full catalog mode: every problem matching the filters, paginated — no
   // more hard cap at 6. Curated mode (company prep) ignores pagination since
   // those lists are short by construction.
-  const catalogFiltered = curatedSlugs ? [] : problems.filter((p) => matchesQuery(p) && matchesDifficulty(p));
+  const catalogFiltered = curatedSlugs
+    ? []
+    : problems.filter((p) => matchesQuery(p) && matchesDifficulty(p) && matchesCompanyTag(p));
   const catalogPageCount = Math.max(1, Math.ceil(catalogFiltered.length / PAGE_SIZE));
   const catalogPage = Math.min(page, catalogPageCount);
   const paginatedCatalog = catalogFiltered.slice((catalogPage - 1) * PAGE_SIZE, catalogPage * PAGE_SIZE);
@@ -221,7 +243,7 @@ function PracticeArenaPageContent() {
                 <Sparkles className="w-4 h-4 text-accent-secondary" />
                 <span>{curatedSlugs ? "Recommended For You" : "Problem Catalog"}</span>
                 {!curatedSlugs && !problemsLoading && (
-                  <span className="px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-[10px] font-mono font-bold text-text-muted">
+                  <span className="px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-3xs font-mono font-bold text-text-muted">
                     {problems.length} total
                   </span>
                 )}
@@ -255,7 +277,7 @@ function PracticeArenaPageContent() {
                     key={key}
                     onClick={() => setDifficultyFilter(key)}
                     className={cn(
-                      "px-2.5 py-1 rounded-control text-[11px] font-bold transition-colors border",
+                      "px-2.5 py-1 rounded-control text-2xs font-bold transition-colors border",
                       active
                         ? key === "easy"
                           ? "bg-status-success text-white border-transparent"
@@ -268,6 +290,45 @@ function PracticeArenaPageContent() {
                     )}
                   >
                     {label} <span className="opacity-70 font-mono">({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!curatedSlugs && !problemsLoading && availableCompanyTags.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => setCompanyTagFilter("all")}
+                className={cn(
+                  "px-2.5 py-1 rounded-control text-2xs font-bold transition-colors border",
+                  companyTagFilter === "all"
+                    ? "bg-accent-primary text-white border-transparent"
+                    : "bg-elevated border-border-subtle text-text-muted hover:text-primary hover:border-accent-primary/40"
+                )}
+              >
+                All Companies{" "}
+                <span className="opacity-70 font-mono">
+                  ({problems.filter((p) => p.companies && p.companies.length > 0).length})
+                </span>
+              </button>
+              {availableCompanyTags.map((company) => {
+                const Icon = COMPANY_ICONS[company];
+                const count = problems.filter((p) => p.companies?.includes(company)).length;
+                const active = companyTagFilter === company;
+                return (
+                  <button
+                    key={company}
+                    onClick={() => setCompanyTagFilter(company)}
+                    className={cn(
+                      "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-control text-2xs font-bold transition-colors border",
+                      active
+                        ? "bg-accent-primary text-white border-transparent"
+                        : "bg-elevated border-border-subtle text-text-muted hover:text-primary hover:border-accent-primary/40"
+                    )}
+                  >
+                    {Icon && <Icon className="w-3 h-3 shrink-0" />}
+                    {company} <span className="opacity-70 font-mono">({count})</span>
                   </button>
                 );
               })}
@@ -296,7 +357,7 @@ function PracticeArenaPageContent() {
               <div className="p-8 text-center text-xs text-text-muted">Loading problems...</div>
             ) : displayList.length === 0 ? (
               <div className="p-8 text-center text-xs text-text-muted">
-                {query || difficultyFilter !== "all"
+                {query || difficultyFilter !== "all" || companyTagFilter !== "all"
                   ? "No problems match your filters."
                   : "No recommended problems found."}
               </div>
@@ -310,7 +371,7 @@ function PracticeArenaPageContent() {
                     <div className="flex items-center gap-2 mb-1">
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize",
+                          "px-1.5 py-0.5 text-3xs font-bold rounded capitalize",
                           problem.difficulty === "easy"
                             ? "bg-status-success/15 text-status-success"
                             : problem.difficulty === "medium"
@@ -321,18 +382,23 @@ function PracticeArenaPageContent() {
                         {problem.difficulty}
                       </span>
                     </div>
-                    <h3 className="text-sm font-semibold text-primary truncate">{problem.title}</h3>
+                    <h3 className="text-sm font-semibold text-primary truncate">
+                      {problem.serial_number}. {problem.title}
+                    </h3>
+                    {problem.companies && problem.companies.length > 0 && (
+                      <CompanyBadgeList companies={problem.companies} size="xs" className="mt-1.5" />
+                    )}
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                       {problem.tags.slice(0, 3).map((tag) => (
                         <span
                           key={tag}
-                          className="px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-[10px] text-text-muted"
+                          className="px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-3xs text-text-muted"
                         >
                           {tag}
                         </span>
                       ))}
                       {problem.acceptance_rate !== null && (
-                        <span className="text-[10px] text-text-muted font-mono">
+                        <span className="text-3xs text-text-muted font-mono">
                           {problem.acceptance_rate}% accepted
                         </span>
                       )}
@@ -359,7 +425,7 @@ function PracticeArenaPageContent() {
 
           {!curatedSlugs && !problemsLoading && catalogPageCount > 1 && (
             <div className="p-3 border-t border-border-subtle flex items-center justify-between gap-3 flex-wrap">
-              <span className="text-[11px] text-text-muted">
+              <span className="text-2xs text-text-muted">
                 Showing {(catalogPage - 1) * PAGE_SIZE + 1}–
                 {Math.min(catalogPage * PAGE_SIZE, catalogFiltered.length)} of {catalogFiltered.length}
               </span>
@@ -367,7 +433,7 @@ function PracticeArenaPageContent() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={catalogPage === 1}
-                  className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 >
                   Previous
                 </button>
@@ -381,7 +447,7 @@ function PracticeArenaPageContent() {
                       key={p}
                       onClick={() => setPage(p)}
                       className={cn(
-                        "w-7 h-7 rounded-control text-[11px] font-bold transition-colors border",
+                        "w-7 h-7 rounded-control text-2xs font-bold transition-colors border",
                         p === catalogPage
                           ? "bg-accent-primary text-white border-transparent"
                           : "bg-elevated hover:bg-surface-hover text-text-secondary border-border-subtle"
@@ -394,7 +460,7 @@ function PracticeArenaPageContent() {
                 <button
                   onClick={() => setPage((p) => Math.min(catalogPageCount, p + 1))}
                   disabled={catalogPage === catalogPageCount}
-                  className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
+                  className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:pointer-events-none"
                 >
                   Next
                 </button>
@@ -411,7 +477,7 @@ function PracticeArenaPageContent() {
                 <Target className="w-4 h-4 text-accent-secondary" />
                 <span>Topic Ladder</span>
               </h3>
-              <Link href="/dashboard/reports" className="text-[11px] font-semibold text-accent-primary hover:underline">
+              <Link href="/dashboard/reports" className="text-2xs font-semibold text-accent-primary hover:underline">
                 Details
               </Link>
             </div>

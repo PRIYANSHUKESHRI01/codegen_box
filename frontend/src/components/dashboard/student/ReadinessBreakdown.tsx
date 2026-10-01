@@ -27,7 +27,7 @@ export function ReadinessBreakdown({ components, nextSteps, compact = false }: R
             <div className="flex items-center justify-between gap-3 text-xs">
               <span className="font-semibold text-primary">{c.label}</span>
               <div className="flex items-center gap-2 shrink-0 font-mono text-text-muted">
-                <span className="text-[10px] uppercase tracking-wide text-text-muted">{c.weight_percent}% weight</span>
+                <span className="text-3xs uppercase tracking-wide text-text-muted">{c.weight_percent}% weight</span>
                 <span className={cn("font-bold", c.score === 0 ? "text-status-danger" : "text-text-secondary")}>{c.score}%</span>
               </div>
             </div>
@@ -49,7 +49,7 @@ export function ReadinessBreakdown({ components, nextSteps, compact = false }: R
               className="flex items-start gap-2 p-3 rounded-control bg-accent-primary/5 border border-accent-primary/20"
             >
               <Sparkles className="w-3.5 h-3.5 text-accent-primary shrink-0 mt-0.5" />
-              <span className="text-[11px] text-text-secondary leading-relaxed">{step}</span>
+              <span className="text-2xs text-text-secondary leading-relaxed">{step}</span>
             </div>
           ))}
         </div>

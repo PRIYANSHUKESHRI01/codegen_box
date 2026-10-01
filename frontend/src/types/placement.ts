@@ -75,7 +75,7 @@ export interface MyDriveApplication {
 }
 
 export interface PlacementDriveDetail {
-  drive: UpcomingPlacementDrive & { status: DriveStatus };
+  drive: UpcomingPlacementDrive & { status: DriveStatus; termsAndConditions: string | null };
   company: PlacementCompanyDetail;
   prepQuestions: PrepQuestion[];
   recommendedProblems: RecommendedProblemRef[];

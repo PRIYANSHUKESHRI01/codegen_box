@@ -112,13 +112,13 @@ export default function InternalCustomersPage() {
       <div className="space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
               <Users2 className="w-3.5 h-3.5" /> My Customers
             </span>
             <div className="text-2xl font-black text-primary font-mono mt-2">{kpis?.total_customers ?? "—"}</div>
           </div>
           <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
               <UserPlus className="w-3.5 h-3.5" /> Converted This Week
             </span>
             <div className="text-2xl font-black text-status-success font-mono mt-2">{kpis?.new_this_week ?? "—"}</div>
@@ -152,7 +152,7 @@ export default function InternalCustomersPage() {
           <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+                <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                   <tr>
                     <th className="px-4 py-3">Customer</th>
                     <th className="px-4 py-3">Converted</th>
@@ -171,7 +171,7 @@ export default function InternalCustomersPage() {
                     >
                       <td className="px-4 py-3">
                         <div className="font-bold text-primary">{customer.name}</div>
-                        <div className="text-[10px] text-text-muted">{customer.email}</div>
+                        <div className="text-3xs text-text-muted">{customer.email}</div>
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{formatDate(customer.converted_at)}</td>
                       <td className="px-4 py-3 text-text-secondary">{customer.plan_name ?? "—"}</td>
@@ -188,7 +188,7 @@ export default function InternalCustomersPage() {
                       <td className="px-4 py-3">
                         <span
                           className={cn(
-                            "px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap inline-flex items-center gap-1",
+                            "px-2 py-0.5 rounded-full text-3xs font-bold border whitespace-nowrap inline-flex items-center gap-1",
                             customer.is_blocked
                               ? "bg-status-danger/15 text-status-danger border-status-danger/30"
                               : "bg-status-success/15 text-status-success border-status-success/30"

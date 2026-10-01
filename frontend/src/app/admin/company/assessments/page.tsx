@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Swords, Plus, X, Loader2, Trash2, CheckCircle2, Send, Trophy, Search } from "lucide-react";
+import { Swords, Plus, Loader2, Trash2, CheckCircle2, Send, Trophy, Search } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { InviteToAssessmentModal } from "@/components/dashboard/company/InviteToAssessmentModal";
 import { AssessmentResultsModal } from "@/components/dashboard/company/AssessmentResultsModal";
@@ -11,6 +11,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
+import { Modal } from "@/components/ui/Modal";
 
 interface CompanyContest {
   id: number;
@@ -145,7 +146,7 @@ export default function AssessmentsPage() {
                       <span className="text-sm font-bold text-primary">{contest.title}</span>
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+                          "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
                           contest.status === "published"
                             ? "bg-status-success/15 text-status-success"
                             : contest.status === "draft"
@@ -156,13 +157,13 @@ export default function AssessmentsPage() {
                         {contest.status}
                       </span>
                       {contest.finalized_at && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
                           <CheckCircle2 className="w-2.5 h-2.5" />
                           Finalized
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-text-muted mt-0.5">
+                    <div className="text-2xs text-text-muted mt-0.5">
                       {contest.placement_drive?.title ?? "No linked opening"} ·{" "}
                       {new Date(contest.start_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                       {" – "}
@@ -175,28 +176,28 @@ export default function AssessmentsPage() {
                 <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setInvitingContest(contest)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Invite</span>
                   </button>
                   <button
                     onClick={() => setViewingResultsContest(contest)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                   >
                     <Trophy className="w-3.5 h-3.5" />
                     <span>Results</span>
                   </button>
                   <button
                     onClick={() => setManagingContest(contest)}
-                    className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                    className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                   >
                     Manage Problems
                   </button>
                   {contest.status === "draft" && (
                     <button
                       onClick={() => handlePublish(contest)}
-                      className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-bold transition-colors"
+                      className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors"
                     >
                       Publish
                     </button>
@@ -204,7 +205,7 @@ export default function AssessmentsPage() {
                   {contest.status === "published" && hasEnded && !contest.finalized_at && (
                     <button
                       onClick={() => handleFinalize(contest)}
-                      className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[11px] font-bold text-status-success transition-colors"
+                      className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors"
                     >
                       Finalize
                     </button>
@@ -297,23 +298,28 @@ function CreateAssessmentModal({ onClose, onCreated }: { onClose: () => void; on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Swords className="w-4 h-4 text-teal-500" />
-            <span>New Assessment</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Assessment"
+      icon={Swords}
+      iconClassName="bg-teal-500/10 text-teal-500"
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
+          <button type="submit" form="create-assessment-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+      <p className="text-2xs text-text-muted mb-3">
+        Only candidates you explicitly invite can ever see this. Starts as a draft, and never affects platform ratings.
+      </p>
 
-        <p className="text-[11px] text-text-muted">
-          Only candidates you explicitly invite can ever see this. Starts as a draft, and never affects platform ratings.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+      <form id="create-assessment-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Job Opening *</label>
             <select
@@ -330,7 +336,7 @@ function CreateAssessmentModal({ onClose, onCreated }: { onClose: () => void; on
               ))}
             </select>
             {drives.length === 0 && (
-              <p className="text-[10px] text-status-warning mt-1">Post a job opening first — an assessment must belong to one.</p>
+              <p className="text-3xs text-status-warning mt-1">Post a job opening first — an assessment must belong to one.</p>
             )}
           </div>
           <div>
@@ -375,19 +381,9 @@ function CreateAssessmentModal({ onClose, onCreated }: { onClose: () => void; on
             </div>
           </div>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -460,15 +456,8 @@ function ManageAssessmentProblemsModal({
   }, [catalog, problems, search]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary">Problems — {contest.title}</h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title={`Problems — ${contest.title}`} size="2xl">
+      <div className="space-y-4">
         {loading ? (
           <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -485,7 +474,7 @@ function ManageAssessmentProblemsModal({
                     <div className="flex items-center gap-2 min-w-0">
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize",
+                          "px-1.5 py-0.5 text-3xs font-bold rounded capitalize",
                           cp.problem.difficulty === "easy" ? "bg-status-success/15 text-status-success" : cp.problem.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
                         )}
                       >
@@ -534,7 +523,7 @@ function ManageAssessmentProblemsModal({
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={cn(
-                            "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize shrink-0",
+                            "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
                             p.difficulty === "easy" ? "bg-status-success/15 text-status-success" : p.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
                           )}
                         >
@@ -557,6 +546,6 @@ function ManageAssessmentProblemsModal({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -52,14 +52,14 @@ function KpiCard({
   return (
     <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col justify-between">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">{label}</span>
+        <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">{label}</span>
         <div className={`w-7 h-7 rounded-control flex items-center justify-center ${accent}`}>
           <Icon className="w-3.5 h-3.5" />
         </div>
       </div>
       <div className="mt-3">
         <div className="text-2xl font-black text-primary tracking-tight font-mono">{value}</div>
-        {sub && <div className="text-[11px] text-text-muted mt-1 font-medium">{sub}</div>}
+        {sub && <div className="text-2xs text-text-muted mt-1 font-medium">{sub}</div>}
       </div>
     </div>
   );
@@ -140,7 +140,7 @@ export function OverviewPanel({ onViewAuditLog }: { onViewAuditLog: () => void }
           <h2 className="text-sm font-bold text-primary">Recent Admin Activity</h2>
           <button
             onClick={onViewAuditLog}
-            className="flex items-center gap-1 text-[11px] font-bold text-accent-primary hover:text-accent-primary-hover transition-colors"
+            className="flex items-center gap-1 text-2xs font-bold text-accent-primary hover:text-accent-primary-hover transition-colors"
           >
             <span>View full audit log</span>
             <ArrowRight className="w-3 h-3" />
@@ -161,7 +161,7 @@ export function OverviewPanel({ onViewAuditLog }: { onViewAuditLog: () => void }
                     {log.target_label && <> — <strong className="text-primary">{log.target_label}</strong></>}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-text-muted shrink-0">{formatDateTime(log.created_at)}</span>
+                <span className="text-3xs font-mono text-text-muted shrink-0">{formatDateTime(log.created_at)}</span>
               </div>
             ))}
           </div>

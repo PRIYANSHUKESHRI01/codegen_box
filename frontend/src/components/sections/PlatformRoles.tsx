@@ -55,12 +55,12 @@ export function PlatformRoles() {
                   <div className="w-10 h-10 rounded-control bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider font-semibold text-text-muted px-2 py-0.5 rounded bg-elevated border border-border-subtle">
+                  <span className="text-3xs font-mono uppercase tracking-wider font-semibold text-text-muted px-2 py-0.5 rounded bg-elevated border border-border-subtle">
                     {role.tag}
                   </span>
                 </div>
                 <h3 className="text-sm sm:text-base font-bold text-primary">{role.title}</h3>
-                <p className="text-xs sm:text-[13px] text-text-secondary leading-relaxed">{role.description}</p>
+                <p className="text-xs sm:text-13 text-text-secondary leading-relaxed">{role.description}</p>
               </Card>
             );
           })}

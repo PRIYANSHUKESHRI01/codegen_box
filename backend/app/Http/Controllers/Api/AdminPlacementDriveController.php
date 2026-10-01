@@ -74,6 +74,7 @@ class AdminPlacementDriveController extends Controller
             'max_backlogs' => ['nullable', 'integer', 'min:0'],
             'eligible_branches' => ['nullable', 'array'],
             'eligible_branches.*' => ['string', 'max:50'],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
             'status' => ['nullable', Rule::in(PlacementDrive::STATUSES)],
         ]);
     }

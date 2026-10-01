@@ -63,7 +63,7 @@ export function ProblemExplorer() {
                     {problem.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="text-[11px] font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted group-hover:border-border-strong transition-colors"
+                        className="text-2xs font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted group-hover:border-border-strong transition-colors"
                       >
                         {tag}
                       </span>

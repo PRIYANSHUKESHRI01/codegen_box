@@ -3,12 +3,13 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { UserCog, ShieldAlert, ShieldCheck, X, Loader2, Pencil } from "lucide-react";
+import { UserCog, ShieldAlert, ShieldCheck, Loader2, Pencil } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AddCoordinatorModal } from "@/components/dashboard/tpo/AddCoordinatorModal";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { Modal } from "@/components/ui/Modal";
 
 export interface Coordinator {
   id: number;
@@ -68,30 +69,34 @@ function EditCoordinatorModal({
   };
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-      >
-        <motion.div
-          initial={{ opacity: 0, y: 12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 8, scale: 0.98 }}
-          className="w-full max-w-sm rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4"
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-            <h3 className="text-base font-bold text-primary flex items-center gap-2">
-              <Pencil className="w-4 h-4 text-accent-primary" />
-              <span>Edit Coordinator</span>
-            </h3>
-            <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-3">
+    <Modal
+      onClose={onClose}
+      title="Edit Coordinator"
+      icon={Pencil}
+      size="sm"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="edit-coordinator-form"
+            disabled={saving || !section}
+            className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>{saving ? "Saving..." : "Save Changes"}</span>
+          </button>
+        </>
+      }
+    >
+      <form id="edit-coordinator-form" onSubmit={handleSubmit} className="space-y-3">
             <div>
               <label className="block text-xs font-semibold text-text-secondary mb-1">Section *</label>
               <select
@@ -116,29 +121,9 @@ function EditCoordinatorModal({
                 className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-accent-primary"
               />
             </div>
-            {error && <p className="text-[11px] text-status-danger">{error}</p>}
-            <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={saving}
-                className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving || !section}
-                className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-              >
-                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                <span>{saving ? "Saving..." : "Save Changes"}</span>
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+            {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -249,15 +234,15 @@ export default function SectionCoordinatorsPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Coordinators</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Total Coordinators</span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{coordinators.length}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Sections Covered</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Sections Covered</span>
           <div className="text-2xl font-black text-accent-secondary font-mono mt-2">{sectionsCovered}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Blocked Accounts</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Blocked Accounts</span>
           <div className="text-2xl font-black text-status-danger font-mono mt-2">{blockedCount}</div>
         </div>
       </div>
@@ -266,7 +251,7 @@ export default function SectionCoordinatorsPage() {
       <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+            <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
               <tr>
                 <th className="px-4 py-3">Coordinator</th>
                 <th className="px-4 py-3">Section</th>
@@ -303,17 +288,17 @@ export default function SectionCoordinatorsPage() {
                   <tr key={c.id} className="hover:bg-surface-hover/60 transition-colors">
                     <td className="px-4 py-3">
                       <div className="font-bold text-primary">{c.name}</div>
-                      <div className="text-[10px] font-mono text-text-muted">{c.email}</div>
+                      <div className="text-3xs font-mono text-text-muted">{c.email}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-[10px]">Section {c.section}</span>
+                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-3xs">Section {c.section}</span>
                     </td>
                     <td className="px-4 py-3 font-mono text-text-secondary">{c.phone ?? "—"}</td>
                     <td className="px-4 py-3 font-mono font-bold text-primary">{c.managed_student_count}</td>
                     <td className="px-4 py-3">
                       <span
                         className={cn(
-                          "px-2 py-0.5 text-[10px] font-bold rounded-full",
+                          "px-2 py-0.5 text-3xs font-bold rounded-full",
                           c.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success"
                         )}
                       >
@@ -324,7 +309,7 @@ export default function SectionCoordinatorsPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setEditing(c)}
-                          className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-[11px] font-medium"
+                          className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-2xs font-medium"
                         >
                           Edit
                         </button>
@@ -332,7 +317,7 @@ export default function SectionCoordinatorsPage() {
                           onClick={() => handleToggleBlock(c)}
                           disabled={busyId === c.id}
                           className={cn(
-                            "flex items-center gap-1 px-2.5 py-1 rounded-control border text-[11px] font-medium transition-colors disabled:opacity-50",
+                            "flex items-center gap-1 px-2.5 py-1 rounded-control border text-2xs font-medium transition-colors disabled:opacity-50",
                             c.is_blocked
                               ? "bg-status-success/10 text-status-success border-status-success/25 hover:bg-status-success/20"
                               : "bg-status-danger/10 text-status-danger border-status-danger/25 hover:bg-status-danger/20"

@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { Mic, Plus, X, Loader2, CheckCircle2, AlertTriangle, ShieldCheck, FileText, BookOpen, Trash2, Sparkles, Layers } from "lucide-react";
+import { Mic, Plus, Loader2, CheckCircle2, AlertTriangle, ShieldCheck, FileText, BookOpen, Trash2, Sparkles, Layers } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -14,6 +14,7 @@ import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewSummary, InterviewType } from "@/types/interview";
+import { Modal } from "@/components/ui/Modal";
 
 const BASE_PATH = "/admin/interviews";
 
@@ -133,14 +134,14 @@ export default function AdminInterviewsPage() {
       <div className="flex justify-end gap-2">
         <Link
           href="/admin/interviews/tracks"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
         >
           <Layers className="w-3.5 h-3.5" />
           <span>Final Interviews (3-Round Tracks)</span>
         </Link>
         <Link
           href="/admin/interviews/question-bank"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
         >
           <BookOpen className="w-3.5 h-3.5" />
           <span>Manage Question Bank</span>
@@ -167,12 +168,12 @@ export default function AdminInterviewsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-primary">{interview.title}</span>
-                    <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", TYPE_BADGE[interview.interview_type])}>
+                    <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", TYPE_BADGE[interview.interview_type])}>
                       {TYPE_LABEL[interview.interview_type]}
                     </span>
                     <span
                       className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+                        "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
                         interview.status === "published"
                           ? "bg-status-success/15 text-status-success"
                           : interview.status === "draft"
@@ -183,7 +184,7 @@ export default function AdminInterviewsPage() {
                       {interview.status}
                     </span>
                     {interview.is_mock && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500/15 text-amber-600">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/15 text-amber-600">
                         <Sparkles className="w-2.5 h-2.5" />
                         Practice Round
                       </span>
@@ -191,7 +192,7 @@ export default function AdminInterviewsPage() {
                     {interview.visibility_summary && (
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded flex items-center gap-1",
+                          "px-1.5 py-0.5 text-3xs font-bold uppercase rounded flex items-center gap-1",
                           interview.visibility_summary.live > 0
                             ? "bg-status-success/15 text-status-success"
                             : "bg-status-warning/15 text-status-warning"
@@ -202,7 +203,7 @@ export default function AdminInterviewsPage() {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-text-muted mt-0.5">
+                  <div className="text-2xs text-text-muted mt-0.5">
                     {interview.sessions_count ?? 0} taken
                     {interview.company && <> · {interview.company.name}</>}
                     {interview.owning_college && <> · {interview.owning_college.short_code} (TPO-owned)</>}
@@ -212,7 +213,7 @@ export default function AdminInterviewsPage() {
 
               <div className="flex items-center gap-2 shrink-0">
                 {interview.interview_type === "tpo_mock" || interview.interview_type === "company_hiring" ? (
-                  <span className="text-[10px] text-text-muted italic px-1 flex items-center gap-1">
+                  <span className="text-3xs text-text-muted italic px-1 flex items-center gap-1">
                     <FileText className="w-3 h-3" />
                     Managed by its owning {interview.interview_type === "tpo_mock" ? "college's TPO" : "company"}
                   </span>
@@ -221,21 +222,21 @@ export default function AdminInterviewsPage() {
                     {interview.interview_type === "company" && interview.placement_drive && (
                       <button
                         onClick={() => setVisibilityInterview(interview)}
-                        className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                        className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                       >
                         Manage Visibility
                       </button>
                     )}
                     <button
                       onClick={() => setManaging(interview)}
-                      className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                      className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                     >
                       Manage Questions
                     </button>
                     {interview.status === "draft" && (
                       <button
                         onClick={() => handlePublish(interview)}
-                        className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
+                        className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
                       >
                         Publish
                       </button>
@@ -323,27 +324,13 @@ function ManageVisibilityModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <div>
-            <h3 className="text-base font-bold text-primary">College Visibility</h3>
-            <p className="text-[11px] text-text-muted mt-0.5">{interview.title}</p>
-          </div>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <p className="text-[10.5px] text-text-muted -mt-2">
-          The drive may be live at more colleges than this interview targets — check only the ones this interview
-          should actually go to.
-        </p>
-        <DriveVisibilityPanel
-          driveId={interview.placement_drive!.id}
-          onToast={onToast}
-          targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
-        />
-        <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
+    <Modal
+      onClose={onClose}
+      title="College Visibility"
+      subtitle={interview.title}
+      size="md"
+      footer={
+        <>
           <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
             Cancel
           </button>
@@ -355,9 +342,19 @@ function ManageVisibilityModal({
           >
             {saving ? "Saving..." : "Save Targeting"}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+        <p className="text-[10.5px] text-text-muted mb-3">
+          The drive may be live at more colleges than this interview targets — check only the ones this interview
+          should actually go to.
+        </p>
+        <DriveVisibilityPanel
+          driveId={interview.placement_drive!.id}
+          onToast={onToast}
+          targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
+        />
+    </Modal>
   );
 }
 
@@ -435,23 +432,27 @@ function CreateInterviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Mic className="w-4 h-4 text-accent-primary" />
-            <span>New Interview</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Interview"
+      icon={Mic}
+      size="xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
-
-        <p className="text-[11px] text-text-muted">
+          <button type="submit" form="create-interview-form" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+        <p className="text-2xs text-text-muted mb-3">
           Starts as a draft — invisible to students until you add questions and click Publish.
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+        <form id="create-interview-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Type *</label>
             <div className="flex gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
@@ -461,7 +462,7 @@ function CreateInterviewModal({
                   type="button"
                   onClick={() => setInterviewType(t)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     interviewType === t ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -470,7 +471,7 @@ function CreateInterviewModal({
               ))}
             </div>
             {interviewType === "company" && (
-              <p className="text-[10px] text-text-muted mt-1">
+              <p className="text-3xs text-text-muted mt-1">
                 Only visible to students at colleges where this drive is mapped &amp; approved. Questions must
                 already be tagged to the company.
               </p>
@@ -538,7 +539,7 @@ function CreateInterviewModal({
                   type="button"
                   onClick={() => setIsMock(true)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     isMock ? "bg-amber-500 text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -548,7 +549,7 @@ function CreateInterviewModal({
                   type="button"
                   onClick={() => setIsMock(false)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     !isMock ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -587,18 +588,8 @@ function CreateInterviewModal({
             />
           )}
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -44,7 +44,7 @@ export function ProctoringConsentGate({
           </div>
           <div>
             <h2 className="text-sm font-bold text-primary">This is a proctored contest</h2>
-            <p className="text-[11px] text-text-muted">Required for every contest problem — not for practice.</p>
+            <p className="text-2xs text-text-muted">Required for every contest problem — not for practice.</p>
           </div>
         </div>
 
@@ -60,7 +60,7 @@ export function ProctoringConsentGate({
           }
         >
           <video ref={previewVideoRef} muted playsInline className="w-full aspect-video object-cover" />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-[10px] font-bold text-white">
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-3xs font-bold text-white">
             <CheckCircle2 className="w-3 h-3 text-status-success" />
             Make sure your face is clearly visible
           </div>
@@ -89,7 +89,7 @@ export function ProctoringConsentGate({
         </ul>
 
         {consentError && (
-          <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-[11px] text-status-danger">
+          <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-2xs text-status-danger">
             {consentError}
           </div>
         )}
@@ -104,7 +104,7 @@ export function ProctoringConsentGate({
           </Button>
         )}
 
-        <p className="text-[10px] text-text-muted text-center">
+        <p className="text-3xs text-text-muted text-center">
           By continuing you consent to being recorded and monitored for the duration of this contest attempt.
         </p>
       </div>

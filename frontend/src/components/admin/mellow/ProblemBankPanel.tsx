@@ -4,13 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Search, FileCode2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { CompanyBadgeList } from "@/components/problems/CompanyBadge";
 
 interface ApiProblem {
   id: number;
   slug: string;
   title: string;
+  serial_number: number;
   difficulty: "easy" | "medium" | "hard";
   tags: string[];
+  companies: string[] | null;
   created_at: string;
   submissions_count: number;
   accepted_submissions_count: number;
@@ -142,7 +145,7 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
               difficulty === d ? "border-accent-primary bg-accent-primary/5" : "border-border-subtle bg-surface hover:border-border-strong"
             )}
           >
-            <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">
+            <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">
               {d === "" ? "All" : d.charAt(0).toUpperCase() + d.slice(1)}
             </span>
             <span className="text-xl font-black text-primary mt-1 block font-mono">
@@ -152,7 +155,7 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
         ))}
       </div>
 
-      <div className="p-3 rounded-control bg-accent-primary/5 border border-accent-primary/20 flex items-start gap-2 text-[11px] text-text-secondary">
+      <div className="p-3 rounded-control bg-accent-primary/5 border border-accent-primary/20 flex items-start gap-2 text-2xs text-text-secondary">
         <Info className="w-3.5 h-3.5 text-accent-primary shrink-0 mt-0.5" />
         <span>
           New problems are authored through Mellow&apos;s structured problem-generation pipeline (a function signature plus a
@@ -170,11 +173,13 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
+                  <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Title</th>
                   <th className="px-4 py-3">Difficulty</th>
                   <th className="px-4 py-3">Tags</th>
+                  <th className="px-4 py-3">Companies</th>
                   <th className="px-4 py-3">Added</th>
                   <th className="px-4 py-3 text-right">Real Submissions</th>
                   <th className="px-4 py-3 text-right">Real Acceptance</th>
@@ -183,23 +188,31 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
               <tbody className="divide-y divide-border-subtle">
                 {problems.map((p) => (
                   <tr key={p.id} className="hover:bg-surface-hover/60 transition-colors">
+                    <td className="px-4 py-3 font-mono font-bold text-text-muted">{p.serial_number}</td>
                     <td className="px-4 py-3">
                       <div className="font-bold text-primary">{p.title}</div>
-                      <div className="text-[10px] font-mono text-text-muted">/{p.slug}</div>
+                      <div className="text-3xs font-mono text-text-muted">/{p.slug}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full border", DIFFICULTY_BADGE[p.difficulty])}>
+                      <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", DIFFICULTY_BADGE[p.difficulty])}>
                         {p.difficulty.charAt(0).toUpperCase() + p.difficulty.slice(1)}
                       </span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {(p.tags ?? []).slice(0, 3).map((tag) => (
-                          <span key={tag} className="px-1.5 py-0.5 text-[10px] rounded bg-elevated text-text-secondary border border-border-subtle">
+                          <span key={tag} className="px-1.5 py-0.5 text-3xs rounded bg-elevated text-text-secondary border border-border-subtle">
                             {tag}
                           </span>
                         ))}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {p.companies && p.companies.length > 0 ? (
+                        <CompanyBadgeList companies={p.companies} size="xs" />
+                      ) : (
+                        <span className="text-3xs text-text-muted">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-text-muted whitespace-nowrap">{formatDate(p.created_at)}</td>
                     <td className="px-4 py-3 text-right font-mono text-primary">{p.submissions_count}</td>

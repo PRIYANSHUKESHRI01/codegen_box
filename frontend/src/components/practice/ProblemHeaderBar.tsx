@@ -33,13 +33,15 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
 
         <div className="min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h1 className="text-sm font-bold text-primary truncate">{problem.title}</h1>
+            <h1 className="text-sm font-bold text-primary truncate">
+              {problem.serial_number}. {problem.title}
+            </h1>
             <DifficultyBadge
               difficulty={problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}
               size="sm"
             />
             {problem.solved && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-status-success">
+              <span className="hidden sm:inline-flex items-center gap-1 text-3xs font-bold text-status-success">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Solved
               </span>
@@ -47,7 +49,7 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
           </div>
           <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
             {problem.tags.slice(0, 3).map((tag, idx, shown) => (
-              <span key={tag} className="text-[10px] font-mono text-text-muted">
+              <span key={tag} className="text-3xs font-mono text-text-muted">
                 {tag}
                 {idx < shown.length - 1 && " ·"}
               </span>
@@ -58,7 +60,7 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {problem.acceptance_rate !== null && (
-          <span className="hidden lg:inline text-[11px] font-mono text-text-muted whitespace-nowrap">
+          <span className="hidden lg:inline text-2xs font-mono text-text-muted whitespace-nowrap">
             {problem.acceptance_rate}% acceptance · {formatNumber(problem.total_submissions)} submissions
           </span>
         )}

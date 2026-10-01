@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { X, GraduationCap, Briefcase, User, Mail, Phone, Building2, MessageSquare, CheckCircle2 } from "lucide-react";
+import { GraduationCap, Briefcase, User, Mail, Phone, Building2, MessageSquare, CheckCircle2 } from "lucide-react";
 import { FormField, authInputClass } from "@/components/auth/FormField";
 import { AuthSubmitButton } from "@/components/auth/AuthSubmitButton";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 
 type Audience = "institution" | "company";
 
@@ -30,9 +30,8 @@ const AUDIENCE_COPY: Record<Audience, { orgLabel: string; orgPlaceholder: string
 
 /**
  * The public "Talk to Our Team" form — replaces the three landing-page CTAs
- * that used to just link to /pricing. Backdrop/panel pattern copies
- * LogoutConfirmModal's proven flash-free structure (static blur layer +
- * separately-animated tint); form/loading/error/success flow copies
+ * that used to just link to /pricing. Uses the shared Modal shell for its
+ * backdrop/panel chrome; form/loading/error/success flow copies
  * ForgotPasswordModal's step-based conventions.
  */
 export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
@@ -50,8 +49,8 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
 
   const resetAndClose = () => {
     onClose();
-    // Wait for the exit animation before wiping state, so the form doesn't
-    // visibly flash back to blank while it's still fading out.
+    // Wait a beat before wiping state so the form doesn't visibly flash
+    // back to blank while the modal is still on its way out.
     setTimeout(() => {
       setSubmitted(false);
       setAudience("institution");
@@ -85,63 +84,35 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
     }
   };
 
+  if (!open) return null;
+
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={resetAndClose}>
-          {/* Static blur — never opacity-animated, avoids the Chromium
-              backdrop-filter flash (see LogoutConfirmModal for the full
-              explanation). The tint below carries the actual fade. */}
-          <div className="absolute inset-0 backdrop-blur-sm" />
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="absolute inset-0 bg-black/75"
-          />
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.2 }}
-            className="relative w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 sm:p-7 max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
+    <Modal
+      onClose={resetAndClose}
+      title={submitted ? `Thanks, ${name.split(" ")[0]}!` : "Talk to Our Team"}
+      subtitle={submitted ? undefined : copy.subtitle}
+      icon={submitted ? undefined : MessageSquare}
+      iconClassName="bg-accent-primary/10 text-accent-primary"
+      size="md"
+    >
+      {submitted ? (
+        <div className="space-y-5 py-2 text-center">
+          <div className="w-14 h-14 mx-auto rounded-full bg-status-success/15 border border-status-success/30 flex items-center justify-center">
+            <CheckCircle2 className="w-7 h-7 text-status-success" />
+          </div>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            We&apos;ve got your message — someone from our team will reach out to{" "}
+            <strong className="text-primary">{email}</strong> within one business day.
+          </p>
+          <button
+            onClick={resetAndClose}
+            className="w-full py-3 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white font-bold text-sm transition-colors"
           >
-            <button
-              onClick={resetAndClose}
-              className="absolute top-4 right-4 p-1 rounded text-text-muted hover:text-primary transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {submitted ? (
-              <div className="space-y-5 py-4 text-center">
-                <div className="w-14 h-14 mx-auto rounded-full bg-status-success/15 border border-status-success/30 flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7 text-status-success" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-primary mb-1.5">Thanks, {name.split(" ")[0]}!</h3>
-                  <p className="text-sm text-text-secondary leading-relaxed">
-                    We&apos;ve got your message — someone from our team will reach out to{" "}
-                    <strong className="text-primary">{email}</strong> within one business day.
-                  </p>
-                </div>
-                <button
-                  onClick={resetAndClose}
-                  className="w-full py-3 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white font-bold text-sm transition-colors"
-                >
-                  Close
-                </button>
-              </div>
-            ) : (
+            Close
+          </button>
+        </div>
+      ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
-                <div>
-                  <h3 className="text-lg font-bold text-primary">Talk to Our Team</h3>
-                  <p className="text-xs text-text-secondary mt-1">{copy.subtitle}</p>
-                </div>
-
                 {/* Audience toggle — same bespoke two-button pattern as PricingHero's audience switch */}
                 <div className="inline-flex items-center gap-1 p-1 rounded-btn bg-elevated border border-border-strong w-full">
                   <button
@@ -168,7 +139,7 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
                   </button>
                 </div>
 
-                {error && <p className="text-[11px] text-status-danger">{error}</p>}
+                {error && <p className="text-2xs text-status-danger">{error}</p>}
 
                 <FormField label="Full Name *" icon={User}>
                   <input
@@ -225,17 +196,14 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
 
                 <AuthSubmitButton loading={loading}>Send Message</AuthSubmitButton>
 
-                <p className="text-center text-[11px] text-text-muted">
+                <p className="text-center text-2xs text-text-muted">
                   Prefer email? Write to us at{" "}
                   <a href="mailto:support@mellowvault.com" className="text-accent-primary hover:underline">
                     support@mellowvault.com
                   </a>
                 </p>
               </form>
-            )}
-          </motion.div>
-        </div>
       )}
-    </AnimatePresence>
+    </Modal>
   );
 }

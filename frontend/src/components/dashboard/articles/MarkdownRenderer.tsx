@@ -42,11 +42,11 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   return (
     <div className="relative my-4 rounded-control overflow-hidden border border-border-subtle not-prose">
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#1e1e1e] border-b border-white/10">
-        <span className="text-[10px] font-mono uppercase tracking-wide text-white/40">{language || "text"}</span>
+        <span className="text-3xs font-mono uppercase tracking-wide text-white/40">{language || "text"}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[10px] font-semibold text-white/50 hover:text-white/90 transition-colors"
+          className="flex items-center gap-1 text-3xs font-semibold text-white/50 hover:text-white/90 transition-colors"
         >
           {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
           {copied ? "Copied" : "Copy"}
@@ -105,7 +105,7 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
           hr: () => <hr className="my-8 border-border-subtle" />,
           table: ({ children }) => (
             <div className="my-4 overflow-x-auto rounded-control border border-border-subtle">
-              <table className="w-full text-[13px]">{children}</table>
+              <table className="w-full text-13">{children}</table>
             </div>
           ),
           thead: ({ children }) => <thead className="bg-elevated">{children}</thead>,

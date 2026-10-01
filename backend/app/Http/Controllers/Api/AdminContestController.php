@@ -11,7 +11,9 @@ use App\Models\ContestSubmission;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Models\Problem;
+use App\Models\User;
 use App\Services\ContestFinalizeService;
+use App\Services\ContestReportService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -280,5 +282,23 @@ class AdminContestController extends Controller
     private function guardNotTpoMock(Contest $contest): void
     {
         abort_if($contest->isTpoMock(), 403, 'This is a TPO mock contest — only its owning college can manage it.');
+    }
+
+    /**
+     * Same report TpoContestController exposes to a contest's own TPO, for
+     * any contest platform-wide — including a college's tpo_mock contest,
+     * deliberately NOT behind guardNotTpoMock(): that guard blocks
+     * mutation of someone else's practice contest, but read-only oversight
+     * of what happened in it is exactly what index() already extends to
+     * every contest type.
+     */
+    public function participants(Contest $contest, ContestReportService $report)
+    {
+        return response()->json(['participants' => $report->participants($contest)]);
+    }
+
+    public function participantSubmissions(Contest $contest, User $student, ContestReportService $report)
+    {
+        return response()->json(['submissions' => $report->participantSubmissions($contest, $student)]);
     }
 }

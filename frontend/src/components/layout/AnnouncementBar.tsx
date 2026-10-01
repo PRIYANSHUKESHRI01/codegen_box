@@ -12,7 +12,7 @@ export function AnnouncementBar() {
   return (
     <div className="relative bg-gradient-to-r from-accent-primary/20 via-indigo-500/15 to-accent-secondary/20 border-b border-accent-primary/20 text-xs sm:text-sm py-2.5 px-4 text-center z-50">
       <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 sm:gap-3 text-text-primary pr-8 sm:pr-0">
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold tracking-wide uppercase shrink-0">
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-2xs font-semibold tracking-wide uppercase shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-0.5" />
           Live
         </span>

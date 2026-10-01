@@ -23,7 +23,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(
       "inline-flex items-center font-medium tracking-wide transition-colors border select-none";
 
     const sizeStyles = {
-      sm: "text-[11px] px-2 py-0.5 rounded-[6px] gap-1.5",
+      sm: "text-2xs px-2 py-0.5 rounded-[6px] gap-1.5",
       md: "text-xs px-2.5 py-1 rounded-[7px] gap-1.5",
     };
 

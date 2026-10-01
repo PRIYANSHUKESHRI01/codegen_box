@@ -6,7 +6,6 @@ import {
   Award,
   Search,
   Loader2,
-  X,
   GraduationCap,
   Star,
   CheckCircle2,
@@ -26,6 +25,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
+import { Modal } from "@/components/ui/Modal";
 
 interface CollegeOption {
   id: number;
@@ -256,12 +256,12 @@ function BrowseTab({ onToast, onView }: { onToast: (msg: string) => void; onView
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="text-sm font-bold text-primary truncate">{c.user?.name ?? "Candidate"}</div>
-                  <div className="text-[11px] text-text-muted mt-0.5 flex items-center gap-1">
+                  <div className="text-2xs text-text-muted mt-0.5 flex items-center gap-1">
                     <GraduationCap className="w-3 h-3" />
                     {c.user?.college?.name ?? "Mellow Direct"}
                   </div>
                 </div>
-                <span className="px-2 py-1 rounded-control bg-status-success/15 text-status-success text-[11px] font-bold shrink-0">{c.score_percent}%</span>
+                <span className="px-2 py-1 rounded-control bg-status-success/15 text-status-success text-2xs font-bold shrink-0">{c.score_percent}%</span>
               </div>
               <div className="mt-3 flex items-center gap-2 text-[10.5px] text-text-muted flex-wrap">
                 {c.user?.branch && <span className="px-1.5 py-0.5 rounded bg-elevated">{c.user.branch}</span>}
@@ -288,17 +288,17 @@ function BrowseTab({ onToast, onView }: { onToast: (msg: string) => void; onView
               {c.user?.skills && c.user.skills.length > 0 && (
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                   {c.user.skills.slice(0, 3).map((skill) => (
-                    <span key={skill} className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 text-[10px] font-semibold">
+                    <span key={skill} className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 text-3xs font-semibold">
                       {skill}
                     </span>
                   ))}
                   {c.user.skills.length > 3 && (
-                    <span className="text-[10px] text-text-muted">+{c.user.skills.length - 3} more</span>
+                    <span className="text-3xs text-text-muted">+{c.user.skills.length - 3} more</span>
                   )}
                 </div>
               )}
               {c.my_inquiry_status && (
-                <div className={cn("mt-3 px-2 py-1 rounded text-[10px] font-bold w-fit", STATUS_BADGE[c.my_inquiry_status] ?? "bg-elevated text-text-muted")}>
+                <div className={cn("mt-3 px-2 py-1 rounded text-3xs font-bold w-fit", STATUS_BADGE[c.my_inquiry_status] ?? "bg-elevated text-text-muted")}>
                   {STATUS_LABEL[c.my_inquiry_status] ?? c.my_inquiry_status}
                 </div>
               )}
@@ -352,14 +352,14 @@ function EngagementsTab({ onView }: { onView: (id: number) => void }) {
         <button key={inq.id} onClick={() => onView(inq.candidate.id)} className="w-full text-left p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex items-center justify-between gap-4 flex-wrap hover:border-teal-500/40 transition-colors">
           <div className="min-w-0">
             <div className="text-sm font-bold text-primary">{inq.candidate.user?.name ?? "Candidate"}</div>
-            <div className="text-[11px] text-text-muted mt-0.5">
+            <div className="text-2xs text-text-muted mt-0.5">
               {inq.candidate.user?.college?.name ?? "Mellow Direct"} · {inq.candidate.score_percent}%
               {inq.interview_scheduled_at && (
                 <> · HR interview {new Date(inq.interview_scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</>
               )}
             </div>
           </div>
-          <span className={cn("px-2 py-1 rounded-control text-[11px] font-bold shrink-0", STATUS_BADGE[inq.status] ?? "bg-elevated text-text-muted")}>
+          <span className={cn("px-2 py-1 rounded-control text-2xs font-bold shrink-0", STATUS_BADGE[inq.status] ?? "bg-elevated text-text-muted")}>
             {STATUS_LABEL[inq.status] ?? inq.status}
           </span>
         </button>
@@ -431,18 +431,8 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
   const isTerminal = inquiry && ["hired", "declined_by_company", "declined_by_candidate", "withdrawn"].includes(inquiry.status);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[88vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Award className="w-4 h-4 text-teal-500" />
-            Talent Pool Profile
-          </h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <>
+      <Modal onClose={onClose} title="Talent Pool Profile" icon={Award} iconClassName="bg-teal-500/10 text-teal-500" size="xl">
         {loading || !detail ? (
           <div className="py-10 flex items-center justify-center gap-2 text-xs text-text-muted">
             <Loader2 className="w-4 h-4 animate-spin" />
@@ -464,19 +454,19 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
 
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-[10px] uppercase font-bold">Branch</div>
+                  <div className="text-text-muted text-3xs uppercase font-bold">Branch</div>
                   <div className="text-primary font-semibold mt-0.5">{detail.candidate.user?.branch ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-[10px] uppercase font-bold">CGPA</div>
+                  <div className="text-text-muted text-3xs uppercase font-bold">CGPA</div>
                   <div className="text-primary font-semibold mt-0.5">{detail.candidate.user?.cgpa ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-[10px] uppercase font-bold">Platform Rating</div>
+                  <div className="text-text-muted text-3xs uppercase font-bold">Platform Rating</div>
                   <div className="text-primary font-semibold mt-0.5">{detail.display_rating ?? "Unrated"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-[10px] uppercase font-bold">Readiness Score</div>
+                  <div className="text-text-muted text-3xs uppercase font-bold">Readiness Score</div>
                   <div className="text-primary font-semibold mt-0.5">{detail.readiness_score ?? "—"}/100</div>
                 </div>
               </div>
@@ -484,11 +474,11 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
               {(detail.candidate.user?.bio || detail.candidate.user?.linkedin_url || detail.candidate.user?.github_url || (detail.candidate.user?.skills?.length ?? 0) > 0 || detail.candidate.user?.has_resume) && (
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] uppercase font-bold text-text-muted">Recruiter Profile</span>
+                    <span className="text-3xs uppercase font-bold text-text-muted">Recruiter Profile</span>
                     {detail.candidate.user && detail.candidate.user.profile_completion_percent > 0 && (
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 rounded text-[10px] font-bold",
+                          "px-1.5 py-0.5 rounded text-3xs font-bold",
                           detail.candidate.user.profile_completion_percent >= 100
                             ? "bg-status-success/15 text-status-success"
                             : "bg-teal-500/15 text-teal-600"
@@ -517,7 +507,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
                         href={detail.candidate.user.linkedin_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
                       >
                         <Linkedin className="w-3.5 h-3.5" />
                         LinkedIn
@@ -528,7 +518,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
                         href={detail.candidate.user.github_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
                       >
                         <Github className="w-3.5 h-3.5" />
                         GitHub
@@ -538,7 +528,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
                       <button
                         onClick={handleResumeDownload}
                         disabled={downloadingResume}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/25 text-[11px] font-bold text-teal-600 transition-colors disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/25 text-2xs font-bold text-teal-600 transition-colors disabled:opacity-50"
                       >
                         {downloadingResume ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                         {downloadingResume ? "Downloading..." : "Resume"}
@@ -549,7 +539,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
                 </div>
               )}
 
-              <p className="text-[11px] text-text-muted">
+              <p className="text-2xs text-text-muted">
                 Qualified via &quot;{detail.candidate.source_contest?.title ?? "a Mellow assessment"}&quot; on{" "}
                 {new Date(detail.candidate.qualified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.
                 Contact details are never shared directly — every action below notifies the candidate through Mellow.
@@ -559,19 +549,19 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
             {inquiry && (
               <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-text-secondary">Your Engagement</span>
-                  <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold", STATUS_BADGE[inquiry.status] ?? "bg-elevated text-text-muted")}>
+                  <span className="text-2xs font-bold text-text-secondary">Your Engagement</span>
+                  <span className={cn("px-2 py-0.5 rounded text-3xs font-bold", STATUS_BADGE[inquiry.status] ?? "bg-elevated text-text-muted")}>
                     {STATUS_LABEL[inquiry.status] ?? inquiry.status}
                   </span>
                 </div>
                 {inquiry.interview_scheduled_at && (
-                  <div className="text-[11px] text-text-muted flex items-center gap-1.5">
+                  <div className="text-2xs text-text-muted flex items-center gap-1.5">
                     <CalendarClock className="w-3 h-3" />
                     {new Date(inquiry.interview_scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · {inquiry.interview_mode} · {inquiry.interview_location}
                   </div>
                 )}
                 {inquiry.ctc_offered && (
-                  <div className="text-[11px] text-text-muted">Offered CTC: ₹{Number(inquiry.ctc_offered).toLocaleString("en-IN")}</div>
+                  <div className="text-2xs text-text-muted">Offered CTC: ₹{Number(inquiry.ctc_offered).toLocaleString("en-IN")}</div>
                 )}
                 {inquiry.messages && inquiry.messages.length > 0 && (
                   <div className="pt-1.5 mt-1.5 border-t border-border-subtle space-y-1.5">
@@ -588,20 +578,20 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
             {!isTerminal && (
               <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border-subtle">
                 {!inquiry && (
-                  <button onClick={handleInterest} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-bold transition-colors disabled:opacity-60">
+                  <button onClick={handleInterest} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors disabled:opacity-60">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     Express Interest
                   </button>
                 )}
-                <button onClick={() => setShowInterviewForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors">
+                <button onClick={() => setShowInterviewForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
                   <CalendarClock className="w-3.5 h-3.5" />
                   Schedule HR Interview
                 </button>
-                <button onClick={() => setShowHireForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[11px] font-bold text-status-success transition-colors">
+                <button onClick={() => setShowHireForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors">
                   <Briefcase className="w-3.5 h-3.5" />
                   Hire
                 </button>
-                <button onClick={() => setShowMessageForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors">
+                <button onClick={() => setShowMessageForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
                   <Send className="w-3.5 h-3.5" />
                   Send Message
                 </button>
@@ -609,7 +599,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
             )}
           </>
         )}
-      </div>
+      </Modal>
 
       {showInterviewForm && (
         <ScheduleInterviewForm candidateId={candidateId} onClose={() => setShowInterviewForm(false)} onDone={(msg) => { onToast(msg); setShowInterviewForm(false); load(); }} />
@@ -620,7 +610,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       {showMessageForm && (
         <MessageForm candidateId={candidateId} onClose={() => setShowMessageForm(false)} onDone={(msg) => { onToast(msg); setShowMessageForm(false); load(); }} />
       )}
-    </div>
+    </>
   );
 }
 
@@ -652,44 +642,44 @@ function ScheduleInterviewForm({ candidateId, onClose, onDone }: { candidateId: 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-3">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-sm font-bold text-primary">Schedule HR Interview</h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50"><X className="w-4 h-4" /></button>
+    <Modal
+      onClose={onClose}
+      title="Schedule HR Interview"
+      size="md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
+          <button type="submit" form="schedule-hr-interview-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Scheduling..." : "Schedule"}</button>
+        </>
+      }
+    >
+      <form id="schedule-hr-interview-form" onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">When *</label>
+          <input required type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
         </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">When *</label>
-            <input required type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">Mode *</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button type="button" onClick={() => setMode("online")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-2xs font-bold transition-colors", mode === "online" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
+              <Video className="w-3.5 h-3.5" /> Online
+            </button>
+            <button type="button" onClick={() => setMode("offline")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-2xs font-bold transition-colors", mode === "offline" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
+              <MapPin className="w-3.5 h-3.5" /> In Person
+            </button>
           </div>
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">Mode *</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => setMode("online")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-[11px] font-bold transition-colors", mode === "online" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
-                <Video className="w-3.5 h-3.5" /> Online
-              </button>
-              <button type="button" onClick={() => setMode("offline")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-[11px] font-bold transition-colors", mode === "offline" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
-                <MapPin className="w-3.5 h-3.5" /> In Person
-              </button>
-            </div>
-          </div>
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">{mode === "online" ? "Meeting Link *" : "Location *"}</label>
-            <input required value={location} onChange={(e) => setLocation(e.target.value)} placeholder={mode === "online" ? "https://meet.example.com/..." : "Office address"} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-          </div>
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">Note</label>
-            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-          </div>
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Scheduling..." : "Schedule"}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        </div>
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">{mode === "online" ? "Meeting Link *" : "Location *"}</label>
+          <input required value={location} onChange={(e) => setLocation(e.target.value)} placeholder={mode === "online" ? "https://meet.example.com/..." : "Office address"} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+        </div>
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">Note</label>
+          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+        </div>
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -714,30 +704,30 @@ function HireForm({ candidateId, onClose, onDone }: { candidateId: number; onClo
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-3">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-sm font-bold text-primary">Hire This Candidate</h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50"><X className="w-4 h-4" /></button>
+    <Modal
+      onClose={onClose}
+      title="Hire This Candidate"
+      size="md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
+          <button type="submit" form="hire-candidate-form" disabled={saving} className="px-4 py-2 rounded-control bg-status-success hover:bg-status-success/90 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Hiring..." : "Confirm Hire"}</button>
+        </>
+      }
+    >
+      <p className="text-2xs text-text-muted mb-3">This is final — the candidate is notified immediately and removed from every other partner&apos;s Talent Pool search.</p>
+      <form id="hire-candidate-form" onSubmit={handleSubmit} className="space-y-3">
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">CTC Offered (₹/year)</label>
+          <input type="number" min={0} value={ctc} onChange={(e) => setCtc(e.target.value)} placeholder="e.g. 1200000" className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
         </div>
-        <p className="text-[11px] text-text-muted">This is final — the candidate is notified immediately and removed from every other partner&apos;s Talent Pool search.</p>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">CTC Offered (₹/year)</label>
-            <input type="number" min={0} value={ctc} onChange={(e) => setCtc(e.target.value)} placeholder="e.g. 1200000" className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-          </div>
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">Note</label>
-            <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-          </div>
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-status-success hover:bg-status-success/90 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Hiring..." : "Confirm Hire"}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div>
+          <label className="block font-semibold text-text-secondary mb-1">Note</label>
+          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+        </div>
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -761,21 +751,21 @@ function MessageForm({ candidateId, onClose, onDone }: { candidateId: number; on
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-3">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-sm font-bold text-primary">Send a Message</h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50"><X className="w-4 h-4" /></button>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
-          <textarea required rows={4} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message to the candidate..." className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Sending..." : "Send"}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <Modal
+      onClose={onClose}
+      title="Send a Message"
+      size="md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
+          <button type="submit" form="send-message-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Sending..." : "Send"}</button>
+        </>
+      }
+    >
+      <form id="send-message-form" onSubmit={handleSubmit} className="space-y-3">
+        <textarea required rows={4} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message to the candidate..." className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+        {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }

@@ -198,14 +198,14 @@ export function PricingPlans({ audience, billingCycle, coverage, onSubscribed }:
                       <Icon className="w-6 h-6" />
                     </div>
                     {isCurrentIndividualPlan ? (
-                      <span className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border bg-status-success/15 text-status-success border-status-success/30">
+                      <span className="px-2.5 py-1 text-3xs font-bold uppercase tracking-wide rounded-full border bg-status-success/15 text-status-success border-status-success/30">
                         Current Plan
                       </span>
                     ) : (
                       plan.badge && (
                         <span
                           className={cn(
-                            "px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide rounded-full border",
+                            "px-2.5 py-1 text-3xs font-bold uppercase tracking-wide rounded-full border",
                             plan.featured
                               ? "bg-accent-primary/15 text-accent-primary border-accent-primary/30"
                               : "bg-elevated text-text-muted border-border-subtle"

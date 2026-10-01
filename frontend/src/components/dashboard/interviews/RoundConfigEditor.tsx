@@ -48,7 +48,7 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
 
       <div className="grid grid-cols-3 gap-2.5">
         <div>
-          <label className="block text-[10px] font-semibold text-text-secondary mb-1">Questions</label>
+          <label className="block text-3xs font-semibold text-text-secondary mb-1">Questions</label>
           <input
             type="number"
             min={1}
@@ -59,7 +59,7 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
           />
         </div>
         <div>
-          <label className="block text-[10px] font-semibold text-text-secondary mb-1">Difficulty</label>
+          <label className="block text-3xs font-semibold text-text-secondary mb-1">Difficulty</label>
           <select
             value={round.difficulty}
             onChange={(e) => onChange({ ...round, difficulty: e.target.value as QuestionDifficulty })}
@@ -73,7 +73,7 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
           </select>
         </div>
         <div>
-          <label className="block text-[10px] font-semibold text-text-secondary mb-1">Qualifying score %</label>
+          <label className="block text-3xs font-semibold text-text-secondary mb-1">Qualifying score %</label>
           <input
             type="number"
             min={1}
@@ -87,10 +87,10 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
 
       <div>
         <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] font-semibold text-text-secondary">Category weights</label>
+          <label className="text-3xs font-semibold text-text-secondary">Category weights</label>
           <span
             className={cn(
-              "flex items-center gap-1 text-[10px] font-bold",
+              "flex items-center gap-1 text-3xs font-bold",
               isValid ? "text-status-success" : "text-status-danger"
             )}
           >

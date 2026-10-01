@@ -87,7 +87,7 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
                 <Search className="w-4 h-4" />
                 <span>Search problems...</span>
               </span>
-              <kbd className="px-1.5 py-0.5 text-[10px] font-mono bg-surface border border-border-subtle rounded">
+              <kbd className="px-1.5 py-0.5 text-3xs font-mono bg-surface border border-border-subtle rounded">
                 ⌘K
               </kbd>
             </button>
@@ -102,7 +102,7 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
                 <>
                   <span>{link.label}</span>
                   {link.badge && (
-                    <span className="px-2 py-0.5 text-[11px] font-bold uppercase rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
+                    <span className="px-2 py-0.5 text-2xs font-bold uppercase rounded-full bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
                       {link.badge}
                     </span>
                   )}

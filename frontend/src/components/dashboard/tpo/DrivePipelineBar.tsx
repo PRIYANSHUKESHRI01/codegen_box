@@ -31,14 +31,14 @@ export function DrivePipelineBar({ stages, compact = false }: DrivePipelineBarPr
       <div className="flex items-center gap-1.5">
         {stages.map((stage, idx) => (
           <div key={stage.name} className="flex-1 min-w-0" title={`${stage.name}: ${stage.count}`}>
-            <div className="text-[9px] text-text-muted truncate mb-1">{stage.name}</div>
+            <div className="text-3xs text-text-muted truncate mb-1">{stage.name}</div>
             <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
               <div
                 className={cn("h-full rounded-full", STAGE_COLORS[idx % STAGE_COLORS.length])}
                 style={{ width: `${Math.max(3, (stage.count / max) * 100)}%` }}
               />
             </div>
-            <div className="text-[10px] font-mono font-bold text-primary mt-1">{stage.count}</div>
+            <div className="text-3xs font-mono font-bold text-primary mt-1">{stage.count}</div>
           </div>
         ))}
       </div>
@@ -53,7 +53,7 @@ export function DrivePipelineBar({ stages, compact = false }: DrivePipelineBarPr
             className={cn("w-2 h-2 rounded-full mx-auto mb-2", STAGE_COLORS[idx % STAGE_COLORS.length])}
           />
           <div className="text-lg font-black text-primary font-mono">{stage.count}</div>
-          <div className="text-[10px] text-text-muted mt-0.5 leading-tight">{stage.name}</div>
+          <div className="text-3xs text-text-muted mt-0.5 leading-tight">{stage.name}</div>
         </div>
       ))}
     </div>

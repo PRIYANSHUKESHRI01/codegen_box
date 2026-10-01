@@ -57,6 +57,12 @@ class JudgeOutcomePersister
             ],
             [
                 'language' => $request->language,
+                // The one-row-per-(user, problem, day) upsert means a later
+                // resubmit on the same day overwrites this with whatever
+                // that resubmit wrote — correct: it's also the row whose
+                // status/runtime this same statement is overwriting, so the
+                // stored code always matches the stored verdict.
+                'code' => $request->code,
                 'status' => $outcome['submissionStatus'],
                 'runtime_ms' => $outcome['runtimeMs'],
                 'memory_kb' => $outcome['memoryKb'],
@@ -88,6 +94,7 @@ class JudgeOutcomePersister
                     'contest_problem_id' => $request->contestProblemId,
                     'user_id' => $request->userId,
                     'language' => $request->language,
+                    'code' => $request->code,
                     'status' => $outcome['submissionStatus'],
                     'submitted_at' => Carbon::parse($request->requestedAt),
                     'points_awarded' => $outcome['submissionStatus'] === Submission::STATUS_ACCEPTED ? $contestProblem->points : 0,

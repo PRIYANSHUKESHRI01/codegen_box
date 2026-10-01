@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { X, Layers, CheckCircle2 } from "lucide-react";
+import { Layers, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { Modal } from "@/components/ui/Modal";
 import { DriveVisibilityPanel } from "@/components/admin/contests/DriveVisibilityPanel";
 import { GenerateQuestionsPanel } from "@/components/dashboard/interviews/GenerateQuestionsPanel";
 import { RoundQuestionTargetChecklist } from "@/components/dashboard/interviews/RoundQuestionTargetChecklist";
@@ -152,19 +153,33 @@ export function CreateInterviewTrackModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Layers className="w-4 h-4 text-accent-primary" />
-            <span>New Final Interview (3 Rounds)</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Final Interview (3 Rounds)"
+      icon={Layers}
+      size="xl"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+          >
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <button
+            type="submit"
+            form="create-interview-track-form"
+            disabled={saving || !selectedTemplate || (needsDrive && !selectedDriveId)}
+            className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-50"
+          >
+            {saving ? "Creating..." : "Create Track"}
+          </button>
+        </>
+      }
+    >
+      <form id="create-interview-track-form" onSubmit={handleSubmit} className="space-y-3 text-xs">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Role Template *</label>
             <select
@@ -181,7 +196,7 @@ export function CreateInterviewTrackModal({
               ))}
             </select>
             {templates.length === 0 && (
-              <p className="text-[10px] text-text-muted mt-1">No role templates yet — create one first.</p>
+              <p className="text-3xs text-text-muted mt-1">No role templates yet — create one first.</p>
             )}
           </div>
 
@@ -208,7 +223,7 @@ export function CreateInterviewTrackModal({
                     type="button"
                     onClick={() => setTrackType(t)}
                     className={cn(
-                      "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                      "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                       trackType === t ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                     )}
                   >
@@ -308,23 +323,9 @@ export function CreateInterviewTrackModal({
             />
           </div>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving || !selectedTemplate || (needsDrive && !selectedDriveId)}
-              className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-50"
-            >
-              {saving ? "Creating..." : "Create Track"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -382,46 +383,20 @@ function GenerateRoundsStep({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <div>
-            <h3 className="text-base font-bold text-primary flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-status-success" />
-              <span>{track.title}</span>
-            </h3>
-            <p className="text-[11px] text-text-muted mt-0.5">Generate each round&apos;s questions, then publish when ready.</p>
-          </div>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-5">
-          {rounds.map((round, i) => {
-            const config = template.rounds_config[i];
-            return (
-              <div key={round.id} className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-[10.5px] font-bold text-accent-primary shrink-0">
-                    {round.round_number}
-                  </span>
-                  <h4 className="text-xs font-bold text-primary">{round.round_name}</h4>
-                </div>
-                <RoundQuestionTargetChecklist round={config} attachedQuestions={attachedByRound[round.id] ?? []} />
-                <GenerateQuestionsPanel
-                  key={round.id}
-                  defaultRole={track.role_title ?? template.name}
-                  companyId={track.company?.id}
-                  onAddNow={handleAddNow(round)}
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+    <Modal
+      onClose={onClose}
+      title={track.title}
+      subtitle="Generate each round's questions, then publish when ready."
+      icon={CheckCircle2}
+      iconClassName="bg-status-success/10 text-status-success"
+      size="2xl"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
+          >
             Finish Later
           </button>
           <button
@@ -432,8 +407,31 @@ function GenerateRoundsStep({
           >
             {publishing ? "Publishing..." : "Publish All 3 Rounds"}
           </button>
-        </div>
+        </>
+      }
+    >
+      <div className="space-y-5">
+        {rounds.map((round, i) => {
+          const config = template.rounds_config[i];
+          return (
+            <div key={round.id} className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-[10.5px] font-bold text-accent-primary shrink-0">
+                  {round.round_number}
+                </span>
+                <h4 className="text-xs font-bold text-primary">{round.round_name}</h4>
+              </div>
+              <RoundQuestionTargetChecklist round={config} attachedQuestions={attachedByRound[round.id] ?? []} />
+              <GenerateQuestionsPanel
+                key={round.id}
+                defaultRole={track.role_title ?? template.name}
+                companyId={track.company?.id}
+                onAddNow={handleAddNow(round)}
+              />
+            </div>
+          );
+        })}
       </div>
-    </div>
+    </Modal>
   );
 }

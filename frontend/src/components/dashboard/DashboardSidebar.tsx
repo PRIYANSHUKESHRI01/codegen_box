@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   ChevronLeft,
   ChevronRight,
@@ -34,6 +34,8 @@ import {
   Newspaper,
   Award,
   Inbox,
+  Sparkles,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -46,14 +48,40 @@ import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
 import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 import { LogoutConfirmModal } from "@/components/dashboard/LogoutConfirmModal";
 
+/**
+ * Rail geometry, in px.
+ *
+ * Mirrored by the `rail` / `rail-collapsed` spacing tokens in
+ * tailwind.config.ts, which DashboardShell consumes as `md:pl-rail` /
+ * `md:pl-rail-collapsed` for the content offset and the SSR placeholder.
+ * Change these and those together — they had already drifted: the panel
+ * animated to 280px while the content was offset by `pl-64` (256px), so the
+ * rail sat on top of the first 24px of every dashboard page's content column.
+ */
+const RAIL_WIDTH = 280;
+const RAIL_COLLAPSED_WIDTH = 80;
+
 export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "admin_marketing" | "user" | "section_coordinator" | "admin_company";
+
+/**
+ * Semantic meaning of a nav badge, not a colour.
+ *
+ * Every badge used to carry its own hand-written Tailwind colour string,
+ * which meant a plain record count ("1,450 students") shouted in saturated
+ * cyan with exactly the same urgency as a real alert ("Live"). On a nav rail
+ * that inverts the hierarchy — the eye is pulled to the least actionable
+ * thing on screen. Counts are now neutral chips and only genuine status
+ * earns colour, which is also why the tone is declared at the call site
+ * rather than a class list: a new item can't invent a seventh badge style.
+ */
+type BadgeTone = "count" | "new" | "live" | "ok";
 
 interface NavItem {
   label: string;
   href: string;
   icon: any;
   badge?: string;
-  badgeColor?: string;
+  badgeTone?: BadgeTone;
 }
 
 interface NavSection {
@@ -93,7 +121,12 @@ export function DashboardSidebar({
   const expanded = !collapsed || hoverPeek;
   const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleRailMouseEnter = () => {
+  // Bound to focus as well as hover (onFocusCapture/onBlurCapture on the
+  // panel). Keyboard users never generate a mouseenter, so a hover-only peek
+  // left them tabbing through a column of unlabelled icons with no way to
+  // find out what any of them were — the collapsed rail was effectively
+  // keyboard-inaccessible.
+  const openPeek = () => {
     if (closeTimeoutRef.current) {
       clearTimeout(closeTimeoutRef.current);
       closeTimeoutRef.current = null;
@@ -101,7 +134,7 @@ export function DashboardSidebar({
     if (collapsed) setHoverPeek(true);
   };
 
-  const handleRailMouseLeave = () => {
+  const closePeekSoon = () => {
     closeTimeoutRef.current = setTimeout(() => setHoverPeek(false), 200);
   };
 
@@ -110,6 +143,12 @@ export function DashboardSidebar({
       if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
     };
   }, []);
+
+  // The rail's width spring is a transform-adjacent layout animation, which
+  // is exactly the class of motion the global prefers-reduced-motion rule in
+  // globals.css cannot reach — that rule caps CSS transitions, and this one
+  // is driven by framer-motion in JS.
+  const prefersReducedMotion = useReducedMotion();
 
   const pathname = usePathname();
   const router = useRouter();
@@ -235,56 +274,63 @@ export function DashboardSidebar({
             href: "/admin?view=mellow&tab=colleges",
             icon: Building2,
             badge: adminOverview ? `${adminOverview.segments.colleges}` : undefined,
-            badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
+            badgeTone: "count",
           },
           {
             label: "Platform Users",
             href: "/admin?view=mellow&tab=users",
             icon: Users2,
             badge: adminOverview ? `${adminOverview.segments.platform_users}` : undefined,
-            badgeColor: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+            badgeTone: "count",
           },
           {
             label: "Problem Bank",
             href: "/admin?view=mellow&tab=problems",
             icon: FileCode2,
             badge: adminOverview ? `${adminOverview.segments.problems}` : undefined,
-            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+            badgeTone: "count",
           },
           {
             label: "Placement Drives",
             href: "/admin/placements",
             icon: Briefcase,
             badge: adminOverview ? `${adminOverview.segments.placement_drives}` : undefined,
-            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+            badgeTone: "count",
           },
           {
             label: "Contests",
             href: "/admin/contests",
             icon: Swords,
             badge: adminOverview ? `${adminOverview.segments.contests}` : undefined,
-            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+            badgeTone: "count",
           },
           {
             label: "AI Interviews",
             href: "/admin/interviews",
             icon: Mic,
             badge: adminOverview ? `${adminOverview.segments.interviews}` : undefined,
-            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+            badgeTone: "count",
+          },
+          {
+            label: "Soft Skills",
+            href: "/admin/soft-skills",
+            icon: Brain,
+            badge: "New",
+            badgeTone: "new",
           },
           {
             label: "Articles",
             href: "/admin/articles",
             icon: Newspaper,
             badge: adminOverview ? `${adminOverview.segments.articles}` : undefined,
-            badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30",
+            badgeTone: "count",
           },
           {
             label: "Talent Pool",
             href: "/admin/talent-pool",
             icon: Award,
             badge: "New",
-            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+            badgeTone: "new",
           },
         ],
       },
@@ -296,7 +342,7 @@ export function DashboardSidebar({
             href: "/admin/customers",
             icon: UserSearch,
             badge: "Converted",
-            badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
+            badgeTone: "ok",
           },
         ],
       },
@@ -362,14 +408,14 @@ export function DashboardSidebar({
               href: "/superadmin?tab=audit",
               icon: ShieldAlert,
               badge: "Live",
-              badgeColor: "bg-status-warning/15 text-status-warning border-status-warning/30",
+              badgeTone: "live",
             },
             {
               label: "Infrastructure & Flags",
               href: "/superadmin?tab=infrastructure",
               icon: Cpu,
               badge: "99.99%",
-              badgeColor: "bg-status-success/15 text-status-success border-status-success/30",
+              badgeTone: "ok",
             },
           ],
         },
@@ -400,7 +446,7 @@ export function DashboardSidebar({
               href: "/admin/students",
               icon: GraduationCap,
               badge: "1,450",
-              badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30",
+              badgeTone: "count",
             },
             {
               label: "Section Coordinators",
@@ -416,6 +462,13 @@ export function DashboardSidebar({
               label: "Mock Interviews",
               href: "/admin/mock-interviews",
               icon: Mic,
+            },
+            {
+              label: "Soft Skills",
+              href: "/admin/mock-soft-skills",
+              icon: Brain,
+              badge: "New",
+              badgeTone: "new",
             },
           ],
         },
@@ -446,11 +499,18 @@ export function DashboardSidebar({
             { label: "Assessments", href: "/admin/company/assessments", icon: Swords },
             { label: "AI Interviews", href: "/admin/company/interviews", icon: Mic },
             {
+              label: "Soft Skills",
+              href: "/admin/company/soft-skills",
+              icon: Brain,
+              badge: "New",
+              badgeTone: "new",
+            },
+            {
               label: "Talent Pool",
               href: "/admin/company/talent-pool",
               icon: Award,
               badge: "New",
-              badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+              badgeTone: "new",
             },
           ],
         },
@@ -507,12 +567,14 @@ export function DashboardSidebar({
             href: "/dashboard/reports",
             icon: LineChart,
             badge: "New",
-            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+            badgeTone: "new",
           },
           {
-            label: "Articles",
-            href: "/dashboard/articles",
-            icon: Newspaper,
+            label: "Learning Centre",
+            href: "/dashboard/learning-centre",
+            icon: Sparkles,
+            badge: "AI",
+            badgeTone: "new",
           },
         ],
       },
@@ -530,14 +592,21 @@ export function DashboardSidebar({
             href: "/dashboard/interviews",
             icon: Mic,
             badge: "New",
-            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+            badgeTone: "new",
+          },
+          {
+            label: "Soft Skills",
+            href: "/dashboard/soft-skills",
+            icon: Brain,
+            badge: "New",
+            badgeTone: "new",
           },
           {
             label: "Talent Pool",
             href: "/dashboard/talent-pool",
             icon: Award,
             badge: "New",
-            badgeColor: "bg-emerald-500/10 text-emerald-500 border-emerald-500/25",
+            badgeTone: "new",
           },
           { label: "Submissions", href: "/dashboard#submissions", icon: Activity },
           { label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Swords },
@@ -657,316 +726,428 @@ export function DashboardSidebar({
   const isRatedStudent = (myStats?.rating.rated_contests_count ?? 0) > 0;
   const studentTier = isRatedStudent ? getRatingTier(myStats!.rating.current_rating) : null;
 
-  const sidebarContent = (
-    <div className="flex flex-col h-full bg-surface border-r border-border-subtle relative select-none">
-      {/* Brand Header */}
-      <div className="px-4 py-3.5 border-b border-border-subtle flex items-center justify-between gap-2.5 h-16 flex-shrink-0">
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+  // Badge presentation, keyed to the semantic tone declared at each call
+  // site. Tuned for the graphite rail specifically rather than reusing the
+  // app-wide status-*/accent-* tokens: those flip with the page theme, and
+  // several of them (accent-primary is #4F46E5 under html.light) land well
+  // under 4.5:1 on the rail's fixed #0E1117 background.
+  //
+  // The `onActive` variant exists because a neutral white/7% chip sitting on
+  // the active row's indigo wash all but disappears — a badge has to survive
+  // being on the selected item, which is exactly where it's most likely to
+  // be looked at.
+  const badgeToneClass: Record<BadgeTone, { idle: string; onActive: string }> = {
+    // A count is reference information, not an alert. Neutral chip, and
+    // tabular figures so a column of them doesn't visibly jitter in width.
+    count: {
+      idle: "bg-sidebar-chip text-sidebar-chip-text tabular-nums",
+      onActive: "bg-white/[0.14] text-white tabular-nums",
+    },
+    new: {
+      idle: "bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/25",
+      onActive: "bg-emerald-400/20 text-emerald-200 ring-1 ring-inset ring-emerald-300/40",
+    },
+    ok: {
+      idle: "bg-emerald-400/10 text-emerald-300 ring-1 ring-inset ring-emerald-400/25",
+      onActive: "bg-emerald-400/20 text-emerald-200 ring-1 ring-inset ring-emerald-300/40",
+    },
+    live: {
+      idle: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/25",
+      onActive: "bg-amber-400/20 text-amber-200 ring-1 ring-inset ring-amber-300/40",
+    },
+  };
+
+  // The secondary line under the account name in the footer.
+  //
+  // The rail used to print the signed-in user TWICE — a bordered identity
+  // card directly beneath the brand header AND a profile row in the footer,
+  // both leading with the same name. That was ~120px of a finite-height rail
+  // spent saying one thing twice, and it's the single biggest reason the old
+  // sidebar didn't read as a shipped product. The card is gone; nothing it
+  // showed is lost, because both things it carried (the role label, and a
+  // student's rating tier) resolve here.
+  const accountMeta =
+    currentRole === "user" && myStats ? (
+      studentTier ? (
+        <>
+          <span className={cn("font-extrabold", studentTier.text)}>{studentTier.label}</span>
+          <span className="font-mono text-sidebar-dim">{myStats.rating.current_rating}</span>
+          <span className="text-sidebar-faint">Div {studentTier.division}</span>
+        </>
+      ) : (
+        <>
+          <span className="font-mono text-sidebar-dim">{myStats.rating.solved_score} pts</span>
+          <span className="text-sidebar-faint">Unrated</span>
+        </>
+      )
+    ) : (
+      <span className="text-sidebar-dim">{currentRoleInfo.label}</span>
+    );
+
+  const showsPlan = currentRole === "user" || currentRole === "admin_tpo";
+
+  /**
+   * One rail, rendered at a caller-chosen width.
+   *
+   * `isExpanded` is a parameter rather than the closed-over `expanded`
+   * because the mobile drawer has no collapsed mode — it is always a full
+   * 300px panel. Reading the desktop state in there meant that collapsing
+   * the rail on a laptop and then narrowing the window (or opening the
+   * drawer on a phone in the same session) produced a 300px-wide drawer
+   * showing nothing but a column of unlabelled icons.
+   */
+  const renderRail = (isExpanded: boolean) => (
+    <div className="relative flex h-full flex-col overflow-hidden bg-sidebar select-none">
+      {/* A single soft accent wash bled down from the top edge. Keeps a tall
+          flat panel from reading as a dead rectangle without resorting to
+          per-element gradients or glows on the nav rows themselves. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(120%_100%_at_50%_0%,rgba(99,102,241,0.13),transparent_72%)]"
+      />
+
+      {/* ── Brand ──────────────────────────────────────────────────────── */}
+      <div
+        className={cn(
+          "relative z-10 flex h-16 flex-shrink-0 items-center border-b border-sidebar-border bg-sidebar-raised",
+          isExpanded ? "justify-between gap-3 px-4" : "justify-center px-0"
+        )}
+      >
         <Link
           href="/"
-          className="flex items-center gap-2.5 overflow-hidden group focus-visible:outline-none min-w-0"
+          className="sb-focus group flex min-w-0 items-center gap-2.5 outline-none"
+          aria-label="CodeGen Box home"
         >
-          {/* Bespoke Production Brand Emblem */}
-          <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:drop-shadow-[0_0_10px_rgba(99,102,241,0.4)]" />
+          <LogoBadge className="h-9 w-9 shrink-0 transition-transform duration-200 group-hover:scale-[1.04]" />
 
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
+          <AnimatePresence initial={false}>
+            {isExpanded && (
+              <motion.span
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -6 }}
                 transition={{ duration: 0.15 }}
-                className="flex flex-col min-w-0 whitespace-nowrap"
+                className="flex min-w-0 flex-col whitespace-nowrap"
               >
-                <div className="flex items-center gap-1.5">
-                  <Wordmark className="font-extrabold text-base tracking-tight text-primary leading-none truncate" />
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold rounded uppercase bg-accent-primary/10 text-accent-primary border border-accent-primary/25 tracking-wider">
-                    PRO
+                <span className="flex items-center gap-1.5">
+                  {/* text-15's own paired line-height (20px, see
+                      tailwind.config.ts) — not leading-none. A 1.0 line-box
+                      combined with `truncate`'s overflow:hidden was clipping
+                      the descender off "Codegen"'s "g"; same fix applied to
+                      every other leading-none+truncate label below. */}
+                  <Wordmark className="truncate text-15 font-extrabold tracking-tight text-sidebar-strong" />
+                  <span className="rounded bg-sidebar-accent-soft px-1.5 py-[3px] text-3xs font-extrabold uppercase leading-none tracking-[0.1em] text-sidebar-accent ring-1 ring-inset ring-[rgba(129,140,248,0.3)]">
+                    Pro
                   </span>
-                </div>
-                <span className="text-[10px] font-semibold text-text-muted tracking-wider uppercase mt-1 truncate">
+                </span>
+                {/* The portal context ("Placement Hub", "Master Console"…).
+                    Deliberately the quietest thing in the header: it labels
+                    the rail, it isn't a destination. */}
+                <span className="mt-1.5 truncate text-[9.5px] font-bold uppercase leading-[13px] tracking-[0.14em] text-sidebar-faint">
                   {currentRoleInfo.subtext}
                 </span>
-              </motion.div>
+              </motion.span>
             )}
           </AnimatePresence>
         </Link>
 
-        {/* Desktop Collapse Toggle */}
-        <button
-          onClick={toggleCollapse}
-          className="hidden lg:flex w-7 h-7 rounded-control border border-border-subtle hover:border-border-strong bg-surface hover:bg-surface-hover text-text-muted hover:text-primary items-center justify-center transition-all flex-shrink-0 shadow-subtle"
-          title={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          aria-label={collapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      </div>
-
-      {/* Signed-in Account (read-only — no persona/role switching) */}
-      <div className="p-3 border-b border-border-subtle flex-shrink-0">
-        <div className="w-full flex items-center gap-2.5 p-2 rounded-control border border-border-subtle bg-surface-hover/40 shadow-subtle">
-          <div
-            className={cn(
-              "w-7 h-7 rounded-control border flex items-center justify-center flex-shrink-0 shadow-subtle",
-              currentRoleInfo.iconBg
-            )}
+        {/* Rendered only while expanded — at 80px the rail cannot fit a 36px
+            mark, a 32px button and their padding, so the old always-on
+            toggle was simply clipped away by the panel's overflow. It needs
+            no collapsed-state equivalent: pointing at the rail (or tabbing
+            into it) peeks it open, which brings this button back with it. */}
+        {isExpanded && (
+          <button
+            onClick={toggleCollapse}
+            className="sb-focus hidden h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-sidebar-border bg-white/[0.03] text-sidebar-dim transition-colors hover:border-sidebar-border-strong hover:bg-white/[0.07] hover:text-sidebar-strong md:flex"
+            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
           >
-            <RoleIcon className={cn("w-3.5 h-3.5", currentRoleInfo.iconColor)} strokeWidth={2.2} />
-          </div>
-
-          <AnimatePresence>
-            {expanded && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
-                className="flex-1 min-w-0 whitespace-nowrap"
-              >
-                <span className="text-xs font-semibold text-primary truncate block leading-tight">
-                  {displayName}
-                </span>
-                {currentRole === "user" && myStats ? (
-                  <span className="flex items-center gap-1.5 mt-0.5 text-[10px] font-medium">
-                    {studentTier ? (
-                      <>
-                        <span className={cn("font-black", studentTier.text)}>{studentTier.label}</span>
-                        <span className="text-text-muted font-mono">{myStats.rating.current_rating}</span>
-                        <span className="text-text-muted">· Div {studentTier.division}</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-text-muted font-mono">{myStats.rating.solved_score} pts</span>
-                        <span className="text-text-muted">· Unrated</span>
-                      </>
-                    )}
-                  </span>
-                ) : currentRole !== "user" ? (
-                  <span className="text-[10px] text-text-muted font-medium truncate block mt-0.5">
-                    {currentRoleInfo.label}
-                  </span>
-                ) : null}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          </button>
+        )}
       </div>
 
-      {/* Navigation Links */}
-      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5">
+      {/* ── Navigation ─────────────────────────────────────────────────── */}
+      <nav
+        aria-label="Dashboard sections"
+        className="sb-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4"
+      >
         {navSections.map((section, idx) => (
-          <div key={idx} className="space-y-1">
-            {expanded && section.title && (
-              <div className="px-2.5 pb-1 text-[10px] font-bold uppercase tracking-wider text-text-muted/75">
-                {section.title}
-              </div>
-            )}
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const active = isItemActive(item.href);
-
-              return (
-                <Link
-                  key={item.label}
-                  href={item.href}
-                  onClick={() => {
-                    if (item.href.includes("#")) {
-                      setCurrentHash("#" + item.href.split("#")[1]);
-                    } else {
-                      setCurrentHash("");
-                    }
-                    if (onCloseMobile) onCloseMobile();
-                  }}
+          <div key={section.title ?? idx} className={idx > 0 ? "mt-6" : undefined}>
+            {section.title && (
+              <>
+                {/* Kept in the accessibility tree at every width — collapsing
+                    the rail is a visual affordance and must not silently
+                    delete the grouping a screen-reader user navigates by. */}
+                <h2
                   className={cn(
-                    "flex items-center gap-3 px-2.5 py-2 rounded-control text-xs font-medium transition-all group relative",
-                    active
-                      ? "bg-accent-primary/10 text-accent-primary font-semibold shadow-subtle border border-accent-primary/20"
-                      : "text-text-secondary hover:text-primary hover:bg-surface-hover/70"
+                    "px-3 pb-2 text-[10.5px] font-bold uppercase leading-none tracking-[0.1em] text-sidebar-faint",
+                    !isExpanded && "sr-only"
                   )}
-                  title={expanded ? undefined : item.label}
                 >
-                  {/* High-end active indicator pill */}
-                  {active && (
-                    <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-accent-primary shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
-                  )}
-                  <Icon
-                    className={cn(
-                      "w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-105",
-                      active ? "text-accent-primary" : "text-text-muted group-hover:text-primary"
-                    )}
-                    strokeWidth={active ? 2.2 : 1.8}
-                  />
-                  <AnimatePresence>
-                    {expanded && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.12 }}
-                        className="flex-1 flex items-center justify-between overflow-hidden whitespace-nowrap"
-                      >
-                        <span className="truncate">{item.label}</span>
-                        {item.badge && (
-                          <span
-                            className={cn(
-                              "ml-2 px-2 py-0.5 text-[10px] font-bold rounded-full border tracking-wide",
-                              item.badgeColor ||
-                                "bg-accent-primary/10 text-accent-primary border-accent-primary/20"
-                            )}
-                          >
-                            {item.badge}
-                          </span>
+                  {section.title}
+                </h2>
+                {/* Stands in for the hidden eyebrow so groups stay legible
+                    in the icon rail. Skipped above the first group, which
+                    already has the brand header's border over it — a rule
+                    directly under a rule just looks like a mistake. */}
+                {!isExpanded && idx > 0 && (
+                  <div aria-hidden className="mx-auto mb-3 h-px w-8 bg-sidebar-border" />
+                )}
+              </>
+            )}
+
+            <ul className="space-y-1">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const active = isItemActive(item.href);
+                const tone = badgeToneClass[item.badgeTone ?? "count"];
+
+                return (
+                  <li key={item.label}>
+                    <Link
+                      href={item.href}
+                      aria-current={active ? "page" : undefined}
+                      onClick={() => {
+                        if (item.href.includes("#")) {
+                          setCurrentHash("#" + item.href.split("#")[1]);
+                        } else {
+                          setCurrentHash("");
+                        }
+                        if (onCloseMobile) onCloseMobile();
+                      }}
+                      className={cn(
+                        "sb-focus group relative flex h-[38px] items-center rounded-[10px] outline-none transition-colors duration-150",
+                        isExpanded ? "gap-3 px-3" : "justify-center px-0",
+                        active
+                          ? "bg-sidebar-active text-sidebar-strong"
+                          : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-strong"
+                      )}
+                      title={isExpanded ? undefined : item.label}
+                    >
+                      {/* Selection rule: one 3px bar flush to the rail's inner
+                          edge. The cheapest unambiguous "you are here" there
+                          is, and the only part of the active treatment that
+                          still works in the collapsed rail, where the label
+                          and its weight change are both gone. */}
+                      {active && (
+                        <span
+                          aria-hidden
+                          className="absolute left-0 top-1/2 h-[18px] w-[3px] -translate-y-1/2 rounded-r-full bg-sidebar-accent"
+                        />
+                      )}
+
+                      <Icon
+                        className={cn(
+                          "h-[18px] w-[18px] shrink-0 transition-colors",
+                          active ? "text-sidebar-accent" : "text-sidebar-icon group-hover:text-sidebar-strong"
                         )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </Link>
-              );
-            })}
+                        strokeWidth={active ? 2.3 : 1.9}
+                      />
+
+                      <AnimatePresence initial={false}>
+                        {isExpanded && (
+                          <motion.span
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.12 }}
+                            className="flex min-w-0 flex-1 items-center gap-2 whitespace-nowrap"
+                          >
+                            {/* 13px semibold idle / bold active. The old rail
+                                was 12px at weight 500 in a mid grey, which is
+                                caption typography — it went soft the moment
+                                you sat back from a large monitor.
+
+                                `flex-1 truncate` is load-bearing, not
+                                decoration: bold glyphs are wider than
+                                semibold ones, so a label sized to its own
+                                content would shove the badge sideways every
+                                time the active row changed. Owning the free
+                                space pins the badge regardless of weight.
+
+                                Line-height is text-13's own paired 18px (see
+                                tailwind.config.ts), not leading-none — a 1.0
+                                line-box left no room for descenders (g/j/p/
+                                q/y), and `truncate`'s overflow:hidden on this
+                                same element clipped them clean off ("Job
+                                Openings"' "g" being the one that got
+                                reported). The row's own height is a fixed
+                                h-[38px] with items-center, so this doesn't
+                                move anything — it only gives the glyphs the
+                                vertical room they always needed. */}
+                            <span
+                              className={cn(
+                                "min-w-0 flex-1 truncate text-13 tracking-[-0.003em]",
+                                active ? "font-bold" : "font-semibold"
+                              )}
+                            >
+                              {item.label}
+                            </span>
+
+                            {item.badge && (
+                              <span
+                                className={cn(
+                                  "flex shrink-0 items-center gap-1 rounded-full px-2 py-[3px] text-3xs font-bold leading-none",
+                                  active ? tone.onActive : tone.idle
+                                )}
+                              >
+                                {item.badgeTone === "live" && (
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300 motion-safe:animate-pulse-subtle" />
+                                )}
+                                {item.badge}
+                              </span>
+                            )}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ))}
+      </nav>
 
-      </div>
+      {/* ── Account ────────────────────────────────────────────────────── */}
+      <div className="relative z-10 flex-shrink-0 border-t border-sidebar-border bg-sidebar-raised p-3">
+        {isExpanded ? (
+          <div className="flex items-center gap-3">
+            <div className="relative shrink-0">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#6366F1] to-[#0EA5E9] text-2xs font-black text-white ring-1 ring-inset ring-white/20">
+                {initials}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[color:var(--sb-bg-raised)]" />
+            </div>
 
-      {/* Production Profile & Sign Out Footer (Theme selector removed per user instructions) */}
-      <div className="p-3 border-t border-border-subtle bg-surface/80 backdrop-blur-sm flex-shrink-0">
-        <div className="flex items-center justify-between gap-2">
-          <AnimatePresence mode="wait" initial={false}>
-          {expanded ? (
-            <motion.div
-              key="footer-expanded"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="flex items-center justify-between gap-2 w-full"
-            >
-              {/* User Profile Information */}
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                <div className="relative flex-shrink-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-primary/20 via-accent-secondary/15 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-xs font-bold text-accent-primary shadow-subtle">
-                    {displayName
-                      .split(" ")
-                      .map((n) => n[0])
-                      .join("")
-                      .slice(0, 2)}
-                  </div>
-                  <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-status-success ring-2 ring-surface" />
-                </div>
-                <div className="flex flex-col min-w-0 flex-1">
-                  <span className="text-xs font-semibold text-primary truncate leading-tight">
-                    {displayName}
+            <div className="min-w-0 flex-1">
+              {/* The e-mail moves to the tooltip rather than the second line:
+                  at this width a real address truncates to noise, and the
+                  role/plan below is what someone actually scans for when
+                  checking which account they're operating as. */}
+              <p
+                className="truncate text-13 font-bold leading-tight text-sidebar-strong"
+                title={displayEmail}
+              >
+                {displayName}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-2xs font-semibold leading-tight">
+                {accountMeta}
+              </p>
+              {showsPlan && (
+                <p className="mt-0.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-2xs leading-tight text-sidebar-faint">
+                  <span className="truncate font-medium">
+                    {coverage === null
+                      ? "…"
+                      : coverage.plan?.name
+                      ? `${coverage.plan.name} Plan`
+                      : "No active plan"}
                   </span>
-                  {currentRole === "user" || currentRole === "admin_tpo" ? (
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-text-muted truncate">
-                        {coverage === null ? "..." : coverage.plan?.name ? `${coverage.plan.name} Plan` : "No active plan"}
-                      </span>
-                      {coverage?.source === "individual" && (
-                        <Link
-                          href="/dashboard/billing"
-                          className="text-[10px] font-bold text-accent-primary hover:underline shrink-0"
-                        >
-                          Upgrade
-                        </Link>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-text-muted truncate mt-0.5">
-                      {displayEmail}
-                    </span>
+                  {coverage?.source === "individual" && (
+                    <Link
+                      href="/dashboard/billing"
+                      className="sb-focus shrink-0 font-bold text-sidebar-accent hover:underline"
+                    >
+                      Upgrade
+                    </Link>
                   )}
-                </div>
-              </div>
+                </p>
+              )}
+            </div>
 
-              {/* Sign Out Action */}
-              <button
-                onClick={() => setConfirmingLogout(true)}
-                className="p-1.5 rounded-control text-text-muted hover:text-status-danger hover:bg-status-danger/10 transition-colors flex-shrink-0"
-                title="Sign Out"
-                aria-label="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="footer-collapsed"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.12 }}
-              className="relative mx-auto flex flex-col items-center gap-2"
+            <button
+              onClick={() => setConfirmingLogout(true)}
+              className="sb-focus flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sidebar-dim transition-colors hover:bg-red-500/15 hover:text-red-300"
+              title="Sign out"
+              aria-label="Sign out"
             >
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent-primary/20 via-accent-secondary/15 to-accent-primary/10 border border-accent-primary/30 flex items-center justify-center text-xs font-bold text-accent-primary shadow-subtle">
-                  {displayName.charAt(0)}
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-status-success ring-2 ring-surface" />
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <div className="relative">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#6366F1] to-[#0EA5E9] text-2xs font-black text-white ring-1 ring-inset ring-white/20">
+                {initials}
               </div>
-              <button
-                onClick={() => setConfirmingLogout(true)}
-                className="p-1.5 rounded-control text-text-muted hover:text-status-danger hover:bg-status-danger/10 transition-colors"
-                title="Sign Out"
-                aria-label="Sign Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-          </AnimatePresence>
-        </div>
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-[color:var(--sb-bg-raised)]" />
+            </div>
+            <button
+              onClick={() => setConfirmingLogout(true)}
+              className="sb-focus flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-dim transition-colors hover:bg-red-500/15 hover:text-red-300"
+              title="Sign out"
+              aria-label="Sign out"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 
   return (
     <>
-      {/* Desktop Persistent Sidebar — while collapsed, hovering it "peeks"
-          open over the content (see `expanded` above) without shifting the
-          page layout, since the content's own padding stays keyed to the
-          real `collapsed` value below in DashboardShell. A spring — not a
-          linear tween — is what actually reads as "smooth" here. */}
+      {/* Desktop persistent rail. While collapsed, pointing at it (or tabbing
+          into it) "peeks" it open over the content without shifting the page
+          layout, since the content's own padding stays keyed to the real
+          `collapsed` value in DashboardShell. A spring — not a linear tween —
+          is what actually reads as smooth at this width delta. */}
       <motion.aside
-        onMouseEnter={handleRailMouseEnter}
-        onMouseLeave={handleRailMouseLeave}
-        animate={{
-          // Widened from 256 -> 280 so the full "CodeGen Box" wordmark + PRO
-          // badge fit on one line without truncating (CodeForge, at 9
-          // characters, fit at 256; CodeGen Box needs the extra room).
-          width: expanded ? 280 : 80,
-          boxShadow:
-            collapsed && hoverPeek
-              ? "0 25px 50px -12px rgba(0,0,0,0.35)"
-              : "0 0px 0px 0 rgba(0,0,0,0)",
-        }}
-        transition={{ type: "spring", stiffness: 360, damping: 34, mass: 0.7 }}
-        className="hidden md:block fixed inset-y-0 left-0 z-30 overflow-hidden"
+        onMouseEnter={openPeek}
+        onMouseLeave={closePeekSoon}
+        onFocusCapture={openPeek}
+        onBlurCapture={closePeekSoon}
+        initial={false}
+        animate={{ width: expanded ? RAIL_WIDTH : RAIL_COLLAPSED_WIDTH }}
+        transition={
+          prefersReducedMotion
+            ? { duration: 0 }
+            : { type: "spring", stiffness: 360, damping: 34, mass: 0.7 }
+        }
+        className={cn(
+          "fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-sidebar-border transition-shadow duration-200 md:block",
+          // Always-on soft edge shadow. Near-invisible against the dark
+          // theme's #08090D page, but under html.light it's what stops a
+          // near-black rail from looking pasted onto the layout.
+          collapsed && hoverPeek
+            ? "shadow-[0_24px_60px_-12px_rgba(0,0,0,0.55)]"
+            : "shadow-[6px_0_24px_-16px_rgba(2,6,23,0.55)]"
+        )}
       >
-        {sidebarContent}
+        {renderRail(expanded)}
       </motion.aside>
 
-      {/* Mobile Drawer Overlay */}
+      {/* Mobile drawer */}
       <AnimatePresence>
         {mobileOpen && (
-          <div className="fixed inset-0 z-50 md:hidden flex">
-            {/* Backdrop */}
+          <div className="fixed inset-0 z-50 flex md:hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onCloseMobile}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm"
             />
-            {/* Slide-over Drawer */}
             <motion.div
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="relative w-72 max-w-[85vw] h-full shadow-2xl z-10"
+              transition={{ type: "spring", damping: 28, stiffness: 260 }}
+              className="relative z-10 h-full w-[300px] max-w-[86vw] shadow-[0_0_60px_-10px_rgba(0,0,0,0.8)]"
             >
-              {sidebarContent}
+              {/* Always full-width — a drawer has no icon-only mode. */}
+              {renderRail(true)}
             </motion.div>
           </div>
         )}

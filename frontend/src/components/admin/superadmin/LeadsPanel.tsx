@@ -89,25 +89,25 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <Users2 className="w-3.5 h-3.5" /> Total Leads
           </span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{kpis?.total_leads ?? "—"}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <UserPlus className="w-3.5 h-3.5" /> New This Week
           </span>
           <div className="text-2xl font-black text-accent-secondary font-mono mt-2">{kpis?.new_this_week ?? "—"}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <CheckCircle2 className="w-3.5 h-3.5" /> Converted
           </span>
           <div className="text-2xl font-black text-status-success font-mono mt-2">{kpis?.converted_count ?? "—"}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> Conversion Rate
           </span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{kpis?.conversion_rate ?? "—"}%</div>
@@ -124,7 +124,7 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Signed Up</th>
@@ -142,14 +142,14 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
                     <tr key={lead.id} className="hover:bg-surface-hover/60 transition-colors">
                       <td className="px-4 py-3 cursor-pointer" onClick={() => setActiveLeadId(lead.id)}>
                         <div className="font-bold text-primary">{lead.name}</div>
-                        <div className="text-[10px] text-text-muted">{lead.email}</div>
+                        <div className="text-3xs text-text-muted">{lead.email}</div>
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{formatDate(lead.created_at)}</td>
                       <td className="px-4 py-3">
                         {lead.assigned_to_name ? (
                           <span className="text-text-secondary font-medium">{lead.assigned_to_name}</span>
                         ) : (
-                          <span className="text-[10px] font-bold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded-full border border-status-warning/25">
+                          <span className="text-3xs font-bold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded-full border border-status-warning/25">
                             Unassigned
                           </span>
                         )}
@@ -165,7 +165,7 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold border whitespace-nowrap", LEAD_STATUS_BADGE_CLASS[lead.lead_status])}>
+                        <span className={cn("px-2 py-0.5 rounded-full text-3xs font-bold border whitespace-nowrap", LEAD_STATUS_BADGE_CLASS[lead.lead_status])}>
                           {LEAD_STATUS_LABELS[lead.lead_status]}
                         </span>
                       </td>
@@ -175,7 +175,7 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
                             href={`/marketing?leadId=${lead.id}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-[11px] font-medium flex items-center gap-1"
+                            className="px-2 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-2xs font-medium flex items-center gap-1"
                             title="Opens the Marketing team's own dashboard in a new tab — bulk-email tools, full unfiltered lead list, etc. Status/notes can be edited right here without leaving this page."
                           >
                             <ExternalLink className="w-3 h-3" />
@@ -184,7 +184,7 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
                           <button
                             onClick={() => handleToggleBlock(lead)}
                             className={cn(
-                              "px-2 py-1 rounded-control border text-[11px] font-semibold transition-colors flex items-center gap-1",
+                              "px-2 py-1 rounded-control border text-2xs font-semibold transition-colors flex items-center gap-1",
                               isBlocked
                                 ? "bg-status-success/10 hover:bg-status-success/20 text-status-success border-status-success/30"
                                 : "bg-status-danger/10 hover:bg-status-danger/20 text-status-danger border-status-danger/30"

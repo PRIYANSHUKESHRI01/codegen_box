@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Plus, Users2, X, Filter } from "lucide-react";
+import Link from "next/link";
+import { Search, Plus, Users2, X, Filter, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 
@@ -207,7 +208,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+              <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
                   <th className="px-4 py-3">User</th>
                   <th className="px-4 py-3">Handle</th>
@@ -227,7 +228,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
                         </div>
                         <div>
                           <div className="font-bold text-primary">{u.name}</div>
-                          <div className="text-[10px] font-mono text-text-muted">{u.email}</div>
+                          <div className="text-3xs font-mono text-text-muted">{u.email}</div>
                         </div>
                       </div>
                     </td>
@@ -236,29 +237,43 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
                       {u.college ? (
                         <span className="text-text-secondary font-medium">{u.college.name}</span>
                       ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-text-muted">Individual</span>
+                        <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-text-muted">Individual</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-text-muted">
                       {new Date(u.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full", u.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success")}>
+                      <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full", u.is_blocked ? "bg-status-danger/15 text-status-danger" : "bg-status-success/15 text-status-success")}>
                         {u.is_blocked ? "Blocked" : "Active"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleToggleBlock(u)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-control border text-[11px] font-semibold transition-colors",
-                          u.is_blocked
-                            ? "bg-status-success/10 text-status-success border-status-success/30 hover:bg-status-success/20"
-                            : "bg-status-danger/10 text-status-danger border-status-danger/30 hover:bg-status-danger/20"
-                        )}
-                      >
-                        {u.is_blocked ? "Unblock" : "Block"}
-                      </button>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        {/* Every contest/interview/drive this coder has been
+                            in, their activity calendar, and — new — the real
+                            code behind any submission. Same report a TPO
+                            sees for their own students, opened here for any
+                            individual coder platform-wide. */}
+                        <Link
+                          href={`/admin/students/report?studentId=${u.id}`}
+                          className="flex items-center gap-1 rounded-control border border-border-subtle bg-elevated px-2.5 py-1 text-2xs font-semibold text-text-secondary transition-colors hover:text-primary"
+                        >
+                          <BarChart3 className="h-3 w-3" />
+                          Report
+                        </Link>
+                        <button
+                          onClick={() => handleToggleBlock(u)}
+                          className={cn(
+                            "px-2.5 py-1 rounded-control border text-2xs font-semibold transition-colors",
+                            u.is_blocked
+                              ? "bg-status-success/10 text-status-success border-status-success/30 hover:bg-status-success/20"
+                              : "bg-status-danger/10 text-status-danger border-status-danger/30 hover:bg-status-danger/20"
+                          )}
+                        >
+                          {u.is_blocked ? "Unblock" : "Block"}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -346,13 +361,13 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
                     </option>
                   ))}
                 </select>
-                <p className="text-[11px] text-text-muted mt-1">
+                <p className="text-2xs text-text-muted mt-1">
                   For adding a single straggler — a whole batch should use <strong className="text-text-secondary">Import Students</strong> on that
                   college's card instead.
                 </p>
               </div>
 
-              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted">
+              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-2xs text-text-muted">
                 A secure temporary password is generated automatically and shown once after creation.
               </div>
 

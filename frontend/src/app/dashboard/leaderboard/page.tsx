@@ -97,16 +97,16 @@ export default function LeaderboardPage() {
             <span className="text-lg font-black font-mono text-accent-primary">#{data.my_row.rank}</span>
             <div>
               <div className="text-sm font-bold text-primary">You</div>
-              <div className="text-[11px] text-text-muted font-mono">{data.my_row.user.handle}</div>
+              <div className="text-2xs text-text-muted font-mono">{data.my_row.user.handle}</div>
             </div>
           </div>
           <div className="flex items-center gap-4 text-xs">
             <div className="text-right">
-              <div className="text-[10px] text-text-muted uppercase tracking-wider">Score</div>
+              <div className="text-3xs text-text-muted uppercase tracking-wider">Score</div>
               <div className="font-mono font-bold text-primary">{data.my_row.solved_score}</div>
             </div>
             <div className="text-right">
-              <div className="text-[10px] text-text-muted uppercase tracking-wider">Rating</div>
+              <div className="text-3xs text-text-muted uppercase tracking-wider">Rating</div>
               <div className="font-mono font-bold text-primary">{data.my_row.display_rating}</div>
             </div>
           </div>
@@ -117,7 +117,7 @@ export default function LeaderboardPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-elevated/80 border-b border-border-subtle text-[11px] font-mono uppercase tracking-wider text-text-muted">
+              <tr className="bg-elevated/80 border-b border-border-subtle text-2xs font-mono uppercase tracking-wider text-text-muted">
                 <th className="py-3 px-4">Rank</th>
                 <th className="py-3 px-4">Coder</th>
                 <th className="py-3 px-4">Rating</th>

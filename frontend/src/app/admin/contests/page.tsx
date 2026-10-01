@@ -2,16 +2,18 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Swords, Plus, X, Trophy, Loader2, Trash2, CheckCircle2, AlertTriangle, ShieldCheck, Search } from "lucide-react";
+import { Swords, Plus, Trophy, Loader2, Trash2, CheckCircle2, AlertTriangle, ShieldCheck, Search } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { DriveVisibilityPanel } from "@/components/admin/contests/DriveVisibilityPanel";
+import { ContestParticipantsModal } from "@/components/dashboard/ContestParticipantsModal";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
+import { Modal } from "@/components/ui/Modal";
 
 type ContestType = "general" | "daily" | "company" | "tpo_mock";
 
@@ -76,6 +78,7 @@ export default function AdminContestsPage() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managingContest, setManagingContest] = useState<AdminContest | null>(null);
+  const [viewingParticipantsOf, setViewingParticipantsOf] = useState<AdminContest | null>(null);
   const [visibilityContest, setVisibilityContest] = useState<AdminContest | null>(null);
 
   const triggerToast = (msg: string) => {
@@ -170,12 +173,12 @@ export default function AdminContestsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-primary">{contest.title}</span>
-                      <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", CONTEST_TYPE_BADGE_COLOR[contest.contest_type])}>
+                      <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", CONTEST_TYPE_BADGE_COLOR[contest.contest_type])}>
                         {CONTEST_TYPE_LABEL[contest.contest_type]}
                       </span>
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+                          "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
                           contest.status === "published"
                             ? "bg-status-success/15 text-status-success"
                             : contest.status === "draft"
@@ -186,10 +189,10 @@ export default function AdminContestsPage() {
                         {contest.status}
                       </span>
                       {contest.is_rated && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500/10 text-amber-500">Rated</span>
+                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/10 text-amber-500">Rated</span>
                       )}
                       {contest.finalized_at && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
                           <CheckCircle2 className="w-2.5 h-2.5" />
                           Finalized
                         </span>
@@ -197,7 +200,7 @@ export default function AdminContestsPage() {
                       {contest.visibility_summary && (
                         <span
                           className={cn(
-                            "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded flex items-center gap-1",
+                            "px-1.5 py-0.5 text-3xs font-bold uppercase rounded flex items-center gap-1",
                             contest.visibility_summary.live > 0
                               ? "bg-status-success/15 text-status-success"
                               : "bg-status-warning/15 text-status-warning"
@@ -209,7 +212,7 @@ export default function AdminContestsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-text-muted mt-0.5">
+                    <div className="text-2xs text-text-muted mt-0.5">
                       {new Date(contest.start_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                       {" – "}
                       {new Date(contest.end_at).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit" })} ·{" "}
@@ -221,28 +224,42 @@ export default function AdminContestsPage() {
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {/* Read-only oversight, deliberately outside the tpo_mock
+                      branch below: viewing who participated and how they
+                      scored is fine for any contest type (index() already
+                      surfaces tpo_mock contests to Mellow staff for exactly
+                      this kind of oversight); only mutating one stays
+                      blocked. */}
+                  <button
+                    onClick={() => setViewingParticipantsOf(contest)}
+                    disabled={contest.participants_count === 0}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:hover:bg-elevated disabled:hover:text-text-secondary"
+                  >
+                    <Trophy className="w-3.5 h-3.5" />
+                    Participants
+                  </button>
                   {contest.contest_type === "tpo_mock" ? (
-                    <span className="text-[10px] text-text-muted italic px-1">Managed by {contest.owning_college?.name ?? "the owning college"}'s TPO</span>
+                    <span className="text-3xs text-text-muted italic px-1">Managed by {contest.owning_college?.name ?? "the owning college"}'s TPO</span>
                   ) : (
                     <>
                       {contest.contest_type === "company" && contest.placement_drive && (
                         <button
                           onClick={() => setVisibilityContest(contest)}
-                          className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                          className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                         >
                           Manage Visibility
                         </button>
                       )}
                       <button
                         onClick={() => setManagingContest(contest)}
-                        className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                        className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                       >
                         Manage Problems
                       </button>
                       {contest.status === "draft" && (
                         <button
                           onClick={() => handlePublish(contest)}
-                          className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
+                          className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
                         >
                           Publish
                         </button>
@@ -250,7 +267,7 @@ export default function AdminContestsPage() {
                       {contest.status === "published" && hasEnded && !contest.finalized_at && (
                         <button
                           onClick={() => handleFinalize(contest)}
-                          className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[11px] font-bold text-status-success transition-colors"
+                          className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors"
                         >
                           Finalize
                         </button>
@@ -280,6 +297,15 @@ export default function AdminContestsPage() {
           contest={managingContest}
           onClose={() => setManagingContest(null)}
           onToast={triggerToast}
+        />
+      )}
+
+      {viewingParticipantsOf && (
+        <ContestParticipantsModal
+          basePath="/admin/contests"
+          contestSlug={viewingParticipantsOf.slug}
+          contestTitle={viewingParticipantsOf.title}
+          onClose={() => setViewingParticipantsOf(null)}
         />
       )}
 
@@ -323,27 +349,13 @@ function ManageVisibilityModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <div>
-            <h3 className="text-base font-bold text-primary">College Visibility</h3>
-            <p className="text-[11px] text-text-muted mt-0.5">{contest.title}</p>
-          </div>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <p className="text-[10.5px] text-text-muted -mt-2">
-          The drive may be live at more colleges than this contest targets — check only the ones this contest
-          should actually go to.
-        </p>
-        <DriveVisibilityPanel
-          driveId={contest.placement_drive!.id}
-          onToast={onToast}
-          targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
-        />
-        <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
+    <Modal
+      onClose={onClose}
+      title="College Visibility"
+      subtitle={contest.title}
+      size="md"
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
@@ -360,9 +372,19 @@ function ManageVisibilityModal({
           >
             {saving ? "Saving..." : "Save Targeting"}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    >
+      <p className="text-[10.5px] text-text-muted mb-3">
+        The drive may be live at more colleges than this contest targets — check only the ones this contest
+        should actually go to.
+      </p>
+      <DriveVisibilityPanel
+        driveId={contest.placement_drive!.id}
+        onToast={onToast}
+        targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
+      />
+    </Modal>
   );
 }
 
@@ -437,24 +459,29 @@ function CreateContestModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Swords className="w-4 h-4 text-accent-primary" />
-            <span>New Contest</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New Contest"
+      icon={Swords}
+      iconClassName="bg-accent-primary/10 text-accent-primary"
+      size="lg"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
+          <button type="submit" form="create-contest-form" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+      <p className="text-2xs text-text-muted mb-3">
+        Starts as a draft — invisible to students until you add problems and click Publish. The daily
+        Challenge contest is auto-generated and never created here.
+      </p>
 
-        <p className="text-[11px] text-text-muted">
-          Starts as a draft — invisible to students until you add problems and click Publish. The daily
-          Challenge contest is auto-generated and never created here.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+      <form id="create-contest-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Type *</label>
             <div className="flex gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
@@ -464,7 +491,7 @@ function CreateContestModal({
                   type="button"
                   onClick={() => setContestType(t)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                     contestType === t ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                   )}
                 >
@@ -473,7 +500,7 @@ function CreateContestModal({
               ))}
             </div>
             {contestType === "company" && (
-              <p className="text-[10px] text-text-muted mt-1">
+              <p className="text-3xs text-text-muted mt-1">
                 Only visible to students at colleges where this drive is mapped &amp; approved. Problems must
                 already be tagged to the company (Placement Drives → Recommended Problems).
               </p>
@@ -581,19 +608,9 @@ function CreateContestModal({
             <span className="text-text-secondary">Rated — affects participants&apos; ratings when finalized</span>
           </label>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }
 
@@ -681,17 +698,10 @@ function ManageProblemsModal({
   }, [catalog, problems, search]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary">Problems — {contest.title}</h3>
-          <button onClick={onClose} className="p-1 rounded text-text-muted hover:text-primary">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
+    <Modal onClose={onClose} title={`Problems — ${contest.title}`} size="2xl">
+      <div className="space-y-4">
         {isCompanyContest && !loading && (
-          <p className="text-[11px] text-text-muted -mt-2">
+          <p className="text-2xs text-text-muted">
             Showing only problems tagged to {contest.company!.name}. Add more under Placement Drives → Recommended
             Problems if the list below is empty.
           </p>
@@ -713,7 +723,7 @@ function ManageProblemsModal({
                     <div className="flex items-center gap-2 min-w-0">
                       <span
                         className={cn(
-                          "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize",
+                          "px-1.5 py-0.5 text-3xs font-bold rounded capitalize",
                           cp.problem.difficulty === "easy" ? "bg-status-success/15 text-status-success" : cp.problem.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
                         )}
                       >
@@ -762,7 +772,7 @@ function ManageProblemsModal({
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={cn(
-                            "px-1.5 py-0.5 text-[10px] font-bold rounded capitalize shrink-0",
+                            "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
                             p.difficulty === "easy" ? "bg-status-success/15 text-status-success" : p.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
                           )}
                         >
@@ -785,6 +795,6 @@ function ManageProblemsModal({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

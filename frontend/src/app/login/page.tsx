@@ -11,9 +11,9 @@ import {
   EyeOff,
   Sparkles,
   Building2,
+  Briefcase,
   GraduationCap,
   CheckCircle2,
-  Github,
   Zap,
   ShieldCheck,
   Fingerprint,
@@ -29,19 +29,102 @@ import { AuthUser, homeRouteForRole } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 
-// Only the two real public account types get a toggle tab here — Mellow
-// Ops/Marketing and superadmin are never self-registered or presented as a
-// choosable "type of account" (see MellowStaffPanel.tsx: those are
-// superadmin-provisioned, with access superadmin grants per employee).
-// Staff still sign in through this exact same form — the tab only changes
-// pre-fill/copy, never what credentials are accepted — they just don't get
-// a dedicated persona tile advertising them as a signup-style option.
-type LoginRole = "user" | "admin";
+// The three real customer-facing account types — every one of them is
+// something a real visitor could plausibly land on this page needing.
+// Superadmin/Mellow-staff are NEVER presented here, in dev or production —
+// see /mellow-internal, a separate unlisted route. Keeping that boundary on
+// this page too (not just in prod) means there's exactly one login surface
+// to ever audit for "does this leak an internal credential."
+type LoginRole = "user" | "admin_tpo" | "admin_company";
 
-const ROLE_TABS: { id: LoginRole; label: string; icon: typeof GraduationCap; iconColor: string; fillKey: "user" | "admin_tpo" }[] = [
-  { id: "user", label: "Student", icon: GraduationCap, iconColor: "text-emerald-400", fillKey: "user" },
-  { id: "admin", label: "College TPO", icon: Building2, iconColor: "text-indigo-400", fillKey: "admin_tpo" },
+// Each role gets its own accent so the whole card reacts to the selected
+// tab (pill glow, ambient backdrop, header icon, CTA copy) instead of
+// everything staying one flat indigo regardless of who's signing in —
+// mirrors the per-role accent treatment /signup already uses for its
+// account-type cards (see ACCOUNT_TYPES there).
+const ROLE_TABS: {
+  id: LoginRole;
+  label: string;
+  icon: typeof GraduationCap;
+  subtitle: string;
+  cta: string;
+  accent: {
+    idleIcon: string;
+    activeIcon: string;
+    pill: string;
+    glow: string;
+    ring: string;
+    chipBg: string;
+    chipBorder: string;
+  };
+}[] = [
+  {
+    id: "user",
+    label: "Student",
+    icon: GraduationCap,
+    subtitle: "Sign in to practice, compete, and track every placement drive you're eligible for.",
+    cta: "Launch Candidate Arena",
+    accent: {
+      idleIcon: "text-emerald-500/60 dark:text-emerald-400/50",
+      activeIcon: "text-emerald-600 dark:text-emerald-400",
+      pill: "bg-emerald-500/10 border-emerald-500/40",
+      glow: "shadow-[0_0_18px_-6px_rgba(16,185,129,0.55)]",
+      ring: "from-emerald-400/30 via-emerald-300/10 to-accent-primary/25",
+      chipBg: "bg-emerald-500/10",
+      chipBorder: "border-emerald-500/25",
+    },
+  },
+  {
+    id: "admin_tpo",
+    label: "College TPO",
+    icon: Building2,
+    subtitle: "Sign in to run your campus placement pipeline, drives, and student readiness.",
+    cta: "Enter Placement Console",
+    accent: {
+      idleIcon: "text-indigo-500/60 dark:text-indigo-400/50",
+      activeIcon: "text-indigo-600 dark:text-indigo-400",
+      pill: "bg-indigo-500/10 border-indigo-500/40",
+      glow: "shadow-[0_0_18px_-6px_rgba(99,102,241,0.55)]",
+      ring: "from-indigo-400/30 via-indigo-300/10 to-accent-primary/25",
+      chipBg: "bg-indigo-500/10",
+      chipBorder: "border-indigo-500/25",
+    },
+  },
+  {
+    id: "admin_company",
+    label: "Hiring Partner",
+    icon: Briefcase,
+    subtitle: "Sign in to manage your candidate pipeline, interviews, and hiring drives.",
+    cta: "Enter Hiring Console",
+    accent: {
+      idleIcon: "text-amber-500/60 dark:text-amber-400/50",
+      activeIcon: "text-amber-600 dark:text-amber-400",
+      pill: "bg-amber-500/10 border-amber-500/40",
+      glow: "shadow-[0_0_18px_-6px_rgba(245,158,11,0.55)]",
+      ring: "from-amber-400/30 via-amber-300/10 to-accent-secondary/25",
+      chipBg: "bg-amber-500/10",
+      chipBorder: "border-amber-500/25",
+    },
+  },
 ];
+
+// Local-dev convenience only. `IS_DEV` is `process.env.NODE_ENV !== "production"`,
+// which Next.js/webpack inlines at build time — in a real `next build` this
+// evaluates to the literal `false`, and Terser's dead-code elimination then
+// strips the whole DEMO_LOGINS object (credentials included) out of the
+// shipped bundle, the same way React strips its own dev-only code. This is
+// NOT just hiding the panel with CSS: the plaintext strings themselves never
+// reach the production JS. Verified by building and grepping `out/` for
+// these values — see the verification step in this change's plan.
+const IS_DEV = process.env.NODE_ENV !== "production";
+
+const DEMO_LOGINS: Record<LoginRole, { email: string; password: string }> | null = IS_DEV
+  ? {
+      user: { email: "alex.chen@student.apex.edu", password: "alex_coder_codeforge" },
+      admin_tpo: { email: "tpo@apex.edu.in", password: "apex_tpo_placement_2026" },
+      admin_company: { email: "hiring@nimbuslabs.example.com", password: "nimbus_hiring_demo_26" },
+    }
+  : null;
 
 const fieldVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -58,8 +141,8 @@ export default function LoginPage() {
   const { login } = useAuth();
   const publicStats = usePublicStats();
   const [selectedRole, setSelectedRole] = useState<LoginRole>("user");
-  const [email, setEmail] = useState("alex.chen@student.apex.edu");
-  const [password, setPassword] = useState("alex_coder_codeforge");
+  const [email, setEmail] = useState(DEMO_LOGINS ? DEMO_LOGINS.user.email : "");
+  const [password, setPassword] = useState(DEMO_LOGINS ? DEMO_LOGINS.user.password : "");
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -67,36 +150,14 @@ export default function LoginPage() {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forcePasswordResetEmail, setForcePasswordResetEmail] = useState<string | null>(null);
 
-  // Fast Demo 1-Click Fill — the sandbox shortcuts still cover every real
-  // role (staff and superadmin included), even though the toggle tabs above
-  // only ever show Student/College TPO. `selectedRole` here is just which
-  // tab visually lights up and which copy/placeholder shows — it has no
-  // effect on which credentials the backend actually accepts.
-  const handleQuickFill = (role: "superadmin" | "admin_mellow" | "admin_marketing" | "admin_tpo" | "admin_company" | "user") => {
-    if (role === "superadmin") {
-      setSelectedRole("admin");
-      setEmail("aryan@mellow.ai");
-      setPassword("super_secure_key_2026");
-    } else if (role === "admin_mellow") {
-      setSelectedRole("admin");
-      setEmail("priya@mellow.ai");
-      setPassword("mellow_staff_ops_99");
-    } else if (role === "admin_marketing") {
-      setSelectedRole("admin");
-      setEmail("marketing@mellow.ai");
-      setPassword("mellow_marketing_growth_26");
-    } else if (role === "admin_tpo") {
-      setSelectedRole("admin");
-      setEmail("tpo@apex.edu.in");
-      setPassword("apex_tpo_placement_2026");
-    } else if (role === "admin_company") {
-      setSelectedRole("admin");
-      setEmail("hiring@nimbuslabs.example.com");
-      setPassword("nimbus_hiring_demo_26");
-    } else {
-      setSelectedRole("user");
-      setEmail("alex.chen@student.apex.edu");
-      setPassword("alex_coder_codeforge");
+  // Selecting a tab always updates which persona's copy/labels show; in dev
+  // only, it also convenience-prefills that persona's demo credentials
+  // (DEMO_LOGINS is null in production, so this is a no-op there).
+  const handleTabClick = (role: LoginRole) => {
+    setSelectedRole(role);
+    if (DEMO_LOGINS) {
+      setEmail(DEMO_LOGINS[role].email);
+      setPassword(DEMO_LOGINS[role].password);
     }
   };
 
@@ -129,6 +190,10 @@ export default function LoginPage() {
     }
   };
 
+  const activeTab = ROLE_TABS.find((tab) => tab.id === selectedRole) ?? ROLE_TABS[0];
+  const ActiveIcon = activeTab.icon;
+  const isStudent = selectedRole === "user";
+
   return (
     <AuthChrome altLabel="Create Account" altHref="/signup">
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
@@ -141,17 +206,21 @@ export default function LoginPage() {
         >
           <div className="space-y-4">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
-              <Sparkles className="w-3.5 h-3.5" />
+              <Sparkles className="w-3.5 h-3.5 animate-pulse-subtle" />
               <span>Enterprise & Campus Edition</span>
             </span>
 
             <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight text-primary leading-tight">
-              One Login. Every Command Center You Need.
+              One Login. Every{" "}
+              <span className="bg-gradient-to-r from-accent-primary to-accent-secondary bg-clip-text text-transparent">
+                Command Center
+              </span>{" "}
+              You Need.
             </h1>
 
             <p className="text-sm text-text-secondary leading-relaxed">
               Sign in to prepare for your next placement drive, run your campus's recruitment pipeline,
-              or govern the platform — whichever dashboard is yours.
+              or manage your hiring pipeline — whichever dashboard is yours.
             </p>
           </div>
 
@@ -163,7 +232,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <div className="font-bold text-xs text-primary">Bulk Roster Onboarding</div>
-                <div className="text-[11px] text-text-muted">Built for placement cells</div>
+                <div className="text-2xs text-text-muted">Built for placement cells</div>
               </div>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
@@ -176,11 +245,11 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-subtle text-xs">
             <div>
               <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.problems_total : "—"}</strong>
-              <span className="text-[11px] text-text-muted">Practice Problems</span>
+              <span className="text-2xs text-text-muted">Practice Problems</span>
             </div>
             <div>
               <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.languages_total : "—"}</strong>
-              <span className="text-[11px] text-text-muted">Judge Languages</span>
+              <span className="text-2xs text-text-muted">Judge Languages</span>
             </div>
           </div>
         </motion.div>
@@ -193,22 +262,68 @@ export default function LoginPage() {
             transition={{ duration: 0.45, ease: "easeOut" }}
             className="relative w-full max-w-xl mx-auto"
           >
-            {/* Ambient glow ring behind the card */}
-            <div className="absolute -inset-0.5 rounded-panel bg-gradient-to-r from-accent-primary/20 via-indigo-400/10 to-accent-secondary/20 blur-lg opacity-60 pointer-events-none" />
+            {/* Ambient glow ring behind the card — crossfades to the
+                selected role's accent instead of staying one flat gradient,
+                so switching tabs reads as the whole card responding. */}
+            <AnimatePresence>
+              <motion.div
+                key={selectedRole}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.65 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.6, ease: "easeInOut" }}
+                className={cn(
+                  "absolute -inset-0.5 rounded-panel bg-gradient-to-r blur-lg pointer-events-none",
+                  activeTab.accent.ring
+                )}
+              />
+            </AnimatePresence>
 
-            <div className="relative p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6">
+            <div className="relative p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6 overflow-hidden">
+              {/* Brand-gradient cap along the top edge, matching the same
+                  accent line used on the marketing navbar/footer cards. */}
+              <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-80 pointer-events-none" />
+
               {/* Header Title */}
-              <div className="space-y-1">
-                <h2 className="text-2xl font-bold text-primary tracking-tight">
-                  Welcome back
-                </h2>
-                <p className="text-xs text-text-muted">
-                  Choose your account type and authenticate to access your dashboard.
-                </p>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2.5">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={selectedRole}
+                      initial={{ opacity: 0, scale: 0.6, rotate: -8 }}
+                      animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                      exit={{ opacity: 0, scale: 0.6, rotate: 8 }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                      className={cn(
+                        "w-9 h-9 rounded-control flex items-center justify-center border shrink-0",
+                        activeTab.accent.chipBg,
+                        activeTab.accent.chipBorder
+                      )}
+                    >
+                      <ActiveIcon className={cn("w-4.5 h-4.5", activeTab.accent.activeIcon)} />
+                    </motion.div>
+                  </AnimatePresence>
+                  <h2 className="text-2xl font-bold text-primary tracking-tight">
+                    Welcome back
+                  </h2>
+                </div>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={selectedRole}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-xs text-text-muted"
+                  >
+                    {activeTab.subtitle}
+                  </motion.p>
+                </AnimatePresence>
               </div>
 
-              {/* 1. Account Role Selector Tabs — sliding pill indicator */}
-              <div className="relative p-1 rounded-control bg-elevated border border-border-subtle grid grid-cols-2 gap-1">
+              {/* 1. Account Role Selector Tabs — sliding pill indicator,
+                  tinted to whichever role is active */}
+              <div className="relative p-1 rounded-control bg-elevated border border-border-subtle grid grid-cols-3 gap-1">
                 {ROLE_TABS.map((tab) => {
                   const isActive = selectedRole === tab.id;
                   const Icon = tab.icon;
@@ -216,14 +331,18 @@ export default function LoginPage() {
                     <button
                       key={tab.id}
                       type="button"
-                      onClick={() => handleQuickFill(tab.fillKey)}
-                      className="relative py-2 rounded-control text-xs font-semibold transition-colors duration-150"
+                      onClick={() => handleTabClick(tab.id)}
+                      className="relative py-2.5 rounded-control text-xs font-semibold transition-colors duration-150"
                     >
                       {isActive && (
                         <motion.span
                           layoutId="role-pill"
-                          className="absolute inset-0 bg-surface border border-border-strong rounded-control shadow-subtle"
-                          transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                          className={cn(
+                            "absolute inset-0 rounded-control border",
+                            tab.accent.pill,
+                            tab.accent.glow
+                          )}
+                          transition={{ type: "spring", stiffness: 500, damping: 34 }}
                         />
                       )}
                       <span
@@ -232,43 +351,23 @@ export default function LoginPage() {
                           isActive ? "text-primary" : "text-text-muted hover:text-primary transition-colors"
                         )}
                       >
-                        <Icon className={cn("w-3.5 h-3.5 shrink-0", tab.iconColor)} />
+                        <motion.span
+                          animate={{ scale: isActive ? 1.12 : 1 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 20 }}
+                          className="flex"
+                        >
+                          <Icon
+                            className={cn(
+                              "w-3.5 h-3.5 shrink-0 transition-colors duration-200",
+                              isActive ? tab.accent.activeIcon : tab.accent.idleIcon
+                            )}
+                          />
+                        </motion.span>
                         <span className="whitespace-nowrap">{tab.label}</span>
                       </span>
                     </button>
                   );
                 })}
-              </div>
-
-              {/* Quick Demo Fill Shortcut Bar */}
-              <div className="relative p-3 rounded-control bg-elevated/50 border border-dashed border-border-strong text-xs space-y-2 overflow-hidden">
-                <div className="absolute -top-6 -right-6 w-16 h-16 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-                <span className="relative text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center gap-1.5">
-                  <Zap className="w-3 h-3 text-amber-500" />
-                  <span>Sandbox &mdash; Quick Demo Logins</span>
-                </span>
-                <div className="relative flex items-center gap-1.5 flex-wrap">
-                  {[
-                    { key: "superadmin" as const, label: "Superadmin", emoji: "👑", cls: "bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border-amber-500/20" },
-                    { key: "admin_mellow" as const, label: "Mellow Ops", emoji: "🛠️", cls: "bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 border-indigo-500/20" },
-                    { key: "admin_marketing" as const, label: "Mellow Marketing", emoji: "📣", cls: "bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 border-rose-500/20" },
-                    { key: "admin_tpo" as const, label: "College TPO", emoji: "🎓", cls: "bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border-cyan-500/20" },
-                    { key: "admin_company" as const, label: "Hiring Partner", emoji: "💼", cls: "bg-teal-500/10 text-teal-500 hover:bg-teal-500/20 border-teal-500/20" },
-                    { key: "user" as const, label: "Student", emoji: "💻", cls: "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20" },
-                  ].map((d) => (
-                    <button
-                      key={d.key}
-                      type="button"
-                      onClick={() => handleQuickFill(d.key)}
-                      className={cn(
-                        "px-2 py-0.5 rounded text-[11px] font-medium border transition-all duration-150 hover:-translate-y-0.5 active:translate-y-0",
-                        d.cls
-                      )}
-                    >
-                      {d.emoji} {d.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Login Form */}
@@ -280,7 +379,7 @@ export default function LoginPage() {
                 className="space-y-4 text-xs"
               >
                 <motion.div variants={fieldVariants}>
-                  <FormField label={selectedRole === "admin" ? "Staff / Institutional Email *" : "Email or Handle *"} icon={Mail}>
+                  <FormField label={isStudent ? "Email or Handle *" : "Staff / Institutional Email *"} icon={Mail}>
                     <input
                       type="text"
                       required
@@ -300,7 +399,7 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setShowForgotModal(true)}
-                        className="text-[11px] text-accent-primary hover:underline font-medium"
+                        className="text-2xs text-accent-primary hover:underline font-medium"
                       >
                         Forgot password?
                       </button>
@@ -336,15 +435,27 @@ export default function LoginPage() {
                   </FormField>
                 </motion.div>
 
-                {/* Remember Me */}
+                {/* Remember Me — a real sliding switch rather than a bare
+                    checkbox, consistent with the sliding-pill language used
+                    by the role tabs and theme toggle above. */}
                 <motion.div variants={fieldVariants} className="flex items-center justify-between pt-1">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded border-border-subtle text-accent-primary focus:ring-accent-primary"
-                    />
+                  <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={rememberMe}
+                      onClick={() => setRememberMe((v) => !v)}
+                      className={cn(
+                        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+                        rememberMe ? "bg-accent-primary border-accent-primary" : "bg-elevated border-border-subtle"
+                      )}
+                    >
+                      <motion.span
+                        animate={{ x: rememberMe ? 18 : 0 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 32 }}
+                        className="absolute left-0.5 top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-sm"
+                      />
+                    </button>
                     <span className="text-text-secondary text-xs">Remember this device for 30 days</span>
                   </label>
                 </motion.div>
@@ -358,7 +469,7 @@ export default function LoginPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="p-2.5 rounded-control bg-status-danger/10 border border-status-danger/30 text-[11px] text-status-danger font-medium">
+                      <div className="p-2.5 rounded-control bg-status-danger/10 border border-status-danger/30 text-2xs text-status-danger font-medium">
                         {error}
                       </div>
                     </motion.div>
@@ -367,50 +478,25 @@ export default function LoginPage() {
 
                 {/* Submit Action Button */}
                 <motion.div variants={fieldVariants}>
-                  <AuthSubmitButton loading={loading}>
-                    {selectedRole === "admin" ? "Enter Admin Portal" : "Launch Candidate Arena"}
-                  </AuthSubmitButton>
+                  <AuthSubmitButton loading={loading}>{activeTab.cta}</AuthSubmitButton>
                 </motion.div>
               </motion.form>
 
-              {/* Social / SSO Single Sign-On */}
-              <div className="space-y-3 pt-2 border-t border-border-subtle">
-                <div className="relative flex justify-center text-[10px] uppercase font-bold text-text-muted">
-                  <span className="bg-surface px-2">Or continue with institutional credentials</span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill("user")}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-semibold text-text-secondary hover:text-primary transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-                  >
-                    <Github className="w-4 h-4" />
-                    <span>GitHub</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickFill("admin_tpo")}
-                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-semibold text-text-secondary hover:text-primary transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
-                  >
-                    <Building2 className="w-4 h-4 text-accent-secondary" />
-                    <span>University SSO</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Trust row */}
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[10px] text-text-muted font-mono pt-1">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              {/* Trust row — rendered as badge chips (matching the
+                  "Enterprise & Campus Edition" pill up in the hero) instead
+                  of bare monospace text, so credibility signals read as
+                  deliberate UI rather than a footnote. */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 border-t border-border-subtle mt-2 pt-4">
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-3xs font-semibold text-emerald-600 dark:text-emerald-400">
+                  <ShieldCheck className="w-3 h-3" />
                   Encrypted Credentials
                 </span>
-                <span className="flex items-center gap-1">
-                  <Fingerprint className="w-3 h-3 text-emerald-400" />
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-3xs font-semibold text-indigo-600 dark:text-indigo-400">
+                  <Fingerprint className="w-3 h-3" />
                   Role-Based Access
                 </span>
-                <span className="flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-3xs font-semibold text-sky-600 dark:text-sky-400">
+                  <CheckCircle2 className="w-3 h-3" />
                   Real Judge Execution
                 </span>
               </div>

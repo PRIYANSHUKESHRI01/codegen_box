@@ -167,6 +167,7 @@ class TpoDriveController extends Controller
             'max_backlogs' => ['nullable', 'integer', 'min:0'],
             'eligible_branches' => ['nullable', 'array'],
             'eligible_branches.*' => ['string', 'max:50'],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
         ]);
 
         $collegeId = $request->user()->college_id;
@@ -207,6 +208,7 @@ class TpoDriveController extends Controller
                 'min_cgpa' => $validated['min_cgpa'] ?? null,
                 'max_backlogs' => $validated['max_backlogs'] ?? null,
                 'eligible_branches' => $validated['eligible_branches'] ?? null,
+                'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
                 'status' => PlacementDrive::STATUS_PUBLISHED,
                 'source' => PlacementDrive::SOURCE_TPO_CREATED,
                 'owning_college_id' => $collegeId,

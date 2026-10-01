@@ -134,7 +134,7 @@ export function Footer() {
                 <LogoBadge className="w-9 h-9 transition-transform group-hover:scale-105" />
                 <div className="flex flex-col">
                   <Wordmark className="font-bold text-lg tracking-tight text-primary" />
-                  <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase">
+                  <span className="text-3xs font-mono text-text-muted tracking-wider uppercase">
                     Placements &bull; Practice
                   </span>
                 </div>
@@ -144,7 +144,7 @@ export function Footer() {
                 href="https://mellowvault.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-[11px] font-mono text-text-muted hover:text-accent-primary transition-colors mb-4"
+                className="inline-flex items-center gap-1.5 text-2xs font-mono text-text-muted hover:text-accent-primary transition-colors mb-4"
               >
                 <span>A product of</span>
                 <span className="font-bold text-text-secondary">Mellow Vault</span>
@@ -186,7 +186,7 @@ export function Footer() {
                     </button>
                   </div>
                   {newsletterStatus === "error" && newsletterError && (
-                    <p className="text-[11px] text-status-danger mt-1.5">{newsletterError}</p>
+                    <p className="text-2xs text-status-danger mt-1.5">{newsletterError}</p>
                   )}
                 </form>
               )}
@@ -197,7 +197,7 @@ export function Footer() {
               <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-elevated border border-border-subtle text-xs font-mono text-text-muted">
                 <Command className="w-3.5 h-3.5 text-accent-primary" />
                 <span>Quick Search:</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-[10px] font-bold text-primary">
+                <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-3xs font-bold text-primary">
                   ⌘K
                 </kbd>
               </div>
@@ -250,7 +250,7 @@ export function Footer() {
                           {link.label}
                         </span>
                         {"badge" in link && link.badge && (
-                          <span className="px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase rounded bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
+                          <span className="px-1.5 py-0.2 text-3xs font-mono font-bold uppercase rounded bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
                             {link.badge}
                           </span>
                         )}

@@ -21,6 +21,7 @@ interface ApiCollege {
   users?: { id: number; name: string; email: string; is_blocked: boolean }[];
   subscription_days_remaining?: number | null;
   subscription_status?: string | null;
+  subscription_is_trial?: boolean;
   /** Null = unlimited (Academic Enterprise, or a custom plan negotiated as unlimited). */
   plan_max_students?: number | null;
 }
@@ -40,6 +41,7 @@ interface College {
   tpoBlocked?: boolean;
   subscriptionDaysRemaining: number | null;
   subscriptionStatus: string | null;
+  subscriptionIsTrial: boolean;
   planMaxStudents: number | null;
 }
 
@@ -60,6 +62,7 @@ function mapCollegeFromApi(college: ApiCollege): College {
     tpoBlocked: tpo?.is_blocked ?? false,
     subscriptionDaysRemaining: college.subscription_days_remaining ?? null,
     subscriptionStatus: college.subscription_status ?? null,
+    subscriptionIsTrial: college.subscription_is_trial ?? false,
     planMaxStudents: college.plan_max_students ?? null,
   };
 }
@@ -91,11 +94,19 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
   const [newCollegeTier, setNewCollegeTier] = useState<CollegeTier>("Academic Enterprise");
   const [newCollegeMaxStudents, setNewCollegeMaxStudents] = useState("");
   const [newCollegeAnnualPrice, setNewCollegeAnnualPrice] = useState("");
+  const [isDemo, setIsDemo] = useState(false);
+  const [demoDays, setDemoDays] = useState("14");
   const [planModalCollege, setPlanModalCollege] = useState<{ id: number; name: string; tier: CollegeTier } | null>(null);
   const [selectedPlanTier, setSelectedPlanTier] = useState<CollegeTier>("Standard");
   const [planMaxStudents, setPlanMaxStudents] = useState("");
   const [planAnnualPrice, setPlanAnnualPrice] = useState("");
   const [assigningPlan, setAssigningPlan] = useState(false);
+  // "Adjust Seats" — deliberately separate from the Renew/Change Plan modal
+  // above: that one always cycles the whole subscription (new renewal
+  // date), this one only ever calls PUT .../seats, which doesn't.
+  const [seatsModalCollege, setSeatsModalCollege] = useState<{ id: number; name: string; currentMax: number | null; activeStudents: number } | null>(null);
+  const [seatsValue, setSeatsValue] = useState("");
+  const [adjustingSeats, setAdjustingSeats] = useState(false);
 
   const loadColleges = useCallback(() => {
     setCollegesLoading(true);
@@ -114,6 +125,7 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
     e.preventDefault();
     if (!newCollegeName || !newTpoName || !newTpoEmail) return;
     if (newCollegeTier === "Custom" && !newCollegeMaxStudents) return;
+    if (isDemo && !demoDays) return;
 
     try {
       const res = await api.post<{ college: ApiCollege; tpo: { id: number; name: string; email: string }; temporary_password: string }>(
@@ -130,6 +142,7 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 custom_annual_price: newCollegeAnnualPrice ? Number(newCollegeAnnualPrice) : undefined,
               }
             : {}),
+          ...(isDemo ? { is_demo: true, demo_days: Number(demoDays) } : {}),
         }
       );
 
@@ -145,9 +158,32 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
       setNewCollegeTier("Academic Enterprise");
       setNewCollegeMaxStudents("");
       setNewCollegeAnnualPrice("");
-      triggerToast(`Partner University "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}`);
+      setIsDemo(false);
+      setDemoDays("14");
+      triggerToast(
+        isDemo
+          ? `"${res.college.name}" onboarded as a ${demoDays}-day demo! TPO temporary password: ${res.temporary_password}`
+          : `Partner University "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}`
+      );
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to onboard university.");
+    }
+  };
+
+  const handleAdjustSeats = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!seatsModalCollege || seatsValue === "") return;
+    setAdjustingSeats(true);
+    try {
+      await api.put(`/admin/colleges/${seatsModalCollege.id}/seats`, { max_students: Number(seatsValue) });
+      loadColleges();
+      triggerToast(`${seatsModalCollege.name}'s seat limit is now ${Number(seatsValue).toLocaleString()} students.`);
+      setSeatsModalCollege(null);
+      setSeatsValue("");
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to adjust seat limit.");
+    } finally {
+      setAdjustingSeats(false);
     }
   };
 
@@ -229,21 +265,21 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Affiliated Campuses</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">Affiliated Campuses</span>
           <span className="text-xl font-black text-primary mt-1 block">{colleges.length}</span>
         </div>
         <div className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Managed Candidates</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">Managed Candidates</span>
           <span className="text-xl font-black text-primary mt-1 block">{colleges.reduce((acc, c) => acc + c.activeStudents, 0).toLocaleString()}</span>
         </div>
         <div className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Avg Campus Placement</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">Avg Campus Placement</span>
           <span className="text-xl font-black text-status-success mt-1 block">
             {colleges.length ? (colleges.reduce((acc, c) => acc + c.placementRate, 0) / colleges.length).toFixed(1) : "0.0"}%
           </span>
         </div>
         <div className="p-3.5 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider block">Active TPO Accounts</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider block">Active TPO Accounts</span>
           <span className="text-xl font-black text-primary mt-1 block">
             {colleges.filter((c) => c.status === "Active").length} / {colleges.length}
           </span>
@@ -271,14 +307,14 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-bold text-sm sm:text-base text-primary">{col.name}</h4>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-elevated border border-border-subtle text-text-secondary">
+                      <span className="px-1.5 py-0.5 rounded text-3xs font-mono font-bold bg-elevated border border-border-subtle text-text-secondary">
                         {col.shortCode}
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mt-1">
                       <span
                         className={cn(
-                          "px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                          "px-2 py-0.5 rounded-full text-3xs font-bold border",
                           col.tier === "Academic Enterprise"
                             ? "bg-purple-500/15 text-purple-400 border-purple-500/30"
                             : col.tier === "Pro Campus"
@@ -290,19 +326,24 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                       >
                         {col.tier}
                       </span>
+                      {col.subscriptionDaysRemaining !== null && col.subscriptionIsTrial && (
+                        <span className="px-2 py-0.5 rounded-full text-3xs font-bold border bg-violet-500/15 text-violet-400 border-violet-500/30">
+                          Demo
+                        </span>
+                      )}
                       {col.subscriptionDaysRemaining !== null && (
-                        <span className={cn("text-[10px] font-mono font-semibold", col.subscriptionDaysRemaining <= 14 ? "text-status-warning" : "text-text-muted")}>
+                        <span className={cn("text-3xs font-mono font-semibold", col.subscriptionDaysRemaining <= 14 ? "text-status-warning" : "text-text-muted")}>
                           {col.subscriptionDaysRemaining}d left
                         </span>
                       )}
-                      <span className="text-[11px] text-text-muted">Joined {col.joinedDate}</span>
+                      <span className="text-2xs text-text-muted">Joined {col.joinedDate}</span>
                     </div>
                   </div>
                 </div>
 
                 <span
                   className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-semibold border flex-shrink-0",
+                    "px-2 py-0.5 rounded-full text-3xs font-semibold border flex-shrink-0",
                     col.status === "Active" ? "bg-status-success/15 text-status-success border-status-success/30" : "bg-status-warning/15 text-status-warning border-status-warning/30"
                   )}
                 >
@@ -317,16 +358,16 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                   </div>
                   <div>
                     <div className="font-semibold text-primary">{col.tpoName}</div>
-                    <div className="text-[11px] text-text-muted font-mono">{col.tpoEmail}</div>
+                    <div className="text-2xs text-text-muted font-mono">{col.tpoEmail}</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-surface border border-border-subtle text-text-secondary">TPO Lead</span>
+                <span className="text-3xs font-mono px-2 py-0.5 rounded bg-surface border border-border-subtle text-text-secondary">TPO Lead</span>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-border-subtle text-xs">
                 <div className="flex items-center gap-4 text-text-secondary">
                   <div>
-                    <span className="text-[10px] text-text-muted block">Students</span>
+                    <span className="text-3xs text-text-muted block">Students</span>
                     <span className="font-bold text-primary">
                       {col.activeStudents.toLocaleString()}
                       {col.planMaxStudents !== null && (
@@ -335,7 +376,7 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] text-text-muted block">Placement Rate</span>
+                    <span className="text-3xs text-text-muted block">Placement Rate</span>
                     <span className="font-bold text-status-success">{col.placementRate}%</span>
                   </div>
                 </div>
@@ -349,6 +390,15 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                     className="px-3 py-1.5 rounded-control border border-border-subtle bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary text-xs font-bold transition-all"
                   >
                     Renew / Change Plan
+                  </button>
+                  <button
+                    onClick={() => {
+                      setSeatsModalCollege({ id: Number(col.id), name: col.name, currentMax: col.planMaxStudents, activeStudents: col.activeStudents });
+                      setSeatsValue(col.planMaxStudents !== null ? String(col.planMaxStudents) : "");
+                    }}
+                    className="px-3 py-1.5 rounded-control border border-border-subtle bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary text-xs font-bold transition-all"
+                  >
+                    Adjust Seats
                   </button>
                   <button
                     onClick={() => setImportModalCollege({ id: Number(col.id), name: col.name })}
@@ -488,7 +538,38 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 </div>
               )}
 
-              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-[11px] text-text-muted">
+              <div className="p-3 rounded-control bg-violet-500/5 border border-dashed border-violet-500/40 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isDemo}
+                    onChange={(e) => setIsDemo(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded border-border-subtle text-violet-500 focus:ring-violet-500"
+                  />
+                  <span className="font-semibold text-primary">Start as a demo</span>
+                  <span className="text-2xs text-text-muted">— the tier above still sets what they get, only how long changes</span>
+                </label>
+                {isDemo && (
+                  <div>
+                    <label className="block font-semibold text-text-secondary mb-1">Demo Length (days) *</label>
+                    <input
+                      type="number"
+                      required
+                      min={1}
+                      max={90}
+                      value={demoDays}
+                      onChange={(e) => setDemoDays(e.target.value)}
+                      placeholder="e.g. 14"
+                      className="w-full sm:w-40 px-3 py-2 rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-violet-500"
+                    />
+                    <p className="text-3xs text-text-muted mt-1">
+                      Access ends automatically after this many days — new students can&apos;t be added until they&apos;re on a real subscription.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3 rounded-control bg-elevated border border-border-subtle text-2xs text-text-muted">
                 <span className="font-semibold text-primary block mb-0.5">Scope Isolation Guarantee</span>
                 Once onboarded, the TPO will receive institutional login credentials scoped strictly to their campus candidate cohort — no access to
                 Mellow internal portals or other universities.
@@ -578,6 +659,55 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                   className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors shadow-subtle hover:shadow-glow disabled:opacity-60"
                 >
                   {assigningPlan ? "Activating..." : "Activate Plan"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {seatsModalCollege && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-panel bg-surface border border-border-subtle shadow-card p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-primary text-base">Adjust Seats</h3>
+              <button onClick={() => setSeatsModalCollege(null)} className="text-text-muted hover:text-primary p-1">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAdjustSeats} className="space-y-4 text-xs">
+              <p className="text-text-muted">
+                <strong className="text-primary">{seatsModalCollege.name}</strong> has{" "}
+                <strong className="text-primary">{seatsModalCollege.activeStudents.toLocaleString()}</strong> students enrolled right now. Lowering
+                the cap below that won&apos;t remove anyone — it only blocks new imports/adds until it&apos;s raised again.
+              </p>
+
+              <div>
+                <label className="block font-semibold text-text-secondary mb-1">Max Students</label>
+                <input
+                  type="number"
+                  required
+                  min={0}
+                  value={seatsValue}
+                  onChange={(e) => setSeatsValue(e.target.value)}
+                  placeholder="e.g. 500"
+                  className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
+                />
+              </div>
+
+              <p className="text-2xs text-text-muted">This marks the plan &quot;Custom&quot; and doesn&apos;t change the renewal date.</p>
+
+              <div className="pt-1 flex justify-end gap-2">
+                <button type="button" onClick={() => setSeatsModalCollege(null)} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={adjustingSeats}
+                  className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors shadow-subtle hover:shadow-glow disabled:opacity-60"
+                >
+                  {adjustingSeats ? "Saving..." : "Save"}
                 </button>
               </div>
             </form>

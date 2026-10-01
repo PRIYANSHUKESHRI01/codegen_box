@@ -5,12 +5,15 @@ use App\Http\Controllers\Api\AdminArticleTopicController;
 use App\Http\Controllers\Api\AdminCompanyController;
 use App\Http\Controllers\Api\AdminContestController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminStudentReportController;
 use App\Http\Controllers\Api\AdminInterviewController;
 use App\Http\Controllers\Api\AdminInterviewQuestionBankController;
 use App\Http\Controllers\Api\AdminInterviewRoleTemplateController;
 use App\Http\Controllers\Api\AdminInterviewTrackController;
 use App\Http\Controllers\Api\AdminPlacementDriveController;
 use App\Http\Controllers\Api\AdminProblemController;
+use App\Http\Controllers\Api\AdminSoftSkillController;
+use App\Http\Controllers\Api\AdminSoftSkillQuestionBankController;
 use App\Http\Controllers\Api\AdminTalentPoolController;
 use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\AuthController;
@@ -26,10 +29,12 @@ use App\Http\Controllers\Api\CompanyInterviewRoleTemplateController;
 use App\Http\Controllers\Api\CompanyInterviewTrackController;
 use App\Http\Controllers\Api\CompanyProctoringController;
 use App\Http\Controllers\Api\CompanyReportsController;
+use App\Http\Controllers\Api\CompanySoftSkillController;
 use App\Http\Controllers\Api\CompanyTalentPoolController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\CoordinatorProctoringController;
 use App\Http\Controllers\Api\CoordinatorStudentController;
+use App\Http\Controllers\Api\CoordinatorStudentReportController;
 use App\Http\Controllers\Api\InterviewController;
 use App\Http\Controllers\Api\InterviewProctoringController;
 use App\Http\Controllers\Api\InterviewQuestionBankController;
@@ -38,13 +43,18 @@ use App\Http\Controllers\Api\InterviewTrackController;
 use App\Http\Controllers\Api\InternalCustomerController;
 use App\Http\Controllers\Api\JudgeResultController;
 use App\Http\Controllers\Api\LeaderboardController;
+use App\Http\Controllers\Api\LearningCentreController;
+use App\Http\Controllers\Api\ListeningLabController;
 use App\Http\Controllers\Api\MarketingContactRequestController;
 use App\Http\Controllers\Api\MarketingLeadController;
+use App\Http\Controllers\Api\MySubmissionsController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PhoneVerificationController;
 use App\Http\Controllers\Api\ProblemController;
 use App\Http\Controllers\Api\PublicController;
+use App\Http\Controllers\Api\SoftSkillController;
+use App\Http\Controllers\Api\SpeakingPracticeController;
 use App\Http\Controllers\Api\StudentDriveController;
 use App\Http\Controllers\Api\StudentImportController;
 use App\Http\Controllers\Api\StudentProfileController;
@@ -62,12 +72,15 @@ use App\Http\Controllers\Api\TpoDriveApplicationController;
 use App\Http\Controllers\Api\TpoDriveController;
 use App\Http\Controllers\Api\TpoProctoringController;
 use App\Http\Controllers\Api\TpoReportsController;
+use App\Http\Controllers\Api\TpoSoftSkillController;
 use App\Http\Controllers\Api\TpoStudentController;
+use App\Http\Controllers\Api\TpoStudentReportController;
+use App\Http\Controllers\Api\VocabularyController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 // The public marketing site's "Talk to Our Team" form — unauthenticated,
 // never creates a user account (see ContactRequest's own docblock for why).
@@ -164,6 +177,12 @@ Route::middleware('auth:sanctum')->group(function () {
                 // self-serve — see SubscriptionService::assignInstitutionPlan.
                 Route::post('/colleges/{college}/subscription', [AdminController::class, 'assignCollegeSubscription']);
 
+                // Real-time seat-count tweak, distinct from the full
+                // subscription (re)assignment above — see
+                // SubscriptionService::adjustSeatLimit() for why this never
+                // resets a renewal date or a demo countdown.
+                Route::put('/colleges/{college}/seats', [AdminController::class, 'adjustCollegeSeats']);
+
                 // White-glove path: Mellow staff run the same bulk student
                 // import on a college's behalf (e.g. they emailed us their
                 // spreadsheet instead of uploading it themselves) — part of
@@ -178,6 +197,13 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('/users', [AdminController::class, 'users']);
                 Route::post('/users', [AdminController::class, 'storeUser']);
                 Route::post('/users/{user}/toggle-block', [AdminController::class, 'toggleUserBlock']);
+
+                // Same student report TpoStudentReportController exposes to a
+                // student's own college TPO, reachable here for any student
+                // platform-wide — Platform Users' own "View Report" action.
+                Route::get('/students/{student}/report', [AdminStudentReportController::class, 'show']);
+                Route::get('/students/{student}/submissions/{submission}', [AdminStudentReportController::class, 'submission']);
+                Route::get('/students/{student}/contest-submissions/{contestSubmission}', [AdminStudentReportController::class, 'contestSubmission']);
             });
 
             Route::middleware('permission:'.User::PERM_PLACEMENTS)->group(function () {
@@ -225,6 +251,12 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::delete('/contests/{contest}/problems/{contestProblem}', [AdminContestController::class, 'destroyProblem']);
                 Route::post('/contests/{contest}/colleges', [AdminContestController::class, 'updateColleges']);
                 Route::post('/contests/{contest}/finalize', [AdminContestController::class, 'finalize']);
+
+                // Contest report — see TpoContestController's mirror for the
+                // full rationale. Platform-wide here, including oversight of
+                // a college's own tpo_mock contest.
+                Route::get('/contests/{contest}/participants', [AdminContestController::class, 'participants']);
+                Route::get('/contests/{contest}/participants/{student}/submissions', [AdminContestController::class, 'participantSubmissions']);
             });
 
             Route::middleware('permission:'.User::PERM_INTERVIEWS)->group(function () {
@@ -276,6 +308,35 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/interview-tracks/{interviewTrack}/colleges', [AdminInterviewTrackController::class, 'updateColleges']);
             });
 
+            Route::middleware('permission:'.User::PERM_SOFT_SKILLS)->group(function () {
+                // Soft Skills — the third pillar alongside Contests/AI
+                // Interviews (see SoftSkillAssessment's docblock). Only
+                // ever creates/edits `general`-type assessments — tpo_mock/
+                // company belong entirely to their owning college/company
+                // (see AdminSoftSkillController::guardManagedElsewhere()).
+                Route::get('/soft-skills', [AdminSoftSkillController::class, 'index']);
+                Route::post('/soft-skills', [AdminSoftSkillController::class, 'store']);
+                Route::post('/soft-skills/{softSkillAssessment}', [AdminSoftSkillController::class, 'update']);
+                Route::delete('/soft-skills/{softSkillAssessment}', [AdminSoftSkillController::class, 'destroy']);
+                Route::get('/soft-skills/{softSkillAssessment}/questions', [AdminSoftSkillController::class, 'questions']);
+                Route::post('/soft-skills/{softSkillAssessment}/questions', [AdminSoftSkillController::class, 'storeQuestion']);
+                Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [AdminSoftSkillController::class, 'destroyQuestion']);
+                Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [AdminSoftSkillController::class, 'autoFillQuestions']);
+
+                // The shared question bank — reachable by every authoring
+                // role (see routes below), registered here too since
+                // Mellow Ops manages it directly. `generate` MUST be
+                // declared before the `{softSkillQuestion}` wildcard route
+                // below — same method, same segment count, so Laravel
+                // matches whichever is declared first; wildcard-first would
+                // swallow "generate" as an id and 404 on the lookup.
+                Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
+                Route::post('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'store']);
+                Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
+                    ->middleware('throttle:ai-generation');
+                Route::post('/soft-skill-question-bank/{softSkillQuestion}', [AdminSoftSkillQuestionBankController::class, 'update']);
+            });
+
             Route::middleware('permission:'.User::PERM_TALENT_POOL)->group(function () {
                 // Marketplace oversight only — authoring the sourcing
                 // assessment itself (the `talent_pool` contest/interview
@@ -312,6 +373,7 @@ Route::middleware('auth:sanctum')->group(function () {
                 // catalog's content going forward.
                 Route::get('/problems', [AdminProblemController::class, 'index']);
                 Route::post('/problems', [AdminProblemController::class, 'store']);
+                Route::put('/problems/{problem}', [AdminProblemController::class, 'update']);
             });
 
             Route::middleware('permission:'.User::PERM_CUSTOMERS)->group(function () {
@@ -409,6 +471,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/students', [TpoStudentController::class, 'store']);
             Route::post('/students/bulk-notify', [TpoStudentController::class, 'bulkNotify']);
 
+            // The Cohort table's "View Report" drill-down: one student's
+            // full contest/interview/drive history, activity calendar, and
+            // (new) the actual code behind any of their submissions.
+            Route::get('/students/{student}/report', [TpoStudentReportController::class, 'show']);
+            Route::get('/students/{student}/submissions/{submission}', [TpoStudentReportController::class, 'submission']);
+            Route::get('/students/{student}/contest-submissions/{contestSubmission}', [TpoStudentReportController::class, 'contestSubmission']);
+
             // Section Coordinators: TPO-provisioned accounts, each scoped to
             // exactly one section of this college, that can view/lightly
             // manage (never create/import) the students already in it.
@@ -416,6 +485,23 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/coordinators', [TpoCoordinatorController::class, 'store']);
             Route::put('/coordinators/{user}', [TpoCoordinatorController::class, 'update']);
             Route::post('/coordinators/{user}/toggle-block', [TpoCoordinatorController::class, 'toggleBlock']);
+
+            // Soft Skills — this college's own private practice tests, for
+            // their own students only (assessment_type=tpo_mock). See
+            // AdminSoftSkillController's routes above for the Mellow-Ops
+            // equivalent; the shared question bank is read/browsed via the
+            // same soft-skill-question-bank routes, scoped read-only here.
+            Route::get('/soft-skills', [TpoSoftSkillController::class, 'index']);
+            Route::post('/soft-skills', [TpoSoftSkillController::class, 'store']);
+            Route::post('/soft-skills/{softSkillAssessment}', [TpoSoftSkillController::class, 'update']);
+            Route::delete('/soft-skills/{softSkillAssessment}', [TpoSoftSkillController::class, 'destroy']);
+            Route::get('/soft-skills/{softSkillAssessment}/questions', [TpoSoftSkillController::class, 'questions']);
+            Route::post('/soft-skills/{softSkillAssessment}/questions', [TpoSoftSkillController::class, 'storeQuestion']);
+            Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [TpoSoftSkillController::class, 'destroyQuestion']);
+            Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [TpoSoftSkillController::class, 'autoFillQuestions']);
+            Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
+            Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
+                ->middleware('throttle:ai-generation');
 
             Route::get('/reports/data', [TpoReportsController::class, 'data']);
             Route::post('/placement-target', [TpoReportsController::class, 'updateTarget']);
@@ -448,6 +534,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/contests/{contest}/problems', [TpoContestController::class, 'storeProblem']);
             Route::delete('/contests/{contest}/problems/{contestProblem}', [TpoContestController::class, 'destroyProblem']);
             Route::post('/contests/{contest}/finalize', [TpoContestController::class, 'finalize']);
+
+            // Contest report: who registered, how they ranked/scored, and
+            // (drilling into one participant) their actual per-problem
+            // submissions including the code they wrote.
+            Route::get('/contests/{contest}/participants', [TpoContestController::class, 'participants']);
+            Route::get('/contests/{contest}/participants/{student}/submissions', [TpoContestController::class, 'participantSubmissions']);
 
             // A TPO's own private "mock" AI interviews — same pattern as
             // Mock Contests above (see TpoInterviewController's docblock).
@@ -583,6 +675,24 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/talent-pool/{candidate}/interview', [CompanyTalentPoolController::class, 'scheduleInterview']);
             Route::post('/talent-pool/{candidate}/hire', [CompanyTalentPoolController::class, 'hire']);
             Route::post('/talent-pool/{candidate}/notify', [CompanyTalentPoolController::class, 'notify']);
+
+            // Soft Skills — this hiring partner's own tests
+            // (assessment_type=company), visible to students at any college
+            // with an approved drive mapping to this company (see
+            // SoftSkillAssessment::isVisibleToUser()) — deliberately named
+            // "Soft Skills" everywhere, never "Assessments" (that already
+            // means Contests — see CompanyContestController/AssessmentsPage).
+            Route::get('/soft-skills', [CompanySoftSkillController::class, 'index']);
+            Route::post('/soft-skills', [CompanySoftSkillController::class, 'store']);
+            Route::post('/soft-skills/{softSkillAssessment}', [CompanySoftSkillController::class, 'update']);
+            Route::delete('/soft-skills/{softSkillAssessment}', [CompanySoftSkillController::class, 'destroy']);
+            Route::get('/soft-skills/{softSkillAssessment}/questions', [CompanySoftSkillController::class, 'questions']);
+            Route::post('/soft-skills/{softSkillAssessment}/questions', [CompanySoftSkillController::class, 'storeQuestion']);
+            Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [CompanySoftSkillController::class, 'destroyQuestion']);
+            Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [CompanySoftSkillController::class, 'autoFillQuestions']);
+            Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
+            Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
+                ->middleware('throttle:ai-generation');
         });
 
     // Section-Coordinator-only: a TPO-provisioned account scoped to exactly
@@ -597,6 +707,15 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/students', [CoordinatorStudentController::class, 'index']);
             Route::post('/students/{user}/toggle-block', [CoordinatorStudentController::class, 'toggleBlock']);
             Route::post('/students/bulk-notify', [CoordinatorStudentController::class, 'bulkNotify']);
+
+            // Same full activity report TpoStudentReportController exposes
+            // to a student's own college TPO — contest/interview/drive
+            // history, activity calendar, unified submission history, and
+            // the actual code behind any submission — narrowed to this
+            // coordinator's own section by CoordinatorStudentReportController.
+            Route::get('/students/{student}/report', [CoordinatorStudentReportController::class, 'show']);
+            Route::get('/students/{student}/submissions/{submission}', [CoordinatorStudentReportController::class, 'submission']);
+            Route::get('/students/{student}/contest-submissions/{contestSubmission}', [CoordinatorStudentReportController::class, 'contestSubmission']);
 
             // Same proctoring review as the TPO's, but scoped to exactly
             // this coordinator's own section — see CoordinatorProctoringController.
@@ -642,10 +761,23 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/problems/{problem}/submit', [SubmissionController::class, 'submit'])->middleware('throttle:judge-submit');
             Route::get('/judge/{token}', [JudgeResultController::class, 'show'])->middleware('throttle:judge-poll');
 
+            // A student's own submission history (practice + contest, unified)
+            // and the code behind any of it — self-service mirror of
+            // TpoStudentReportController/CoordinatorStudentReportController/
+            // AdminStudentReportController, which expose the exact same thing
+            // about someone ELSE'S submissions.
+            Route::get('/submissions', [MySubmissionsController::class, 'index']);
+            Route::get('/submissions/{submission}', [MySubmissionsController::class, 'show']);
+            Route::get('/contest-submissions/{contestSubmission}', [MySubmissionsController::class, 'contestSubmission']);
+
             // Real solved-count/streak/topic-mastery/etc — powers the
             // dashboard, performance report, and practice pages.
             Route::get('/me/stats', [StudentStatsController::class, 'mine']);
             Route::get('/me/rating-history', [StudentStatsController::class, 'ratingHistory']);
+            // Own interview performance (with scores) — see InterviewController::history()'s docblock for why this is separate from /interviews below.
+            Route::get('/me/interviews', [InterviewController::class, 'history']);
+            // Own Soft Skills performance — powers the Reports page's "Soft Skills Performance" card, same shape as /me/interviews above.
+            Route::get('/me/soft-skills', [SoftSkillController::class, 'history']);
 
             // Global leaderboard, ranked by real solved-score (or real
             // contest rating once a student has one — see User::displayRating()).
@@ -668,6 +800,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer']);
             Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete']);
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result']);
+            Route::get('/interviews/{interview}/responses/{interviewResponse}/audio', [InterviewController::class, 'responseAudio']);
 
             // Camera/mic proctoring for the interview attempt — mirrors the
             // contest proctoring routes above (start() is idempotent, resumes
@@ -675,6 +808,21 @@ Route::middleware('auth:sanctum')->group(function () {
             // frontend's tab-switch/fullscreen/devtools detectors call).
             Route::post('/interviews/{interview}/proctoring/start', [InterviewProctoringController::class, 'start']);
             Route::post('/interviews/{interview}/proctoring/violations', [InterviewProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
+
+            // Soft Skills — the option-based third pillar alongside
+            // Contests/AI Interviews above (see SoftSkillAssessment's
+            // docblock). answer() autosaves one response at a time by its
+            // own id (not gated on a "current expected question" like
+            // interviews/answer — a student can navigate this test freely,
+            // like a real exam), submit() is the one moment everything gets
+            // graded. No judge-*/ai-generation throttle needed — grading is
+            // exact-match, no Gemini call in the student-facing path at all.
+            Route::get('/soft-skills', [SoftSkillController::class, 'index']);
+            Route::get('/soft-skills/{softSkillAssessment}', [SoftSkillController::class, 'show']);
+            Route::post('/soft-skills/{softSkillAssessment}/start', [SoftSkillController::class, 'start']);
+            Route::post('/soft-skills/sessions/{softSkillSession}/answer', [SoftSkillController::class, 'answer']);
+            Route::post('/soft-skills/sessions/{softSkillSession}/submit', [SoftSkillController::class, 'submit']);
+            Route::get('/soft-skills/sessions/{softSkillSession}', [SoftSkillController::class, 'viewSession']);
 
             // The "Final Interview" 3-round pipeline — index() is where a
             // candidate discovers a track exists at all (standalone
@@ -691,6 +839,27 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/articles/topics/{articleTopic}', [ArticleController::class, 'topicShow']);
             Route::get('/articles/{article}', [ArticleController::class, 'show']);
             Route::post('/articles/{article}/read', [ArticleController::class, 'markRead']);
+
+            // Learning Centre — the Articles nav item's new home (Reading Hub
+            // links back to /articles/* above unchanged) plus three practice
+            // modules: Speaking (Gemini-scored, synchronous), Listening
+            // (deterministic grading, no Gemini call), Vocabulary (Gemini
+            // generates a fresh quiz per attempt). See LearningCentreController's
+            // docblock for the hub stats this overview route powers.
+            Route::get('/learning-centre/overview', [LearningCentreController::class, 'overview']);
+
+            Route::get('/learning-centre/speaking/prompts', [SpeakingPracticeController::class, 'index']);
+            Route::get('/learning-centre/speaking/prompts/{speakingPrompt}', [SpeakingPracticeController::class, 'show']);
+            Route::post('/learning-centre/speaking/prompts/{speakingPrompt}/attempts', [SpeakingPracticeController::class, 'submit'])
+                ->middleware('throttle:ai-generation');
+
+            Route::get('/learning-centre/listening/lessons', [ListeningLabController::class, 'index']);
+            Route::get('/learning-centre/listening/lessons/{listeningLesson}', [ListeningLabController::class, 'show']);
+            Route::post('/learning-centre/listening/lessons/{listeningLesson}/attempts', [ListeningLabController::class, 'submit']);
+
+            Route::post('/learning-centre/vocabulary/generate', [VocabularyController::class, 'generate'])
+                ->middleware('throttle:ai-generation');
+            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/submit', [VocabularyController::class, 'submit']);
 
             // Proctoring — contest problem-solving only, never practice (see
             // ContestProctoringController's docblock). start() is idempotent

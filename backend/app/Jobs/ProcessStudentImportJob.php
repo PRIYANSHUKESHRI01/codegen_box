@@ -85,6 +85,13 @@ class ProcessStudentImportJob implements ShouldQueue
         // with the message below). Same-college existing-email rows are
         // idempotent updates, not new seats, so they never touch $remaining.
         $college = College::find($import->college_id);
+        // A college with no active subscription at all must block every new
+        // row, not just ones past a seat cap — $limit/$remaining below are
+        // null for an expired college exactly the same way they'd be null
+        // for a genuinely unlimited active plan, so this has to be checked
+        // separately (see StudentImportService::import() for the same fix
+        // on the upfront, whole-batch rejection path).
+        $subscriptionExpired = $college === null || ! $college->hasActiveSubscription();
         $limit = $college?->studentLimit();
         $remaining = $limit === null ? null : max(0, $limit - ($college?->studentCount() ?? 0));
         $planName = $college?->activePlan()?->name;
@@ -146,6 +153,12 @@ class ProcessStudentImportJob implements ShouldQueue
                 ], fn ($v) => $v !== null));
                 $successCount++;
             } else {
+                if ($subscriptionExpired) {
+                    $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => "{$college?->name}'s subscription has expired — new students can't be added until it's renewed. Contact Mellow Vault."];
+
+                    continue;
+                }
+
                 if ($remaining !== null && $remaining <= 0) {
                     $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => "Your college's {$planName} plan allows up to {$limit} students — this row wasn't added. Upgrade your plan to add more."];
 

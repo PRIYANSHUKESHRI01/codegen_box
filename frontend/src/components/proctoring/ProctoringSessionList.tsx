@@ -99,14 +99,14 @@ export function ProctoringSessionList({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-bold text-primary">{session.student.name}</span>
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded", STATUS_STYLE[session.status])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", STATUS_STYLE[session.status])}>
                     {session.status}
                   </span>
                   {session.student.section && (
-                    <span className="text-[10px] text-text-muted">Section {session.student.section}</span>
+                    <span className="text-3xs text-text-muted">Section {session.student.section}</span>
                   )}
                 </div>
-                <p className="text-[11px] text-text-muted mt-0.5">
+                <p className="text-2xs text-text-muted mt-0.5">
                   {session.contest.title} · {session.violation_count} strike{session.violation_count === 1 ? "" : "s"}
                   {session.student.roll_number && <> · {session.student.roll_number}</>}
                 </p>
@@ -124,14 +124,14 @@ export function ProctoringSessionList({
                 ) : (
                   <ul className="space-y-1.5">
                     {(violations[session.id] ?? []).map((v) => (
-                      <li key={v.id} className="flex items-center justify-between text-[11px] px-2.5 py-1.5 rounded bg-elevated/50">
+                      <li key={v.id} className="flex items-center justify-between text-2xs px-2.5 py-1.5 rounded bg-elevated/50">
                         <span className="text-text-secondary">
                           {v.label}
                           {v.problem && <span className="text-text-muted"> · {v.problem}</span>}
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
                           {v.counted_toward_lock && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-status-danger/15 text-status-danger">
+                            <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-status-danger/15 text-status-danger">
                               Strike
                             </span>
                           )}
@@ -148,7 +148,7 @@ export function ProctoringSessionList({
                   <button
                     onClick={() => handleReinstate(session)}
                     disabled={reinstatingId === session.id}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[11px] font-bold text-status-success transition-colors disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors disabled:opacity-50"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     {reinstatingId === session.id ? "Reinstating..." : "Reinstate (false alarm)"}

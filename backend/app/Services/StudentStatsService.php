@@ -183,6 +183,12 @@ class StudentStatsService
             ->limit($limit)
             ->get()
             ->map(fn (Submission $s) => [
+                // Lets a caller with permission to see this student's code
+                // (StudentReportController and friends) fetch it by id via
+                // GET .../submissions/{submission} — `code` itself stays out
+                // of this listing (see Submission::$hidden) since this can
+                // return up to 30 rows at once.
+                'id' => $s->id,
                 'problem_title' => $s->problem->title,
                 'problem_slug' => $s->problem->slug,
                 'difficulty' => $s->problem->difficulty,

@@ -151,14 +151,14 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
             <FileSpreadsheet className="w-4 h-4 text-accent-primary" />
             <span>Bulk Import Students</span>
           </h3>
-          <p className="text-[11px] text-text-muted mt-0.5">
+          <p className="text-2xs text-text-muted mt-0.5">
             Add {collegeName}&apos;s whole batch at once — each new student gets an emailed login the moment their row is created.
           </p>
         </div>
         <button
           onClick={handleDownloadTemplate}
           disabled={downloadingTemplate}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
         >
           {downloadingTemplate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
           <span>Download CSV Template</span>
@@ -171,18 +171,18 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
           type="file"
           accept=".csv,text/csv"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="flex-1 w-full text-[11px] text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-control file:border-0 file:bg-accent-primary/10 file:text-accent-primary file:text-[11px] file:font-bold"
+          className="flex-1 w-full text-2xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-control file:border-0 file:bg-accent-primary/10 file:text-accent-primary file:text-2xs file:font-bold"
         />
         <button
           onClick={handleUpload}
           disabled={!file || uploading}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors disabled:opacity-50 shrink-0 w-full sm:w-auto justify-center"
+          className="flex items-center gap-1.5 px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50 shrink-0 w-full sm:w-auto justify-center"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
           <span>Upload &amp; Import</span>
         </button>
       </div>
-      {uploadError && <p className="text-[11px] text-status-danger">{uploadError}</p>}
+      {uploadError && <p className="text-2xs text-status-danger">{uploadError}</p>}
 
       {loadingImports ? (
         <div className="p-6 flex items-center justify-center gap-2 text-xs text-text-muted">
@@ -190,7 +190,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
           Loading import history...
         </div>
       ) : imports.length === 0 ? (
-        <p className="text-[11px] text-text-muted text-center py-4">No imports yet — upload a CSV to add your first batch.</p>
+        <p className="text-2xs text-text-muted text-center py-4">No imports yet — upload a CSV to add your first batch.</p>
       ) : (
         <div className="space-y-2">
           {imports.map((imp) => {
@@ -204,11 +204,11 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
                     <p className="text-xs font-semibold text-primary truncate">{imp.original_filename}</p>
-                    <p className="text-[10px] text-text-muted mt-0.5">{formatDate(imp.created_at)}</p>
+                    <p className="text-3xs text-text-muted mt-0.5">{formatDate(imp.created_at)}</p>
                   </div>
                   <span
                     className={cn(
-                      "shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold",
+                      "shrink-0 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-3xs font-bold",
                       meta.className
                     )}
                   >
@@ -222,12 +222,12 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
                     <div className="w-full h-1.5 rounded-full bg-elevated overflow-hidden">
                       <div className="h-full rounded-full bg-accent-primary transition-all" style={{ width: `${progressPct}%` }} />
                     </div>
-                    <p className="text-[10px] text-text-muted">
+                    <p className="text-3xs text-text-muted">
                       {imp.processed_rows} / {imp.total_rows || "…"} rows processed
                     </p>
                   </div>
                 ) : (
-                  <div className="mt-2.5 flex items-center gap-4 text-[11px]">
+                  <div className="mt-2.5 flex items-center gap-4 text-2xs">
                     <span className="text-status-success font-semibold">{imp.successful_rows} added</span>
                     {imp.failed_rows > 0 && (
                       <button
@@ -243,7 +243,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
                 {expandedErrorsId === imp.id && imp.errors && imp.errors.length > 0 && (
                   <div className="mt-2.5 pt-2.5 border-t border-border-subtle space-y-1 max-h-40 overflow-y-auto">
                     {imp.errors.map((err, i) => (
-                      <p key={i} className="text-[10px] text-text-muted font-mono">
+                      <p key={i} className="text-3xs text-text-muted font-mono">
                         {err.row ? `Row ${err.row}` : "General"}
                         {err.email ? ` (${err.email})` : ""}: <span className="text-status-danger">{err.error}</span>
                       </p>

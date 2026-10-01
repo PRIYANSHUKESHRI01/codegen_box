@@ -65,49 +65,6 @@ export interface ApiCollege {
   plan_max_students?: number | null;
 }
 
-export interface College {
-  id: number;
-  name: string;
-  shortCode: string;
-  tpoName: string;
-  tpoEmail: string;
-  activeStudents: number;
-  tier: CollegeTier;
-  placementRate: number;
-  status: "Active" | "Suspended";
-  joinedDate: string;
-  tpoUserId?: number;
-  subscriptionStatus: string | null;
-  subscriptionDaysRemaining: number | null;
-  planPrice: number | null;
-  planMaxStudents: number | null;
-}
-
-export function mapCollegeFromApi(college: ApiCollege): College {
-  const tpo = college.users?.[0];
-  return {
-    id: college.id,
-    name: college.name,
-    shortCode: college.short_code,
-    tpoName: tpo?.name ?? "Unassigned",
-    tpoEmail: tpo?.email ?? "—",
-    activeStudents: college.active_students_count ?? 0,
-    tier: college.tier,
-    placementRate: Number(college.placement_rate),
-    status: tpo?.is_blocked ? "Suspended" : "Active",
-    joinedDate: new Date(college.created_at).toLocaleDateString("en-IN", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    }),
-    tpoUserId: tpo?.id,
-    subscriptionStatus: college.subscription_status ?? null,
-    subscriptionDaysRemaining: college.subscription_days_remaining ?? null,
-    planPrice: college.plan_price ?? null,
-    planMaxStudents: college.plan_max_students ?? null,
-  };
-}
-
 export const ROLE_LABEL: Record<PlatformRole, string> = {
   superadmin: "Superadmin",
   admin_internal: "Mellow Staff (Ops)",

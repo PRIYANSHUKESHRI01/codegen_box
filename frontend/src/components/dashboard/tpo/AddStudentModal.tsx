@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { X, UserPlus, Loader2 } from "lucide-react";
+import { UserPlus, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { CohortStudent } from "@/types/cohort";
+import { Modal } from "@/components/ui/Modal";
 
 interface AddStudentModalProps {
   open: boolean;
@@ -77,133 +77,114 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
     }
   };
 
+  if (!open) return null;
+
   return (
-    <AnimatePresence>
-      {open && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 12, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            className="w-full max-w-lg rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+    <Modal
+      onClose={handleClose}
+      title="Add Student"
+      icon={UserPlus}
+      size="lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={saving}
+            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
           >
-            <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-              <h3 className="text-base font-bold text-primary flex items-center gap-2">
-                <UserPlus className="w-4 h-4 text-accent-primary" />
-                <span>Add Student</span>
-              </h3>
-              <button
-                onClick={handleClose}
-                disabled={saving}
-                className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50"
-              >
-                <X className="w-5 h-5" />
-              </button>
+            Cancel
+          </button>
+          <button
+            type="submit"
+            form="add-student-form"
+            disabled={saving || !form.name || !form.email}
+            className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+          >
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+            <span>{saving ? "Adding..." : "Add & Send Credentials"}</span>
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-2xs text-text-muted">
+          They&apos;ll get an email with their login and a temporary password the moment you add them — the same
+          welcome email a bulk CSV import sends.
+        </p>
+
+        <form id="add-student-form" onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Full Name *</label>
+              <input required value={form.name} onChange={set("name")} placeholder="e.g. Ananya Iyer" className={inputClass} />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Email *</label>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={set("email")}
+                placeholder="student@college.edu"
+                className={inputClass}
+              />
+            </div>
+          </div>
 
-            <p className="text-[11px] text-text-muted">
-              They&apos;ll get an email with their login and a temporary password the moment you add them — the same
-              welcome email a bulk CSV import sends.
-            </p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Roll Number</label>
+              <input value={form.roll_number} onChange={set("roll_number")} placeholder="Optional" className={cn(inputClass, "font-mono")} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Branch</label>
+              <input value={form.branch} onChange={set("branch")} placeholder="Optional" className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Section</label>
+              <input value={form.section} onChange={set("section")} placeholder="e.g. A" className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">CGPA</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                step="0.01"
+                value={form.cgpa}
+                onChange={set("cgpa")}
+                placeholder="0-10"
+                className={cn(inputClass, "font-mono")}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Backlogs</label>
+              <input
+                type="number"
+                min={0}
+                value={form.backlogs}
+                onChange={set("backlogs")}
+                placeholder="0"
+                className={cn(inputClass, "font-mono")}
+              />
+            </div>
+          </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Full Name *</label>
-                  <input required value={form.name} onChange={set("name")} placeholder="e.g. Ananya Iyer" className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Email *</label>
-                  <input
-                    required
-                    type="email"
-                    value={form.email}
-                    onChange={set("email")}
-                    placeholder="student@college.edu"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Phone</label>
+              <input value={form.phone} onChange={set("phone")} placeholder="Optional" className={inputClass} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-text-secondary mb-1">Parent Phone</label>
+              <input value={form.parent_phone} onChange={set("parent_phone")} placeholder="Optional" className={inputClass} />
+            </div>
+          </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Roll Number</label>
-                  <input value={form.roll_number} onChange={set("roll_number")} placeholder="Optional" className={cn(inputClass, "font-mono")} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Branch</label>
-                  <input value={form.branch} onChange={set("branch")} placeholder="Optional" className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Section</label>
-                  <input value={form.section} onChange={set("section")} placeholder="e.g. A" className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">CGPA</label>
-                  <input
-                    type="number"
-                    min={0}
-                    max={10}
-                    step="0.01"
-                    value={form.cgpa}
-                    onChange={set("cgpa")}
-                    placeholder="0-10"
-                    className={cn(inputClass, "font-mono")}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Backlogs</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={form.backlogs}
-                    onChange={set("backlogs")}
-                    placeholder="0"
-                    className={cn(inputClass, "font-mono")}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Phone</label>
-                  <input value={form.phone} onChange={set("phone")} placeholder="Optional" className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-text-secondary mb-1">Parent Phone</label>
-                  <input value={form.parent_phone} onChange={set("parent_phone")} placeholder="Optional" className={inputClass} />
-                </div>
-              </div>
-
-              {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-              <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  disabled={saving}
-                  className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving || !form.name || !form.email}
-                  className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
-                >
-                  {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{saving ? "Adding..." : "Add & Send Credentials"}</span>
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+        </form>
+      </div>
+    </Modal>
   );
 }

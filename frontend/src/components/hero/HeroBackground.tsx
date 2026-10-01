@@ -21,7 +21,7 @@ export function HeroBackground() {
       {FLOATING_CHIPS.map((chip) => (
         <div
           key={chip.label}
-          className={`absolute items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface/80 border border-border-subtle shadow-subtle backdrop-blur-sm text-[10px] font-mono font-semibold text-text-secondary animate-float ${chip.className}`}
+          className={`absolute items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface/80 border border-border-subtle shadow-subtle backdrop-blur-sm text-3xs font-mono font-semibold text-text-secondary animate-float ${chip.className}`}
           style={{ animationDelay: `${chip.delay}s` }}
         >
           {chip.label}

@@ -26,6 +26,57 @@ const VIEW_W = 800;
 const PAD = { top: 18, right: 18, bottom: 30, left: 54 };
 const GRID_LINES = 4;
 
+/**
+ * Monotone cubic (Fritsch–Carlson) path through the points.
+ *
+ * The series used to be drawn as straight `L` segments, which made a rating
+ * history read as a jagged sawtooth. A spline reads far better — but the
+ * usual Catmull-Rom is wrong for this data: it overshoots, so a curve
+ * between two contests could bulge above a peak the student never reached
+ * or dip below their real floor. Monotone interpolation is the one family
+ * that guarantees the curve never leaves the range of the points it joins,
+ * so the picture can't imply a rating that didn't happen.
+ */
+function monotonePath(pts: { x: number; y: number }[]): string {
+  const n = pts.length;
+  if (n === 0) return "";
+  const at = (i: number) => `${pts[i].x.toFixed(2)} ${pts[i].y.toFixed(2)}`;
+  if (n === 1) return `M ${at(0)}`;
+  if (n === 2) return `M ${at(0)} L ${at(1)}`;
+
+  const dx: number[] = [];
+  const slope: number[] = [];
+  for (let i = 0; i < n - 1; i++) {
+    dx[i] = pts[i + 1].x - pts[i].x;
+    slope[i] = (pts[i + 1].y - pts[i].y) / dx[i];
+  }
+
+  // Tangent at each point, flattened to 0 at every local extremum — that
+  // clamp is what stops the overshoot.
+  const m: number[] = new Array(n);
+  m[0] = slope[0];
+  m[n - 1] = slope[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) {
+      m[i] = 0;
+    } else {
+      const w1 = 2 * dx[i] + dx[i - 1];
+      const w2 = dx[i] + 2 * dx[i - 1];
+      m[i] = (w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i]);
+    }
+  }
+
+  let d = `M ${at(0)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const c1x = pts[i].x + dx[i] / 3;
+    const c1y = pts[i].y + (m[i] * dx[i]) / 3;
+    const c2x = pts[i + 1].x - dx[i] / 3;
+    const c2y = pts[i + 1].y - (m[i + 1] * dx[i]) / 3;
+    d += ` C ${c1x.toFixed(2)} ${c1y.toFixed(2)}, ${c2x.toFixed(2)} ${c2y.toFixed(2)}, ${at(i + 1)}`;
+  }
+  return d;
+}
+
 export function RatingChart({ data, height = 260, showAxis = true }: RatingChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
@@ -46,7 +97,8 @@ export function RatingChart({ data, height = 260, showAxis = true }: RatingChart
   const x = (i: number) => (data.length === 1 ? PAD.left + innerW / 2 : PAD.left + (i / (data.length - 1)) * innerW);
   const y = (v: number) => PAD.top + (1 - (v - min) / (max - min)) * innerH;
 
-  const linePath = data.map((d, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(2)} ${y(d.rating).toFixed(2)}`).join(" ");
+  const points = data.map((d, i) => ({ x: x(i), y: y(d.rating) }));
+  const linePath = monotonePath(points);
   const areaPath = `${linePath} L ${x(data.length - 1).toFixed(2)} ${PAD.top + innerH} L ${x(0).toFixed(2)} ${
     PAD.top + innerH
   } Z`;
@@ -111,6 +163,22 @@ export function RatingChart({ data, height = 260, showAxis = true }: RatingChart
             strokeLinejoin="round"
             vectorEffect="non-scaling-stroke"
           />
+
+          {/* Crosshair — ties the floating tooltip back to the x-axis, so
+              "which contest is this?" is answerable without counting dots. */}
+          {activeIndex !== null && (
+            <line
+              x1={x(activeIndex)}
+              x2={x(activeIndex)}
+              y1={PAD.top}
+              y2={PAD.top + innerH}
+              stroke="var(--accent-primary)"
+              strokeOpacity="0.35"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              vectorEffect="non-scaling-stroke"
+            />
+          )}
 
           {/* Points */}
           {data.map((d, i) => (
@@ -179,7 +247,7 @@ export function RatingChart({ data, height = 260, showAxis = true }: RatingChart
           >
             <div className="px-3 py-2 rounded-control bg-surface border border-border-strong shadow-card text-xs whitespace-nowrap">
               <div className="font-bold text-primary">{active.contest}</div>
-              <div className="text-text-muted font-mono text-[11px] mt-0.5">
+              <div className="text-text-muted font-mono text-2xs mt-0.5">
                 {active.rating}
                 <span
                   className={cn(
@@ -192,7 +260,7 @@ export function RatingChart({ data, height = 260, showAxis = true }: RatingChart
                 </span>
               </div>
               {active.rank !== undefined && (
-                <div className="text-text-muted text-[11px] mt-0.5">
+                <div className="text-text-muted text-2xs mt-0.5">
                   Rank #{active.rank.toLocaleString()}
                   {active.solved !== undefined && active.total !== undefined && ` • ${active.solved}/${active.total} solved`}
                 </div>

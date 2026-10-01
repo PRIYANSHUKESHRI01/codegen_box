@@ -39,6 +39,7 @@ class Problem extends Model
         'title',
         'difficulty',
         'tags',
+        'companies',
         'description',
         'function_name',
         'params',
@@ -56,6 +57,7 @@ class Problem extends Model
     {
         return [
             'tags' => 'array',
+            'companies' => 'array',
             'params' => 'array',
             'comparison_epsilon' => 'decimal:8',
             'constraints' => 'array',

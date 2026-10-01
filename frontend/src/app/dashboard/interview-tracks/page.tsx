@@ -50,7 +50,7 @@ function InterviewTrackPipelinePageContent() {
 
   return (
     <DashboardShell role="user" title="Final Interview">
-      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent-primary hover:underline mb-4">
+      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-4">
         <ArrowLeft className="w-3.5 h-3.5" />
         Back to Interviews
       </Link>
@@ -72,7 +72,7 @@ function InterviewTrackPipelinePageContent() {
             {pipeline.track.description && <p className="text-sm text-text-secondary leading-relaxed">{pipeline.track.description}</p>}
 
             <div className="pt-2 border-t border-border-subtle space-y-1.5">
-              <div className="flex items-center justify-between text-[11px] font-semibold text-text-muted">
+              <div className="flex items-center justify-between text-2xs font-semibold text-text-muted">
                 <span>{reviewedCount} of {sortedRounds.length} rounds complete</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -88,7 +88,7 @@ function InterviewTrackPipelinePageContent() {
               </div>
             </div>
 
-            <p className="text-[11px] text-text-muted">
+            <p className="text-2xs text-text-muted">
               A 3-round pipeline — each round unlocks once a reviewer scores your previous round and you clear its
               qualifying threshold.
             </p>
@@ -151,7 +151,7 @@ function RoundRow({ round, isLast }: { round: TrackPipelineRound; isLast: boolea
           <div className="text-sm font-bold text-primary">
             Round {round.round_number} — {round.round_name}
           </div>
-          <div className="text-[11px] text-text-muted mt-0.5">
+          <div className="text-2xs text-text-muted mt-0.5">
             {round.question_count} questions · qualifying score {round.qualifying_score_percent}%
             {isReviewed && (
               <>
@@ -180,7 +180,7 @@ function RoundRow({ round, isLast }: { round: TrackPipelineRound; isLast: boolea
           ) : (
             <Link
               href={`/dashboard/interviews/view?slug=${round.interview_slug}`}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
             >
               <PlayCircle className="w-3.5 h-3.5" />
               {round.my_session_status === "in_progress" ? "Continue" : "Start"}

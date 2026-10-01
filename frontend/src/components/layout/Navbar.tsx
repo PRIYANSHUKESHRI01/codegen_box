@@ -85,7 +85,7 @@ export function Navbar() {
               <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.4)]" />
               <div className="flex flex-col">
                 <Wordmark className="font-bold text-lg tracking-tight text-primary leading-none" />
-                <span className="text-[10px] font-mono text-text-muted tracking-wider uppercase whitespace-nowrap">
+                <span className="text-3xs font-mono text-text-muted tracking-wider uppercase whitespace-nowrap">
                   Placements &bull; Practice
                 </span>
               </div>
@@ -130,13 +130,13 @@ export function Navbar() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-sm text-primary placeholder:text-text-muted focus:outline-none"
               />
-              <kbd className="px-2 py-0.5 text-[11px] font-mono bg-elevated border border-border-subtle rounded text-text-muted">
+              <kbd className="px-2 py-0.5 text-2xs font-mono bg-elevated border border-border-subtle rounded text-text-muted">
                 ESC
               </kbd>
             </div>
 
             <div className="max-h-80 overflow-y-auto p-2">
-              <div className="text-[11px] font-mono uppercase tracking-wider text-text-muted px-3 py-1.5">
+              <div className="text-2xs font-mono uppercase tracking-wider text-text-muted px-3 py-1.5">
                 Suggested Problems
               </div>
               {searchResults.length === 0 ? (

@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, X, Loader2, Trash2, Pencil, Eye, EyeOff, FolderPlus, Newspaper } from "lucide-react";
+import { Plus, Loader2, Trash2, Pencil, Eye, EyeOff, FolderPlus, Newspaper } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { TopicIcon } from "@/components/dashboard/articles/topicIcons";
@@ -12,6 +12,7 @@ import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { TOPIC_COLORS, TOPIC_ICON_NAMES, type ArticleTopicSummary, type AdminArticleSummary, type TopicColor, type TopicIconName } from "@/types/article";
+import { Modal } from "@/components/ui/Modal";
 
 const COLORS: TopicColor[] = ["indigo", "emerald", "amber", "sky", "rose"];
 
@@ -113,7 +114,7 @@ export default function AdminArticlesPage() {
           <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Topics</h3>
           <button
             onClick={() => setShowTopicModal("new")}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
           >
             <FolderPlus className="w-3.5 h-3.5" />
             New Topic
@@ -123,7 +124,7 @@ export default function AdminArticlesPage() {
           <button
             onClick={() => setTopicFilter("")}
             className={cn(
-              "px-3 py-1.5 rounded-control text-[11px] font-bold border transition-colors",
+              "px-3 py-1.5 rounded-control text-2xs font-bold border transition-colors",
               topicFilter === "" ? "bg-accent-primary text-white border-accent-primary" : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
             )}
           >
@@ -134,7 +135,7 @@ export default function AdminArticlesPage() {
               <button
                 onClick={() => setTopicFilter(topic.slug)}
                 className={cn(
-                  "flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-control text-[11px] font-bold border transition-colors",
+                  "flex items-center gap-1.5 pl-2.5 pr-3 py-1.5 rounded-control text-2xs font-bold border transition-colors",
                   topicFilter === topic.slug
                     ? "bg-accent-primary text-white border-accent-primary"
                     : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
@@ -187,17 +188,17 @@ export default function AdminArticlesPage() {
                   <span className="text-sm font-bold text-primary truncate">{article.title}</span>
                   <span
                     className={cn(
-                      "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+                      "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
                       article.status === "published" ? "bg-status-success/15 text-status-success" : "bg-elevated text-text-muted"
                     )}
                   >
                     {article.status}
                   </span>
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold rounded border", TOPIC_COLORS[article.article_topic.color ?? "indigo"])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded border", TOPIC_COLORS[article.article_topic.color ?? "indigo"])}>
                     {article.article_topic.name}
                   </span>
                 </div>
-                <div className="text-[11px] text-text-muted mt-0.5">
+                <div className="text-2xs text-text-muted mt-0.5">
                   {article.reading_time_minutes} min read · {article.view_count} view{article.view_count === 1 ? "" : "s"} · order {article.display_order}
                 </div>
               </div>
@@ -206,14 +207,14 @@ export default function AdminArticlesPage() {
                 <button
                   onClick={() => handleTogglePublish(article)}
                   title={article.status === "published" ? "Unpublish" : "Publish"}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   {article.status === "published" ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   {article.status === "published" ? "Unpublish" : "Publish"}
                 </button>
                 <button
                   onClick={() => router.push(`/admin/articles/edit?slug=${article.slug}`)}
-                  className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                  className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   Edit
                 </button>
@@ -283,16 +284,22 @@ function TopicModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary">{topic ? "Edit Topic" : "New Topic"}</h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title={topic ? "Edit Topic" : "New Topic"}
+      size="md"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+          <button type="submit" form="topic-form" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Saving..." : topic ? "Save Changes" : "Create Topic"}
+          </button>
+        </>
+      }
+    >
+      <form id="topic-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Name *</label>
             <input
@@ -340,7 +347,7 @@ function TopicModal({
                   type="button"
                   onClick={() => setColor(c)}
                   className={cn(
-                    "px-3 py-1.5 rounded-control text-[11px] font-bold border capitalize transition-all",
+                    "px-3 py-1.5 rounded-control text-2xs font-bold border capitalize transition-all",
                     TOPIC_COLORS[c],
                     color === c ? "ring-2 ring-offset-1 ring-offset-surface ring-accent-primary" : "opacity-60 hover:opacity-100"
                   )}
@@ -351,18 +358,8 @@ function TopicModal({
             </div>
           </div>
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Saving..." : topic ? "Save Changes" : "Create Topic"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }

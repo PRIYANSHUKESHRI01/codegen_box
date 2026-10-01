@@ -69,6 +69,41 @@ class JudgePipelineTest extends TestCase
         return User::factory()->create(['role' => User::ROLE_USER]);
     }
 
+    /** The real shape every problem is meant to have: 3 samples (indices 0-2), then 7 hidden (3-9). */
+    private function makeTenCaseProblem(): Problem
+    {
+        $problem = Problem::create([
+            'slug' => 'two-sum-ten',
+            'title' => 'Two Sum Ten',
+            'difficulty' => 'easy',
+            'tags' => [],
+            'description' => 'Find two numbers.',
+            'function_name' => 'twoSum',
+            'params' => [['name' => 'nums', 'type' => 'integer[]'], ['name' => 'target', 'type' => 'integer']],
+            'return_type' => 'integer[]',
+            'comparison_mode' => Problem::COMPARISON_EXACT,
+            'display_order' => 2,
+        ]);
+
+        foreach (range(0, 9) as $i) {
+            $problem->testCases()->create([
+                'inputs' => ['nums' => [$i, $i + 1], 'target' => 2 * $i + 1],
+                'expected_output' => [0, 1],
+                'is_sample' => $i < 3,
+                'display_order' => $i,
+            ]);
+        }
+
+        return $problem;
+    }
+
+    private function sendTo(Problem $problem, User $user, string $action, string $code = 'pass', string $language = 'python')
+    {
+        Sanctum::actingAs($user);
+
+        return $this->postJson("/api/problems/{$problem->slug}/{$action}", ['language' => $language, 'code' => $code]);
+    }
+
     private function fakePiston(string $stdout = "[0,1]\n[1,2]\n", int $exitCode = 0, string $stderr = ''): void
     {
         Http::fake(['piston-test:2000/*' => Http::response([
@@ -201,6 +236,104 @@ class JudgePipelineTest extends TestCase
 
         $this->assertSame(1, Submission::where('user_id', $user->id)->count());
         $this->assertSame('accepted', Submission::where('user_id', $user->id)->value('status'));
+    }
+
+    // --------------------------------------------- hidden-case masking (security)
+
+    public function test_a_failing_hidden_case_never_reveals_its_content_and_stops_the_reveal(): void
+    {
+        $problem = $this->makeTenCaseProblem();
+        // Samples 0-2 pass, hidden case 3 (index 3) fails, hidden cases 4-9 would all actually
+        // pass too (the stdout lines are right there) — but none of that should be revealed.
+        $stdout = "[0,1]\n[0,1]\n[0,1]\n[9,9]\n".str_repeat("[0,1]\n", 6);
+        Http::fake(['piston-test:2000/*' => Http::response(['run' => ['stdout' => $stdout, 'stderr' => '', 'code' => 0, 'signal' => null, 'cpu_time' => 12, 'memory' => 2048000], 'compile' => null])]);
+
+        $response = $this->sendTo($problem, $this->student(), 'submit')->assertOk();
+        $results = $response->json('result.results');
+
+        $this->assertCount(10, $results);
+        $this->assertFalse($response->json('result.all_passed'));
+
+        // The three samples are always fully revealed, pass or fail.
+        foreach (range(0, 2) as $i) {
+            $this->assertArrayHasKey('input', $results[$i]);
+            $this->assertArrayHasKey('expected', $results[$i]);
+            $this->assertTrue($results[$i]['passed']);
+        }
+
+        // Case 4 (index 3, the first hidden case): failed, masked, no content whatsoever.
+        $this->assertSame(['case' => 4, 'passed' => false, 'hidden' => true], $results[3]);
+
+        // Everything after the first hidden failure is withheld, even though it actually passed.
+        foreach (range(4, 9) as $i) {
+            $this->assertSame(['case' => $i + 1, 'passed' => false, 'hidden' => true, 'not_run' => true], $results[$i]);
+        }
+    }
+
+    public function test_a_failing_sample_does_not_block_later_samples_or_hidden_cases_from_being_judged(): void
+    {
+        $problem = $this->makeTenCaseProblem();
+        // Sample 0 fails; samples 1-2 and every hidden case pass.
+        $stdout = "[9,9]\n".str_repeat("[0,1]\n", 9);
+        Http::fake(['piston-test:2000/*' => Http::response(['run' => ['stdout' => $stdout, 'stderr' => '', 'code' => 0, 'signal' => null, 'cpu_time' => 12, 'memory' => 2048000], 'compile' => null])]);
+
+        $results = $this->sendTo($problem, $this->student(), 'submit')->assertOk()->json('result.results');
+
+        $this->assertFalse($results[0]['passed']);
+        $this->assertArrayHasKey('input', $results[0], 'a failing sample is still shown in full');
+        $this->assertTrue($results[1]['passed']);
+        $this->assertTrue($results[2]['passed']);
+
+        // No hidden case failed, so none of them are withheld.
+        foreach (range(3, 9) as $i) {
+            $this->assertArrayNotHasKey('not_run', $results[$i]);
+            $this->assertTrue($results[$i]['passed']);
+            $this->assertArrayNotHasKey('input', $results[$i]);
+        }
+    }
+
+    public function test_a_per_case_runtime_error_does_not_lose_later_cases(): void
+    {
+        $problem = $this->makeTenCaseProblem();
+        // Case 4 (first hidden case) is the harness's own sentinel for a caught per-case
+        // exception — the process kept running and printed every other case's line.
+        $stdout = "[0,1]\n[0,1]\n[0,1]\n__RUNTIME_ERROR__\n".str_repeat("[0,1]\n", 6);
+        Http::fake(['piston-test:2000/*' => Http::response(['run' => ['stdout' => $stdout, 'stderr' => '', 'code' => 0, 'signal' => null, 'cpu_time' => 12, 'memory' => 2048000], 'compile' => null])]);
+
+        $results = $this->sendTo($problem, $this->student(), 'submit')->assertOk()->json('result.results');
+
+        $this->assertSame(['case' => 4, 'passed' => false, 'hidden' => true], $results[3]);
+        foreach (range(4, 9) as $i) {
+            $this->assertTrue($results[$i]['not_run'] ?? false);
+        }
+    }
+
+    public function test_a_time_limit_exceeded_reports_partial_per_case_progress_instead_of_nothing(): void
+    {
+        $problem = $this->makeTenCaseProblem();
+        // Only 4 cases finished printing before the kill (e.g. an O(n^2) solution finally
+        // timing out on a large adversarial hidden case).
+        $stdout = "[0,1]\n[0,1]\n[0,1]\n[0,1]\n";
+        Http::fake(['piston-test:2000/*' => Http::response([
+            'run' => ['stdout' => $stdout, 'stderr' => '', 'code' => null, 'signal' => 'SIGKILL', 'status' => 'TO', 'message' => 'Time limit exceeded', 'cpu_time' => 7001, 'memory' => 2048000],
+            'compile' => null,
+        ])]);
+
+        $response = $this->sendTo($problem, $this->student(), 'submit')->assertOk();
+        $results = $response->json('result.results');
+
+        $this->assertSame('Time Limit Exceeded', $response->json('result.status'));
+        $this->assertFalse($response->json('result.all_passed'));
+        $this->assertCount(10, $results, 'progress made before the kill is still reported');
+
+        foreach (range(0, 2) as $i) {
+            $this->assertTrue($results[$i]['passed']);
+        }
+        $this->assertTrue($results[3]['passed'] && ($results[3]['hidden'] ?? false));
+
+        foreach (range(4, 9) as $i) {
+            $this->assertTrue($results[$i]['not_run'] ?? false);
+        }
     }
 
     // ------------------------------------------------------------------ caching

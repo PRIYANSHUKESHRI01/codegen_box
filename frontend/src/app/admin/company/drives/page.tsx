@@ -224,18 +224,18 @@ export default function JobOpeningsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-bold text-sm text-primary">{drv.title}</h3>
-                    <span className={cn("px-2 py-0.5 rounded-full text-[10px] font-bold", STATUS_META[drv.status].className)}>
+                    <span className={cn("px-2 py-0.5 rounded-full text-3xs font-bold", STATUS_META[drv.status].className)}>
                       {STATUS_META[drv.status].label}
                     </span>
                     {drv.is_open_to_all && (
-                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-500 border border-teal-500/30">
+                      <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-bold bg-teal-500/15 text-teal-500 border border-teal-500/30">
                         <Globe2 className="w-2.5 h-2.5" />
                         Open to All
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-text-muted mt-0.5">{drv.role_title}</div>
-                  <div className="text-[11px] text-text-muted mt-1 flex items-center gap-3 flex-wrap">
+                  <div className="text-2xs text-text-muted mt-0.5">{drv.role_title}</div>
+                  <div className="text-2xs text-text-muted mt-1 flex items-center gap-3 flex-wrap">
                     <span className="flex items-center gap-1.5">
                       <Calendar className="w-3 h-3" />
                       {formatDriveDate(drv.drive_date)}
@@ -247,13 +247,13 @@ export default function JobOpeningsPage() {
                     {drv.ctc_range && <span className="font-mono font-bold text-primary">{drv.ctc_range}</span>}
                   </div>
                   {drv.college_mappings && drv.college_mappings.length > 0 && (
-                    <div className="text-[11px] text-text-muted mt-1.5 flex items-center gap-1.5 flex-wrap">
+                    <div className="text-2xs text-text-muted mt-1.5 flex items-center gap-1.5 flex-wrap">
                       <GraduationCap className="w-3 h-3" />
                       {drv.college_mappings.map((m) => (
                         <span
                           key={m.id}
                           className={cn(
-                            "px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase",
+                            "px-1.5 py-0.5 rounded-full text-3xs font-bold uppercase",
                             m.status === "approved"
                               ? "bg-status-success/15 text-status-success"
                               : m.status === "pending"
@@ -274,7 +274,7 @@ export default function JobOpeningsPage() {
                   value={drv.status}
                   disabled={updatingId === drv.id}
                   onChange={(e) => handleStatusChange(drv, e.target.value as DriveStatus)}
-                  className="text-[11px] px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500 disabled:opacity-50"
+                  className="text-2xs px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500 disabled:opacity-50"
                 >
                   {(Object.keys(STATUS_META) as DriveStatus[]).map((s) => (
                     <option key={s} value={s}>
@@ -287,7 +287,7 @@ export default function JobOpeningsPage() {
                   disabled={updatingId === drv.id}
                   title={drv.is_open_to_all ? "Restrict back to invite-only / college-wise" : "Open this opening to every registered candidate — no approval needed"}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control border text-[11px] font-bold transition-colors disabled:opacity-50",
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-control border text-2xs font-bold transition-colors disabled:opacity-50",
                     drv.is_open_to_all
                       ? "bg-teal-500/15 hover:bg-teal-500/25 border-teal-500/30 text-teal-500"
                       : "bg-elevated hover:bg-surface-hover border-border-subtle text-text-secondary hover:text-primary"
@@ -306,14 +306,14 @@ export default function JobOpeningsPage() {
                         ? "Publish this opening first"
                         : undefined
                   }
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Propose</span>
                 </button>
                 <button
                   onClick={() => router.push(`/admin/company/candidates?drive=${drv.id}`)}
-                  className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-bold transition-colors"
+                  className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors"
                 >
                   Manage Candidates
                 </button>
@@ -328,7 +328,7 @@ export default function JobOpeningsPage() {
                     autoFocus
                     value={interviewDateInput}
                     onChange={(e) => setInterviewDateInput(e.target.value)}
-                    className="text-[11px] px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500"
+                    className="text-2xs px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-text-secondary outline-none focus:border-teal-500"
                   />
                   <button
                     onClick={() => handleSaveInterviewDate(drv)}
@@ -350,7 +350,7 @@ export default function JobOpeningsPage() {
                     setEditingInterviewDateId(drv.id);
                     setInterviewDateInput(utcIsoToLocalDatetimeInput(drv.interview_date));
                   }}
-                  className="flex items-center gap-1.5 text-[11px] text-text-muted hover:text-teal-500 transition-colors"
+                  className="flex items-center gap-1.5 text-2xs text-text-muted hover:text-teal-500 transition-colors"
                 >
                   <CalendarClock className="w-3 h-3" />
                   {drv.interview_date ? (
@@ -434,7 +434,7 @@ function InterviewUrgencyBanner({ drive, onPublish }: { drive: ApiDrive; onPubli
           <button
             onClick={() => onPublish(true)}
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-[11px] font-bold transition-colors",
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-colors",
               lowTime
                 ? "bg-elevated text-text-secondary border border-border-subtle hover:text-primary"
                 : "bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-600"
@@ -452,7 +452,7 @@ function InterviewUrgencyBanner({ drive, onPublish }: { drive: ApiDrive; onPubli
         )}
         <button
           onClick={() => onPublish(false)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-bold transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors"
         >
           <Mic className="w-3.5 h-3.5" />
           Publish Final Interview

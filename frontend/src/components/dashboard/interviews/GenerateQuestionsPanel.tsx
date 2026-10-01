@@ -138,7 +138,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Role / Position *</label>
+          <label className="block text-2xs font-semibold text-text-secondary mb-1">Role / Position *</label>
           <input
             value={role}
             onChange={(e) => setRole(e.target.value)}
@@ -148,7 +148,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
         </div>
 
         <div className="col-span-2">
-          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Difficulty *</label>
+          <label className="block text-2xs font-semibold text-text-secondary mb-1">Difficulty *</label>
           <div className="flex gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
             {DIFFICULTIES.map((d) => (
               <button
@@ -156,7 +156,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
                 type="button"
                 onClick={() => setDifficulty(d)}
                 className={cn(
-                  "px-3 py-1.5 rounded-control text-[11px] font-bold capitalize transition-all",
+                  "px-3 py-1.5 rounded-control text-2xs font-bold capitalize transition-all",
                   difficulty === d ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                 )}
               >
@@ -167,7 +167,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
         </div>
 
         <div className="col-span-2">
-          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Focus Area(s) *</label>
+          <label className="block text-2xs font-semibold text-text-secondary mb-1">Focus Area(s) *</label>
           <div className="flex flex-wrap gap-1.5">
             {ALL_CATEGORIES.map((c) => (
               <button
@@ -186,7 +186,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Number of Questions</label>
+          <label className="block text-2xs font-semibold text-text-secondary mb-1">Number of Questions</label>
           <input
             type="number"
             min={1}
@@ -197,7 +197,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
           />
         </div>
         <div>
-          <label className="block text-[11px] font-semibold text-text-secondary mb-1">Key Skills (optional)</label>
+          <label className="block text-2xs font-semibold text-text-secondary mb-1">Key Skills (optional)</label>
           <input
             value={skills}
             onChange={(e) => setSkills(e.target.value)}
@@ -229,7 +229,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
       {error && (
         <div className="p-3 rounded-control bg-status-warning/10 border border-status-warning/25 flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0 mt-0.5" />
-          <p className="text-[11px] text-text-secondary">
+          <p className="text-2xs text-text-secondary">
             {error} {onAddNow ? "You can still add questions from the bank below." : 'You can still create this interview and add questions from the bank afterward via "Manage Questions".'}
           </p>
         </div>
@@ -246,13 +246,13 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
             <div key={q.id} className="p-3 rounded-control bg-surface border border-border-subtle flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold uppercase rounded border", CATEGORY_COLORS[q.category])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", CATEGORY_COLORS[q.category])}>
                     {CATEGORY_LABELS[q.category]}
                   </span>
-                  <span className={cn("px-1.5 py-0.5 text-[9px] font-bold rounded capitalize", DIFFICULTY_COLORS[q.difficulty])}>
+                  <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", DIFFICULTY_COLORS[q.difficulty])}>
                     {q.difficulty}
                   </span>
-                  <span className="text-[9px] text-text-muted">~{Math.round(q.expected_duration_seconds / 60)} min</span>
+                  <span className="text-3xs text-text-muted">~{Math.round(q.expected_duration_seconds / 60)} min</span>
                 </div>
                 <p className="text-xs font-medium text-primary">{q.question_text}</p>
               </div>

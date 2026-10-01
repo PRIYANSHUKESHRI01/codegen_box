@@ -171,13 +171,13 @@ export default function StudentTalentPoolPage() {
                 </div>
                 <div>
                   <div className="text-sm font-bold text-primary">You qualified for the Talent Pool</div>
-                  <div className="text-[11px] text-text-muted mt-0.5">
+                  <div className="text-2xs text-text-muted mt-0.5">
                     Scored <strong className="text-primary">{candidate.score_percent}%</strong> on &quot;{candidate.source_contest?.title ?? "a Mellow assessment"}&quot; ·{" "}
                     {new Date(candidate.qualified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                   </div>
                 </div>
               </div>
-              <span className={cn("px-2.5 py-1 rounded-control text-[11px] font-bold shrink-0", candidate.visibility_status === "visible" ? "bg-status-success/15 text-status-success" : candidate.visibility_status === "hired" ? "bg-accent-primary/15 text-accent-primary" : "bg-status-warning/15 text-status-warning")}>
+              <span className={cn("px-2.5 py-1 rounded-control text-2xs font-bold shrink-0", candidate.visibility_status === "visible" ? "bg-status-success/15 text-status-success" : candidate.visibility_status === "hired" ? "bg-accent-primary/15 text-accent-primary" : "bg-status-warning/15 text-status-warning")}>
                 {VISIBILITY_LABEL[candidate.visibility_status] ?? candidate.visibility_status}
               </span>
             </div>
@@ -193,7 +193,7 @@ export default function StudentTalentPoolPage() {
               </div>
             ) : (
               <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-[11px] text-text-muted max-w-md">
+                <p className="text-2xs text-text-muted max-w-md">
                   {candidate.visibility_status === "visible"
                     ? "Hiring partners can currently find and reach out to you. Your email/phone are never shared directly — every message comes through Mellow."
                     : "Nothing is shared with any company until you turn this on. You're always in control."}
@@ -202,7 +202,7 @@ export default function StudentTalentPoolPage() {
                   onClick={candidate.visibility_status === "visible" ? handleOptOut : handleOptIn}
                   disabled={busy}
                   className={cn(
-                    "flex items-center gap-1.5 px-3.5 py-2 rounded-control text-[11px] font-bold transition-colors disabled:opacity-60 shrink-0",
+                    "flex items-center gap-1.5 px-3.5 py-2 rounded-control text-2xs font-bold transition-colors disabled:opacity-60 shrink-0",
                     candidate.visibility_status === "visible" ? "bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary" : "bg-emerald-500 hover:bg-emerald-600 text-white"
                   )}
                 >
@@ -236,15 +236,15 @@ export default function StudentTalentPoolPage() {
 
                     {inq.status === "interview_scheduled" && inq.interview_scheduled_at && (
                       <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-1.5">
-                        <div className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                        <div className="text-2xs text-text-secondary flex items-center gap-1.5">
                           <CalendarClock className="w-3.5 h-3.5" />
                           {new Date(inq.interview_scheduled_at).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
                         </div>
-                        <div className="text-[11px] text-text-secondary flex items-center gap-1.5">
+                        <div className="text-2xs text-text-secondary flex items-center gap-1.5">
                           {inq.interview_mode === "online" ? <Video className="w-3.5 h-3.5" /> : <MapPin className="w-3.5 h-3.5" />}
                           {inq.interview_location}
                         </div>
-                        {inq.interview_notes && <p className="text-[11px] text-text-muted">{inq.interview_notes}</p>}
+                        {inq.interview_notes && <p className="text-2xs text-text-muted">{inq.interview_notes}</p>}
 
                         {!inq.responded_at ? (
                           <div className="flex items-center gap-2 pt-1">

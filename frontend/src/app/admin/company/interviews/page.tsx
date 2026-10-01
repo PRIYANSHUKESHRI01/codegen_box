@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Mic, Plus, X, Loader2, Send, FileText, Trash2, Sparkles } from "lucide-react";
+import { Mic, Plus, Loader2, Send, FileText, Trash2, Sparkles } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ManageInterviewQuestionsModal } from "@/components/dashboard/interviews/ManageInterviewQuestionsModal";
 import { ReviewSessionsModal } from "@/components/dashboard/interviews/ReviewSessionsModal";
@@ -13,6 +13,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewSummary } from "@/types/interview";
+import { Modal } from "@/components/ui/Modal";
 
 const BASE_PATH = "/company/interviews";
 
@@ -136,7 +137,7 @@ function CompanyInterviewsPageContent() {
                     <span className="text-sm font-bold text-primary">{interview.title}</span>
                     <span
                       className={cn(
-                        "px-1.5 py-0.5 text-[9px] font-bold uppercase rounded",
+                        "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
                         interview.status === "published"
                           ? "bg-status-success/15 text-status-success"
                           : interview.status === "draft"
@@ -147,13 +148,13 @@ function CompanyInterviewsPageContent() {
                       {interview.status}
                     </span>
                     {interview.is_mock && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold uppercase rounded bg-amber-500/15 text-amber-600">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/15 text-amber-600">
                         <Sparkles className="w-2.5 h-2.5" />
                         Practice Round
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-text-muted mt-0.5">
+                  <div className="text-2xs text-text-muted mt-0.5">
                     {interview.placement_drive?.title ?? "No linked opening"} · {interview.sessions_count ?? 0} shortlisted
                   </div>
                 </div>
@@ -162,28 +163,28 @@ function CompanyInterviewsPageContent() {
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setInviting(interview)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Shortlist</span>
                 </button>
                 <button
                   onClick={() => setReviewing(interview)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   <span>Responses</span>
                 </button>
                 <button
                   onClick={() => setManaging(interview)}
-                  className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-bold text-text-secondary hover:text-primary transition-colors"
+                  className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
                 >
                   Manage Questions
                 </button>
                 {interview.status === "draft" && (
                   <button
                     onClick={() => handlePublish(interview)}
-                    className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-[11px] font-bold transition-colors"
+                    className="px-3 py-1.5 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors"
                   >
                     Publish
                   </button>
@@ -317,23 +318,28 @@ function CreateInterviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-xl rounded-panel bg-surface border border-border-strong shadow-card p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between pb-3 border-b border-border-subtle">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Mic className="w-4 h-4 text-teal-500" />
-            <span>New AI Interview</span>
-          </h3>
-          <button onClick={onClose} disabled={saving} className="p-1 rounded text-text-muted hover:text-primary disabled:opacity-50">
-            <X className="w-5 h-5" />
+    <Modal
+      onClose={onClose}
+      title="New AI Interview"
+      icon={Mic}
+      iconClassName="bg-teal-500/10 text-teal-500"
+      size="xl"
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+            Cancel
           </button>
-        </div>
+          <button type="submit" form="create-interview-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">
+            {saving ? "Creating..." : "Create Draft"}
+          </button>
+        </>
+      }
+    >
+      <p className="text-2xs text-text-muted mb-3">
+        Only candidates you explicitly shortlist can ever see this. Starts as a draft — add questions, publish, then shortlist.
+      </p>
 
-        <p className="text-[11px] text-text-muted">
-          Only candidates you explicitly shortlist can ever see this. Starts as a draft — add questions, publish, then shortlist.
-        </p>
-
-        <form onSubmit={handleSubmit} className="space-y-3 text-xs">
+      <form id="create-interview-form" onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Job Opening *</label>
             <select
@@ -350,7 +356,7 @@ function CreateInterviewModal({
               ))}
             </select>
             {drives.length === 0 && (
-              <p className="text-[10px] text-status-warning mt-1">Post a job opening first — an interview must belong to one.</p>
+              <p className="text-3xs text-status-warning mt-1">Post a job opening first — an interview must belong to one.</p>
             )}
           </div>
           <div>
@@ -360,7 +366,7 @@ function CreateInterviewModal({
                 type="button"
                 onClick={() => setIsMock(true)}
                 className={cn(
-                  "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                  "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                   isMock ? "bg-amber-500 text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                 )}
               >
@@ -370,14 +376,14 @@ function CreateInterviewModal({
                 type="button"
                 onClick={() => setIsMock(false)}
                 className={cn(
-                  "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all",
+                  "px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
                   !isMock ? "bg-teal-500 text-white shadow-subtle" : "text-text-secondary hover:text-primary"
                 )}
               >
                 Final (Evaluated)
               </button>
             </div>
-            <p className="text-[10px] text-text-muted mt-1">
+            <p className="text-3xs text-text-muted mt-1">
               {isMock
                 ? "Candidates see this clearly labeled as a practice round — it's never part of the hiring decision."
                 : "The real, evaluated round — this is what a human reviewer actually judges."}
@@ -405,18 +411,8 @@ function CreateInterviewModal({
 
           <GenerateQuestionsPanel key={placementDriveId} defaultRole={selectedDrive?.role_title} onAcceptedChange={setAcceptedIds} />
 
-          {error && <p className="text-[11px] text-status-danger">{error}</p>}
-
-          <div className="pt-2 flex justify-end gap-2 border-t border-border-subtle">
-            <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">
-              {saving ? "Creating..." : "Create Draft"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+          {error && <p className="text-2xs text-status-danger">{error}</p>}
+      </form>
+    </Modal>
   );
 }

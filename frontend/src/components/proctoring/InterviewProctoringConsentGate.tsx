@@ -47,7 +47,7 @@ export function InterviewProctoringConsentGate({
           </div>
           <div>
             <h2 className="text-sm font-bold text-primary">This is a proctored AI interview</h2>
-            <p className="text-[11px] text-text-muted">Required to take this interview.</p>
+            <p className="text-2xs text-text-muted">Required to take this interview.</p>
           </div>
         </div>
 
@@ -59,7 +59,7 @@ export function InterviewProctoringConsentGate({
           }
         >
           <video ref={previewVideoRef} muted playsInline className="w-full aspect-video object-cover -scale-x-100" />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-[10px] font-bold text-white">
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-3xs font-bold text-white">
             <CheckCircle2 className="w-3 h-3 text-status-success" />
             Make sure your face is clearly visible
           </div>
@@ -92,7 +92,7 @@ export function InterviewProctoringConsentGate({
         </ul>
 
         {consentError && (
-          <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-[11px] text-status-danger">
+          <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-2xs text-status-danger">
             {consentError}
           </div>
         )}
@@ -107,7 +107,7 @@ export function InterviewProctoringConsentGate({
           </Button>
         )}
 
-        <p className="text-[10px] text-text-muted text-center">
+        <p className="text-3xs text-text-muted text-center">
           By continuing you consent to being recorded and monitored for the duration of this interview.
         </p>
       </motion.div>

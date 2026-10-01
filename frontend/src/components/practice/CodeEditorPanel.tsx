@@ -129,7 +129,7 @@ export function CodeEditorPanel({
         </select>
 
         <div className="flex items-center gap-1">
-          <span className="text-[11px] text-text-muted font-mono w-8 text-center select-none">{fontSize}px</span>
+          <span className="text-2xs text-text-muted font-mono w-8 text-center select-none">{fontSize}px</span>
           <button
             onClick={() => onFontSizeChange(Math.max(11, fontSize - 1))}
             className="p-1 rounded-control text-text-muted hover:text-primary hover:bg-surface-hover transition-colors"
@@ -149,7 +149,7 @@ export function CodeEditorPanel({
 
           <button
             onClick={onReset}
-            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-control text-[11px] font-semibold text-text-muted hover:text-primary hover:bg-surface-hover transition-colors"
+            className="inline-flex items-center gap-1.5 px-2 py-1 rounded-control text-2xs font-semibold text-text-muted hover:text-primary hover:bg-surface-hover transition-colors"
             title="Reset to starter code"
           >
             <RotateCcw className="w-3.5 h-3.5" />
@@ -157,7 +157,7 @@ export function CodeEditorPanel({
           </button>
 
           {savedAt !== null && (
-            <span className="hidden md:inline text-[10px] text-text-muted/80 ml-1 whitespace-nowrap">
+            <span className="hidden md:inline text-3xs text-text-muted/80 ml-1 whitespace-nowrap">
               Draft saved
             </span>
           )}
@@ -182,7 +182,16 @@ export function CodeEditorPanel({
             padding: { top: 14 },
             renderLineHighlight: "gutter",
             fontLigatures: true,
-            fontFamily: "'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace",
+            // Monaco renders its text as real DOM spans (not canvas), so it
+            // reads var(--font-mono) exactly like any other element —
+            // meaning the editor is the one place in the app that was
+            // hardcoding its own mono stack rather than using the site's.
+            // 'SF Mono' listed first meant every Mac visitor saw the code
+            // editor in a visibly different typeface from every other
+            // monospace value on the page (ratings, timestamps, table
+            // figures), which is the exact cross-page drift this pass
+            // fixes elsewhere via the shared type scale.
+            fontFamily: "var(--font-mono), 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
             cursorBlinking: "smooth",
           }}
         />

@@ -140,7 +140,7 @@ export function CollegeCoordinatorsModal({
             <UserCog className="w-5 h-5 text-accent-primary" />
             <div>
               <h3 className="font-bold text-primary text-base">Section Coordinators</h3>
-              <p className="text-[11px] text-text-muted">{college.name}</p>
+              <p className="text-2xs text-text-muted">{college.name}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-primary p-1">
@@ -161,12 +161,12 @@ export function CollegeCoordinatorsModal({
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-xs font-bold text-primary truncate">{c.name}</div>
-                    <div className="text-[11px] text-text-muted font-mono truncate">{c.email}</div>
+                    <div className="text-2xs text-text-muted font-mono truncate">{c.email}</div>
                   </div>
                   <button
                     onClick={() => handleToggleBlock(c)}
                     className={cn(
-                      "shrink-0 px-2.5 py-1 rounded-control border text-[10px] font-bold transition-all flex items-center gap-1",
+                      "shrink-0 px-2.5 py-1 rounded-control border text-3xs font-bold transition-all flex items-center gap-1",
                       c.is_blocked
                         ? "bg-status-success/10 hover:bg-status-success/20 text-status-success border-status-success/30"
                         : "bg-status-danger/10 hover:bg-status-danger/20 text-status-danger border-status-danger/30"
@@ -176,7 +176,7 @@ export function CollegeCoordinatorsModal({
                     {c.is_blocked ? "Unblock" : "Block"}
                   </button>
                 </div>
-                <div className="flex items-center gap-2 text-[11px] text-text-muted">
+                <div className="flex items-center gap-2 text-2xs text-text-muted">
                   <span>{c.managed_student_count} students managed</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -195,7 +195,7 @@ export function CollegeCoordinatorsModal({
                   </select>
                   <button
                     onClick={() => handleReassignSection(c)}
-                    className="px-2.5 py-1.5 rounded-control border border-border-subtle bg-surface hover:bg-surface-hover text-text-secondary hover:text-primary text-[11px] font-bold transition-all"
+                    className="px-2.5 py-1.5 rounded-control border border-border-subtle bg-surface hover:bg-surface-hover text-text-secondary hover:text-primary text-2xs font-bold transition-all"
                   >
                     Reassign
                   </button>
@@ -240,7 +240,7 @@ export function CollegeCoordinatorsModal({
                     ))}
                   </select>
                 ) : (
-                  <div className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-[11px] text-text-muted flex items-center gap-1.5">
+                  <div className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-2xs text-text-muted flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 shrink-0" />
                     <span>{sections.length === 0 ? "No sections yet" : "All sections covered"}</span>
                   </div>

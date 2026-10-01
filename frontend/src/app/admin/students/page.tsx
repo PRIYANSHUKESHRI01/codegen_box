@@ -2,8 +2,9 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Upload, Download, CheckCircle2, Mail, Loader2, ShieldAlert, UserPlus, Phone, UserX } from "lucide-react";
+import { Search, Upload, Download, CheckCircle2, Mail, Loader2, ShieldAlert, UserPlus, Phone, UserX, BarChart3 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EligibilityBadge } from "@/components/dashboard/EligibilityBadge";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
@@ -219,14 +220,14 @@ export default function StudentCohortPage() {
         <div className="flex items-center justify-between gap-3 flex-wrap p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
           <div>
             <h3 className="font-bold text-sm text-primary">Add Students</h3>
-            <p className="text-[11px] text-text-muted mt-0.5">
+            <p className="text-2xs text-text-muted mt-0.5">
               Add one student by hand, or import your whole batch via CSV below — either way they get an emailed
               login the moment their account is created.
             </p>
           </div>
           <button
             onClick={() => setShowAddStudent(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-bold transition-colors shrink-0"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors shrink-0"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Add Student</span>
@@ -248,7 +249,7 @@ export default function StudentCohortPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Total Cohort</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Total Cohort</span>
           <div className="text-2xl font-black text-primary font-mono mt-2">{students.length}</div>
         </div>
         <button
@@ -261,17 +262,17 @@ export default function StudentCohortPage() {
           )}
           title="Click to filter the table to students eligible for at least one active drive"
         >
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">
             Eligible (Active Drives)
           </span>
           <div className="text-2xl font-black text-status-success font-mono mt-2">{eligibleCount}</div>
         </button>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Needs Training</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Needs Training</span>
           <div className="text-2xl font-black text-status-warning font-mono mt-2">{needsTrainingCount}</div>
         </div>
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
-          <span className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Blocked Accounts</span>
+          <span className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Blocked Accounts</span>
           <div className="text-2xl font-black text-status-danger font-mono mt-2">{blockedCount}</div>
         </div>
       </div>
@@ -280,11 +281,11 @@ export default function StudentCohortPage() {
       {sections.length > 0 && (
         <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-[11px] font-semibold text-text-muted uppercase tracking-wider">Sections At a Glance</h3>
+            <h3 className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Sections At a Glance</h3>
             {sectionFilter !== "ALL" && (
               <button
                 onClick={() => setSectionFilter("ALL")}
-                className="text-[10px] font-bold text-accent-primary hover:underline"
+                className="text-3xs font-bold text-accent-primary hover:underline"
               >
                 Clear section filter
               </button>
@@ -297,7 +298,7 @@ export default function StudentCohortPage() {
                 onClick={() => setSectionFilter(sectionFilter === section ? "ALL" : section)}
                 title={coordinator ? `Coordinator: ${coordinator.name}` : "No coordinator assigned"}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-control border text-[11px] font-semibold transition-all",
+                  "flex items-center gap-2 px-3 py-1.5 rounded-control border text-2xs font-semibold transition-all",
                   sectionFilter === section
                     ? "bg-accent-primary text-white border-accent-primary shadow-subtle"
                     : "bg-elevated text-text-secondary border-border-subtle hover:border-border-strong hover:text-primary"
@@ -319,7 +320,7 @@ export default function StudentCohortPage() {
               </button>
             ))}
             {unassignedSectionCount > 0 && (
-              <span className="flex items-center gap-2 px-3 py-1.5 rounded-control border border-dashed border-border-subtle text-[11px] font-semibold text-text-muted">
+              <span className="flex items-center gap-2 px-3 py-1.5 rounded-control border border-dashed border-border-subtle text-2xs font-semibold text-text-muted">
                 <span>No Section</span>
                 <span className="font-mono">{unassignedSectionCount}</span>
               </span>
@@ -366,7 +367,7 @@ export default function StudentCohortPage() {
       {/* Filters */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-[11px] font-bold text-text-muted uppercase tracking-wider mr-0.5">Filters</span>
+          <span className="text-2xs font-bold text-text-muted uppercase tracking-wider mr-0.5">Filters</span>
           <select
             value={branchFilter}
             onChange={(e) => setBranchFilter(e.target.value as (typeof BRANCHES)[number])}
@@ -405,7 +406,7 @@ export default function StudentCohortPage() {
             onClick={() => setEligibleOnly(!eligibleOnly)}
             title="Students eligible for at least one currently active drive mapped to your college"
             className={cn(
-              "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all border flex items-center gap-1.5",
+              "px-3 py-1.5 rounded-control text-2xs font-bold transition-all border flex items-center gap-1.5",
               eligibleOnly
                 ? "bg-status-success/10 text-status-success border-status-success/30"
                 : "bg-surface text-text-secondary border-border-subtle hover:border-border-strong"
@@ -416,7 +417,7 @@ export default function StudentCohortPage() {
           </button>
 
           {/* Readiness score range filter — the TPO sets their own threshold */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-surface border border-border-subtle text-[11px] text-text-secondary">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-surface border border-border-subtle text-2xs text-text-secondary">
             <span className="font-semibold text-text-muted">Readiness</span>
             <input
               type="number"
@@ -442,7 +443,7 @@ export default function StudentCohortPage() {
               setMaxScore(AT_RISK_THRESHOLD - 1);
             }}
             className={cn(
-              "px-3 py-1.5 rounded-control text-[11px] font-bold transition-all border flex items-center gap-1.5",
+              "px-3 py-1.5 rounded-control text-2xs font-bold transition-all border flex items-center gap-1.5",
               maxScore === AT_RISK_THRESHOLD - 1 && minScore === 0
                 ? "bg-status-danger/10 text-status-danger border-status-danger/30"
                 : "bg-surface text-text-secondary border-border-subtle hover:border-border-strong"
@@ -458,7 +459,7 @@ export default function StudentCohortPage() {
           {selectedIds.size > 0 && (
             <button
               onClick={() => openNotify(Array.from(selectedIds), `${selectedIds.size} selected student(s)`)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[11px] font-semibold transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-semibold transition-colors"
             >
               <Mail className="w-3.5 h-3.5" />
               <span>Notify Selected ({selectedIds.size})</span>
@@ -467,7 +468,7 @@ export default function StudentCohortPage() {
           <button
             onClick={() => openNotify(filtered.map((s) => s.id), `all ${filtered.length} filtered student(s)`)}
             disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
           >
             <Mail className="w-3.5 h-3.5" />
             <span>Notify All Filtered ({filtered.length})</span>
@@ -475,7 +476,7 @@ export default function StudentCohortPage() {
           <button
             onClick={handleExport}
             disabled={exporting || filtered.length === 0}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[11px] font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
           >
             {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
             <span>Download Excel ({filtered.length})</span>
@@ -498,14 +499,14 @@ export default function StudentCohortPage() {
           and undoable in one click, instead of a TPO having to mentally
           track which of six controls they touched. */}
       <div className="flex items-center justify-between gap-3 -mt-1">
-        <p className="text-[11px] text-text-muted">
+        <p className="text-2xs text-text-muted">
           Showing <span className="font-bold text-primary font-mono">{filtered.length}</span> of{" "}
           <span className="font-bold text-primary font-mono">{students.length}</span> students
         </p>
         {hasActiveFilters && (
           <button
             onClick={clearFilters}
-            className="text-[11px] font-bold text-accent-primary hover:underline"
+            className="text-2xs font-bold text-accent-primary hover:underline"
           >
             Clear all filters
           </button>
@@ -516,7 +517,7 @@ export default function StudentCohortPage() {
       <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-[10px]">
+            <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
               <tr>
                 <th className="px-4 py-3 w-8">
                   <input
@@ -576,16 +577,16 @@ export default function StudentCohortPage() {
                         <div className="font-bold text-primary group-hover:text-accent-primary transition-colors">
                           {s.name}
                         </div>
-                        <div className="text-[10px] font-mono text-text-muted">{s.roll_number ?? s.email}</div>
+                        <div className="text-3xs font-mono text-text-muted">{s.roll_number ?? s.email}</div>
                       </button>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-[10px]">
+                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-3xs">
                         {s.branch ?? "—"}
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-[10px]">
+                      <span className="px-1.5 py-0.5 rounded bg-elevated font-mono text-3xs">
                         {s.section ?? "—"}
                       </span>
                     </td>
@@ -603,7 +604,7 @@ export default function StudentCohortPage() {
                     </td>
                     <td className="px-4 py-3">
                       {s.eligible_for_active_drive === null ? (
-                        <span className="px-1.5 py-0.5 text-[9px] font-bold rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
+                        <span className="px-1.5 py-0.5 text-3xs font-bold rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
                           No Active Drives
                         </span>
                       ) : (
@@ -611,7 +612,7 @@ export default function StudentCohortPage() {
                           <EligibilityBadge eligible={s.eligible_for_active_drive} />
                           {s.active_drive_count > 1 && (
                             <span
-                              className="text-[10px] font-mono text-text-muted"
+                              className="text-3xs font-mono text-text-muted"
                               title={`Eligible for ${s.eligible_drive_count} of ${s.active_drive_count} currently active drives mapped to your college`}
                             >
                               {s.eligible_drive_count}/{s.active_drive_count}
@@ -621,17 +622,33 @@ export default function StudentCohortPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={cn("px-2 py-0.5 text-[10px] font-bold rounded-full", TIER_STYLE[s.readiness_tier])}>
+                      <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full", TIER_STYLE[s.readiness_tier])}>
                         {s.readiness_tier}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setActiveStudent(s)}
-                        className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-[11px] font-medium"
-                      >
-                        Profile
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        {/* One click straight into contest/interview/drive
+                            history, the activity calendar and submitted
+                            code — previously only reachable by opening the
+                            Profile drawer first and scrolling to its own
+                            button. */}
+                        <Link
+                          href={`/admin/students/report?studentId=${s.id}`}
+                          title="View full activity report"
+                          aria-label="View full activity report"
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-2xs font-medium"
+                        >
+                          <BarChart3 className="w-3.5 h-3.5" />
+                          Report
+                        </Link>
+                        <button
+                          onClick={() => setActiveStudent(s)}
+                          className="px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-2xs font-medium"
+                        >
+                          Profile
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))

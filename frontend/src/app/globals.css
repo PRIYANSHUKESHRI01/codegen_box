@@ -364,3 +364,190 @@ html.light .glass-panel {
     scroll-behavior: auto !important;
   }
 }
+/* ─────────────────────────────────────────────────────────────────────────
+   Premium portal surface system ("hp-*") — used by every admin_company
+   (Hiring Partner) and admin_tpo (College TPO) screen (see components/portal/kit.tsx). Scoped under the
+   .hp-portal wrapper that DashboardShell adds for that role only, so no
+   other role's pages are affected.
+
+   Palette logic: indigo→violet = action (matches the product brand),
+   teal→cyan = hiring identity (logo tile, hero glow, spotlight), emerald =
+   positive outcomes only. Surfaces stay on the shared theme tokens, so both
+   light and dark themes work without per-component branching.
+   ───────────────────────────────────────────────────────────────────────── */
+:root,
+html.light {
+  --hp-shadow: 0 1px 2px rgba(39, 47, 92, 0.04), 0 8px 24px -10px rgba(39, 47, 92, 0.14);
+  --hp-shadow-hover: 0 2px 4px rgba(39, 47, 92, 0.05), 0 18px 40px -12px rgba(79, 70, 229, 0.22);
+  --hp-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --hp-spot: rgba(99, 102, 241, 0.09);
+  --hp-aurora-a: rgba(99, 102, 241, 0.13);
+  --hp-aurora-b-a: 0.11;
+  --hp-aurora-c: rgba(139, 92, 246, 0.08);
+  --hp-skel-a: rgba(99, 102, 241, 0.06);
+  --hp-skel-b: rgba(99, 102, 241, 0.14);
+}
+
+html.dark {
+  --hp-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
+  --hp-shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 48px -14px rgba(99, 102, 241, 0.35);
+  --hp-edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --hp-spot: rgba(129, 140, 248, 0.12);
+  --hp-aurora-a: rgba(99, 102, 241, 0.20);
+  --hp-aurora-b-a: 0.13;
+  --hp-aurora-c: rgba(139, 92, 246, 0.14);
+  --hp-skel-a: rgba(255, 255, 255, 0.04);
+  --hp-skel-b: rgba(255, 255, 255, 0.10);
+}
+
+/* Ambient page wash: an aurora bleeding from the top edge, fading out well
+   before the fold so long pages don't carry a coloured slab. Painted on the
+   column wrapper's ::before (behind <main>, which is lifted via z-[1]). */
+/* Portal identity colour (space-separated RGB so it takes alpha). Teal→cyan
+   for the Hiring Partner portal (default), sky→indigo-blue for the College
+   TPO portal. Drives the aurora, hero glow, gradient hairline and spotlight. */
+.hp-portal {
+  --hp-id: 20 184 166;
+  --hp-id2: 6 182 212;
+}
+
+.hp-portal[data-portal="tpo"] {
+  --hp-id: 14 165 233;
+  --hp-id2: 99 102 241;
+}
+
+.hp-canvas {
+  position: relative;
+  isolation: isolate;
+}
+
+.hp-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 560px;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(55% 75% at 12% 0%, var(--hp-aurora-a), transparent 70%),
+    radial-gradient(45% 70% at 88% 0%, rgb(var(--hp-id) / var(--hp-aurora-b-a)), transparent 70%),
+    radial-gradient(40% 60% at 50% 0%, var(--hp-aurora-c), transparent 75%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+}
+
+/* Card: hairline border, layered navy shadow, a 1px top-edge highlight. */
+/* :where() drops the surface colour to zero specificity so a bg-* utility
+   passed to HpCard can override it (this rule sits after the utilities). */
+:where(.hp-card) {
+  background: rgb(var(--bg-surface-rgb));
+}
+
+.hp-card {
+  position: relative;
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--hp-edge), var(--hp-shadow);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease, border-color 0.25s ease;
+}
+
+.hp-card-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: var(--hp-edge), var(--hp-shadow-hover);
+}
+
+/* Cursor-following spotlight (Linear / Vercel pattern). --mx/--my are set by
+   HpCard's pointer handler; with no pointer it simply never shows. */
+.hp-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), var(--hp-spot), transparent 62%);
+}
+
+.hp-spot:hover::before {
+  opacity: 1;
+}
+
+/* Gradient hairline border (featured cards, hero). Mask trick keeps the
+   interior transparent so it works over any surface colour. */
+.hp-gborder::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  pointer-events: none;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.55), rgb(var(--hp-id) / 0.35) 50%, rgba(139, 92, 246, 0.45));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+/* Fine dotted texture for heroes / empty states. */
+.hp-dots {
+  background-image: radial-gradient(circle, rgba(99, 102, 241, 0.22) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+/* Skeleton shimmer. */
+.hp-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(100deg, var(--hp-skel-a) 30%, var(--hp-skel-b) 50%, var(--hp-skel-a) 70%);
+  background-size: 220% 100%;
+  animation: hp-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes hp-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+/* Primary CTA sheen sweeping across on hover. */
+.hp-btn-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.hp-btn-sheen::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  transform: skewX(-20deg);
+  transition: left 0.7s ease;
+  pointer-events: none;
+}
+
+.hp-btn-sheen:hover::after {
+  left: 130%;
+}
+
+/* Slow ambient drift for hero orbs. */
+@keyframes hp-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(14px, -10px, 0) scale(1.06); }
+}
+
+.hp-drift {
+  animation: hp-drift 11s ease-in-out infinite;
+}
+
+/* Live indicator ring. */
+@keyframes hp-ping-soft {
+  0% { transform: scale(1); opacity: 0.55; }
+  80%, 100% { transform: scale(2.4); opacity: 0; }
+}
+
+.hp-ping {
+  animation: hp-ping-soft 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }

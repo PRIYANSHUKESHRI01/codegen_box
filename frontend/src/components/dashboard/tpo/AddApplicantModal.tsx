@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search, Loader2, UserPlus, CheckCircle2 } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { Search, Loader2, UserPlus, Check, Info, RotateCcw, SearchX, Mail, Users2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { DriveApplication } from "@/types/placement";
 import { Modal } from "@/components/ui/Modal";
+import { HpAvatar, HpButton, hpEase, hpInput, hpLabel } from "@/components/portal/kit";
+import { HpCallout, HpFormError } from "@/components/portal/pipeline-kit";
 
 interface RosterStudent {
   id: number;
@@ -81,101 +84,150 @@ export function AddApplicantModal({ placementDriveId, companyName, excludeUserId
   return (
     <Modal
       onClose={onClose}
-      title={`Add Applicant — ${companyName}`}
+      title="Add Applicant"
+      subtitle={`${companyName} · selection pipeline`}
       icon={UserPlus}
-      iconClassName="bg-accent-secondary/10 text-accent-secondary"
       size="md"
+      variant="premium"
       footer={
         <>
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50 text-xs font-semibold"
-          >
+          <HpButton type="button" variant="ghost" onClick={onClose} disabled={submitting}>
             Cancel
-          </button>
-          <button
+          </HpButton>
+          <HpButton
+            type="button"
             onClick={handleSubmit}
             disabled={!selected || submitting}
-            className={cn(
-              "px-4 py-2 rounded-control text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5",
-              "bg-accent-primary hover:bg-accent-primary-hover"
-            )}
+            isLoading={submitting}
+            leftIcon={<UserPlus className="h-4 w-4" />}
           >
-            {submitting && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            <span>{submitting ? "Adding..." : "Add Applicant"}</span>
-          </button>
+            {submitting ? "Adding..." : "Add Applicant"}
+          </HpButton>
         </>
       }
     >
-      <div className="space-y-4">
-        <p className="text-2xs text-text-muted">
+      <MotionConfig reducedMotion="user">
+      <div className="space-y-5">
+        <HpCallout icon={Info} tone="indigo">
           For a student a company approved outside the standard eligibility cutoffs — most students should come in via
           &quot;Register Eligible Students&quot; instead.
-        </p>
+        </HpCallout>
 
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        {error && <HpFormError>{error}</HpFormError>}
 
-        {selected ? (
-          <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-control bg-elevated border border-accent-primary/30">
-            <span className="flex items-center gap-2 min-w-0">
-              <CheckCircle2 className="w-3.5 h-3.5 text-status-success shrink-0" />
-              <span className="min-w-0">
-                <span className="font-semibold text-primary truncate block">{selected.name}</span>
-                <span className="text-3xs text-text-muted truncate block">
-                  {selected.roll_number ?? "No roll number"} · {selected.branch ?? "No branch"}
-                </span>
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="text-2xs font-bold text-accent-primary hover:underline shrink-0"
+        <AnimatePresence mode="wait" initial={false}>
+          {selected ? (
+            <motion.div
+              key="selected"
+              initial={{ opacity: 0, y: 6, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.99 }}
+              transition={{ duration: 0.22, ease: hpEase }}
             >
-              Change
-            </button>
-          </div>
-        ) : (
-          <div>
-            <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={loadingRoster ? "Loading your cohort..." : "Search by name, roll number, or email..."}
-                disabled={loadingRoster}
-                className="w-full pl-8 pr-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs placeholder:text-text-muted outline-none focus:border-accent-primary disabled:opacity-60"
-              />
-              {loadingRoster && <Loader2 className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted animate-spin" />}
-            </div>
-
-            {results.length > 0 && (
-              <div className="mt-2 max-h-56 overflow-y-auto rounded-control border border-border-subtle divide-y divide-border-subtle">
-                {results.map((s) => (
-                  <button
-                    key={s.id}
-                    onClick={() => setSelected(s)}
-                    className="w-full px-3 py-2 text-left hover:bg-elevated transition-colors flex items-center justify-between gap-2"
-                  >
-                    <span className="min-w-0">
-                      <span className="text-xs font-semibold text-primary block truncate">{s.name}</span>
-                      <span className="text-3xs text-text-muted block truncate">
-                        {s.roll_number ?? "—"} · {s.branch ?? "—"} · {s.email}
-                      </span>
-                    </span>
-                  </button>
-                ))}
+              <p className={hpLabel}>Selected student</p>
+              <div className="flex items-center gap-3 rounded-2xl border border-indigo-500/40 bg-indigo-500/[0.06] p-3.5 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
+                <span className="relative shrink-0">
+                  <HpAvatar name={selected.name} size="lg" />
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-b from-indigo-500 to-violet-600 text-white ring-2 ring-surface">
+                    <Check className="h-3 w-3" strokeWidth={3.2} aria-hidden />
+                  </span>
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-13 font-bold text-primary">{selected.name}</span>
+                  <span className="block truncate text-2xs text-text-muted">
+                    {selected.roll_number ?? "No roll number"} · {selected.branch ?? "No branch"}
+                  </span>
+                  <span className="mt-0.5 flex min-w-0 items-center gap-1 text-3xs text-text-muted">
+                    <Mail className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate">{selected.email}</span>
+                  </span>
+                </span>
+                <HpButton
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelected(null)}
+                  leftIcon={<RotateCcw className="h-3.5 w-3.5" />}
+                >
+                  Change
+                </HpButton>
               </div>
-            )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="search"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: hpEase }}
+            >
+              <label htmlFor="add-applicant-search" className={hpLabel}>
+                Find a student in your cohort
+              </label>
+              <div className="group/field relative">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted transition-colors group-focus-within/field:text-indigo-500" />
+                <input
+                  id="add-applicant-search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={loadingRoster ? "Loading your cohort..." : "Search by name, roll number, or email..."}
+                  disabled={loadingRoster}
+                  autoComplete="off"
+                  className={cn(hpInput, "pl-10 pr-10")}
+                />
+                {loadingRoster && (
+                  <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" aria-label="Loading cohort" />
+                )}
+              </div>
 
-            {query.trim().length > 0 && results.length === 0 && !loadingRoster && (
-              <p className="mt-2 text-2xs text-text-muted text-center py-3">
-                No matching student, or they&apos;re already registered for this drive.
-              </p>
-            )}
-          </div>
-        )}
+              {!loadingRoster && query.trim().length === 0 && (
+                <p className="mt-2 flex items-center gap-1.5 text-3xs text-text-muted">
+                  <Users2 className="h-3 w-3" aria-hidden />
+                  <span className="tabular">{roster.length}</span> student{roster.length === 1 ? "" : "s"} in your cohort · showing up to 8 matches
+                </p>
+              )}
+
+              {results.length > 0 && (
+                <ul className="mt-3 max-h-64 space-y-1 overflow-y-auto rounded-2xl border border-border-subtle bg-elevated/30 p-1.5" aria-label="Matching students">
+                  {results.map((s, idx) => (
+                    <motion.li
+                      key={s.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, ease: hpEase, delay: Math.min(idx, 6) * 0.025 }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelected(s)}
+                        className="group/row flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-[rgb(var(--bg-surface-rgb))] hover:shadow-[0_1px_2px_rgba(39,47,92,0.08)] focus-visible:bg-[rgb(var(--bg-surface-rgb))] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      >
+                        <HpAvatar name={s.name} size="sm" />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-13 font-semibold text-primary">{s.name}</span>
+                          <span className="block truncate text-3xs text-text-muted">
+                            {s.roll_number ?? "—"} · {s.branch ?? "—"} · {s.email}
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-2xs font-semibold text-indigo-600 opacity-0 transition-opacity group-hover/row:opacity-100 group-focus-visible/row:opacity-100 dark:text-indigo-300">
+                          Select
+                        </span>
+                      </button>
+                    </motion.li>
+                  ))}
+                </ul>
+              )}
+
+              {query.trim().length > 0 && results.length === 0 && !loadingRoster && (
+                <div className="mt-3 flex flex-col items-center rounded-2xl border border-dashed border-border-strong bg-elevated/30 px-4 py-6 text-center">
+                  <SearchX className="h-5 w-5 text-text-muted" aria-hidden />
+                  <p className="mt-2 text-2xs text-text-muted">No matching student, or they&apos;re already registered for this drive.</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+      </MotionConfig>
     </Modal>
   );
 }

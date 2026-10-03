@@ -154,6 +154,7 @@ class DatabaseSeeder extends Seeder
         $this->call(DsaHundredProblemSeederV6::class);
         $this->call(DsaHundredProblemSeederV7::class);
         $this->call(DsaHundredProblemSeederV8::class);
+        $this->call(DsaHundredProblemSeederV9::class);
         $this->call(CompanyTagSeeder::class);
         // InterviewQuestionBankSeeder before CampusRosterSeeder: both
         // CompanyHiringSeeder and InterviewSeeder below attach real

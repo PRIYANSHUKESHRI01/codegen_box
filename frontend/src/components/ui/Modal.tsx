@@ -30,6 +30,8 @@ export interface ModalProps {
   showCloseButton?: boolean;
   /** Overrides the body's default `px-6 py-5 text-xs` — for edge-to-edge content (a code viewer, a data table) that needs to manage its own padding. */
   bodyClassName?: string;
+  /** "premium" is the hiring-portal treatment (frosted backdrop, 24px card, gradient icon tile, gradient hairline). Default is unchanged for every other role. */
+  variant?: "default" | "premium";
   children: React.ReactNode;
 }
 
@@ -56,8 +58,10 @@ export function Modal({
   closeOnBackdrop = true,
   showCloseButton = true,
   bodyClassName,
+  variant = "default",
   children,
 }: ModalProps) {
+  const premium = variant === "premium";
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && showCloseButton) onClose();
@@ -75,7 +79,10 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm animate-fade-in"
+      className={cn(
+        "fixed inset-0 z-50 overflow-y-auto animate-fade-in",
+        premium ? "bg-slate-950/60 backdrop-blur-md" : "bg-black/70 backdrop-blur-sm"
+      )}
       onClick={closeOnBackdrop ? onClose : undefined}
     >
       <div className="flex min-h-full items-center justify-center p-4 py-8">
@@ -85,19 +92,35 @@ export function Modal({
           aria-labelledby="modal-title"
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "w-full flex flex-col max-h-[calc(100vh-4rem)] rounded-panel bg-surface border border-border-strong shadow-card animate-modal-in",
+            "w-full flex flex-col max-h-[calc(100vh-4rem)] bg-surface animate-modal-in",
+            premium
+              ? "relative overflow-hidden rounded-[24px] border border-border-subtle shadow-[0_32px_80px_-20px_rgba(15,23,42,0.55),0_0_0_1px_rgba(99,102,241,0.08)]"
+              : "rounded-panel border border-border-strong shadow-card",
             SIZE_CLASSES[size]
           )}
         >
-          <div className="flex items-center justify-between gap-3 px-6 py-4 border-b border-border-subtle shrink-0">
+          {premium && (
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+          )}
+          <div
+            className={cn(
+              "flex items-center justify-between gap-3 px-6 border-b border-border-subtle shrink-0",
+              premium ? "py-5 bg-gradient-to-b from-indigo-500/[0.05] to-transparent" : "py-4"
+            )}
+          >
             <div className="flex items-center gap-3 min-w-0">
-              {Icon && (
-                <span className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", iconClassName)}>
-                  <Icon className="w-4 h-4" />
-                </span>
-              )}
+              {Icon &&
+                (premium ? (
+                  <span className="relative w-10 h-10 rounded-xl flex items-center justify-center shrink-0 text-white bg-gradient-to-br from-indigo-500 to-violet-600 shadow-[0_8px_18px_-6px_rgba(99,102,241,0.65)] ring-1 ring-inset ring-white/25">
+                    <Icon className="w-[18px] h-[18px]" strokeWidth={2.2} />
+                  </span>
+                ) : (
+                  <span className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0", iconClassName)}>
+                    <Icon className="w-4 h-4" />
+                  </span>
+                ))}
               <div className="min-w-0">
-                <h3 id="modal-title" className="text-base font-bold text-primary truncate">
+                <h3 id="modal-title" className={cn("font-bold text-primary truncate", premium ? "text-lg tracking-tight" : "text-base")}>
                   {title}
                 </h3>
                 {subtitle && <p className="text-2xs text-text-muted truncate mt-0.5">{subtitle}</p>}
@@ -108,7 +131,7 @@ export function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-elevated transition-colors shrink-0"
+                className={cn("p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-elevated transition-colors shrink-0", premium && "hover:rotate-90 duration-200")}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -118,7 +141,7 @@ export function Modal({
           <div className={cn("overflow-y-auto grow", bodyClassName ?? "px-6 py-5 text-xs")}>{children}</div>
 
           {footer && (
-            <div className="px-6 py-4 border-t border-border-subtle shrink-0 flex items-center justify-end gap-2">{footer}</div>
+            <div className={cn("px-6 py-4 border-t border-border-subtle shrink-0 flex items-center justify-end gap-2", premium && "bg-elevated/50")}>{footer}</div>
           )}
         </div>
       </div>

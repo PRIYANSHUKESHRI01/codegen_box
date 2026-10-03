@@ -47,6 +47,7 @@ import type { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subsc
 import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
 import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 import { LogoutConfirmModal } from "@/components/dashboard/LogoutConfirmModal";
+import { HpCompanyLogo } from "@/components/portal/kit";
 
 /**
  * Rail geometry, in px.
@@ -881,6 +882,56 @@ export function DashboardSidebar({
         aria-label="Dashboard sections"
         className="sb-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-3 py-4"
       >
+        {currentRole === "admin_tpo" && currentTpoView === "tpo" && storedUser?.college && (
+          <div className={cn("mb-5", !isExpanded && "flex justify-center")}>
+            {isExpanded ? (
+              <div className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-sidebar-border bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-2.5 transition-colors hover:border-sidebar-border-strong">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-sky-400/20 blur-2xl transition-opacity group-hover:opacity-100"
+                />
+                <HpCompanyLogo name={storedUser.college.name} size="sm" />
+                <div className="relative min-w-0 flex-1">
+                  <p className="truncate text-13 font-bold leading-tight text-sidebar-strong">{storedUser.college.name}</p>
+                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-2xs font-medium text-sidebar-dim">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-sky-400" />
+                    {storedUser.college.short_code}
+                    {storedUser.college.city ? ` · ${storedUser.college.city}` : ""}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <HpCompanyLogo name={storedUser.college.name} size="sm" />
+            )}
+          </div>
+        )}
+
+        {/* Hiring partners: the tenant being operated on, pinned above the
+            nav as a workspace card (Linear / Vercel team-switcher pattern).
+            Display-only — a company account has exactly one tenant. */}
+        {currentRole === "admin_company" && storedUser?.company && (
+          <div className={cn("mb-5", !isExpanded && "flex justify-center")}>
+            {isExpanded ? (
+              <div className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-sidebar-border bg-gradient-to-br from-white/[0.06] to-white/[0.02] p-2.5 transition-colors hover:border-sidebar-border-strong">
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-teal-400/20 blur-2xl transition-opacity group-hover:opacity-100"
+                />
+                <HpCompanyLogo name={storedUser.company.name} logo={storedUser.company.logo} size="sm" />
+                <div className="relative min-w-0 flex-1">
+                  <p className="truncate text-13 font-bold leading-tight text-sidebar-strong">{storedUser.company.name}</p>
+                  <p className="mt-0.5 flex items-center gap-1.5 truncate text-2xs font-medium text-sidebar-dim">
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal-400" />
+                    {storedUser.company.industry ?? "Hiring partner"}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <HpCompanyLogo name={storedUser.company.name} logo={storedUser.company.logo} size="sm" />
+            )}
+          </div>
+        )}
+
         {navSections.map((section, idx) => (
           <div key={section.title ?? idx} className={idx > 0 ? "mt-6" : undefined}>
             {section.title && (

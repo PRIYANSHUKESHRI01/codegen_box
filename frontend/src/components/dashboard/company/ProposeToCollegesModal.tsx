@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { GraduationCap, Loader2, Search, Send, CheckCircle2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { GraduationCap, Send, CheckCircle2, ChevronDown, SlidersHorizontal, MailCheck, SearchX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { BRANCH_OPTIONS, type AdminDriveCollegeMapping } from "@/components/admin/placements/types";
 import type { CompanyPartnerCollege } from "@/types/hiring";
 import { Modal } from "@/components/ui/Modal";
+import { HpButton, HpCompanyLogo, HpPill, HpSearch, HpSkeleton, hpEase, hpInput, hpLabel, type HpTone } from "@/components/portal/kit";
+import { HpCallout, HpCheckboxBox, HpFormError } from "@/components/portal/pipeline-kit";
 
 interface DriveForPropose {
   id: number;
@@ -22,8 +25,11 @@ interface ProposeToCollegesModalProps {
   onProposed: (proposedCount: number, skippedCount: number) => void;
 }
 
-const inputClass =
-  "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500 text-xs";
+const MAPPING_TONE: Record<AdminDriveCollegeMapping["status"], HpTone> = {
+  approved: "emerald",
+  pending: "amber",
+  declined: "rose",
+};
 
 /**
  * A company proposing one of its own job openings to specific colleges —
@@ -116,174 +122,228 @@ export function ProposeToCollegesModal({ drive, preselectedCollegeId, onClose, o
     <Modal
       onClose={onClose}
       title="Propose to Colleges"
+      subtitle={`“${drive.title}”`}
       icon={GraduationCap}
-      iconClassName="bg-teal-500/10 text-teal-500"
       size="lg"
+      variant="premium"
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-          >
+          <HpButton type="button" variant="ghost" onClick={onClose} disabled={submitting}>
             Cancel
-          </button>
-          <button
+          </HpButton>
+          <HpButton
             type="button"
             onClick={handleSubmit}
             disabled={submitting || selected.size === 0}
-            className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            isLoading={submitting}
+            leftIcon={selected.size > 0 ? <Send className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
           >
-            {submitting ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : selected.size > 0 ? (
-              <Send className="w-3.5 h-3.5" />
-            ) : (
-              <CheckCircle2 className="w-3.5 h-3.5" />
-            )}
-            <span>{submitting ? "Sending..." : `Propose to ${selected.size} College${selected.size === 1 ? "" : "s"}`}</span>
-          </button>
+            {submitting ? "Sending..." : `Propose to ${selected.size} College${selected.size === 1 ? "" : "s"}`}
+          </HpButton>
         </>
       }
     >
-      <div className="space-y-4">
-        <p className="text-xs text-text-secondary">
-          Propose <strong>&ldquo;{drive.title}&rdquo;</strong> to one or more colleges. It won&apos;t appear for a
-          college&apos;s students until that college&apos;s TPO approves it — they&apos;ll get an email with the full
+      <div className="space-y-5">
+        <HpCallout icon={MailCheck} tone="indigo">
+          Propose <strong className="font-semibold text-primary">&ldquo;{drive.title}&rdquo;</strong> to one or more colleges. It won&apos;t
+          appear for a college&apos;s students until that college&apos;s TPO approves it — they&apos;ll get an email with the full
           opening detail the moment you send this.
-        </p>
+        </HpCallout>
 
-        {submitError && <p className="text-2xs text-status-danger">{submitError}</p>}
+        {submitError && <HpFormError>{submitError}</HpFormError>}
 
-        <div className="relative">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search colleges..."
-            className={cn(inputClass, "pl-8")}
-          />
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-semibold text-text-secondary">Partner colleges</span>
+            <AnimatePresence initial={false}>
+              {selected.size > 0 && (
+                <motion.span
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ duration: 0.2, ease: hpEase }}
+                >
+                  <HpPill tone="indigo" size="sm">
+                    <span className="tabular">{selected.size}</span> selected
+                  </HpPill>
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <HpSearch value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search colleges..." aria-label="Search colleges" />
+
+          {loading ? (
+            <div className="space-y-1 rounded-2xl border border-border-subtle p-1.5" role="status" aria-label="Loading partner colleges">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 p-2.5">
+                  <HpSkeleton className="h-[18px] w-[18px] rounded-[6px]" />
+                  <HpSkeleton className="h-8 w-8 rounded-[10px]" />
+                  <div className="flex-1 space-y-1.5">
+                    <HpSkeleton className="h-3 w-1/2" />
+                    <HpSkeleton className="h-2.5 w-1/4" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : loadError ? (
+            <HpFormError>{loadError}</HpFormError>
+          ) : (
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-2xl border border-border-subtle bg-elevated/30 p-1.5">
+              {filtered.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center">
+                  <SearchX className="h-5 w-5 text-text-muted" />
+                  <p className="text-2xs text-text-muted">No colleges match your search.</p>
+                </div>
+              ) : (
+                filtered.map((c) => {
+                  const existingStatus = statusByCollege.get(c.id);
+                  const disabled = existingStatus === "pending" || existingStatus === "approved";
+                  const isChecked = selected.has(c.id);
+                  return (
+                    <label
+                      key={c.id}
+                      className={cn(
+                        "flex items-center gap-3 rounded-xl p-2.5 text-xs transition-colors duration-200",
+                        disabled
+                          ? "cursor-not-allowed opacity-50"
+                          : isChecked
+                            ? "cursor-pointer bg-indigo-500/[0.07] ring-1 ring-inset ring-indigo-500/25"
+                            : "cursor-pointer hover:bg-[rgb(var(--bg-surface-rgb))] hover:shadow-[0_1px_3px_rgba(39,47,92,0.08)]"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleCollege(c.id)}
+                        disabled={disabled}
+                        className="peer sr-only"
+                      />
+                      <HpCheckboxBox checked={isChecked} />
+                      <HpCompanyLogo name={c.name} size="sm" className="h-8 w-8 rounded-[10px] text-base shadow-none" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold text-primary">{c.name}</span>
+                        <span className="tabular block truncate text-3xs text-text-muted">
+                          {c.short_code ? `${c.short_code} · ` : ""}
+                          {c.student_count} students
+                        </span>
+                      </span>
+                      {existingStatus && (
+                        <HpPill tone={MAPPING_TONE[existingStatus]} dot size="sm" className="shrink-0 capitalize">
+                          {existingStatus}
+                        </HpPill>
+                      )}
+                    </label>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="p-6 flex items-center justify-center gap-2 text-xs text-text-muted">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading partner colleges...
-          </div>
-        ) : loadError ? (
-          <p className="text-2xs text-status-danger">{loadError}</p>
-        ) : (
-          <div className="max-h-56 overflow-y-auto space-y-1.5 border border-border-subtle rounded-control p-2">
-            {filtered.length === 0 ? (
-              <p className="text-2xs text-text-muted text-center py-4">No colleges match your search.</p>
-            ) : (
-              filtered.map((c) => {
-                const existingStatus = statusByCollege.get(c.id);
-                const disabled = existingStatus === "pending" || existingStatus === "approved";
-                return (
-                  <label
-                    key={c.id}
-                    className={cn(
-                      "flex items-center gap-2.5 p-2 rounded-control text-xs cursor-pointer",
-                      disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-elevated"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.has(c.id)}
-                      onChange={() => toggleCollege(c.id)}
-                      disabled={disabled}
-                      className="rounded border-border-subtle"
-                    />
-                    <span className="flex-1 min-w-0 truncate font-semibold text-primary">{c.name}</span>
-                    <span className="text-3xs text-text-muted font-mono shrink-0">{c.student_count} students</span>
-                    {existingStatus && (
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 rounded-full text-3xs font-bold uppercase shrink-0",
-                          existingStatus === "approved"
-                            ? "bg-status-success/15 text-status-success"
-                            : existingStatus === "pending"
-                              ? "bg-status-warning/15 text-status-warning"
-                              : "bg-status-danger/15 text-status-danger"
-                        )}
-                      >
-                        {existingStatus}
-                      </span>
-                    )}
-                  </label>
-                );
-              })
-            )}
-          </div>
-        )}
-
-        <div>
+        <div className="rounded-2xl border border-border-subtle">
           <button
             type="button"
             onClick={() => setShowOverrides(!showOverrides)}
-            className="text-2xs font-bold text-teal-500 hover:underline"
+            aria-expanded={showOverrides}
+            className="group flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-colors hover:bg-elevated/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
-            {showOverrides ? "Hide" : "Override"} eligibility for these colleges (optional)
+            <SlidersHorizontal className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-300" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-xs font-semibold text-primary">
+                {showOverrides ? "Hide" : "Override"} eligibility for these colleges
+              </span>
+              <span className="block text-3xs text-text-muted">Optional — min CGPA, backlogs and branches</span>
+            </span>
+            <ChevronDown className={cn("h-4 w-4 shrink-0 text-text-muted transition-transform duration-300", showOverrides && "rotate-180")} />
           </button>
-          {showOverrides && (
-            <div className="mt-2.5 space-y-2.5 p-3 rounded-control bg-elevated/60 border border-border-subtle">
-              <p className="text-3xs text-text-muted">Leave blank for no eligibility restriction.</p>
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-2xs font-semibold text-text-secondary mb-1">Min CGPA</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="10"
-                    value={minCgpa}
-                    onChange={(e) => setMinCgpa(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-2xs font-semibold text-text-secondary mb-1">Max Backlogs</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={maxBacklogs}
-                    onChange={(e) => setMaxBacklogs(e.target.value)}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-2xs font-semibold text-text-secondary">Eligible Branches</label>
-                  <label className="flex items-center gap-1.5 text-2xs text-text-muted">
-                    <input type="checkbox" checked={allBranches} onChange={(e) => setAllBranches(e.target.checked)} />
-                    All branches
-                  </label>
-                </div>
-                {!allBranches && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {BRANCH_OPTIONS.map((b) => (
-                      <button
-                        key={b}
-                        type="button"
-                        onClick={() => toggleBranch(b)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                          branches.includes(b)
-                            ? "bg-teal-500 text-white border-teal-500"
-                            : "bg-surface text-text-secondary border-border-subtle"
-                        )}
-                      >
-                        {b}
-                      </button>
-                    ))}
+
+          <AnimatePresence initial={false}>
+            {showOverrides && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: hpEase }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-4 border-t border-border-subtle px-4 pb-4 pt-3.5">
+                  <p className="text-3xs text-text-muted">Leave blank for no eligibility restriction.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label htmlFor="ptc-min-cgpa" className={hpLabel}>
+                        Min CGPA
+                      </label>
+                      <input
+                        id="ptc-min-cgpa"
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="10"
+                        value={minCgpa}
+                        onChange={(e) => setMinCgpa(e.target.value)}
+                        className={cn(hpInput, "tabular")}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="ptc-max-backlogs" className={hpLabel}>
+                        Max Backlogs
+                      </label>
+                      <input
+                        id="ptc-max-backlogs"
+                        type="number"
+                        min="0"
+                        value={maxBacklogs}
+                        onChange={(e) => setMaxBacklogs(e.target.value)}
+                        className={cn(hpInput, "tabular")}
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
+                  <div>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-text-secondary">Eligible Branches</span>
+                      <label className="flex cursor-pointer items-center gap-2 text-2xs font-medium text-text-secondary">
+                        <input type="checkbox" checked={allBranches} onChange={(e) => setAllBranches(e.target.checked)} className="peer sr-only" />
+                        <HpCheckboxBox checked={allBranches} />
+                        All branches
+                      </label>
+                    </div>
+                    <AnimatePresence initial={false}>
+                      {!allBranches && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -4 }}
+                          transition={{ duration: 0.2, ease: hpEase }}
+                          className="flex flex-wrap gap-1.5"
+                        >
+                          {BRANCH_OPTIONS.map((b) => {
+                            const on = branches.includes(b);
+                            return (
+                              <button
+                                key={b}
+                                type="button"
+                                aria-pressed={on}
+                                onClick={() => toggleBranch(b)}
+                                className={cn(
+                                  "rounded-full px-3 py-1.5 text-2xs font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
+                                  on
+                                    ? "bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.6)]"
+                                    : "bg-[rgb(var(--bg-surface-rgb))] text-text-secondary ring-1 ring-inset ring-border-strong hover:text-primary hover:ring-indigo-500/30"
+                                )}
+                              >
+                                {b}
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </Modal>

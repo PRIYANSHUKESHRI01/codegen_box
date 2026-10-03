@@ -417,8 +417,17 @@ export function DashboardHeader({
               the same accent used everywhere else rather than flat grey, so
               it reads as "designed" rather than a leftover system chip. */}
           {tenant && (
-            <span className="hidden flex-shrink-0 items-center gap-1.5 rounded-full border border-accent-primary/15 bg-accent-primary/5 px-2.5 py-1 text-2xs font-semibold text-text-secondary lg:inline-flex">
-              <Building2 className="h-3 w-3 flex-shrink-0 text-accent-primary" />
+            <span
+              className={cn(
+                "hidden flex-shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-semibold text-text-secondary lg:inline-flex",
+                identityRole === "admin_company"
+                  ? "border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-cyan-500/5"
+                  : identityRole === "admin_tpo"
+                  ? "border-sky-500/25 bg-gradient-to-r from-sky-500/10 to-indigo-500/5"
+                  : "border-accent-primary/15 bg-accent-primary/5"
+              )}
+            >
+              <Building2 className={cn("h-3 w-3 flex-shrink-0", identityRole === "admin_company" ? "text-teal-500" : identityRole === "admin_tpo" ? "text-sky-500" : "text-accent-primary")} />
               <span className="max-w-[220px] truncate">{tenant}</span>
             </span>
           )}
@@ -560,7 +569,9 @@ export function DashboardHeader({
               onClick={actionButton.onClick}
               title={actionButton.label}
               aria-label={actionButton.label}
-              className="group flex h-9 flex-shrink-0 items-center gap-1.5 rounded-[10px] bg-gradient-to-r from-accent-primary to-accent-secondary bg-[length:160%_100%] bg-left px-2.5 text-13 font-bold text-white shadow-subtle transition-all duration-300 hover:bg-right hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:scale-95 sm:px-3.5"
+              className={cn("group flex h-9 flex-shrink-0 items-center gap-1.5 rounded-[10px] bg-gradient-to-r bg-[length:160%_100%] bg-left px-2.5 text-13 font-bold text-white shadow-subtle transition-all duration-300 hover:bg-right hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface active:scale-95 sm:px-3.5",
+                identityRole === "admin_company" || identityRole === "admin_tpo" ? "from-indigo-500 to-violet-600" : "from-accent-primary to-accent-secondary"
+              )}
             >
               {actionButton.icon && (
                 <actionButton.icon

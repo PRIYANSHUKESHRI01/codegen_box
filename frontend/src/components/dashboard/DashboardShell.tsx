@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { DashboardSidebar, DashboardRole } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 interface DashboardShellProps {
@@ -59,6 +60,13 @@ export function DashboardShell({
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultSidebarCollapsed);
+  // Hiring partners and college TPOs get the premium surface system (aurora
+  // canvas, wider column, richer page heading — see .hp-canvas in
+  // globals.css), each with its own identity colour via data-portal. Every
+  // other role renders exactly as before.
+  const portal: "hiring" | "tpo" | null =
+    role === "admin_company" ? "hiring" : role === "admin_tpo" && currentTpoView === "tpo" ? "tpo" : null;
+  const isHiring = portal !== null;
 
   return (
     // The exam-mode workspace (fullBleed + hideChrome) promises "no outer
@@ -74,7 +82,10 @@ export function DashboardShell({
     // centered-card consent/locked screens on this same route should keep
     // their natural scroll-into-view safety net if their content ever runs
     // taller than a short viewport.
-    <div className={cn("bg-background text-primary flex", hideChrome ? "h-screen overflow-hidden" : "min-h-screen")}>
+    <div
+      data-portal={portal ?? undefined}
+      className={cn("bg-background text-primary flex", isHiring && "hp-portal", hideChrome ? "h-screen overflow-hidden" : "min-h-screen")}
+    >
       {/* Production Sidebar — Suspense-wrapped because it reads
           useSearchParams() (for ?tab=/?status=-based active-link
           highlighting), which static export requires to be wrapped or the
@@ -98,6 +109,7 @@ export function DashboardShell({
       <div
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-[padding] duration-300",
+          isHiring && "hp-canvas",
           hideChrome && "min-h-0",
           // rail / rail-collapsed are the SAME tokens the panel itself is
           // sized from (RAIL_WIDTH / RAIL_COLLAPSED_WIDTH in
@@ -124,13 +136,35 @@ export function DashboardShell({
           className={cn(
             fullBleed
               ? "flex-1 min-h-0 flex flex-col overflow-hidden"
+              : isHiring
+              ? "relative z-[1] flex-1 p-4 sm:p-6 lg:p-8 max-w-[1360px] w-full mx-auto space-y-8"
               : "flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-8"
           )}
         >
           {/* Page heading — the compact topbar keeps the portal name, this
               carries the per-page title and context. Skipped in fullBleed
               mode, where the page builds its own compact header instead. */}
-          {!fullBleed && (
+          {!fullBleed && isHiring && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-2"
+            >
+              <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/[0.07] px-2.5 py-1 text-3xs font-bold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="hp-ping absolute inline-flex h-full w-full rounded-full bg-[rgb(var(--hp-id))]" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[rgb(var(--hp-id))]" />
+                </span>
+                {portal === "tpo" ? "Placement Hub" : "Hiring Hub"}
+              </span>
+              <h1 className="text-2xl sm:text-[32px] sm:leading-[38px] font-extrabold text-primary tracking-[-0.025em]">{title}</h1>
+              {subtitle && (
+                <p className="text-sm sm:text-[15px] text-text-secondary leading-relaxed max-w-3xl">{subtitle}</p>
+              )}
+            </motion.div>
+          )}
+          {!fullBleed && !isHiring && (
             <div className="space-y-1">
               <h1 className="text-xl sm:text-2xl font-extrabold text-primary tracking-tight">{title}</h1>
               {subtitle && (

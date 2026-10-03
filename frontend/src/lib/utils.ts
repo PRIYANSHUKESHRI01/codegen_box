@@ -1,5 +1,17 @@
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+// The custom type-scale steps declared in tailwind.config.ts (3xs/2xs/13/15)
+// must be registered as FONT SIZES — otherwise twMerge can't tell `text-13`
+// from a `text-<color>` and drops one of the pair, which silently stripped
+// the text colour off any element combining the two (e.g. a 13px button).
+const twMerge = extendTailwindMerge({
+  extend: {
+    classGroups: {
+      "font-size": [{ text: ["3xs", "2xs", "13", "15"] }],
+    },
+  },
+});
 
 /**
  * Combines multiple Tailwind CSS classes cleanly resolving conflicts.

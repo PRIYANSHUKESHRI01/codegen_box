@@ -2,7 +2,29 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Swords, Plus, Loader2, Trash2, CheckCircle2, Search, Trophy } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import {
+  Swords,
+  Plus,
+  Trash2,
+  CheckCircle2,
+  Trophy,
+  CalendarClock,
+  Timer,
+  Users,
+  Radio,
+  ListChecks,
+  Rocket,
+  Flag,
+  PenLine,
+  Ban,
+  SearchX,
+  Code2,
+  ClipboardCheck,
+  GraduationCap,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ContestParticipantsModal } from "@/components/dashboard/ContestParticipantsModal";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -11,6 +33,35 @@ import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
 import { Modal } from "@/components/ui/Modal";
+import {
+  HpButton,
+  HpCard,
+  HpEmptyState,
+  HpIconTile,
+  HpItem,
+  HpPill,
+  HpProgress,
+  HpSearch,
+  HpSkeletonCards,
+  HpStagger,
+  HpStatCard,
+  HpTabs,
+  HpToast,
+  hpInput,
+  hpLabel,
+  type HpTone,
+} from "@/components/portal/kit";
+import {
+  ScDateTile,
+  ScIconButton,
+  ScInlineEmpty,
+  ScMeta,
+  ScNotice,
+  ScReveal,
+  ScSkeletonList,
+  formatRelative,
+  formatSpan,
+} from "@/components/portal/screeningKit";
 
 interface TpoContest {
   id: number;
@@ -31,6 +82,46 @@ interface TpoContestProblem {
   problem: { id: number; slug: string; title: string; difficulty: string };
 }
 
+/* ── Presentation-only derivations (no data is invented here) ───────────── */
+
+/** Where a mock contest sits on its timeline, derived purely from status + start/end/finalized_at. */
+type Phase = "draft" | "cancelled" | "scheduled" | "live" | "ended" | "finalized";
+
+function phaseOf(contest: TpoContest, now: Date): Phase {
+  if (contest.status === "draft") return "draft";
+  if (contest.status === "cancelled") return "cancelled";
+  if (contest.finalized_at) return "finalized";
+  if (now < new Date(contest.start_at)) return "scheduled";
+  if (new Date(contest.end_at) < now) return "ended";
+  return "live";
+}
+
+/** Live uses sky — the TPO portal's identity colour — so "happening now" reads as this portal's pulse. */
+const PHASE_META: Record<Phase, { label: string; tone: HpTone; dot?: boolean; pulse?: boolean; icon?: LucideIcon }> = {
+  draft: { label: "Draft", tone: "slate", icon: PenLine },
+  cancelled: { label: "Cancelled", tone: "rose", icon: Ban },
+  scheduled: { label: "Scheduled", tone: "indigo", dot: true },
+  live: { label: "Live now", tone: "sky", dot: true, pulse: true },
+  ended: { label: "Ended", tone: "amber", dot: true },
+  finalized: { label: "Finalized", tone: "emerald", icon: CheckCircle2 },
+};
+
+type FilterId = "all" | "live" | "upcoming" | "draft" | "completed";
+
+const FILTER_PHASES: Record<FilterId, Phase[] | null> = {
+  all: null,
+  live: ["live"],
+  upcoming: ["scheduled"],
+  draft: ["draft"],
+  completed: ["ended", "finalized"],
+};
+
+/** Coding-difficulty tones: teal reads as "approachable" without spending emerald (reserved for outcomes). */
+const DIFFICULTY_TONE: Record<string, HpTone> = { easy: "teal", medium: "amber", hard: "rose" };
+
+const DATE_TIME: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" };
+const TIME_ONLY: Intl.DateTimeFormatOptions = { hour: "numeric", minute: "2-digit" };
+
 /**
  * A college TPO's own private "mock" contests — practice rounds visible only
  * to their own students, entirely separate from Mellow's platform-run
@@ -45,6 +136,9 @@ export default function MockContestsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [managingContest, setManagingContest] = useState<TpoContest | null>(null);
   const [viewingParticipantsOf, setViewingParticipantsOf] = useState<TpoContest | null>(null);
+  // View-only list controls (client-side filtering of the already-loaded list).
+  const [filter, setFilter] = useState<FilterId>("all");
+  const [query, setQuery] = useState("");
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -95,6 +189,25 @@ export default function MockContestsPage() {
     }
   };
 
+  const now = new Date();
+  const withPhase = contests.map((contest) => ({ contest, phase: phaseOf(contest, now) }));
+  const countOf = (phases: Phase[] | null) => (phases ? withPhase.filter((c) => phases.includes(c.phase)).length : withPhase.length);
+  const liveCount = countOf(["live"]);
+  const upcomingCount = countOf(["scheduled"]);
+  const draftCount = countOf(["draft"]);
+  const needsFinalizeCount = countOf(["ended"]);
+  const registeredTotal = contests.reduce((sum, c) => sum + c.participants_count, 0);
+
+  const q = query.trim().toLowerCase();
+  const visible = withPhase.filter(({ contest, phase }) => {
+    const phases = FILTER_PHASES[filter];
+    if (phases && !phases.includes(phase)) return false;
+    if (!q) return true;
+    return contest.title.toLowerCase().includes(q) || (contest.description ?? "").toLowerCase().includes(q);
+  });
+
+  const hasAny = contests.length > 0;
+
   return (
     <DashboardShell
       role="admin_tpo"
@@ -103,102 +216,113 @@ export default function MockContestsPage() {
       subtitle="Private practice rounds for your own students only — never rated, never visible to any other college."
       actionButton={{ label: "New Mock Contest", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
+      <HpToast message={toastMessage} />
 
-      {loading ? (
-        <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading mock contests...
-        </div>
-      ) : contests.length === 0 ? (
-        <div className="p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          No mock contests yet — click &quot;New Mock Contest&quot; to create one for your students.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {contests.map((contest) => {
-            const hasEnded = new Date(contest.end_at) < new Date();
-            return (
-              <div key={contest.id} className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex items-center justify-between gap-4 flex-wrap">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-control bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center text-cyan-400 shrink-0">
-                    <Swords className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-bold text-primary">{contest.title}</span>
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
-                          contest.status === "published"
-                            ? "bg-status-success/15 text-status-success"
-                            : contest.status === "draft"
-                            ? "bg-elevated text-text-muted"
-                            : "bg-status-danger/15 text-status-danger"
-                        )}
-                      >
-                        {contest.status}
-                      </span>
-                      {contest.finalized_at && (
-                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-status-success/15 text-status-success flex items-center gap-1">
-                          <CheckCircle2 className="w-2.5 h-2.5" />
-                          Finalized
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-2xs text-text-muted mt-0.5">
-                      {new Date(contest.start_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                      {" – "}
-                      {new Date(contest.end_at).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit" })} ·{" "}
-                      {contest.participants_count} registered
-                    </div>
-                  </div>
-                </div>
+      <HpStagger className="space-y-6">
+        {(loading || hasAny) && (
+          <HpItem>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              <HpStatCard
+                label="Mock contests"
+                value={contests.length}
+                icon={Swords}
+                tone="indigo"
+                loading={loading}
+                hint={draftCount > 0 ? `${draftCount} in draft` : "All published"}
+              />
+              <HpStatCard label="Live now" value={liveCount} icon={Radio} tone="sky" loading={loading} hint={`${upcomingCount} upcoming`} />
+              <HpStatCard label="Registered" value={registeredTotal} icon={Users} tone="violet" loading={loading} hint="Across all rounds" />
+              <HpStatCard
+                label="To finalize"
+                value={needsFinalizeCount}
+                icon={Flag}
+                tone={needsFinalizeCount > 0 ? "amber" : "slate"}
+                loading={loading}
+                hint={needsFinalizeCount > 0 ? "Ended, not yet ranked" : "All caught up"}
+              />
+            </div>
+          </HpItem>
+        )}
 
-                <div className="flex items-center gap-2 shrink-0">
-                  {/* Who registered, how they ranked, and — drilling in —
-                      their actual per-problem code. Previously the only
-                      signal here was the bare "N registered" count above. */}
-                  <button
-                    onClick={() => setViewingParticipantsOf(contest)}
-                    disabled={contest.participants_count === 0}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 disabled:hover:bg-elevated disabled:hover:text-text-secondary"
-                  >
-                    <Trophy className="w-3.5 h-3.5" />
-                    Participants
-                  </button>
-                  <button
-                    onClick={() => setManagingContest(contest)}
-                    className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
-                  >
-                    Manage Problems
-                  </button>
-                  {contest.status === "draft" && (
-                    <button
-                      onClick={() => handlePublish(contest)}
-                      className="px-3 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors"
-                    >
-                      Publish
-                    </button>
-                  )}
-                  {contest.status === "published" && hasEnded && !contest.finalized_at && (
-                    <button
-                      onClick={() => handleFinalize(contest)}
-                      className="px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors"
-                    >
-                      Finalize
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+        {hasAny && (
+          <HpItem>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <HpTabs<FilterId>
+                value={filter}
+                onChange={setFilter}
+                tabs={[
+                  { id: "all", label: "All", count: contests.length },
+                  { id: "live", label: "Live", count: liveCount },
+                  { id: "upcoming", label: "Upcoming", count: upcomingCount },
+                  { id: "draft", label: "Drafts", count: draftCount },
+                  { id: "completed", label: "Completed", count: countOf(FILTER_PHASES.completed) },
+                ]}
+              />
+              <HpSearch
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search mock contests"
+                aria-label="Search mock contests"
+                wrapperClassName="w-full sm:w-72"
+              />
+            </div>
+          </HpItem>
+        )}
+
+        <HpItem>
+          {loading ? (
+            <HpSkeletonCards count={4} className="md:grid-cols-1 xl:grid-cols-2" />
+          ) : !hasAny ? (
+            <HpEmptyState
+              icon={Swords}
+              tone="sky"
+              title="No mock contests yet"
+              description="Create a private practice round, add problems from the catalog, then publish — only your own students will ever see it, and it never touches their platform rating."
+              action={
+                <HpButton leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
+                  New Mock Contest
+                </HpButton>
+              }
+            />
+          ) : visible.length === 0 ? (
+            <HpEmptyState
+              icon={SearchX}
+              tone="slate"
+              title="Nothing matches"
+              description="No mock contests fit this filter or search. Try another view, or clear the search."
+              action={
+                <HpButton
+                  variant="secondary"
+                  onClick={() => {
+                    setFilter("all");
+                    setQuery("");
+                  }}
+                >
+                  Clear filters
+                </HpButton>
+              }
+            />
+          ) : (
+            <div className="relative grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <AnimatePresence mode="popLayout" initial={false}>
+                {visible.map(({ contest, phase }, index) => (
+                  <ScReveal key={contest.id} index={index} className="h-full">
+                    <MockContestCard
+                      contest={contest}
+                      phase={phase}
+                      now={now}
+                      onParticipants={() => setViewingParticipantsOf(contest)}
+                      onManage={() => setManagingContest(contest)}
+                      onPublish={() => handlePublish(contest)}
+                      onFinalize={() => handleFinalize(contest)}
+                    />
+                  </ScReveal>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+        </HpItem>
+      </HpStagger>
 
       {showCreate && (
         <CreateMockContestModal
@@ -230,6 +354,163 @@ export default function MockContestsPage() {
   );
 }
 
+/* ── Mock contest card ──────────────────────────────────────────────────── */
+
+function MockContestCard({
+  contest,
+  phase,
+  now,
+  onParticipants,
+  onManage,
+  onPublish,
+  onFinalize,
+}: {
+  contest: TpoContest;
+  phase: Phase;
+  now: Date;
+  onParticipants: () => void;
+  onManage: () => void;
+  onPublish: () => void;
+  onFinalize: () => void;
+}) {
+  const meta = PHASE_META[phase];
+  const start = new Date(contest.start_at);
+  const end = new Date(contest.end_at);
+  const hasEnded = end < now;
+  const sameDay = start.toDateString() === end.toDateString();
+  const windowMs = end.getTime() - start.getTime();
+  const elapsedPct = phase === "live" && windowMs > 0 ? ((now.getTime() - start.getTime()) / windowMs) * 100 : 0;
+
+  const relative =
+    phase === "scheduled"
+      ? `Starts ${formatRelative(start, now)}`
+      : phase === "live"
+      ? `Ends ${formatRelative(end, now)}`
+      : phase === "ended" || phase === "finalized"
+      ? `Ended ${formatRelative(end, now)}`
+      : phase === "draft"
+      ? start > now
+        ? `Starts ${formatRelative(start, now)} once published`
+        : `Scheduled start was ${formatRelative(start, now)}`
+      : "Cancelled";
+
+  const canFinalize = contest.status === "published" && hasEnded && !contest.finalized_at;
+  const noParticipants = contest.participants_count === 0;
+
+  return (
+    <HpCard className="hp-card-hover group flex h-full flex-col p-5 sm:p-6">
+      <div className="flex-1">
+        <div className="flex items-start gap-3.5">
+          <HpIconTile
+            icon={Swords}
+            tone={meta.tone === "slate" ? "sky" : meta.tone}
+            size="lg"
+            className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+              <h3 className="min-w-0 line-clamp-2 text-15 font-bold leading-snug tracking-tight text-primary">{contest.title}</h3>
+              <HpPill tone={meta.tone} dot={meta.dot} pulse={meta.pulse} icon={meta.icon} className="shrink-0">
+                {meta.label}
+              </HpPill>
+            </div>
+            <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <ScMeta icon={GraduationCap}>Your students only</ScMeta>
+              <HpPill tone="slate" icon={ShieldCheck} size="sm">
+                Unrated
+              </HpPill>
+              {contest.finalized_at && phase !== "finalized" && (
+                <HpPill tone="emerald" icon={CheckCircle2} size="sm">
+                  Finalized
+                </HpPill>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {contest.description && <p className="mt-3.5 line-clamp-2 text-13 leading-relaxed text-text-secondary">{contest.description}</p>}
+
+        {/* Schedule */}
+        <div className="mt-4 rounded-2xl border border-border-subtle bg-elevated/40 p-3.5 transition-colors duration-300 group-hover:bg-elevated/60">
+          <div className="flex items-center gap-3.5">
+            <ScDateTile date={start} tone={meta.tone === "slate" ? "sky" : meta.tone} />
+            <div className="min-w-0 flex-1">
+              <p className="tabular text-13 font-semibold leading-snug text-primary">
+                {start.toLocaleString("en-IN", DATE_TIME)}
+                <span className="mx-1.5 text-text-muted" aria-hidden>
+                  →
+                </span>
+                <span className="sr-only"> to </span>
+                {end.toLocaleString("en-IN", sameDay ? TIME_ONLY : DATE_TIME)}
+              </p>
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                <ScMeta icon={Timer}>{formatSpan(windowMs)} window</ScMeta>
+                <ScMeta icon={phase === "live" ? Radio : CalendarClock} className={cn(phase === "live" && "text-sky-600 dark:text-sky-300")}>
+                  {relative}
+                </ScMeta>
+              </div>
+            </div>
+          </div>
+          {phase === "live" && (
+            <div className="mt-3.5">
+              <HpProgress value={elapsedPct} tone="sky" />
+              <div className="tabular mt-1.5 flex justify-between text-3xs font-semibold text-text-muted">
+                <span>{Math.round(elapsedPct)}% elapsed</span>
+                <span>{formatSpan(end.getTime() - now.getTime())} left</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+          <ScMeta icon={Users}>
+            <span className="tabular font-bold text-primary">{contest.participants_count}</span> registered
+          </ScMeta>
+          {phase === "finalized" && contest.finalized_at && (
+            <ScMeta icon={Trophy}>Ranked {formatRelative(new Date(contest.finalized_at), now)}</ScMeta>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+        {/* Who registered, how they ranked, and — drilling in — their
+            actual per-problem code. Previously the only signal here was the
+            bare "N registered" count above. */}
+        <HpButton
+          variant="secondary"
+          size="sm"
+          leftIcon={<Trophy className="h-3.5 w-3.5" />}
+          onClick={onParticipants}
+          disabled={noParticipants}
+          title={noParticipants ? "No one has registered yet" : undefined}
+        >
+          Participants
+        </HpButton>
+        <HpButton variant="ghost" size="sm" leftIcon={<ListChecks className="h-3.5 w-3.5" />} onClick={onManage}>
+          Manage Problems
+        </HpButton>
+        {(contest.status === "draft" || canFinalize) && (
+          <div className="ml-auto flex items-center gap-2">
+            {contest.status === "draft" && (
+              <HpButton size="sm" leftIcon={<Rocket className="h-3.5 w-3.5" />} onClick={onPublish}>
+                Publish
+              </HpButton>
+            )}
+            {canFinalize && (
+              <HpButton variant="success" size="sm" leftIcon={<Flag className="h-3.5 w-3.5" />} onClick={onFinalize}>
+                Finalize
+              </HpButton>
+            )}
+          </div>
+        )}
+      </div>
+    </HpCard>
+  );
+}
+
+/* ── Create modal ───────────────────────────────────────────────────────── */
+
 function CreateMockContestModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -257,76 +538,82 @@ function CreateMockContestModal({ onClose, onCreated }: { onClose: () => void; o
     }
   };
 
+  // Display-only preview of the window the two pickers describe.
+  const windowMs = startAt && endAt ? new Date(endAt).getTime() - new Date(startAt).getTime() : NaN;
+
   return (
     <Modal
+      variant="premium"
       onClose={onClose}
       title="New Mock Contest"
+      subtitle="A private, unrated practice round for your students"
       icon={Swords}
-      iconClassName="bg-cyan-500/10 text-cyan-400"
       size="lg"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50">
+          <HpButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
-          </button>
-          <button type="submit" form="create-mock-contest-form" disabled={saving} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
+          </HpButton>
+          <HpButton type="submit" form="create-mock-contest-form" isLoading={saving} leftIcon={<Plus className="h-4 w-4" />}>
             {saving ? "Creating..." : "Create Draft"}
-          </button>
+          </HpButton>
         </>
       }
     >
-      <p className="text-2xs text-text-muted mb-3">
+      <ScNotice tone="indigo" className="mb-5">
         Only your own students can ever see this. Starts as a draft, and never affects platform ratings.
-      </p>
+      </ScNotice>
 
-      <form id="create-mock-contest-form" onSubmit={handleSubmit} className="space-y-3">
+      <form id="create-mock-contest-form" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">Title *</label>
+          <label htmlFor="mc-title" className={hpLabel}>
+            Title *
+          </label>
           <input
+            id="mc-title"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Pre-Placement Mock Round 1"
-            className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
+            className={hpInput}
           />
         </div>
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">Description</label>
-          <textarea
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-          />
+          <label htmlFor="mc-desc" className={hpLabel}>
+            Description
+          </label>
+          <textarea id="mc-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={cn(hpInput, "resize-y")} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <label className="block font-semibold text-text-secondary mb-1">Start *</label>
-            <input
-              required
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => setStartAt(e.target.value)}
-              className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-            />
+            <label htmlFor="mc-start" className={hpLabel}>
+              Start *
+            </label>
+            <input id="mc-start" required type="datetime-local" value={startAt} onChange={(e) => setStartAt(e.target.value)} className={hpInput} />
           </div>
           <div>
-            <label className="block font-semibold text-text-secondary mb-1">End *</label>
-            <input
-              required
-              type="datetime-local"
-              value={endAt}
-              onChange={(e) => setEndAt(e.target.value)}
-              className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-            />
+            <label htmlFor="mc-end" className={hpLabel}>
+              End *
+            </label>
+            <input id="mc-end" required type="datetime-local" value={endAt} onChange={(e) => setEndAt(e.target.value)} className={hpInput} />
           </div>
         </div>
+        {Number.isFinite(windowMs) && windowMs > 0 && (
+          <div className="flex flex-wrap items-center gap-2 text-2xs text-text-muted">
+            <HpPill tone="sky" icon={Timer} size="sm">
+              {formatSpan(windowMs)} window
+            </HpPill>
+            <span>Students can start any time inside this window.</span>
+          </div>
+        )}
 
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        {error && <ScNotice tone="rose">{error}</ScNotice>}
       </form>
     </Modal>
   );
 }
+
+/* ── Manage problems modal ──────────────────────────────────────────────── */
 
 function ManageMockProblemsModal({
   contest,
@@ -396,97 +683,136 @@ function ManageMockProblemsModal({
     return notAdded.filter((p) => p.title.toLowerCase().includes(query) || p.difficulty.toLowerCase().includes(query));
   }, [catalog, problems, search]);
 
+  const totalPoints = problems.reduce((sum, cp) => sum + cp.points, 0);
+
   return (
-    <Modal onClose={onClose} title={`Problems — ${contest.title}`} size="2xl">
-      <div className="space-y-4">
-        {loading ? (
-          <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading...
-          </div>
-        ) : (
-          <>
-            <div className="space-y-2">
-              {problems.length === 0 ? (
-                <p className="text-xs text-text-muted text-center py-4">No problems added yet.</p>
-              ) : (
-                problems.map((cp) => (
-                  <div key={cp.id} className="flex items-center justify-between gap-3 p-3 rounded-control bg-elevated/60 border border-border-subtle text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 text-3xs font-bold rounded capitalize",
-                          cp.problem.difficulty === "easy" ? "bg-status-success/15 text-status-success" : cp.problem.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
-                        )}
-                      >
-                        {cp.problem.difficulty}
-                      </span>
-                      <span className="font-semibold text-primary truncate">{cp.problem.title}</span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono font-bold text-accent-primary">{cp.points} pts</span>
-                      <button onClick={() => handleRemove(cp.id)} className="text-text-muted hover:text-status-danger transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))
+    <Modal
+      variant="premium"
+      onClose={onClose}
+      title="Manage Problems"
+      subtitle={contest.title}
+      icon={ListChecks}
+      size="2xl"
+      bodyClassName="px-6 py-5 text-xs space-y-6"
+    >
+      {loading ? (
+        <ScSkeletonList rows={4} />
+      ) : (
+        <>
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h4 className="text-13 font-bold tracking-tight text-primary">In this mock contest</h4>
+                <p className="text-2xs text-text-muted">The problems your students will solve, in order.</p>
+              </div>
+              {problems.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <HpPill tone="indigo" size="sm" icon={Code2}>
+                    <span className="tabular">{problems.length}</span> problem{problems.length === 1 ? "" : "s"}
+                  </HpPill>
+                  <HpPill tone="violet" size="sm" icon={ClipboardCheck}>
+                    <span className="tabular">{totalPoints}</span> pts
+                  </HpPill>
+                </div>
               )}
             </div>
 
-            <div className="pt-3 border-t border-border-subtle space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Search problems by name or difficulty..."
-                    className="w-full pl-8 pr-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-accent-primary"
-                  />
-                </div>
+            {problems.length === 0 ? (
+              <ScInlineEmpty
+                icon={Code2}
+                tone="sky"
+                title="No problems added yet"
+                description="Pick from the catalog below — each one is judged by the same engine as every other contest on the platform."
+              />
+            ) : (
+              <div className="relative space-y-2">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {problems.map((cp, i) => (
+                    <ScReveal key={cp.id} index={i}>
+                      <div className="group flex items-center gap-3 rounded-2xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] px-3 py-2.5 transition-all duration-200 hover:border-indigo-500/25 hover:bg-elevated/40 sm:px-3.5">
+                        <span className="tabular hidden h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-elevated text-2xs font-bold text-text-muted sm:flex">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-13 font-semibold text-primary">{cp.problem.title}</p>
+                          <HpPill tone={DIFFICULTY_TONE[cp.problem.difficulty] ?? "slate"} size="sm" className="mt-1 capitalize">
+                            {cp.problem.difficulty}
+                          </HpPill>
+                        </div>
+                        <span className="tabular shrink-0 text-right text-sm font-extrabold text-indigo-600 dark:text-indigo-300">
+                          {cp.points}
+                          <span className="ml-0.5 text-3xs font-bold text-text-muted">pts</span>
+                        </span>
+                        <ScIconButton icon={Trash2} label={`Remove ${cp.problem.title}`} tone="danger" onClick={() => handleRemove(cp.id)} />
+                      </div>
+                    </ScReveal>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-3 border-t border-border-subtle pt-5">
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <h4 className="text-13 font-bold tracking-tight text-primary">Add from catalog</h4>
+                <p className="text-2xs text-text-muted">
+                  <span className="tabular">{availableProblems.length}</span> available · each is added at the points value on the right
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <HpSearch
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search problems by name or difficulty..."
+                aria-label="Search problems"
+                wrapperClassName="flex-1"
+              />
+              <label className="flex shrink-0 items-center gap-2">
+                <span className="text-2xs font-semibold text-text-secondary">Points</span>
                 <input
                   type="number"
                   value={pointsInput}
                   onChange={(e) => setPointsInput(e.target.value)}
-                  className="w-20 px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-accent-primary"
+                  className={cn(hpInput, "tabular h-10 w-24 py-0")}
                   placeholder="Points"
                 />
-              </div>
-              <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
-                {availableProblems.length === 0 ? (
-                  <p className="text-[10.5px] text-text-muted text-center py-4">
-                    {search ? "No problems match your search." : "No more problems available to add."}
-                  </p>
-                ) : (
-                  availableProblems.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-xs">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={cn(
-                            "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
-                            p.difficulty === "easy" ? "bg-status-success/15 text-status-success" : p.difficulty === "medium" ? "bg-status-warning/15 text-status-warning" : "bg-status-danger/15 text-status-danger"
-                          )}
-                        >
-                          {p.difficulty}
-                        </span>
-                        <span className="text-primary truncate">{p.title}</span>
-                      </div>
-                      <button
-                        onClick={() => handleAdd(p.id)}
-                        disabled={addingId === p.id}
-                        className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-[10.5px] font-bold transition-colors disabled:opacity-50 shrink-0"
-                      >
-                        {addingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+              </label>
             </div>
-          </>
-        )}
-      </div>
+            <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
+              {availableProblems.length === 0 ? (
+                <p className="py-6 text-center text-2xs text-text-muted">
+                  {search ? "No problems match your search." : "No more problems available to add."}
+                </p>
+              ) : (
+                availableProblems.map((p) => (
+                  <div
+                    key={p.id}
+                    className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-all duration-200 hover:border-border-subtle hover:bg-elevated/50"
+                  >
+                    <HpPill tone={DIFFICULTY_TONE[p.difficulty] ?? "slate"} size="sm" className="w-[58px] shrink-0 justify-center capitalize">
+                      {p.difficulty}
+                    </HpPill>
+                    <span className="min-w-0 flex-1 truncate text-13 text-primary">{p.title}</span>
+                    <HpButton
+                      variant="soft"
+                      size="sm"
+                      onClick={() => handleAdd(p.id)}
+                      isLoading={addingId === p.id}
+                      leftIcon={<Plus className="h-3.5 w-3.5" />}
+                      className="shrink-0"
+                      aria-label={`Add ${p.title}`}
+                    >
+                      Add
+                    </HpButton>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </>
+      )}
     </Modal>
   );
 }

@@ -1,17 +1,32 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { HP_TONES, hpEase, type HpTone } from "@/components/portal/kit";
+import { DRIVE_APPLICATION_STAGES, type DriveApplicationStage } from "@/types/placement";
 
-const STAGE_COLORS = [
-  "bg-accent-primary",
-  "bg-accent-secondary",
-  "bg-status-warning",
-  "bg-purple-500",
-  "bg-blue-500",
-  "bg-status-success",
-  "bg-status-danger",
-  "bg-text-muted",
-];
+/**
+ * One tone per ATS stage, shared by this bar and the applicant stage pills on
+ * the Campus Drives page: sky = new in pipeline (the TPO identity colour),
+ * teal→indigo→violet = progressing rounds, amber = offer awaiting a reply,
+ * emerald = placed, rose / slate = closed.
+ */
+export const DRIVE_STAGE_TONE: Record<DriveApplicationStage, HpTone> = {
+  registered: "sky",
+  online_test: "teal",
+  technical_interview: "indigo",
+  hr_round: "violet",
+  offer_extended: "amber",
+  offer_accepted: "emerald",
+  rejected: "rose",
+  withdrawn: "slate",
+};
+
+/** Callers pass stages in DRIVE_APPLICATION_STAGES order, so index → stage → tone. */
+function toneAt(idx: number): HpTone {
+  const stage = DRIVE_APPLICATION_STAGES[idx];
+  return stage ? DRIVE_STAGE_TONE[stage] : "slate";
+}
 
 export interface PipelineStageCount {
   name: string;
@@ -20,42 +35,78 @@ export interface PipelineStageCount {
 
 interface DrivePipelineBarProps {
   stages: PipelineStageCount[];
+  /** Dense variant: the distribution bar plus an inline legend instead of the stage tiles. */
   compact?: boolean;
+  className?: string;
 }
 
-export function DrivePipelineBar({ stages, compact = false }: DrivePipelineBarProps) {
-  const max = stages[0]?.count || 1;
-
-  if (compact) {
-    return (
-      <div className="flex items-center gap-1.5">
-        {stages.map((stage, idx) => (
-          <div key={stage.name} className="flex-1 min-w-0" title={`${stage.name}: ${stage.count}`}>
-            <div className="text-3xs text-text-muted truncate mb-1">{stage.name}</div>
-            <div className="h-1.5 rounded-full bg-elevated overflow-hidden">
-              <div
-                className={cn("h-full rounded-full", STAGE_COLORS[idx % STAGE_COLORS.length])}
-                style={{ width: `${Math.max(3, (stage.count / max) * 100)}%` }}
-              />
-            </div>
-            <div className="text-3xs font-mono font-bold text-primary mt-1">{stage.count}</div>
-          </div>
-        ))}
-      </div>
-    );
-  }
+export function DrivePipelineBar({ stages, compact = false, className }: DrivePipelineBarProps) {
+  const reduce = useReducedMotion();
+  const total = stages.reduce((sum, s) => sum + s.count, 0);
+  const share = (n: number) => (total > 0 ? Math.round((n / total) * 100) : 0);
 
   return (
-    <div className="grid grid-cols-5 gap-2">
-      {stages.map((stage, idx) => (
-        <div key={stage.name} className="p-3 rounded-control bg-elevated/60 border border-border-subtle text-center">
-          <div
-            className={cn("w-2 h-2 rounded-full mx-auto mb-2", STAGE_COLORS[idx % STAGE_COLORS.length])}
-          />
-          <div className="text-lg font-black text-primary font-mono">{stage.count}</div>
-          <div className="text-3xs text-text-muted mt-0.5 leading-tight">{stage.name}</div>
-        </div>
-      ))}
+    <div className={cn("space-y-4", className)}>
+      {/* Stage distribution — each segment's width is its share of all applicants. */}
+      <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-elevated [&>*+*]:border-l-2 [&>*+*]:border-surface" aria-hidden>
+        {stages.map((stage, idx) =>
+          stage.count > 0 ? (
+            <motion.div
+              key={stage.name}
+              title={`${stage.name}: ${stage.count}`}
+              className={cn("h-full", HP_TONES[toneAt(idx)].bar)}
+              initial={reduce ? false : { width: 0 }}
+              animate={{ width: `${(stage.count / total) * 100}%` }}
+              transition={{ duration: 0.8, ease: hpEase, delay: reduce ? 0 : idx * 0.04 }}
+            />
+          ) : null
+        )}
+      </div>
+
+      {compact ? (
+        <ul className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Applicants by stage">
+          {stages.map((stage, idx) => (
+            <li key={stage.name} className={cn("flex items-center gap-1.5 text-2xs", stage.count === 0 && "opacity-55")}>
+              <span className={cn("h-2 w-2 shrink-0 rounded-full", HP_TONES[toneAt(idx)].fill)} aria-hidden />
+              <span className="font-medium text-text-secondary">{stage.name}</span>
+              <span className="tabular font-bold text-primary">{stage.count}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8" aria-label="Applicants by stage">
+          {stages.map((stage, idx) => {
+            const tone = toneAt(idx);
+            return (
+              <li
+                key={stage.name}
+                className={cn(
+                  "group/stage relative flex min-w-0 flex-col gap-2 overflow-hidden rounded-2xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong",
+                  stage.count === 0 && "opacity-60"
+                )}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className={cn("h-2 w-2 shrink-0 rounded-full", HP_TONES[tone].fill)} aria-hidden />
+                  <span className="tabular text-lg font-extrabold leading-none tracking-tight text-primary">{stage.count}</span>
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-2xs font-semibold leading-tight text-text-secondary">{stage.name}</span>
+                  <span className="tabular mt-0.5 block text-3xs font-medium text-text-muted">{share(stage.count)}% of pipeline</span>
+                </span>
+                {/* mt-auto pins the bar to the tile's foot so bars line up when a label wraps. */}
+                <span aria-hidden className="mt-auto h-1 w-full overflow-hidden rounded-full bg-elevated">
+                  <motion.span
+                    className={cn("block h-full rounded-full", HP_TONES[tone].bar)}
+                    initial={reduce ? false : { width: 0 }}
+                    animate={{ width: `${share(stage.count)}%` }}
+                    transition={{ duration: 0.8, ease: hpEase, delay: reduce ? 0 : 0.1 + idx * 0.04 }}
+                  />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

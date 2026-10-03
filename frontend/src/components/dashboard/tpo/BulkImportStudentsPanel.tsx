@@ -1,9 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, Download, Loader2, CheckCircle2, AlertTriangle, XCircle, Clock, FileSpreadsheet } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  Upload,
+  Download,
+  Loader2,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Clock,
+  FileSpreadsheet,
+  FileText,
+  ChevronDown,
+  CloudUpload,
+} from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
+import { HP_TONES, HpButton, HpCard, HpIconTile, HpPill, HpSkeleton, hpEase, type HpTone } from "@/components/portal/kit";
+import { HpFormError } from "@/components/portal/pipeline-kit";
 
 interface BulkImportStudentsPanelProps {
   /** Omit for the TPO self-serve path (scoped to the caller's own college
@@ -12,6 +28,26 @@ interface BulkImportStudentsPanelProps {
    * themselves). */
   collegeId?: number;
   collegeName: string;
+  /**
+   * "premium" is the College TPO portal treatment (kit card, drop zone,
+   * animated progress). When omitted it follows the signed-in role — a TPO
+   * gets premium; Mellow staff (PartnerCollegesPanel) keep the original look.
+   */
+  variant?: "default" | "premium";
+}
+
+const PREMIUM_STATUS: Record<ImportStatus, { tone: HpTone }> = {
+  pending: { tone: "slate" },
+  processing: { tone: "sky" },
+  completed: { tone: "emerald" },
+  completed_with_errors: { tone: "amber" },
+  failed: { tone: "rose" },
+};
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 type ImportStatus = "pending" | "processing" | "completed" | "completed_with_errors" | "failed";
@@ -58,7 +94,9 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportStudentsPanelProps) {
+export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: BulkImportStudentsPanelProps) {
+  const { user } = useAuth();
+  const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
   const [imports, setImports] = useState<ApiStudentImport[]>([]);
   const [loadingImports, setLoadingImports] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -142,6 +180,210 @@ export function BulkImportStudentsPanel({ collegeId, collegeName }: BulkImportSt
       setUploading(false);
     }
   };
+
+  if (premium) {
+    return (
+      <HpCard spotlight={false} className="space-y-5 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <HpIconTile icon={FileSpreadsheet} tone="sky" size="md" />
+            <div className="min-w-0">
+              <h3 className="text-15 font-bold tracking-tight text-primary">Bulk Import Students</h3>
+              <p className="mt-0.5 max-w-xl text-2xs leading-relaxed text-text-muted">
+                Add {collegeName}&apos;s whole batch at once — each new student gets an emailed login the moment their row is created.
+              </p>
+            </div>
+          </div>
+          <HpButton
+            variant="secondary"
+            size="sm"
+            onClick={handleDownloadTemplate}
+            disabled={downloadingTemplate}
+            isLoading={downloadingTemplate}
+            leftIcon={<Download className="h-3.5 w-3.5" />}
+          >
+            Download CSV Template
+          </HpButton>
+        </div>
+
+        {/* Drop zone — the native file input is stretched invisibly over the
+            whole zone, so click-to-browse and drag-and-drop are both the
+            browser's own file-input behaviour (no custom drop handling). */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+          <div
+            className={cn(
+              "group relative flex min-w-0 flex-1 items-center gap-4 rounded-2xl border-2 border-dashed p-4 transition-all duration-200 focus-within:border-indigo-500/60 focus-within:shadow-[0_0_0_4px_rgba(99,102,241,0.14)]",
+              file
+                ? "border-indigo-500/40 bg-indigo-500/[0.05]"
+                : "border-border-strong bg-elevated/40 hover:border-sky-500/50 hover:bg-sky-500/[0.04]"
+            )}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              aria-label="Choose a student CSV file"
+              className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+            />
+            <span
+              className={cn(
+                "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-all duration-300 group-hover:-translate-y-0.5",
+                file ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300" : "bg-[rgb(var(--bg-surface-rgb))] text-sky-600 ring-1 ring-inset ring-border-subtle dark:text-sky-300"
+              )}
+            >
+              {file ? <FileText className="h-5 w-5" /> : <CloudUpload className="h-5 w-5" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              {file ? (
+                <>
+                  <span className="block truncate text-13 font-semibold text-primary">{file.name}</span>
+                  <span className="block text-2xs text-text-muted">{formatBytes(file.size)} · click to choose a different file</span>
+                </>
+              ) : (
+                <>
+                  <span className="block text-13 font-semibold text-primary">
+                    Drop a CSV here, or{" "}
+                    <span className="text-indigo-600 underline decoration-indigo-500/40 underline-offset-4 dark:text-indigo-300">browse</span>
+                  </span>
+                  <span className="block text-2xs text-text-muted">Use the template&apos;s columns · .csv only</span>
+                </>
+              )}
+            </span>
+          </div>
+          <HpButton
+            onClick={handleUpload}
+            disabled={!file || uploading}
+            isLoading={uploading}
+            leftIcon={<Upload className="h-4 w-4" />}
+            className="h-auto min-h-[44px] w-full sm:w-auto"
+          >
+            Upload &amp; Import
+          </HpButton>
+        </div>
+        {uploadError && <HpFormError>{uploadError}</HpFormError>}
+
+        <div className="space-y-2.5">
+          <h4 className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Import history</h4>
+
+          {loadingImports ? (
+            <div className="space-y-2" role="status" aria-label="Loading import history">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3 rounded-2xl border border-border-subtle p-3.5">
+                  <HpSkeleton className="h-9 w-9 rounded-xl" />
+                  <div className="flex-1 space-y-1.5">
+                    <HpSkeleton className="h-3 w-1/3" />
+                    <HpSkeleton className="h-2.5 w-1/5" />
+                  </div>
+                  <HpSkeleton className="h-5 w-20 rounded-full" />
+                </div>
+              ))}
+            </div>
+          ) : imports.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle px-4 py-6 text-center">
+              <FileSpreadsheet className="h-5 w-5 text-text-muted" />
+              <p className="text-2xs text-text-muted">No imports yet — upload a CSV to add your first batch.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {imports.map((imp) => {
+                const meta = STATUS_META[imp.status];
+                const StatusIcon = meta.icon;
+                const isActive = imp.status === "pending" || imp.status === "processing";
+                const progressPct = imp.total_rows > 0 ? Math.round((imp.processed_rows / imp.total_rows) * 100) : 0;
+                const expanded = expandedErrorsId === imp.id;
+
+                return (
+                  <div
+                    key={imp.id}
+                    className="rounded-2xl border border-border-subtle bg-elevated/40 p-3.5 transition-colors duration-200 hover:border-border-strong"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[rgb(var(--bg-surface-rgb))] text-text-muted ring-1 ring-inset ring-border-subtle">
+                          <FileText className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-xs font-semibold text-primary">{imp.original_filename}</p>
+                          <p className="mt-0.5 text-3xs text-text-muted">{formatDate(imp.created_at)}</p>
+                        </div>
+                      </div>
+                      <HpPill tone={PREMIUM_STATUS[imp.status].tone} size="sm" className="shrink-0">
+                        <StatusIcon className={cn("h-3 w-3", imp.status === "processing" && "animate-spin")} strokeWidth={2.4} />
+                        {meta.label}
+                      </HpPill>
+                    </div>
+
+                    {isActive ? (
+                      <div className="mt-3 space-y-1.5">
+                        <div
+                          className="h-1.5 w-full overflow-hidden rounded-full bg-[rgb(var(--bg-surface-rgb))] ring-1 ring-inset ring-border-subtle"
+                          role="progressbar"
+                          aria-valuenow={progressPct}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-label={`${imp.original_filename} import progress`}
+                        >
+                          <motion.div
+                            className={cn("h-full rounded-full", HP_TONES.sky.bar)}
+                            initial={false}
+                            animate={{ width: `${progressPct}%` }}
+                            transition={{ duration: 0.6, ease: hpEase }}
+                          />
+                        </div>
+                        <p className="tabular text-3xs text-text-muted">
+                          {imp.processed_rows} / {imp.total_rows || "…"} rows processed
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs">
+                        <span className="tabular inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-300">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {imp.successful_rows} added
+                        </span>
+                        {imp.failed_rows > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setExpandedErrorsId(expandedErrorsId === imp.id ? null : imp.id)}
+                            aria-expanded={expanded}
+                            className="tabular inline-flex items-center gap-1 rounded-md font-semibold text-amber-600 transition-colors hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-300 dark:hover:text-amber-200"
+                          >
+                            {imp.failed_rows} failed — {expanded ? "hide" : "view"} details
+                            <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", expanded && "rotate-180")} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    <AnimatePresence initial={false}>
+                      {expanded && imp.errors && imp.errors.length > 0 && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: hpEase }}
+                          className="overflow-hidden"
+                        >
+                          <div className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-xl border border-rose-500/15 bg-rose-500/[0.04] p-3">
+                            {imp.errors.map((err, i) => (
+                              <p key={i} className="font-mono text-3xs leading-relaxed text-text-muted">
+                                <span className="font-semibold text-text-secondary">{err.row ? `Row ${err.row}` : "General"}</span>
+                                {err.email ? ` (${err.email})` : ""}: <span className="text-rose-600 dark:text-rose-300">{err.error}</span>
+                              </p>
+                            ))}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </HpCard>
+    );
+  }
 
   return (
     <div className="p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-4">

@@ -2,8 +2,9 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { GraduationCap, Search, Loader2, AlertCircle, Send, ChevronDown, Users2, SearchX, Trophy } from "lucide-react";
+import { GraduationCap, Send, Users2, SearchX, Trophy, MapPin, Briefcase, ArrowRight, Plus } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ProposeToCollegesModal } from "@/components/dashboard/company/ProposeToCollegesModal";
 import type { AdminDriveCollegeMapping } from "@/components/admin/placements/types";
@@ -11,21 +12,47 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { CompanyPartnerCollege } from "@/types/hiring";
+import {
+  HpButton,
+  HpCard,
+  HpCompanyLogo,
+  HpEmptyState,
+  HpIconTile,
+  HpItem,
+  HpPill,
+  HpProgress,
+  HpSearch,
+  HpSkeleton,
+  HpSkeletonCards,
+  HpStagger,
+  HpStatCard,
+  HpTabs,
+  HpToast,
+  hpBtn,
+  hpEase,
+  type HpTabItem,
+  type HpTone,
+} from "@/components/portal/kit";
+import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 
 // Same tier→colour convention PartnerCollegesPanel.tsx already uses on the
-// Mellow Ops side — reused rather than invented, so a tier reads the same
-// color everywhere in the app instead of teal-tinting everything here.
-const TIER_PILL: Record<CompanyPartnerCollege["tier"], string> = {
-  "Academic Enterprise": "bg-purple-500/15 text-purple-400 border-purple-500/30",
-  "Pro Campus": "bg-cyan-500/15 text-cyan-400 border-cyan-500/30",
-  Standard: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+// Mellow Ops side (purple / cyan / amber) — reused rather than invented, so a
+// tier reads the same colour everywhere in the app.
+const TIER_META: Record<CompanyPartnerCollege["tier"], { tone: HpTone; cap: string }> = {
+  "Academic Enterprise": { tone: "violet", cap: "from-violet-500 via-fuchsia-500 to-violet-400" },
+  "Pro Campus": { tone: "sky", cap: "from-sky-400 via-cyan-400 to-sky-500" },
+  Standard: { tone: "amber", cap: "from-amber-400 via-orange-400 to-amber-500" },
 };
 
-const TIER_BAR: Record<CompanyPartnerCollege["tier"], string> = {
-  "Academic Enterprise": "bg-purple-500",
-  "Pro Campus": "bg-cyan-500",
-  Standard: "bg-amber-500",
+const TIERS = Object.keys(TIER_META) as CompanyPartnerCollege["tier"][];
+
+const MAPPING_META: Record<AdminDriveCollegeMapping["status"], { label: string; tone: HpTone }> = {
+  pending: { label: "Proposal pending", tone: "amber" },
+  approved: { label: "Approved", tone: "emerald" },
+  declined: { label: "Declined", tone: "rose" },
 };
+
+type TierFilter = "all" | CompanyPartnerCollege["tier"];
 
 interface CompanyDriveOption {
   id: number;
@@ -50,6 +77,7 @@ export default function PartnerCollegesPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [selectedDriveId, setSelectedDriveId] = useState<number | "">("");
   const [proposingCollegeId, setProposingCollegeId] = useState<number | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -88,7 +116,8 @@ export default function PartnerCollegesPage() {
 
   const companyName = user?.company?.name ?? "your company";
   const selectedDrive = drives.find((d) => d.id === selectedDriveId) ?? null;
-  const filtered = colleges.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+  const searched = colleges.filter((c) => c.name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = tierFilter === "all" ? searched : searched.filter((c) => c.tier === tierFilter);
 
   const handleProposed = (proposedCount: number, skippedCount: number) => {
     setProposingCollegeId(null);
@@ -100,146 +129,266 @@ export default function PartnerCollegesPage() {
     load();
   };
 
+  // Quick-stat figures — straight aggregates of what the API returned.
+  const initialLoading = loading && colleges.length === 0;
+  const totalStudents = colleges.reduce((sum, c) => sum + c.student_count, 0);
+  const avgPlacement = colleges.length > 0 ? colleges.reduce((sum, c) => sum + Number(c.placement_rate), 0) / colleges.length : 0;
+  const mappingFor = (collegeId: number) => selectedDrive?.college_mappings?.find((m) => m.college_id === collegeId) ?? null;
+
+  const tierTabs: HpTabItem<TierFilter>[] = [
+    { id: "all", label: "All tiers", count: colleges.length },
+    ...TIERS.map((t) => ({ id: t, label: t, count: colleges.filter((c) => c.tier === t).length })),
+  ];
+
   return (
     <DashboardShell
       role="admin_company"
       title="Partner Colleges"
       subtitle={`Every college on CodeGen Box — pick one to propose one of ${companyName}'s job openings to their campus.`}
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-teal-500/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <div className="w-2 h-2 rounded-full bg-teal-500 animate-ping shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <HpToast message={toastMessage} />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="relative group">
-          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted transition-colors duration-200 group-focus-within:text-teal-500" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search colleges..."
-            className="pl-8 pr-3 py-2 w-full sm:w-64 rounded-control bg-surface border border-border-subtle text-xs text-primary placeholder:text-text-muted outline-none transition-all duration-200 focus:border-teal-500 focus:ring-[3px] focus:ring-teal-500/12 shadow-subtle"
-          />
-        </div>
-
-        {drives.length > 0 && (
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-text-muted shrink-0 font-medium">Proposing:</span>
-            <div className="relative group">
-              <select
-                value={selectedDriveId}
-                onChange={(e) => setSelectedDriveId(Number(e.target.value))}
-                className="appearance-none pl-3 pr-8 py-2 rounded-control bg-surface border border-border-subtle text-xs font-semibold text-primary outline-none transition-all duration-200 focus:border-teal-500 focus:ring-[3px] focus:ring-teal-500/12 shadow-subtle max-w-[260px] truncate"
-              >
-                {drives.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.title}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none transition-colors duration-200 group-focus-within:text-teal-500" />
+      <HpStagger className="space-y-6">
+        {!(loadError && colleges.length === 0) && (
+          <HpItem>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+              <HpStatCard label="Colleges" value={colleges.length} icon={GraduationCap} tone="teal" loading={initialLoading} hint="on the platform" />
+              <HpStatCard
+                label="Students"
+                value={totalStudents.toLocaleString("en-IN")}
+                icon={Users2}
+                tone="indigo"
+                loading={initialLoading}
+                hint="across campuses"
+              />
+              <HpStatCard
+                label="Avg. placed"
+                value={Math.round(avgPlacement)}
+                suffix="%"
+                icon={Trophy}
+                tone="emerald"
+                loading={initialLoading}
+                hint="placement rate"
+              />
+              <HpStatCard label="Live openings" value={drives.length} icon={Briefcase} tone="violet" loading={initialLoading} hint="ready to propose" />
             </div>
-          </div>
+          </HpItem>
         )}
-      </div>
 
-      {drives.length === 0 && !loading && (
-        <div className="p-3.5 rounded-panel bg-status-warning/10 border border-status-warning/25 text-xs text-status-warning">
-          Post a job opening first — you&apos;ll need at least one published opening before you can propose it to a college.
-        </div>
-      )}
-
-      {loadError && (
-        <div className="p-4 rounded-panel bg-status-danger/10 border border-status-danger/25 flex items-center justify-between gap-3 text-xs text-status-danger">
-          <span className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            {loadError}
-          </span>
-          <button onClick={load} className="font-bold underline shrink-0">
-            Retry
-          </button>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading partner colleges...
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="p-10 flex flex-col items-center justify-center gap-2 text-center rounded-panel bg-surface border border-border-subtle">
-          <SearchX className="w-6 h-6 text-text-muted" />
-          <p className="text-sm font-semibold text-primary">No colleges match &quot;{search}&quot;</p>
-          <p className="text-xs text-text-muted">Try a different name, or clear the search to see every partner campus.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((c, idx) => (
-            <motion.div
-              key={c.id}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: Math.min(idx * 0.025, 0.3), ease: "easeOut" }}
-              className="group relative rounded-panel bg-surface border border-border-subtle shadow-subtle overflow-hidden transition-all duration-200 hover:-translate-y-1 hover:shadow-card hover:border-teal-500/40"
-            >
-              {/* Tier-tinted cap, matching the tier pill below — invisible
-                  until hover, so the grid doesn't turn into a stripe of
-                  colour bars at rest. */}
-              <div className={cn("absolute top-0 inset-x-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200", TIER_BAR[c.tier])} />
-
-              <div className="p-4 space-y-3">
-                <div className="flex items-start gap-2.5">
-                  <div className="w-10 h-10 rounded-control bg-teal-500/10 border border-teal-500/25 flex items-center justify-center text-teal-500 shrink-0 transition-transform duration-200 group-hover:scale-105">
-                    <GraduationCap className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="text-sm font-bold text-primary truncate" title={c.name}>
-                      {c.name}
-                    </h4>
-                    <p className="text-2xs text-text-muted truncate">
-                      {[c.city, c.state].filter(Boolean).join(", ") || "Location not on file"}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center flex-wrap gap-1.5 pt-3 border-t border-border-subtle">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-elevated border border-border-subtle text-3xs font-bold text-text-secondary tabular-nums">
-                    <Users2 className="w-3 h-3 text-text-muted" />
-                    {c.student_count.toLocaleString()}
-                  </span>
-                  <span className={cn("px-2 py-1 rounded-full text-3xs font-bold border", TIER_PILL[c.tier])}>{c.tier}</span>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-3xs font-bold text-emerald-500 tabular-nums">
-                    <Trophy className="w-3 h-3" />
-                    {Number(c.placement_rate).toFixed(0)}% placed
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => setProposingCollegeId(c.id)}
-                  disabled={!selectedDrive}
-                  className="group/btn relative w-full flex items-center gap-1.5 px-3.5 py-2.5 rounded-control bg-teal-500 text-white text-2xs font-bold transition-all duration-200 shadow-subtle hover:bg-teal-400 hover:-translate-y-0.5 hover:shadow-[0_0_18px_-4px_rgba(20,184,166,0.55)] active:translate-y-0 active:scale-[0.99] disabled:opacity-40 disabled:pointer-events-none disabled:hover:translate-y-0 disabled:hover:shadow-subtle overflow-hidden"
-                >
-                  <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700 ease-out bg-gradient-to-r from-transparent via-white/25 to-transparent skew-x-12" />
-                  <Send className="w-3.5 h-3.5 shrink-0 relative z-10" />
-                  <span className="relative z-10 min-w-0 flex-1 truncate text-left">
-                    Propose {selectedDrive ? `"${selectedDrive.title}"` : "a Drive"}
-                  </span>
-                </button>
+        {/* Proposal context — which opening the card CTAs will propose. */}
+        <HpItem>
+          {initialLoading ? (
+            <HpCard spotlight={false} className="flex items-center gap-4 p-4 sm:p-5">
+              <HpSkeleton className="h-10 w-10 rounded-xl" />
+              <div className="flex-1 space-y-2">
+                <HpSkeleton className="h-3 w-28" />
+                <HpSkeleton className="h-10 w-full max-w-md rounded-xl" />
               </div>
-            </motion.div>
-          ))}
-        </div>
-      )}
+            </HpCard>
+          ) : drives.length > 0 ? (
+            <HpCard featured spotlight={false} className="p-4 sm:p-5">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-3.5">
+                  <HpIconTile icon={Send} tone="indigo" size="md" />
+                  <div className="min-w-0 flex-1">
+                    <label htmlFor="propose-opening" className="mb-1.5 block text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">
+                      Proposing opening
+                    </label>
+                    <HpSelect
+                      id="propose-opening"
+                      value={selectedDriveId}
+                      onChange={(e) => setSelectedDriveId(Number(e.target.value))}
+                      wrapperClassName="w-full max-w-md"
+                    >
+                      {drives.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.title}
+                        </option>
+                      ))}
+                    </HpSelect>
+                  </div>
+                </div>
+                <p className="max-w-sm text-2xs leading-relaxed text-text-muted md:text-right">
+                  Each college&apos;s TPO approves a proposal before it reaches their students.
+                  {selectedDrive && (selectedDrive.college_mappings?.length ?? 0) > 0 && (
+                    <span className="mt-1 block font-semibold text-text-secondary">
+                      Already proposed to {selectedDrive.college_mappings?.length} campus{selectedDrive.college_mappings?.length === 1 ? "" : "es"}.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </HpCard>
+          ) : (
+            !loading && (
+              <div className="flex flex-col gap-4 rounded-[20px] border border-amber-500/25 bg-gradient-to-r from-amber-500/[0.09] via-amber-500/[0.04] to-transparent p-4 sm:flex-row sm:items-center sm:p-5">
+                <HpIconTile icon={Briefcase} tone="amber" size="md" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-13 font-bold text-primary">No published openings yet</p>
+                  <p className="mt-0.5 text-2xs leading-relaxed text-text-secondary">
+                    Post a job opening first — you&apos;ll need at least one published opening before you can propose it to a college.
+                  </p>
+                </div>
+                <Link href="/admin/company/drives" className={hpBtn("secondary", "sm", "group/go self-start sm:self-auto")}>
+                  <Plus className="h-3.5 w-3.5" />
+                  Go to Job Openings
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover/go:translate-x-0.5" />
+                </Link>
+              </div>
+            )
+          )}
+        </HpItem>
+
+        <HpItem>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <HpTabs tabs={tierTabs} value={tierFilter} onChange={setTierFilter} />
+            <HpSearch
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search colleges..."
+              aria-label="Search partner colleges by name"
+              wrapperClassName="w-full lg:w-72"
+            />
+          </div>
+        </HpItem>
+
+        {loadError && (
+          <HpItem>
+            <HpErrorCard message={loadError} onRetry={load} />
+          </HpItem>
+        )}
+
+        <HpItem>
+          {initialLoading ? (
+            <HpSkeletonCards count={6} className="sm:grid-cols-2 md:grid-cols-2" />
+          ) : loadError && colleges.length === 0 ? null : colleges.length === 0 ? (
+            <HpEmptyState
+              icon={GraduationCap}
+              tone="teal"
+              title="No partner colleges yet"
+              description="Colleges show up here as soon as they join CodeGen Box — check back soon to propose your openings to their campus."
+            />
+          ) : filtered.length === 0 ? (
+            <HpEmptyState
+              icon={SearchX}
+              tone="slate"
+              title={search ? `No colleges match “${search}”` : "No colleges in this tier"}
+              description="Try a different name, or clear the filters to see every partner campus."
+              action={
+                <HpButton
+                  variant="secondary"
+                  onClick={() => {
+                    setSearch("");
+                    setTierFilter("all");
+                  }}
+                >
+                  Clear filters
+                </HpButton>
+              }
+            />
+          ) : (
+            <div className="relative grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <AnimatePresence mode="popLayout">
+                {filtered.map((c, idx) => {
+                  const tier = TIER_META[c.tier];
+                  const mapping = mappingFor(c.id);
+                  const rate = Number(c.placement_rate);
+                  return (
+                    <motion.div
+                      key={c.id}
+                      layout="position"
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.2, ease: hpEase } }}
+                      transition={{ duration: 0.35, ease: hpEase, delay: Math.min(idx * 0.025, 0.3), layout: { duration: 0.3, ease: hpEase } }}
+                      className="h-full"
+                    >
+                      <HpCard className="hp-card-hover group flex h-full flex-col overflow-hidden">
+                        {/* Tier-tinted cap — revealed on hover so the grid
+                            doesn't turn into a stripe of colour bars at rest. */}
+                        <div
+                          aria-hidden
+                          className={cn(
+                            "absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r opacity-0 transition-opacity duration-300 group-hover:opacity-100",
+                            tier.cap
+                          )}
+                        />
+
+                        <div className="flex flex-1 flex-col p-5">
+                          <div className="flex items-start gap-3.5">
+                            <HpCompanyLogo
+                              name={c.name}
+                              size="md"
+                              className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-15 font-bold tracking-tight text-primary" title={c.name}>
+                                {c.name}
+                              </h3>
+                              <p className="mt-0.5 flex min-w-0 items-center gap-1 text-2xs text-text-muted">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">{[c.city, c.state].filter(Boolean).join(", ") || "Location not on file"}</span>
+                              </p>
+                            </div>
+                            {c.short_code && (
+                              <span className="shrink-0 rounded-md bg-elevated px-1.5 py-0.5 font-mono text-3xs font-bold uppercase text-text-muted ring-1 ring-inset ring-border-subtle">
+                                {c.short_code}
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap items-center gap-1.5">
+                            <HpPill tone={tier.tone} size="sm">
+                              {c.tier}
+                            </HpPill>
+                            {mapping && (
+                              <HpPill tone={MAPPING_META[mapping.status].tone} dot size="sm">
+                                {MAPPING_META[mapping.status].label}
+                              </HpPill>
+                            )}
+                          </div>
+
+                          <dl className="mt-4 grid grid-cols-2 gap-4 rounded-2xl bg-elevated/60 p-3.5 ring-1 ring-inset ring-border-subtle">
+                            <div className="min-w-0">
+                              <dt className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                                <Users2 className="h-3 w-3" />
+                                Students
+                              </dt>
+                              <dd className="tabular mt-1 text-15 font-extrabold text-primary">{c.student_count.toLocaleString()}</dd>
+                            </div>
+                            <div className="min-w-0">
+                              <dt className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                                <Trophy className="h-3 w-3" />
+                                Placed
+                              </dt>
+                              <dd className="mt-1">
+                                <span className="tabular text-15 font-extrabold text-emerald-600 dark:text-emerald-300">{rate.toFixed(0)}%</span>
+                                <HpProgress value={rate} tone="emerald" className="mt-1.5" />
+                              </dd>
+                            </div>
+                          </dl>
+
+                          <div className="mt-auto pt-4">
+                            <HpButton
+                              onClick={() => setProposingCollegeId(c.id)}
+                              disabled={!selectedDrive}
+                              leftIcon={<Send className="h-3.5 w-3.5 shrink-0" />}
+                              className="w-full justify-start"
+                            >
+                              <span className="min-w-0 flex-1 truncate text-left">
+                                Propose {selectedDrive ? `"${selectedDrive.title}"` : "a Drive"}
+                              </span>
+                            </HpButton>
+                          </div>
+                        </div>
+                      </HpCard>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+          )}
+        </HpItem>
+      </HpStagger>
 
       {proposingCollegeId !== null && selectedDrive && (
         <ProposeToCollegesModal

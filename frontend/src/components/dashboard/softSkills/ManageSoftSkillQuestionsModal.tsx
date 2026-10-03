@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { ListChecks, Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HP_TONES, HpButton, HpIconTile, HpPill, HpSkeleton, hpInput, hpLabel, type HpTone } from "@/components/portal/kit";
+import { ScIconButton, ScInlineEmpty, ScReveal, ScSkeletonList } from "@/components/portal/screeningKit";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
@@ -21,7 +24,13 @@ interface ManageSoftSkillQuestionsModalProps {
   assessmentTitle: string;
   onClose: () => void;
   onToast: (msg: string) => void;
+  /** "premium" is the hiring-portal look. Default leaves Ops/TPO markup exactly as before. */
+  variant?: "default" | "premium";
 }
+
+/* Premium-only presentation maps (emerald is kept for outcomes, so no category uses it). */
+const PREMIUM_CATEGORY_TONE: Record<SoftSkillCategory, HpTone> = { aptitude: "indigo", reasoning: "amber", english: "sky", situational: "violet" };
+const PREMIUM_DIFFICULTY_TONE: Record<SoftSkillDifficulty, HpTone> = { easy: "teal", medium: "amber", hard: "rose" };
 
 /**
  * Shared across Mellow Ops/TPO/Company — attach/detach bank questions,
@@ -38,6 +47,7 @@ export function ManageSoftSkillQuestionsModal({
   assessmentTitle,
   onClose,
   onToast,
+  variant = "default",
 }: ManageSoftSkillQuestionsModalProps) {
   const [attached, setAttached] = useState<AttachedAssessmentQuestion[]>([]);
   const [bankCounts, setBankCounts] = useState<Partial<Record<SoftSkillCategory, number>>>({});
@@ -127,6 +137,159 @@ export function ManageSoftSkillQuestionsModal({
       setGenerating(false);
     }
   };
+
+  if (variant === "premium") {
+    const requestedTotal = CATEGORY_ORDER.reduce((sum, cat) => sum + (composition[cat] || 0), 0);
+    return (
+      <Modal
+        variant="premium"
+        onClose={onClose}
+        title="Manage Questions"
+        subtitle={assessmentTitle}
+        icon={ListChecks}
+        size="3xl"
+        bodyClassName="px-6 py-5 text-xs space-y-5"
+      >
+        {loading ? (
+          <div className="space-y-4" role="status" aria-label="Loading">
+            <HpSkeleton className="h-40 w-full rounded-[20px]" />
+            <HpSkeleton className="h-28 w-full rounded-[20px]" />
+            <ScSkeletonList rows={3} />
+          </div>
+        ) : (
+          <>
+            {/* Auto-fill panel */}
+            <section className="space-y-4 rounded-[20px] border border-border-subtle bg-elevated/30 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <HpIconTile icon={Wand2} tone="indigo" size="sm" />
+                  <div className="min-w-0">
+                    <h3 className="text-13 font-bold tracking-tight text-primary">Auto-fill from bank</h3>
+                    <p className="text-2xs text-text-muted">Choose how many of each category to pull from the shared bank.</p>
+                  </div>
+                </div>
+                <HpPill tone="indigo" size="sm">
+                  <span className="tabular">{requestedTotal}</span> requested
+                </HpPill>
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {CATEGORY_ORDER.map((cat) => {
+                  const inBank = bankCounts[cat] ?? 0;
+                  const short = composition[cat] > inBank;
+                  return (
+                    <label
+                      key={cat}
+                      className="block min-w-0 rounded-2xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] p-3 transition-colors duration-200 focus-within:border-indigo-500/40 hover:border-indigo-500/25"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={cn("h-2 w-2 shrink-0 rounded-full", HP_TONES[PREMIUM_CATEGORY_TONE[cat]].fill)} aria-hidden />
+                        <span className="truncate text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">{CATEGORY_LABELS[cat]}</span>
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={100}
+                        value={composition[cat]}
+                        onChange={(e) => setComposition((prev) => ({ ...prev, [cat]: Number(e.target.value) }))}
+                        className={cn(hpInput, "tabular mt-2 h-9 py-0 text-sm font-bold")}
+                      />
+                      <span className={cn("mt-1.5 block text-3xs", short ? "font-semibold text-amber-700 dark:text-amber-300" : "text-text-muted")}>
+                        <span className="tabular">{inBank}</span> in bank{short ? " — will fall short" : ""}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <HpButton onClick={handleAutoFill} isLoading={autoFilling} leftIcon={<Wand2 className="h-4 w-4" />}>
+                Auto-fill
+              </HpButton>
+            </section>
+
+            {/* Generate with AI panel */}
+            <section className="relative space-y-4 overflow-hidden rounded-[20px] border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.07] via-transparent to-indigo-500/[0.05] p-4 sm:p-5">
+              <div aria-hidden className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/5 blur-3xl" />
+              <div className="relative flex min-w-0 items-center gap-3">
+                <HpIconTile icon={Sparkles} tone="violet" size="sm" />
+                <div className="min-w-0">
+                  <h3 className="text-13 font-bold tracking-tight text-primary">Generate more with AI</h3>
+                  <p className="text-2xs text-text-muted">New questions land in the shared bank — auto-fill can then pick them up.</p>
+                </div>
+              </div>
+              <div className="relative grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_96px_auto] sm:items-end">
+                <label className="block min-w-0">
+                  <span className={hpLabel}>Category</span>
+                  <select value={genCategory} onChange={(e) => setGenCategory(e.target.value as SoftSkillCategory)} className={hpInput}>
+                    {CATEGORY_ORDER.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {CATEGORY_LABELS[cat]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block min-w-0">
+                  <span className={hpLabel}>Difficulty</span>
+                  <select value={genDifficulty} onChange={(e) => setGenDifficulty(e.target.value as SoftSkillDifficulty)} className={hpInput}>
+                    <option value="easy">Easy</option>
+                    <option value="medium">Medium</option>
+                    <option value="hard">Hard</option>
+                  </select>
+                </label>
+                <label className="block min-w-0">
+                  <span className={hpLabel}>Count</span>
+                  <input type="number" min={1} max={15} value={genCount} onChange={(e) => setGenCount(Number(e.target.value))} className={cn(hpInput, "tabular")} />
+                </label>
+                <HpButton variant="secondary" onClick={handleGenerate} isLoading={generating} leftIcon={<Sparkles className="h-4 w-4" />}>
+                  Generate
+                </HpButton>
+              </div>
+            </section>
+
+            {/* Currently attached */}
+            <section className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-13 font-bold tracking-tight text-primary">Attached Questions</h3>
+                <HpPill tone="indigo" size="sm">
+                  <span className="tabular">{attached.length}</span> total
+                </HpPill>
+              </div>
+              {attached.length === 0 ? (
+                <ScInlineEmpty icon={ListChecks} title="No questions attached yet" description="Use auto-fill above to pull a balanced set from the bank." />
+              ) : (
+                CATEGORY_ORDER.map((cat) => {
+                  const items = attachedByCategory[cat];
+                  if (items.length === 0) return null;
+                  return (
+                    <div key={cat} className="space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={cn("h-2 w-2 rounded-full", HP_TONES[PREMIUM_CATEGORY_TONE[cat]].fill)} aria-hidden />
+                        <p className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">{CATEGORY_LABELS[cat]}</p>
+                        <span className="tabular rounded-full bg-elevated px-1.5 py-px text-3xs font-bold text-text-muted">{items.length}</span>
+                      </div>
+                      <div className="relative space-y-1.5">
+                        <AnimatePresence mode="popLayout" initial={false}>
+                          {items.map((a, i) => (
+                            <ScReveal key={a.id} index={i}>
+                              <div className="group flex items-center gap-3 rounded-xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] px-3 py-2 transition-all duration-200 hover:border-indigo-500/25 hover:bg-elevated/40">
+                                <span className="min-w-0 flex-1 truncate text-13 text-primary">{a.question.question_text}</span>
+                                <HpPill tone={PREMIUM_DIFFICULTY_TONE[a.question.difficulty] ?? "slate"} size="sm" className="hidden capitalize sm:inline-flex">
+                                  {a.question.difficulty}
+                                </HpPill>
+                                <ScIconButton icon={Trash2} label="Remove from this assessment" tone="danger" onClick={() => handleRemove(a.id)} />
+                              </div>
+                            </ScReveal>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </section>
+          </>
+        )}
+      </Modal>
+    );
+  }
 
   return (
     <Modal onClose={onClose} title="Manage Questions" subtitle={assessmentTitle} icon={ListChecks} size="3xl" bodyClassName="px-6 py-5 text-xs space-y-5">

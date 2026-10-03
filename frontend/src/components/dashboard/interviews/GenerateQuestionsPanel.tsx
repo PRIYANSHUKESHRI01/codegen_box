@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, Loader2, X, RotateCcw, Wand2, AlertTriangle, CheckCircle2, Plus } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Sparkles, Loader2, X, RotateCcw, Wand2, AlertTriangle, CheckCircle2, Plus, Check, Clock } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HpButton, HpIconTile, HpPill, hpInput, hpLabel, type HpTone } from "@/components/portal/kit";
+import { ScIconButton, ScNotice, ScReveal, ScSegmented } from "@/components/portal/screeningKit";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
@@ -33,7 +36,11 @@ interface GenerateQuestionsPanelProps {
    * deliberate per-question human click, never auto-attached).
    */
   onAddNow?: (q: BankQuestion) => Promise<void>;
+  /** "premium" is the hiring-portal look (kit surfaces, gradient CTA, animated list). Default leaves every other caller's markup exactly as before. */
+  variant?: "default" | "premium";
 }
+
+const PREMIUM_DIFFICULTY_TONE: Record<QuestionDifficulty, HpTone> = { easy: "teal", medium: "amber", hard: "rose" };
 
 /**
  * The AI-authoring step embedded in every "Create Interview" modal (Ops,
@@ -44,7 +51,7 @@ interface GenerateQuestionsPanelProps {
  * skip this and add questions from the existing bank afterward via the
  * unchanged "Manage Questions" flow.
  */
-export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChange, onAddNow }: GenerateQuestionsPanelProps) {
+export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChange, onAddNow, variant = "default" }: GenerateQuestionsPanelProps) {
   const [role, setRole] = useState(defaultRole ?? "");
   const [difficulty, setDifficulty] = useState<QuestionDifficulty>("medium");
   const [categories, setCategories] = useState<Set<QuestionCategory>>(new Set<QuestionCategory>(["technical"]));
@@ -128,6 +135,160 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
       setAddingId(null);
     }
   };
+
+  if (variant === "premium") {
+    return (
+      <div className="relative overflow-hidden rounded-[20px] border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.06] via-transparent to-indigo-500/[0.05] p-4 sm:p-5">
+        <div aria-hidden className="pointer-events-none absolute -right-14 -top-16 h-44 w-44 rounded-full bg-gradient-to-br from-violet-500/20 to-indigo-500/5 blur-3xl" />
+        <div className="relative space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <HpIconTile icon={Sparkles} tone="violet" size="sm" />
+              <div className="min-w-0">
+                <h4 className="text-13 font-bold tracking-tight text-primary">Generate Questions with AI</h4>
+                <p className="text-2xs text-text-muted">Describe the round — you review every question before it&apos;s attached.</p>
+              </div>
+            </div>
+            <HpPill tone="violet" size="sm" className="shrink-0">
+              Optional
+            </HpPill>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label className="block sm:col-span-2">
+              <span className={hpLabel}>Role / Position *</span>
+              <input value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Backend Engineer, Data Analyst" className={hpInput} />
+            </label>
+
+            <div className="sm:col-span-2">
+              <span className={hpLabel}>Difficulty *</span>
+              <ScSegmented<QuestionDifficulty>
+                label="Difficulty"
+                value={difficulty}
+                onChange={setDifficulty}
+                options={DIFFICULTIES.map((d) => ({ id: d, label: d }))}
+              />
+            </div>
+
+            <div className="sm:col-span-2">
+              <span className={hpLabel}>Focus Area(s) *</span>
+              <div role="group" aria-label="Focus areas" className="flex flex-wrap gap-1.5">
+                {ALL_CATEGORIES.map((c) => {
+                  const on = categories.has(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => toggleCategory(c)}
+                      className={cn(
+                        "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-2xs font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
+                        on
+                          ? cn(CATEGORY_COLORS[c], "shadow-[0_4px_12px_-6px_rgba(99,102,241,0.45)]")
+                          : "border-border-strong bg-[rgb(var(--bg-surface-rgb))] text-text-muted hover:-translate-y-px hover:border-indigo-500/30 hover:text-primary"
+                      )}
+                    >
+                      {on && <Check className="h-3 w-3" strokeWidth={3} aria-hidden />}
+                      {CATEGORY_LABELS[c]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <label className="block">
+              <span className={hpLabel}>Number of Questions</span>
+              <input type="number" min={1} max={10} value={count} onChange={(e) => setCount(e.target.value)} className={cn(hpInput, "tabular")} />
+            </label>
+            <label className="block">
+              <span className={hpLabel}>Key Skills (optional)</span>
+              <input value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="e.g. React, system design" className={hpInput} />
+            </label>
+          </div>
+
+          <HpButton
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating || !role.trim() || categories.size === 0}
+            isLoading={generating}
+            leftIcon={<Wand2 className="h-4 w-4" />}
+            className="w-full"
+          >
+            {generating ? "Generating..." : questions.length > 0 ? "Regenerate All" : "Generate Questions"}
+          </HpButton>
+
+          {error && (
+            <ScNotice tone="amber">
+              {error} {onAddNow ? "You can still add questions from the bank below." : 'You can still create this interview and add questions from the bank afterward via "Manage Questions".'}
+            </ScNotice>
+          )}
+
+          {questions.length > 0 && (
+            <div className="space-y-2.5 pt-1">
+              <div className="flex items-center gap-1.5 text-2xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                {questions.length} question{questions.length === 1 ? "" : "s"} ready
+                {onAddNow ? " — click Add to attach one to this interview" : " — attached when you create the interview"}
+              </div>
+              <div className="relative space-y-2">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {questions.map((q, i) => (
+                    <ScReveal key={q.id} index={i}>
+                      <div className="group flex items-start gap-3 rounded-2xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] p-3.5 shadow-[0_1px_2px_rgba(39,47,92,0.05)] transition-all duration-200 hover:border-indigo-500/25 hover:shadow-[0_8px_20px_-12px_rgba(79,70,229,0.35)]">
+                        <span className="tabular mt-0.5 hidden h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-3xs font-bold text-violet-700 dark:text-violet-300 sm:flex">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                            <span className={cn("rounded-full border px-2 py-0.5 text-3xs font-bold uppercase tracking-wide", CATEGORY_COLORS[q.category])}>
+                              {CATEGORY_LABELS[q.category]}
+                            </span>
+                            <HpPill tone={PREMIUM_DIFFICULTY_TONE[q.difficulty]} size="sm" className="capitalize">
+                              {q.difficulty}
+                            </HpPill>
+                            <span className="tabular inline-flex items-center gap-1 text-3xs text-text-muted">
+                              <Clock className="h-3 w-3" aria-hidden />~{Math.round(q.expected_duration_seconds / 60)} min
+                            </span>
+                          </div>
+                          <p className="text-13 font-medium leading-relaxed text-primary">{q.question_text}</p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <ScIconButton
+                            icon={regeneratingId === q.id ? Loader2 : RotateCcw}
+                            spinning={regeneratingId === q.id}
+                            label="Regenerate this question"
+                            tone="accent"
+                            onClick={() => handleRegenerateOne(q)}
+                            disabled={regeneratingId === q.id || addingId === q.id}
+                          />
+                          {onAddNow ? (
+                            <HpButton
+                              type="button"
+                              variant="soft"
+                              size="sm"
+                              title="Add to interview"
+                              onClick={() => handleAddNow(q)}
+                              disabled={addingId === q.id || regeneratingId === q.id}
+                              isLoading={addingId === q.id}
+                              leftIcon={<Plus className="h-3.5 w-3.5" />}
+                            >
+                              Add
+                            </HpButton>
+                          ) : (
+                            <ScIconButton icon={X} label="Remove" tone="danger" onClick={() => handleRemove(q.id)} />
+                          )}
+                        </div>
+                      </div>
+                    </ScReveal>
+                  ))}
+                </AnimatePresence>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-panel border border-accent-primary/20 bg-accent-primary/[0.03] p-4 space-y-4">

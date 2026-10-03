@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Briefcase, Search, Loader2, Building2, CheckCircle2 } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { Briefcase, Search, Loader2, Building2, Check, Lock, Plus, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import { Modal } from "@/components/ui/Modal";
+import { HpButton, HpCompanyLogo, hpEase, hpInput, hpLabel } from "@/components/portal/kit";
+import { HpCallout, HpCheckboxBox, HpFormError } from "@/components/portal/pipeline-kit";
 
 interface CreateDriveModalProps {
   collegeName: string;
@@ -23,8 +26,34 @@ interface SearchCompany {
 }
 
 const BRANCH_OPTIONS = ["CSE", "IT", "ECE", "EE", "MECH"];
-const inputClass =
-  "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary";
+
+/** Small numbered section heading inside the form. */
+function FormSection({ step, title, children }: { step: number; title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3.5">
+      <h4 className="flex items-center gap-2.5 text-3xs font-bold uppercase tracking-[0.12em] text-text-muted">
+        <span className="tabular flex h-5 w-5 items-center justify-center rounded-full bg-indigo-500/10 text-3xs font-extrabold text-indigo-600 ring-1 ring-inset ring-indigo-500/20 dark:text-indigo-300">
+          {step}
+        </span>
+        {title}
+        <span aria-hidden className="h-px flex-1 bg-gradient-to-r from-border-subtle to-transparent" />
+      </h4>
+      {children}
+    </section>
+  );
+}
+
+function RequiredMark() {
+  return (
+    <span className="ml-0.5 text-rose-500" aria-hidden>
+      *
+    </span>
+  );
+}
+
+function Optional() {
+  return <span className="font-medium text-text-muted">(optional)</span>;
+}
 
 /**
  * Self-service "the company isn't in Mellow's catalog yet" flow — the
@@ -143,256 +172,391 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
   };
 
   const companyChosen = selectedCompany !== null || (addingNewCompany && companyQuery.trim().length > 0);
+  const showResults = companyQuery.trim().length >= 2 && !addingNewCompany;
 
   return (
     <Modal
       onClose={onClose}
-      title={`Create a Drive for ${collegeName}`}
+      title="Create a Campus Drive"
+      subtitle={`Visible only to ${collegeName}'s students`}
       icon={Briefcase}
-      iconClassName="bg-accent-secondary/10 text-accent-secondary"
-      size="lg"
+      size="xl"
+      variant="premium"
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors"
-          >
+          <HpButton type="button" variant="ghost" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </HpButton>
+          <HpButton
             type="submit"
             form="create-drive-form"
             disabled={saving || !companyChosen}
-            className="px-4 py-2 rounded-control bg-accent-secondary hover:bg-accent-secondary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            isLoading={saving}
+            leftIcon={<Plus className="h-4 w-4" />}
+            className="min-w-0"
+            title={`Create & Add to ${collegeName}`}
           >
-            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-            <span>Create & Add to {collegeName}</span>
-          </button>
+            <span className="truncate">Create &amp; Add to {collegeName}</span>
+          </HpButton>
         </>
       }
     >
-      <form id="create-drive-form" onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+      <MotionConfig reducedMotion="user">
+      <form id="create-drive-form" onSubmit={handleSubmit} className="space-y-7">
+        {error && <HpFormError>{error}</HpFormError>}
 
-          {/* Company picker */}
+        {/* Company picker */}
+        <FormSection step={1} title="Company">
           <div>
-            <label className="block font-semibold text-text-secondary mb-1">Company *</label>
+            <label htmlFor={selectedCompany ? undefined : "cd-company"} className={hpLabel}>
+              Company
+              <RequiredMark />
+            </label>
 
             {selectedCompany ? (
-              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-control bg-elevated border border-accent-primary/30">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">{selectedCompany.logo ?? "🏢"}</span>
-                  <span className="font-semibold text-primary truncate">{selectedCompany.name}</span>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-status-success shrink-0" />
+              <div className="flex items-center gap-3 rounded-2xl border border-indigo-500/40 bg-indigo-500/[0.06] p-3 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
+                <HpCompanyLogo name={selectedCompany.name} logo={selectedCompany.logo} size="md" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-13 font-bold text-primary">{selectedCompany.name}</span>
+                    <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-b from-indigo-500 to-violet-600 text-white">
+                      <Check className="h-2.5 w-2.5" strokeWidth={3.2} aria-hidden />
+                    </span>
+                  </span>
+                  <span className="block truncate text-2xs text-text-muted">
+                    {selectedCompany.industry ?? "From the shared company catalog"}
+                  </span>
                 </span>
-                <button type="button" onClick={clearCompanyChoice} className="font-bold text-accent-primary hover:underline shrink-0">
+                <HpButton type="button" variant="ghost" size="sm" onClick={clearCompanyChoice} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>
                   Change
-                </button>
+                </HpButton>
               </div>
             ) : (
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+              <div className="group/field relative">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted transition-colors group-focus-within/field:text-indigo-500" />
                 <input
+                  id="cd-company"
                   value={companyQuery}
                   onChange={(e) => {
                     setCompanyQuery(e.target.value);
                     setAddingNewCompany(false);
                   }}
                   placeholder="Search for a company (e.g. Infosys)..."
-                  className={cn(inputClass, "pl-8")}
+                  className={cn(hpInput, "pl-10 pr-10")}
                   autoComplete="off"
+                  aria-expanded={showResults}
+                  aria-controls="cd-company-results"
+                  aria-autocomplete="list"
                 />
-                {searching && <Loader2 className="w-3.5 h-3.5 absolute right-3 top-1/2 -translate-y-1/2 text-text-muted animate-spin" />}
+                {searching && (
+                  <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" aria-label="Searching" />
+                )}
 
-                {companyQuery.trim().length >= 2 && !addingNewCompany && (
-                  <div className="absolute z-10 mt-1 w-full rounded-control bg-surface border border-border-strong shadow-card overflow-hidden max-h-56 overflow-y-auto">
-                    {searchResults.map((c) => (
+                <AnimatePresence>
+                  {showResults && (
+                    <motion.div
+                      id="cd-company-results"
+                      initial={{ opacity: 0, y: -4, scale: 0.99 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -4, scale: 0.99 }}
+                      transition={{ duration: 0.18, ease: hpEase }}
+                      className="absolute z-10 mt-2 max-h-64 w-full overflow-hidden overflow-y-auto rounded-2xl border border-border-strong bg-[rgb(var(--bg-surface-rgb))] p-1.5 shadow-[0_18px_50px_-12px_rgba(39,47,92,0.35)]"
+                    >
+                      {searchResults.length > 0 && (
+                        <p className="px-2.5 pb-1 pt-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">In the catalog</p>
+                      )}
+                      {searchResults.map((c) => (
+                        <button
+                          type="button"
+                          key={c.id}
+                          onClick={() => pickCompany(c)}
+                          className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-indigo-500/[0.06] focus-visible:bg-indigo-500/[0.08] focus-visible:outline-none"
+                        >
+                          <HpCompanyLogo name={c.name} logo={c.logo} size="sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-13 font-semibold text-primary">{c.name}</span>
+                            {c.industry && <span className="block truncate text-3xs text-text-muted">{c.industry}</span>}
+                          </span>
+                        </button>
+                      ))}
                       <button
                         type="button"
-                        key={c.id}
-                        onClick={() => pickCompany(c)}
-                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-hover text-left transition-colors"
+                        onClick={() => setAddingNewCompany(true)}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-indigo-500/[0.06] focus-visible:bg-indigo-500/[0.08] focus-visible:outline-none",
+                          searchResults.length > 0 && "mt-1 border-t border-border-subtle pt-2.5"
+                        )}
                       >
-                        <span className="text-base shrink-0">{c.logo ?? "🏢"}</span>
-                        <span className="min-w-0">
-                          <span className="block font-semibold text-primary truncate">{c.name}</span>
-                          {c.industry && <span className="block text-3xs text-text-muted truncate">{c.industry}</span>}
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-dashed border-indigo-500/40 bg-indigo-500/[0.06] text-indigo-600 dark:text-indigo-300">
+                          <Building2 className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 truncate text-13 font-semibold text-indigo-600 dark:text-indigo-300">
+                          Add &ldquo;{companyQuery.trim()}&rdquo; as a new company
                         </span>
                       </button>
-                    ))}
-                    <button
-                      type="button"
-                      onClick={() => setAddingNewCompany(true)}
-                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-surface-hover text-left transition-colors border-t border-border-subtle"
-                    >
-                      <Building2 className="w-3.5 h-3.5 text-accent-primary shrink-0" />
-                      <span className="font-semibold text-accent-primary">
-                        Add &ldquo;{companyQuery.trim()}&rdquo; as a new company
-                      </span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {addingNewCompany && (
-              <div className="mt-2 p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xs font-bold text-text-secondary">
-                    New company: <span className="text-primary">{companyQuery.trim()}</span>
-                  </span>
-                  <button type="button" onClick={clearCompanyChoice} className="text-2xs font-bold text-accent-primary hover:underline">
-                    Change
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    value={newCompanyLogo}
-                    onChange={(e) => setNewCompanyLogo(e.target.value)}
-                    placeholder="Logo emoji (optional)"
-                    className={inputClass}
-                  />
-                  <input
-                    value={newCompanyIndustry}
-                    onChange={(e) => setNewCompanyIndustry(e.target.value)}
-                    placeholder="Industry (optional)"
-                    className={inputClass}
-                  />
-                </div>
-                <input
-                  value={newCompanyWebsite}
-                  onChange={(e) => setNewCompanyWebsite(e.target.value)}
-                  placeholder="Website (optional)"
-                  className={inputClass}
-                />
-                <textarea
-                  value={newCompanyOverview}
-                  onChange={(e) => setNewCompanyOverview(e.target.value)}
-                  placeholder="A short overview students will see on their prep page (optional)"
-                  rows={2}
-                  className={inputClass}
-                />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
           </div>
 
-          {/* Drive details */}
+          <AnimatePresence initial={false}>
+            {addingNewCompany && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: hpEase }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-3.5 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+                  <div className="flex items-center gap-3">
+                    {/* Live preview of how the company mark will render across the portal. */}
+                    <HpCompanyLogo name={companyQuery.trim() || "New company"} logo={newCompanyLogo || null} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">New company</p>
+                      <p className="truncate text-13 font-bold text-primary">{companyQuery.trim()}</p>
+                    </div>
+                    <HpButton type="button" variant="ghost" size="sm" onClick={clearCompanyChoice} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>
+                      Change
+                    </HpButton>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="cd-logo" className={hpLabel}>
+                        Logo emoji <Optional />
+                      </label>
+                      <input
+                        id="cd-logo"
+                        value={newCompanyLogo}
+                        onChange={(e) => setNewCompanyLogo(e.target.value)}
+                        placeholder="Logo emoji (optional)"
+                        className={hpInput}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="cd-industry" className={hpLabel}>
+                        Industry <Optional />
+                      </label>
+                      <input
+                        id="cd-industry"
+                        value={newCompanyIndustry}
+                        onChange={(e) => setNewCompanyIndustry(e.target.value)}
+                        placeholder="Industry (optional)"
+                        className={hpInput}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="cd-website" className={hpLabel}>
+                      Website <Optional />
+                    </label>
+                    <input
+                      id="cd-website"
+                      value={newCompanyWebsite}
+                      onChange={(e) => setNewCompanyWebsite(e.target.value)}
+                      placeholder="Website (optional)"
+                      className={hpInput}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="cd-overview" className={hpLabel}>
+                      Overview <Optional />
+                    </label>
+                    <textarea
+                      id="cd-overview"
+                      value={newCompanyOverview}
+                      onChange={(e) => setNewCompanyOverview(e.target.value)}
+                      placeholder="A short overview students will see on their prep page (optional)"
+                      rows={2}
+                      className={cn(hpInput, "resize-y leading-relaxed")}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </FormSection>
+
+        {/* Drive details */}
+        <FormSection step={2} title="The role">
           <div>
-            <label className="block font-semibold text-text-secondary mb-1">Drive Title *</label>
+            <label htmlFor="cd-title" className={hpLabel}>
+              Drive Title
+              <RequiredMark />
+            </label>
             <input
+              id="cd-title"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Cisco Systems — Campus Drive (Nov 2026)"
-              className={inputClass}
+              className={hpInput}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">Role Title *</label>
-              <input required value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={inputClass} />
+              <label htmlFor="cd-role" className={hpLabel}>
+                Role Title
+                <RequiredMark />
+              </label>
+              <input id="cd-role" required value={roleTitle} onChange={(e) => setRoleTitle(e.target.value)} className={hpInput} />
             </div>
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">CTC Range</label>
-              <input
-                value={ctcRange}
-                onChange={(e) => setCtcRange(e.target.value)}
-                placeholder="₹8 - 10 LPA"
-                className={inputClass}
-              />
+              <label htmlFor="cd-ctc" className={hpLabel}>
+                CTC Range
+              </label>
+              <input id="cd-ctc" value={ctcRange} onChange={(e) => setCtcRange(e.target.value)} placeholder="₹8 - 10 LPA" className={hpInput} />
             </div>
           </div>
+        </FormSection>
 
-          <div className="grid grid-cols-2 gap-3">
+        <FormSection step={3} title="Schedule">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">Drive Date & Time *</label>
+              <label htmlFor="cd-date" className={hpLabel}>
+                Drive Date &amp; Time
+                <RequiredMark />
+              </label>
               <input
+                id="cd-date"
                 required
                 type="datetime-local"
                 value={driveDate}
                 onChange={(e) => setDriveDate(e.target.value)}
-                className={inputClass}
+                className={hpInput}
               />
             </div>
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">Duration (minutes)</label>
-              <input
-                type="number"
-                min="1"
-                value={durationMinutes}
-                onChange={(e) => setDurationMinutes(e.target.value)}
-                className={inputClass}
-              />
+              <label htmlFor="cd-duration" className={hpLabel}>
+                Duration
+              </label>
+              <div className="relative">
+                <input
+                  id="cd-duration"
+                  type="number"
+                  min="1"
+                  value={durationMinutes}
+                  onChange={(e) => setDurationMinutes(e.target.value)}
+                  className={cn(hpInput, "tabular pr-16")}
+                />
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-2xs font-semibold text-text-muted">minutes</span>
+              </div>
             </div>
           </div>
+        </FormSection>
 
-          <div className="grid grid-cols-2 gap-3">
+        <FormSection step={4} title="Eligibility">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
             <div>
-              <label className="block font-semibold text-text-secondary mb-1">Min CGPA</label>
+              <label htmlFor="cd-cgpa" className={hpLabel}>
+                Min CGPA
+              </label>
+              <div className="relative">
+                <input
+                  id="cd-cgpa"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="10"
+                  value={minCgpa}
+                  onChange={(e) => setMinCgpa(e.target.value)}
+                  className={cn(hpInput, "tabular pr-14")}
+                />
+                <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-2xs font-semibold text-text-muted">/ 10</span>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="cd-backlogs" className={hpLabel}>
+                Max Backlogs
+              </label>
               <input
+                id="cd-backlogs"
                 type="number"
-                step="0.1"
                 min="0"
-                max="10"
-                value={minCgpa}
-                onChange={(e) => setMinCgpa(e.target.value)}
-                className={inputClass}
+                value={maxBacklogs}
+                onChange={(e) => setMaxBacklogs(e.target.value)}
+                className={cn(hpInput, "tabular")}
               />
-            </div>
-            <div>
-              <label className="block font-semibold text-text-secondary mb-1">Max Backlogs</label>
-              <input type="number" min="0" value={maxBacklogs} onChange={(e) => setMaxBacklogs(e.target.value)} className={inputClass} />
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="font-semibold text-text-secondary">Eligible Branches</label>
-              <label className="flex items-center gap-1.5 text-text-muted">
-                <input type="checkbox" checked={allBranches} onChange={(e) => setAllBranches(e.target.checked)} />
+          <div className="rounded-2xl border border-border-subtle bg-elevated/40 p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span id="cd-branches-label" className="text-xs font-semibold text-text-secondary">
+                Eligible Branches
+              </span>
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-text-secondary">
+                <input type="checkbox" className="peer sr-only" checked={allBranches} onChange={(e) => setAllBranches(e.target.checked)} />
+                <HpCheckboxBox checked={allBranches} />
                 All branches
               </label>
             </div>
-            {!allBranches && (
-              <div className="flex flex-wrap gap-1.5">
-                {BRANCH_OPTIONS.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => toggleBranch(b)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-control font-bold border transition-colors",
-                      branches.includes(b)
-                        ? "bg-accent-primary text-white border-accent-primary"
-                        : "bg-elevated text-text-secondary border-border-subtle"
-                    )}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            )}
+            <AnimatePresence initial={false}>
+              {!allBranches && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: hpEase }}
+                  className="overflow-hidden"
+                >
+                  <div role="group" aria-labelledby="cd-branches-label" className="flex flex-wrap gap-2 pt-3">
+                    {BRANCH_OPTIONS.map((b) => {
+                      const on = branches.includes(b);
+                      return (
+                        <button
+                          key={b}
+                          type="button"
+                          aria-pressed={on}
+                          onClick={() => toggleBranch(b)}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
+                            on
+                              ? "border-transparent bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_6px_14px_-6px_rgba(99,102,241,0.8)]"
+                              : "border-border-strong bg-[rgb(var(--bg-surface-rgb))] text-text-secondary hover:border-indigo-500/40 hover:text-primary"
+                          )}
+                        >
+                          {on && <Check className="h-3 w-3" strokeWidth={3} aria-hidden />}
+                          {b}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {branches.length === 0 && (
+                    <p className="mt-2 text-3xs text-text-muted">Pick at least one branch, or switch back to all branches.</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+        </FormSection>
 
+        <FormSection step={5} title="Terms">
           <div>
-            <label className="block font-semibold text-text-secondary mb-1">Terms & Conditions</label>
+            <label htmlFor="cd-terms" className={hpLabel}>
+              Terms &amp; Conditions
+            </label>
             <textarea
+              id="cd-terms"
               value={termsAndConditions}
               onChange={(e) => setTermsAndConditions(e.target.value)}
               placeholder="Eligibility conditions, service/bond terms, offer conditions, selection process rules, etc. Shown to every student this drive is visible to."
               rows={4}
-              className={cn(inputClass, "resize-y")}
+              className={cn(hpInput, "resize-y leading-relaxed")}
             />
-            <p className="text-3xs text-text-muted mt-1">Optional, but recommended — students will see this before applying.</p>
+            <p className="mt-1.5 text-3xs text-text-muted">Optional, but recommended — students will see this before applying.</p>
           </div>
+        </FormSection>
 
-          <p className="text-3xs text-text-muted leading-relaxed">
-            This drive is only ever visible to {collegeName} — it won&apos;t appear for other colleges to map, since it&apos;s
-            specific to your campus.
-          </p>
-        </form>
-      </Modal>
+        <HpCallout icon={Lock} tone="indigo">
+          This drive is only ever visible to <span className="font-semibold text-primary">{collegeName}</span> — it won&apos;t
+          appear for other colleges to map, since it&apos;s specific to your campus.
+        </HpCallout>
+      </form>
+      </MotionConfig>
+    </Modal>
   );
 }

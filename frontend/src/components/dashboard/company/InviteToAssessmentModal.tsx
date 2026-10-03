@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Send, Loader2, CheckCircle2 } from "lucide-react";
+import { Send, CheckCircle2, Users, UserCheck } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { DriveApplication } from "@/types/placement";
+import { DRIVE_APPLICATION_STAGE_LABELS, type DriveApplication } from "@/types/placement";
 import { Modal } from "@/components/ui/Modal";
+import { HpButton, HpPill } from "@/components/portal/kit";
+import { ScCheckRow, ScInlineEmpty, ScNotice, ScSkeletonList } from "@/components/portal/screeningKit";
 
 interface InviteToAssessmentModalProps {
   /** Contest::getRouteKeyName() is 'slug' — every /company/contests/{contest}/* route binds by slug, never the numeric id. */
@@ -74,70 +76,89 @@ export function InviteToAssessmentModal({ contestSlug, contestTitle, placementDr
   };
 
   const invitable = candidates.filter((c) => !invitedUserIds.has(c.user_id));
+  const alreadyInvited = candidates.length - invitable.length;
 
   return (
     <Modal
+      variant="premium"
       onClose={onClose}
-      title={`Invite Candidates — ${contestTitle}`}
+      title="Invite Candidates"
+      subtitle={contestTitle}
       icon={Send}
-      iconClassName="bg-teal-500/10 text-teal-500"
       size="lg"
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={sending}
-            className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-          >
+          <HpButton type="button" variant="secondary" onClick={onClose} disabled={sending}>
             Cancel
-          </button>
-          <button
+          </HpButton>
+          <HpButton
             onClick={handleSend}
-            disabled={sending || selected.size === 0}
-            className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            disabled={selected.size === 0}
+            isLoading={sending}
+            leftIcon={<CheckCircle2 className="h-4 w-4" />}
           >
-            {sending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
             <span>Invite {selected.size > 0 ? `(${selected.size})` : ""}</span>
-          </button>
+          </HpButton>
         </>
       }
     >
       <div className="space-y-4">
-        <p className="text-2xs text-text-muted">
-          Only candidates already in this opening&apos;s pipeline can be invited. They&apos;ll see this assessment
-          the moment you invite them — no separate registration step on their end.
-        </p>
+        <ScNotice tone="indigo">
+          Only candidates already in this opening&apos;s pipeline can be invited. They&apos;ll see this assessment the moment you invite
+          them — no separate registration step on their end.
+        </ScNotice>
 
         {loading ? (
-          <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading candidates...
-          </div>
+          <ScSkeletonList rows={4} />
         ) : invitable.length === 0 ? (
-          <p className="text-xs text-text-muted text-center py-6">
-            {candidates.length === 0
-              ? "No candidates in this opening's pipeline yet."
-              : "Everyone in this opening's pipeline has already been invited."}
-          </p>
+          <ScInlineEmpty
+            icon={candidates.length === 0 ? Users : UserCheck}
+            tone={candidates.length === 0 ? "slate" : "teal"}
+            title={candidates.length === 0 ? "Pipeline is empty" : "Everyone's invited"}
+            description={
+              candidates.length === 0
+                ? "No candidates in this opening's pipeline yet."
+                : "Everyone in this opening's pipeline has already been invited."
+            }
+          />
         ) : (
-          <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-            {invitable.map((c) => (
-              <label
-                key={c.id}
-                className="flex items-center gap-2.5 p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-xs cursor-pointer hover:bg-elevated transition-colors"
-              >
-                <input type="checkbox" checked={selected.has(c.user_id)} onChange={() => toggle(c.user_id)} />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-primary truncate">{c.user.name}</span>
-                  <span className="block text-3xs text-text-muted truncate">{c.user.email}</span>
-                </span>
-              </label>
-            ))}
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-2xs font-semibold text-text-secondary">
+                <span className="tabular">{invitable.length}</span> available to invite
+                {alreadyInvited > 0 && (
+                  <span className="font-normal text-text-muted">
+                    {" "}
+                    · <span className="tabular">{alreadyInvited}</span> already invited
+                  </span>
+                )}
+              </p>
+              {selected.size > 0 && (
+                <HpPill tone="indigo" dot size="sm">
+                  <span className="tabular">{selected.size}</span> selected
+                </HpPill>
+              )}
+            </div>
+            <div className="max-h-72 space-y-1.5 overflow-y-auto pr-1">
+              {invitable.map((c) => (
+                <ScCheckRow
+                  key={c.id}
+                  name={c.user.name}
+                  detail={c.user.email}
+                  checked={selected.has(c.user_id)}
+                  onChange={() => toggle(c.user_id)}
+                  trailing={
+                    <HpPill tone="slate" size="sm" className="hidden shrink-0 sm:inline-flex">
+                      {DRIVE_APPLICATION_STAGE_LABELS[c.stage] ?? c.stage}
+                    </HpPill>
+                  }
+                />
+              ))}
+            </div>
           </div>
         )}
 
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        {error && <ScNotice tone="rose">{error}</ScNotice>}
       </div>
     </Modal>
   );

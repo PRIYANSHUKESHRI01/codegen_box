@@ -1,7 +1,24 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Brain, Loader2, ListChecks, Plus, Trash2 } from "lucide-react";
+import { AnimatePresence } from "framer-motion";
+import { Brain, Loader2, ListChecks, Plus, Trash2, Rocket, PenLine, Ban, Timer, Target, Users, SearchX, type LucideIcon } from "lucide-react";
+import {
+  HpButton,
+  HpCard,
+  HpEmptyState,
+  HpIconTile,
+  HpItem,
+  HpPill,
+  HpSearch,
+  HpSkeletonCards,
+  HpStagger,
+  HpStatCard,
+  HpTabs,
+  HpToast,
+  type HpTone,
+} from "@/components/portal/kit";
+import { ScIconButton, ScMetric, ScNotice, ScReveal } from "@/components/portal/screeningKit";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CreateSoftSkillAssessmentModal } from "./CreateSoftSkillAssessmentModal";
@@ -21,7 +38,17 @@ interface SoftSkillAdminConsoleProps {
   title: string;
   subtitle: string;
   emptyMessage: string;
+  /** "premium" is the hiring-portal look (kit cards, stats, filters, premium modals). Default leaves Ops/TPO markup exactly as before. */
+  variant?: "default" | "premium";
 }
+
+const PREMIUM_STATUS: Record<AdminSoftSkillAssessment["status"], { label: string; tone: HpTone; icon?: LucideIcon; dot?: boolean; pulse?: boolean }> = {
+  published: { label: "Published", tone: "teal", dot: true, pulse: true },
+  draft: { label: "Draft", tone: "slate", icon: PenLine },
+  cancelled: { label: "Cancelled", tone: "rose", icon: Ban },
+};
+
+type PremiumFilter = "all" | "published" | "draft";
 
 /**
  * The shared list+create+manage surface, used identically by Mellow Ops
@@ -40,6 +67,7 @@ export function SoftSkillAdminConsole({
   title,
   subtitle,
   emptyMessage,
+  variant = "default",
 }: SoftSkillAdminConsoleProps) {
   const { status } = useAuthGuard(allowedRoles);
   const [assessments, setAssessments] = useState<AdminSoftSkillAssessment[]>([]);
@@ -47,6 +75,9 @@ export function SoftSkillAdminConsole({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<AdminSoftSkillAssessment | null>(null);
+  // View-only list controls for the premium presentation (client-side filtering of the loaded list).
+  const [filter, setFilter] = useState<PremiumFilter>("all");
+  const [query, setQuery] = useState("");
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -91,6 +122,219 @@ export function SoftSkillAdminConsole({
       triggerToast(err instanceof ApiError ? err.message : "Failed to delete.");
     }
   };
+
+  if (variant === "premium") {
+    const publishedCount = assessments.filter((a) => a.status === "published").length;
+    const draftCount = assessments.filter((a) => a.status === "draft").length;
+    const questionsTotal = assessments.reduce((sum, a) => sum + a.assessment_questions_count, 0);
+    const attemptsTotal = assessments.reduce((sum, a) => sum + a.sessions_count, 0);
+    const q = query.trim().toLowerCase();
+    const visible = assessments.filter((a) => {
+      if (filter !== "all" && a.status !== filter) return false;
+      if (!q) return true;
+      return a.title.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q);
+    });
+    const hasAny = assessments.length > 0;
+
+    return (
+      <DashboardShell
+        role={shellRole}
+        currentTpoView={currentTpoView}
+        title={title}
+        subtitle={subtitle}
+        actionButton={{ label: "New Soft Skills Test", icon: Plus, onClick: () => setShowCreate(true) }}
+      >
+        <HpToast message={toastMessage} />
+
+        <HpStagger className="space-y-6">
+          {(loading || hasAny) && (
+            <HpItem>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+                <HpStatCard
+                  label="Tests"
+                  value={assessments.length}
+                  icon={Brain}
+                  tone="violet"
+                  loading={loading}
+                  hint={draftCount > 0 ? `${draftCount} in draft` : "All published"}
+                />
+                <HpStatCard label="Published" value={publishedCount} icon={Rocket} tone="teal" loading={loading} hint="Live for test-takers" />
+                <HpStatCard label="Questions" value={questionsTotal} icon={ListChecks} tone="indigo" loading={loading} hint="Attached across tests" />
+                <HpStatCard label="Attempts" value={attemptsTotal} icon={Users} tone="sky" loading={loading} hint="Sessions taken" />
+              </div>
+            </HpItem>
+          )}
+
+          {hasAny && (
+            <HpItem>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <HpTabs<PremiumFilter>
+                  value={filter}
+                  onChange={setFilter}
+                  tabs={[
+                    { id: "all", label: "All", count: assessments.length },
+                    { id: "published", label: "Published", count: publishedCount },
+                    { id: "draft", label: "Drafts", count: draftCount },
+                  ]}
+                />
+                <HpSearch
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Search tests"
+                  aria-label="Search Soft Skills tests"
+                  wrapperClassName="w-full sm:w-72"
+                />
+              </div>
+            </HpItem>
+          )}
+
+          <HpItem>
+            {loading ? (
+              <HpSkeletonCards count={4} className="md:grid-cols-1 xl:grid-cols-2" />
+            ) : !hasAny ? (
+              <HpEmptyState
+                icon={Brain}
+                tone="violet"
+                title="Create your first Soft Skills test"
+                description={emptyMessage}
+                action={
+                  <HpButton leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreate(true)}>
+                    New Soft Skills Test
+                  </HpButton>
+                }
+              />
+            ) : visible.length === 0 ? (
+              <HpEmptyState
+                icon={SearchX}
+                tone="slate"
+                title="Nothing matches"
+                description="No tests fit this filter or search. Try another view, or clear the search."
+                action={
+                  <HpButton
+                    variant="secondary"
+                    onClick={() => {
+                      setFilter("all");
+                      setQuery("");
+                    }}
+                  >
+                    Clear filters
+                  </HpButton>
+                }
+              />
+            ) : (
+              <div className="relative grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <AnimatePresence mode="popLayout" initial={false}>
+                  {visible.map((assessment, index) => {
+                    const meta = PREMIUM_STATUS[assessment.status] ?? PREMIUM_STATUS.draft;
+                    const needsQuestions = assessment.assessment_questions_count === 0;
+                    return (
+                      <ScReveal key={assessment.id} index={index} className="h-full">
+                        <HpCard className="hp-card-hover group flex h-full flex-col p-5 sm:p-6">
+                          <div className="flex-1">
+                            <div className="flex items-start gap-3.5">
+                              <HpIconTile
+                                icon={Brain}
+                                tone="violet"
+                                size="lg"
+                                className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-105"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+                                  <h3 className="min-w-0 line-clamp-2 text-15 font-bold leading-snug tracking-tight text-primary">{assessment.title}</h3>
+                                  <HpPill tone={meta.tone} dot={meta.dot} pulse={meta.pulse} icon={meta.icon} className="shrink-0">
+                                    {meta.label}
+                                  </HpPill>
+                                </div>
+                                <div className="mt-1.5">
+                                  <HpPill tone="indigo" size="sm">
+                                    {ASSESSMENT_TYPE_LABELS[assessment.assessment_type]}
+                                  </HpPill>
+                                </div>
+                              </div>
+                            </div>
+
+                            {assessment.description && (
+                              <p className="mt-3.5 line-clamp-2 text-13 leading-relaxed text-text-secondary">{assessment.description}</p>
+                            )}
+
+                            <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                              <ScMetric icon={ListChecks} label="Questions" value={assessment.assessment_questions_count} tone="indigo" />
+                              <ScMetric icon={Timer} label="Duration" value={`${assessment.duration_minutes} min`} tone="sky" />
+                              <ScMetric icon={Target} label="Pass at" value={`${assessment.pass_percentage}%`} tone="teal" />
+                              <ScMetric icon={Users} label="Taken" value={assessment.sessions_count} tone="violet" />
+                            </div>
+
+                            {assessment.status === "draft" && needsQuestions && (
+                              <ScNotice tone="amber" className="mt-3">
+                                Attach at least one question first — then you can publish.
+                              </ScNotice>
+                            )}
+                          </div>
+
+                          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+                            <HpButton
+                              variant={assessment.status === "draft" && needsQuestions ? "primary" : "secondary"}
+                              size="sm"
+                              leftIcon={<ListChecks className="h-3.5 w-3.5" />}
+                              onClick={() => setManaging(assessment)}
+                            >
+                              Manage Questions
+                            </HpButton>
+                            <div className="ml-auto flex items-center gap-1.5">
+                              {assessment.status === "draft" && (
+                                <HpButton
+                                  size="sm"
+                                  onClick={() => handlePublish(assessment)}
+                                  disabled={needsQuestions}
+                                  title={needsQuestions ? "Attach at least one question first" : undefined}
+                                  leftIcon={<Rocket className="h-3.5 w-3.5" />}
+                                >
+                                  Publish
+                                </HpButton>
+                              )}
+                              <ScIconButton icon={Trash2} label="Delete" tone="danger" onClick={() => handleDelete(assessment)} />
+                            </div>
+                          </div>
+                        </HpCard>
+                      </ScReveal>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
+          </HpItem>
+        </HpStagger>
+
+        {showCreate && (
+          <CreateSoftSkillAssessmentModal
+            variant="premium"
+            basePath={basePath}
+            onClose={() => setShowCreate(false)}
+            onCreated={() => {
+              setShowCreate(false);
+              load();
+              triggerToast("Draft created — now attach some questions.");
+            }}
+          />
+        )}
+
+        {managing && (
+          <ManageSoftSkillQuestionsModal
+            variant="premium"
+            basePath={basePath}
+            bankBasePath={bankBasePath}
+            assessmentSlug={managing.slug}
+            assessmentTitle={managing.title}
+            onClose={() => {
+              setManaging(null);
+              load();
+            }}
+            onToast={triggerToast}
+          />
+        )}
+      </DashboardShell>
+    );
+  }
 
   return (
     <DashboardShell

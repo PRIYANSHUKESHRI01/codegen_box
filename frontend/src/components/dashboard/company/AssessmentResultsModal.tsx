@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Trophy, Loader2, UserPlus, Lock } from "lucide-react";
+import { Trophy, UserPlus, Lock, Users, Target, GitBranch, CheckSquare } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { DRIVE_APPLICATION_STAGE_LABELS, type DriveApplicationStage } from "@/types/placement";
 import { Modal } from "@/components/ui/Modal";
+import { HpButton, HpPill, HpProgress, hpInput, type HpTone } from "@/components/portal/kit";
+import { ScCheckRow, ScInlineEmpty, ScMetric, ScNotice, ScSkeletonList } from "@/components/portal/screeningKit";
 
 interface AssessmentResultsModalProps {
   /** Contest::getRouteKeyName() is 'slug' — every /company/contests/{contest}/* route binds by slug, never the numeric id. */
@@ -23,6 +25,19 @@ interface ResultRow {
   penalty_minutes: number;
   pipeline_stage: DriveApplicationStage | null;
 }
+
+/** Bar tone for a score — emerald only for a genuinely strong result. */
+function scoreTone(pct: number): HpTone {
+  if (pct >= 70) return "emerald";
+  if (pct >= 40) return "indigo";
+  return "amber";
+}
+
+const RANK_STYLES: Record<number, string> = {
+  1: "bg-gradient-to-br from-amber-300 to-amber-500 text-white shadow-[0_4px_10px_-4px_rgba(245,158,11,0.8)]",
+  2: "bg-gradient-to-br from-slate-300 to-slate-500 text-white shadow-[0_4px_10px_-4px_rgba(100,116,139,0.8)]",
+  3: "bg-gradient-to-br from-orange-300 to-orange-600 text-white shadow-[0_4px_10px_-4px_rgba(234,88,12,0.7)]",
+};
 
 /**
  * Score-ranked results for an assessment, whoever the candidates are
@@ -98,98 +113,128 @@ export function AssessmentResultsModal({ contestSlug, contestTitle, onClose, onI
   };
 
   const showFooter = !loading && !loadError && results.length > 0;
+  const topScore = results.length > 0 ? Math.max(...results.map((r) => r.score_percent)) : 0;
+  const pipedCount = results.length - importable.length;
 
   return (
     <Modal
+      variant="premium"
       onClose={onClose}
-      title={`Results — ${contestTitle}`}
+      title="Results"
+      subtitle={contestTitle}
       icon={Trophy}
-      iconClassName="bg-teal-500/10 text-teal-500"
-      size="xl"
+      size="2xl"
       footer={
         showFooter ? (
           <>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={submitting}
-              className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors disabled:opacity-50"
-            >
+            <HpButton type="button" variant="secondary" onClick={onClose} disabled={submitting}>
               Close
-            </button>
-            <button
+            </HpButton>
+            <HpButton
               onClick={handleImport}
-              disabled={submitting || selected.size === 0}
-              className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              disabled={selected.size === 0}
+              isLoading={submitting}
+              leftIcon={<UserPlus className="h-4 w-4" />}
             >
-              {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserPlus className="w-3.5 h-3.5" />}
               <span>Add {selected.size > 0 ? `(${selected.size})` : ""} to Pipeline</span>
-            </button>
+            </HpButton>
           </>
         ) : undefined
       }
     >
       {loading ? (
-        <div className="py-8 flex items-center justify-center gap-2 text-xs text-text-muted">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading results...
-        </div>
+        <ScSkeletonList rows={5} />
       ) : loadError ? (
-        <p className="text-2xs text-status-danger">{loadError}</p>
+        <ScNotice tone="rose" title="Couldn't load results">
+          {loadError}
+        </ScNotice>
       ) : results.length === 0 ? (
-        <p className="text-xs text-text-muted text-center py-6">No one has submitted anything yet.</p>
+        <ScInlineEmpty
+          icon={Trophy}
+          tone="slate"
+          title="No submissions yet"
+          description="No one has submitted anything yet. Results appear here as soon as candidates start solving."
+        />
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center gap-2 text-xs">
-            <label className="font-semibold text-text-secondary shrink-0">Min score %</label>
-            <input
-              type="number"
-              min={0}
-              max={100}
-              value={minScorePercent}
-              onChange={(e) => setMinScorePercent(e.target.value)}
-              placeholder="e.g. 90"
-              className="w-24 px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500"
-            />
-            <span className="text-3xs text-text-muted">pre-selects matching, not-yet-piped candidates below</span>
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            <ScMetric icon={Users} label="Submitted" value={results.length} tone="indigo" />
+            <ScMetric icon={Target} label="Top score" value={`${topScore}%`} tone="emerald" />
+            <ScMetric icon={GitBranch} label="In pipeline" value={pipedCount} tone="teal" />
+            <ScMetric icon={CheckSquare} label="Selected" value={selected.size} tone="violet" />
           </div>
 
-          <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
-            {results.map((r) => {
+          <div className="flex flex-col gap-2.5 rounded-2xl border border-border-subtle bg-elevated/40 p-3.5 sm:flex-row sm:items-center sm:gap-3">
+            <label htmlFor="ar-min-score" className="shrink-0 text-xs font-semibold text-text-secondary">
+              Min score %
+            </label>
+            <div className="relative w-28 shrink-0">
+              <input
+                id="ar-min-score"
+                type="number"
+                min={0}
+                max={100}
+                value={minScorePercent}
+                onChange={(e) => setMinScorePercent(e.target.value)}
+                placeholder="e.g. 90"
+                className={cn(hpInput, "tabular h-9 py-0 pr-8")}
+              />
+              <span aria-hidden className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-2xs font-bold text-text-muted">
+                %
+              </span>
+            </div>
+            <span className="text-2xs leading-relaxed text-text-muted">pre-selects matching, not-yet-piped candidates below</span>
+          </div>
+
+          <div className="max-h-80 space-y-1.5 overflow-y-auto pr-1">
+            {results.map((r, i) => {
               const alreadyPiped = r.pipeline_stage !== null;
+              const rank = i + 1;
+              const stageLabel = alreadyPiped ? DRIVE_APPLICATION_STAGE_LABELS[r.pipeline_stage!] : null;
               return (
-                <label
+                <ScCheckRow
                   key={r.user_id}
-                  className={cn(
-                    "flex items-center gap-2.5 p-2.5 rounded-control border text-xs",
-                    alreadyPiped
-                      ? "bg-elevated/40 border-border-subtle opacity-60 cursor-not-allowed"
-                      : "bg-elevated/60 border-border-subtle cursor-pointer hover:bg-elevated"
-                  )}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selected.has(r.user_id)}
-                    onChange={() => toggle(r.user_id)}
-                    disabled={alreadyPiped}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-primary truncate">{r.user.name}</span>
-                    <span className="block text-3xs text-text-muted truncate">{r.user.email}</span>
-                  </span>
-                  <span className="font-mono font-bold text-primary shrink-0">{r.score_percent}%</span>
-                  {alreadyPiped ? (
-                    <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-3xs font-bold uppercase bg-elevated text-text-muted border border-border-subtle shrink-0">
-                      <Lock className="w-2.5 h-2.5" />
-                      {DRIVE_APPLICATION_STAGE_LABELS[r.pipeline_stage!]}
+                  name={r.user.name}
+                  checked={selected.has(r.user_id)}
+                  onChange={() => toggle(r.user_id)}
+                  disabled={alreadyPiped}
+                  detail={
+                    <>
+                      {r.user.email}
+                      {r.penalty_minutes > 0 && <span className="tabular"> · +{r.penalty_minutes}m penalty</span>}
+                      {stageLabel && <span className="sm:hidden"> · {stageLabel}</span>}
+                    </>
+                  }
+                  leading={
+                    <span
+                      className={cn(
+                        "tabular flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-3xs font-extrabold",
+                        RANK_STYLES[rank] ?? "bg-elevated text-text-muted"
+                      )}
+                    >
+                      <span className="sr-only">Rank </span>
+                      {rank}
                     </span>
-                  ) : null}
-                </label>
+                  }
+                  trailing={
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <div className="hidden w-20 sm:block">
+                        <HpProgress value={r.score_percent} tone={scoreTone(r.score_percent)} />
+                      </div>
+                      <span className="tabular w-11 text-right text-13 font-extrabold text-primary">{r.score_percent}%</span>
+                      {stageLabel && (
+                        <HpPill tone="slate" icon={Lock} size="sm" className="hidden sm:inline-flex">
+                          {stageLabel}
+                        </HpPill>
+                      )}
+                    </div>
+                  }
+                />
               );
             })}
           </div>
 
-          {submitError && <p className="text-2xs text-status-danger">{submitError}</p>}
+          {submitError && <ScNotice tone="rose">{submitError}</ScNotice>}
         </div>
       )}
     </Modal>

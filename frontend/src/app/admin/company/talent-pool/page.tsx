@@ -1,10 +1,10 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import {
   Award,
-  Search,
   Loader2,
   GraduationCap,
   Star,
@@ -19,6 +19,24 @@ import {
   FileText,
   Download,
   Gauge,
+  AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
+  BookOpen,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Handshake,
+  IndianRupee,
+  SearchX,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Trophy,
+  Users,
+  X,
+  XCircle,
+  type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -26,6 +44,32 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import { Modal } from "@/components/ui/Modal";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import {
+  HP_TONES,
+  HpAvatar,
+  HpButton,
+  HpCard,
+  HpCompanyLogo,
+  HpEmptyState,
+  HpIconTile,
+  HpItem,
+  HpPill,
+  HpProgress,
+  HpRing,
+  HpSearch,
+  HpSectionHeader,
+  HpSkeleton,
+  HpSkeletonRows,
+  HpStagger,
+  HpTabs,
+  HpToast,
+  hpBtn,
+  hpEase,
+  hpInput,
+  hpLabel,
+  type HpTone,
+} from "@/components/portal/kit";
 
 interface CollegeOption {
   id: number;
@@ -116,15 +160,46 @@ const STATUS_LABEL: Record<string, string> = {
   withdrawn: "Withdrawn",
 };
 
-const STATUS_BADGE: Record<string, string> = {
-  interested: "bg-accent-secondary/15 text-accent-secondary",
-  interview_scheduled: "bg-status-warning/15 text-status-warning",
-  interview_completed: "bg-sky-500/15 text-sky-400",
-  hired: "bg-status-success/15 text-status-success",
-  declined_by_company: "bg-elevated text-text-muted",
-  declined_by_candidate: "bg-status-danger/15 text-status-danger",
-  withdrawn: "bg-elevated text-text-muted",
+/** Engagement status → pill tone. Amber = needs attention (an interview on the calendar), emerald = the one positive outcome, rose = the candidate said no. */
+const STATUS_TONE: Record<string, HpTone> = {
+  interested: "violet",
+  interview_scheduled: "amber",
+  interview_completed: "sky",
+  hired: "emerald",
+  declined_by_company: "slate",
+  declined_by_candidate: "rose",
+  withdrawn: "slate",
 };
+
+/** Quick presets for the min-score filter — they write the same `minScore` value the number field does. */
+const SCORE_PRESETS = [
+  { value: "", label: "Any" },
+  { value: "80", label: "80+" },
+  { value: "90", label: "90+" },
+  { value: "95", label: "95+" },
+];
+
+type ToastTone = "emerald" | "rose";
+
+/** Hairline dividers for the 2×2 (mobile) → 1×4 (sm+) engagement strip. */
+const STRIP_CELL_BORDERS = ["border-b border-r sm:border-b-0", "border-b sm:border-b-0 sm:border-r", "border-r", ""] as const;
+
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const fmtDateTime = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+/** Score → ring tone: teal (hiring identity) for the strongest scores, indigo for solid, slate below. */
+function scoreTone(score: number): HpTone {
+  if (score >= 90) return "teal";
+  if (score >= 75) return "indigo";
+  return "slate";
+}
+
+/** Cursor spotlight for a <button> styled as an hp-card (HpCard itself is a div). */
+function trackSpotlight(e: MouseEvent<HTMLElement>) {
+  const r = e.currentTarget.getBoundingClientRect();
+  e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
+  e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
+}
 
 /**
  * A hiring partner's window into the shared Talent Pool — candidates Mellow
@@ -138,9 +213,11 @@ export default function CompanyTalentPoolPage() {
   const { status } = useAuthGuard(["admin_company"]);
   const [tab, setTab] = useState<"browse" | "engagements">("browse");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<ToastTone>("emerald");
   const [viewingCandidateId, setViewingCandidateId] = useState<number | null>(null);
 
-  const triggerToast = (msg: string) => {
+  const triggerToast = (msg: string, tone: ToastTone = "emerald") => {
+    setToastTone(tone);
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
@@ -153,42 +230,62 @@ export default function CompanyTalentPoolPage() {
       title="Talent Pool"
       subtitle="Candidates Mellow already tested and scored — browse, express interest, schedule an HR interview, or hire directly."
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-teal-500/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
+      <MotionConfig reducedMotion="user">
+        <HpToast message={toastMessage} tone={toastTone} />
 
-      <div className="flex items-center gap-1 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
-        {(["browse", "engagements"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={cn("px-4 py-1.5 rounded-control text-xs font-bold transition-colors", tab === t ? "bg-teal-500 text-white shadow-subtle" : "text-text-muted hover:text-primary")}
-          >
-            {t === "browse" ? "Browse Candidates" : "My Engagements"}
-          </button>
-        ))}
-      </div>
+        <HpStagger className="space-y-6">
+          <HpItem>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <HpTabs
+                tabs={[
+                  { id: "browse", label: "Browse Candidates", icon: Users },
+                  { id: "engagements", label: "My Engagements", icon: Handshake },
+                ]}
+                value={tab}
+                onChange={setTab}
+                className="self-start"
+              />
+              <p className="flex items-center gap-2 text-2xs text-text-muted">
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-600 dark:text-teal-300" />
+                Contact details stay private — every touchpoint goes through Mellow.
+              </p>
+            </div>
+          </HpItem>
 
-      {tab === "browse" ? (
-        <BrowseTab onToast={triggerToast} onView={(id) => setViewingCandidateId(id)} />
-      ) : (
-        <EngagementsTab onView={(id) => setViewingCandidateId(id)} />
-      )}
+          <HpItem>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={tab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.22, ease: hpEase }}
+              >
+                {tab === "browse" ? (
+                  <BrowseTab onToast={triggerToast} onView={(id) => setViewingCandidateId(id)} />
+                ) : (
+                  <EngagementsTab onView={(id) => setViewingCandidateId(id)} onBrowse={() => setTab("browse")} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </HpItem>
+        </HpStagger>
 
-      {viewingCandidateId !== null && (
-        <CandidateProfileModal
-          candidateId={viewingCandidateId}
-          onClose={() => setViewingCandidateId(null)}
-          onToast={triggerToast}
-        />
-      )}
+        {viewingCandidateId !== null && (
+          <CandidateProfileModal
+            candidateId={viewingCandidateId}
+            onClose={() => setViewingCandidateId(null)}
+            onToast={triggerToast}
+          />
+        )}
+      </MotionConfig>
     </DashboardShell>
   );
 }
 
-function BrowseTab({ onToast, onView }: { onToast: (msg: string) => void; onView: (id: number) => void }) {
+/* ── Browse ─────────────────────────────────────────────────────────────── */
+
+function BrowseTab({ onToast, onView }: { onToast: (msg: string, tone?: ToastTone) => void; onView: (id: number) => void }) {
   const [result, setResult] = useState<Paginated<TalentPoolCandidateCard> | null>(null);
   const [colleges, setColleges] = useState<CollegeOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -212,7 +309,7 @@ function BrowseTab({ onToast, onView }: { onToast: (msg: string) => void; onView
       const res = await api.get<{ candidates: Paginated<TalentPoolCandidateCard> }>(`/company/talent-pool?${params.toString()}`);
       setResult(res.candidates);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load the Talent Pool.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load the Talent Pool.", "rose");
     } finally {
       setLoading(false);
     }
@@ -224,101 +321,341 @@ function BrowseTab({ onToast, onView }: { onToast: (msg: string) => void; onView
     return () => clearTimeout(t);
   }, [load]);
 
+  const hasFilters = !!(search || minScore || collegeId);
+  const clearFilters = () => {
+    setPage(1);
+    setSearch("");
+    setMinScore("");
+    setCollegeId("");
+  };
+  const hasCards = !!result && result.data.length > 0;
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="w-3.5 h-3.5 text-text-muted absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input value={search} onChange={(e) => { setPage(1); setSearch(e.target.value); }} placeholder="Search by name or skill..." className="w-full pl-8 pr-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-teal-500" />
+    <div className="space-y-5">
+      {/* Filter bar */}
+      <HpCard spotlight={false} className="p-3 sm:p-4">
+        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+          <HpSearch
+            value={search}
+            onChange={(e) => { setPage(1); setSearch(e.target.value); }}
+            placeholder="Search by name or skill..."
+            aria-label="Search candidates by name or skill"
+            wrapperClassName="min-w-0 flex-1"
+            className="text-[13px]"
+          />
+          <div className="grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-[minmax(0,1fr)_9.5rem] lg:flex lg:items-center">
+            <label className="group relative block lg:w-64">
+              <span className="sr-only">Filter by college</span>
+              <GraduationCap className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-indigo-500" />
+              <select
+                value={collegeId}
+                onChange={(e) => { setPage(1); setCollegeId(e.target.value); }}
+                className={cn(hpInput, "h-10 cursor-pointer appearance-none truncate py-0 pl-10 pr-9 text-[13px]")}
+              >
+                <option value="">All Colleges</option>
+                {colleges.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            </label>
+            <label className="group relative block lg:w-40">
+              <span className="sr-only">Minimum score percent</span>
+              <Gauge className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-indigo-500" />
+              <input
+                type="number"
+                min={1}
+                max={100}
+                value={minScore}
+                onChange={(e) => { setPage(1); setMinScore(e.target.value); }}
+                placeholder="Min score"
+                className={cn(hpInput, "tabular h-10 py-0 pl-10 pr-8 text-[13px]")}
+              />
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-text-muted">%</span>
+            </label>
+          </div>
         </div>
-        <input type="number" min={1} max={100} value={minScore} onChange={(e) => { setPage(1); setMinScore(e.target.value); }} placeholder="Min score %" className="w-28 px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-teal-500" />
-        <select value={collegeId} onChange={(e) => { setPage(1); setCollegeId(e.target.value); }} className="px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs outline-none focus:border-teal-500">
-          <option value="">All Colleges</option>
-          {colleges.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
+          <span className="mr-1 flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+            <SlidersHorizontal className="h-3 w-3" />
+            Score
+          </span>
+          {SCORE_PRESETS.map((p) => {
+            const active = minScore === p.value;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                aria-pressed={active}
+                onClick={() => { setPage(1); setMinScore(p.value); }}
+                className={cn(
+                  "tabular rounded-full px-3 py-1 text-2xs font-semibold ring-1 ring-inset transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
+                  active
+                    ? "bg-indigo-500/10 text-indigo-700 ring-indigo-500/30 shadow-[0_4px_12px_-6px_rgba(99,102,241,0.6)] dark:text-indigo-300"
+                    : "text-text-muted ring-border-subtle hover:bg-elevated hover:text-primary hover:ring-border-strong"
+                )}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+          <AnimatePresence>
+            {hasFilters && (
+              <motion.button
+                type="button"
+                onClick={clearFilters}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2, ease: hpEase }}
+                className="ml-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-2xs font-semibold text-text-muted transition-colors hover:bg-rose-500/10 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-rose-300"
+              >
+                <X className="h-3 w-3" />
+                Clear filters
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+      </HpCard>
+
+      {/* Result meta */}
+      <div className="flex min-h-[20px] flex-wrap items-center justify-between gap-2 px-1" aria-live="polite">
+        <p className="text-xs text-text-muted">
+          {result ? (
+            <>
+              <span className="tabular font-bold text-primary">{result.total}</span>{" "}
+              {result.total === 1 ? "candidate" : "candidates"}
+              {hasFilters ? " match your filters" : " in the pool"}
+            </>
+          ) : loading ? (
+            "Searching the pool…"
+          ) : null}
+        </p>
+        {loading && result ? (
+          <span className="inline-flex items-center gap-1.5 text-2xs font-semibold text-indigo-600 dark:text-indigo-300">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Updating
+          </span>
+        ) : result && result.last_page > 1 ? (
+          <span className="tabular text-2xs text-text-muted">
+            Page {result.current_page} of {result.last_page}
+          </span>
+        ) : null}
       </div>
 
-      {loading ? (
-        <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading candidates...
-        </div>
-      ) : !result || result.data.length === 0 ? (
-        <div className="p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          No candidates match these filters yet.
-        </div>
+      {/* Results */}
+      {loading && !hasCards ? (
+        <CandidateGridSkeleton />
+      ) : !hasCards ? (
+        <HpEmptyState
+          icon={SearchX}
+          tone="teal"
+          title="No candidates match these filters yet"
+          description={
+            hasFilters
+              ? "Try a lower score threshold, a different college, or a broader search term."
+              : "New candidates join the pool as they qualify on Mellow assessments — check back soon."
+          }
+          action={
+            hasFilters ? (
+              <HpButton variant="secondary" size="sm" onClick={clearFilters} leftIcon={<X className="h-3.5 w-3.5" />}>
+                Clear filters
+              </HpButton>
+            ) : undefined
+          }
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {result.data.map((c) => (
-            <button key={c.id} onClick={() => onView(c.id)} className="text-left p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-teal-500/50 transition-colors">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-primary truncate">{c.user?.name ?? "Candidate"}</div>
-                  <div className="text-2xs text-text-muted mt-0.5 flex items-center gap-1">
-                    <GraduationCap className="w-3 h-3" />
-                    {c.user?.college?.name ?? "Mellow Direct"}
-                  </div>
-                </div>
-                <span className="px-2 py-1 rounded-control bg-status-success/15 text-status-success text-2xs font-bold shrink-0">{c.score_percent}%</span>
-              </div>
-              <div className="mt-3 flex items-center gap-2 text-[10.5px] text-text-muted flex-wrap">
-                {c.user?.branch && <span className="px-1.5 py-0.5 rounded bg-elevated">{c.user.branch}</span>}
-                {c.user && c.user.rated_contests_count > 0 && (
-                  <span className="px-1.5 py-0.5 rounded bg-elevated flex items-center gap-1">
-                    <Star className="w-2.5 h-2.5" />
-                    {c.user.current_rating}
-                  </span>
-                )}
-                {c.user && c.user.profile_completion_percent > 0 && (
-                  <span
-                    className={cn(
-                      "px-1.5 py-0.5 rounded flex items-center gap-1 font-bold",
-                      c.user.profile_completion_percent >= 100
-                        ? "bg-status-success/15 text-status-success"
-                        : "bg-elevated text-text-muted"
-                    )}
-                  >
-                    <Gauge className="w-2.5 h-2.5" />
-                    {c.user.profile_completion_percent}%
-                  </span>
-                )}
-              </div>
-              {c.user?.skills && c.user.skills.length > 0 && (
-                <div className="mt-1.5 flex items-center gap-1 flex-wrap">
-                  {c.user.skills.slice(0, 3).map((skill) => (
-                    <span key={skill} className="px-1.5 py-0.5 rounded bg-teal-500/10 text-teal-600 text-3xs font-semibold">
-                      {skill}
-                    </span>
-                  ))}
-                  {c.user.skills.length > 3 && (
-                    <span className="text-3xs text-text-muted">+{c.user.skills.length - 3} more</span>
-                  )}
-                </div>
-              )}
-              {c.my_inquiry_status && (
-                <div className={cn("mt-3 px-2 py-1 rounded text-3xs font-bold w-fit", STATUS_BADGE[c.my_inquiry_status] ?? "bg-elevated text-text-muted")}>
-                  {STATUS_LABEL[c.my_inquiry_status] ?? c.my_inquiry_status}
-                </div>
-              )}
-            </button>
+        <div
+          aria-busy={loading}
+          className={cn(
+            "grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4 transition-opacity duration-300",
+            loading && "pointer-events-none opacity-55"
+          )}
+        >
+          {result!.data.map((c, i) => (
+            <CandidateCard key={c.id} candidate={c} index={i} onView={onView} />
           ))}
         </div>
       )}
 
       {result && result.last_page > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="px-3 py-1.5 rounded-control border border-border-subtle text-xs text-text-secondary disabled:opacity-40">Prev</button>
-          <span className="text-xs text-text-muted">Page {result.current_page} of {result.last_page}</span>
-          <button disabled={page >= result.last_page} onClick={() => setPage((p) => p + 1)} className="px-3 py-1.5 rounded-control border border-border-subtle text-xs text-text-secondary disabled:opacity-40">Next</button>
-        </div>
+        <nav aria-label="Pagination" className="flex items-center justify-center gap-3 pt-1">
+          <HpButton
+            variant="secondary"
+            size="sm"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            leftIcon={<ChevronLeft className="h-4 w-4" />}
+          >
+            Prev
+          </HpButton>
+          <span className="tabular text-xs text-text-muted">
+            Page <span className="font-bold text-primary">{result.current_page}</span> of {result.last_page}
+          </span>
+          <HpButton
+            variant="secondary"
+            size="sm"
+            disabled={page >= result.last_page}
+            onClick={() => setPage((p) => p + 1)}
+            rightIcon={<ChevronRight className="h-4 w-4" />}
+          >
+            Next
+          </HpButton>
+        </nav>
       )}
     </div>
   );
 }
 
-function EngagementsTab({ onView }: { onView: (id: number) => void }) {
+function CandidateCard({ candidate: c, index, onView }: { candidate: TalentPoolCandidateCard; index: number; onView: (id: number) => void }) {
+  const u = c.user;
+  const name = u?.name ?? "Candidate";
+  const score = Number(c.score_percent);
+  const skills = u?.skills ?? [];
+  const completion = u?.profile_completion_percent ?? 0;
+  const rated = !!u && u.rated_contests_count > 0;
+  const meta = [u?.branch, u?.cgpa ? `CGPA ${u.cgpa}` : null].filter(Boolean).join(" · ");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: hpEase, delay: Math.min(index, 9) * 0.04 }}
+      className="h-full"
+    >
+      <button
+        type="button"
+        onClick={() => onView(c.id)}
+        onMouseMove={trackSpotlight}
+        className="hp-card hp-spot hp-card-hover group relative flex h-full w-full flex-col rounded-[20px] p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg-surface-rgb))]"
+      >
+        {/* hover hairline */}
+        <span aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+        <div className="relative flex items-start gap-3.5">
+          <HpAvatar name={name} size="lg" />
+          <div className="min-w-0 flex-1 pt-0.5">
+            <div className="truncate text-[15px] font-bold tracking-tight text-primary transition-colors duration-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-300">
+              {name}
+            </div>
+            <div className="tabular mt-0.5 truncate text-2xs text-text-muted">{meta || `Qualified ${fmtDate(c.qualified_at)}`}</div>
+          </div>
+          <div className="shrink-0" title={`Assessment score ${c.score_percent}%`}>
+            <HpRing value={score} size={54} stroke={5} tone={scoreTone(score)}>
+              <span className="tabular text-xs font-extrabold text-primary">
+                <span className="sr-only">Score </span>
+                {Math.round(score)}
+                <span className="text-3xs font-bold text-text-muted">%</span>
+              </span>
+            </HpRing>
+          </div>
+        </div>
+
+        <div className="relative mt-4 flex items-center gap-2.5 rounded-xl bg-elevated/60 px-2.5 py-2 ring-1 ring-inset ring-border-subtle">
+          <CollegeMark name={u?.college?.name ?? null} />
+          <span className="min-w-0 flex-1 truncate text-xs font-semibold text-text-secondary">{u?.college?.name ?? "Mellow Direct"}</span>
+          {u?.college?.short_code && (
+            <span className="shrink-0 text-3xs font-bold uppercase tracking-wider text-text-muted">{u.college.short_code}</span>
+          )}
+        </div>
+
+        {skills.length > 0 && (
+          <div className="relative mt-3 flex flex-wrap items-center gap-1.5">
+            {skills.slice(0, 3).map((skill) => (
+              <HpPill key={skill} tone="teal" size="sm">
+                {skill}
+              </HpPill>
+            ))}
+            {skills.length > 3 && (
+              <span className="rounded-full bg-elevated px-2 py-0.5 text-3xs font-semibold text-text-muted">+{skills.length - 3} more</span>
+            )}
+          </div>
+        )}
+
+        <div className="relative mt-auto grid grid-cols-2 gap-2 pt-4">
+          <div className="rounded-xl bg-elevated/60 px-3 py-2 ring-1 ring-inset ring-border-subtle">
+            <div className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">Rating</div>
+            <div className="mt-0.5 flex items-center gap-1 text-[13px] font-bold text-primary">
+              {rated ? (
+                <>
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  <span className="tabular">{u!.current_rating}</span>
+                </>
+              ) : (
+                <span className="font-semibold text-text-muted">Unrated</span>
+              )}
+            </div>
+          </div>
+          <div className="rounded-xl bg-elevated/60 px-3 py-2 ring-1 ring-inset ring-border-subtle">
+            <div className="flex items-center justify-between text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+              <span>Profile</span>
+              <span className="tabular text-text-secondary">{completion}%</span>
+            </div>
+            <HpProgress value={completion} tone={completion >= 100 ? "emerald" : "teal"} className="mt-2" />
+          </div>
+        </div>
+
+        <div className="relative mt-4 flex items-center justify-between gap-2 border-t border-border-subtle pt-3.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            {c.my_inquiry_status ? (
+              <StatusPill status={c.my_inquiry_status} size="sm" />
+            ) : (
+              <span className="truncate text-2xs text-text-muted">Qualified {fmtDate(c.qualified_at)}</span>
+            )}
+            {u?.has_resume && (
+              <span title="Resume on file" className="inline-flex shrink-0 items-center gap-1 rounded-full bg-elevated px-1.5 py-0.5 text-3xs font-semibold text-text-muted">
+                <FileText className="h-3 w-3" />
+                CV
+              </span>
+            )}
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-0.5 text-2xs font-bold text-indigo-600 transition-[gap] duration-300 group-hover:gap-1.5 dark:text-indigo-300">
+            View profile
+            <ArrowUpRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:-translate-y-px group-hover:translate-x-px" />
+          </span>
+        </div>
+      </button>
+    </motion.div>
+  );
+}
+
+function CandidateGridSkeleton() {
+  return (
+    <div role="status" aria-label="Loading candidates" className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,18rem),1fr))] gap-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <HpCard key={i} spotlight={false} className="p-5">
+          <div className="flex items-start gap-3.5">
+            <HpSkeleton className="h-12 w-12 rounded-full" />
+            <div className="flex-1 space-y-2 pt-1">
+              <HpSkeleton className="h-3.5 w-3/5" />
+              <HpSkeleton className="h-3 w-2/5" />
+            </div>
+            <HpSkeleton className="h-[54px] w-[54px] rounded-full" />
+          </div>
+          <HpSkeleton className="mt-4 h-10 w-full rounded-xl" />
+          <div className="mt-3 flex gap-1.5">
+            <HpSkeleton className="h-5 w-14 rounded-full" />
+            <HpSkeleton className="h-5 w-16 rounded-full" />
+            <HpSkeleton className="h-5 w-12 rounded-full" />
+          </div>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <HpSkeleton className="h-[52px] rounded-xl" />
+            <HpSkeleton className="h-[52px] rounded-xl" />
+          </div>
+          <div className="mt-4 flex items-center justify-between border-t border-border-subtle pt-3.5">
+            <HpSkeleton className="h-5 w-24 rounded-full" />
+            <HpSkeleton className="h-3.5 w-20" />
+          </div>
+        </HpCard>
+      ))}
+    </div>
+  );
+}
+
+/* ── Engagements ────────────────────────────────────────────────────────── */
+
+function EngagementsTab({ onView, onBrowse }: { onView: (id: number) => void; onBrowse?: () => void }) {
   const [inquiries, setInquiries] = useState<(Inquiry & { candidate: TalentPoolCandidateCard })[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -329,46 +666,242 @@ function EngagementsTab({ onView }: { onView: (id: number) => void }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const counts = useMemo(() => {
+    const by = (statuses: string[]) => inquiries.filter((i) => statuses.includes(i.status)).length;
+    return {
+      active: by(["interested", "interview_scheduled", "interview_completed"]),
+      interviews: by(["interview_scheduled"]),
+      hired: by(["hired"]),
+      closed: by(["declined_by_company", "declined_by_candidate", "withdrawn"]),
+    };
+  }, [inquiries]);
+
   if (loading) {
     return (
-      <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-        <Loader2 className="w-4 h-4 animate-spin" />
-        Loading...
+      <div className="space-y-5">
+        <HpCard spotlight={false} className="grid grid-cols-2 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-4 sm:p-5">
+              <HpSkeleton className="h-8 w-8 rounded-[10px]" />
+              <div className="space-y-1.5">
+                <HpSkeleton className="h-5 w-8" />
+                <HpSkeleton className="h-2.5 w-14" />
+              </div>
+            </div>
+          ))}
+        </HpCard>
+        <HpSkeletonRows rows={5} />
       </div>
     );
   }
 
   if (inquiries.length === 0) {
     return (
-      <div className="p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-        No engagements yet — express interest in a candidate from the Browse tab to start one.
-      </div>
+      <HpEmptyState
+        icon={Handshake}
+        tone="violet"
+        title="No engagements yet"
+        description="Express interest in a candidate from the Browse tab to start one — every conversation, interview and hire you start shows up here."
+        action={
+          onBrowse ? (
+            <HpButton variant="primary" size="sm" onClick={onBrowse} leftIcon={<Users className="h-3.5 w-3.5" />}>
+              Browse candidates
+            </HpButton>
+          ) : undefined
+        }
+      />
     );
   }
 
   return (
-    <div className="space-y-3">
-      {inquiries.map((inq) => (
-        <button key={inq.id} onClick={() => onView(inq.candidate.id)} className="w-full text-left p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex items-center justify-between gap-4 flex-wrap hover:border-teal-500/40 transition-colors">
-          <div className="min-w-0">
-            <div className="text-sm font-bold text-primary">{inq.candidate.user?.name ?? "Candidate"}</div>
-            <div className="text-2xs text-text-muted mt-0.5">
-              {inq.candidate.user?.college?.name ?? "Mellow Direct"} · {inq.candidate.score_percent}%
-              {inq.interview_scheduled_at && (
-                <> · HR interview {new Date(inq.interview_scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</>
-              )}
+    <div className="space-y-5">
+      {/* Pipeline strip — straight counts of the engagements listed below. */}
+      <HpCard spotlight={false} className="grid grid-cols-2 overflow-hidden sm:grid-cols-4">
+        {(
+          [
+            { label: "Active", title: "Interested, interview scheduled or completed", value: counts.active, icon: Handshake, tone: "violet" },
+            { label: "Interviews", title: "HR interviews currently scheduled", value: counts.interviews, icon: CalendarClock, tone: "amber" },
+            { label: "Hired", title: "Hired through the Talent Pool", value: counts.hired, icon: Trophy, tone: "emerald" },
+            { label: "Closed", title: "Declined or withdrawn", value: counts.closed, icon: XCircle, tone: "slate" },
+          ] as const
+        ).map((s, i) => (
+          <div
+            key={s.label}
+            title={s.title}
+            className={cn("group flex items-center gap-3 border-border-subtle p-4 transition-colors duration-200 hover:bg-elevated/40 sm:p-5", STRIP_CELL_BORDERS[i])}
+          >
+            <HpIconTile icon={s.icon} tone={s.tone} size="sm" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+            <div className="min-w-0">
+              <div className="tabular text-xl font-extrabold leading-none tracking-tight text-primary">
+                <AnimatedCounter target={s.value} />
+              </div>
+              <div className="mt-1 truncate text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">{s.label}</div>
             </div>
           </div>
-          <span className={cn("px-2 py-1 rounded-control text-2xs font-bold shrink-0", STATUS_BADGE[inq.status] ?? "bg-elevated text-text-muted")}>
-            {STATUS_LABEL[inq.status] ?? inq.status}
-          </span>
-        </button>
-      ))}
+        ))}
+      </HpCard>
+
+      <HpCard spotlight={false} className="overflow-hidden">
+        <div className="border-b border-border-subtle px-4 py-4 sm:px-5">
+          <HpSectionHeader
+            title="Engagements"
+            subtitle={`${inquiries.length} ${inquiries.length === 1 ? "candidate" : "candidates"} you've engaged through the Talent Pool`}
+            icon={Handshake}
+            tone="violet"
+          />
+        </div>
+        <ul className="divide-y divide-border-subtle">
+          {inquiries.map((inq, i) => {
+            const name = inq.candidate.user?.name ?? "Candidate";
+            return (
+              <motion.li
+                key={inq.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: hpEase, delay: Math.min(i, 10) * 0.03 }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onView(inq.candidate.id)}
+                  className="group flex w-full items-center gap-3.5 px-4 py-3.5 text-left transition-colors duration-200 hover:bg-indigo-500/[0.04] focus-visible:bg-indigo-500/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500 sm:px-5"
+                >
+                  <HpAvatar name={name} size="md" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-bold text-primary transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300">{name}</div>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-2xs text-text-muted">
+                      <span className="inline-flex min-w-0 items-center gap-1">
+                        <GraduationCap className="h-3 w-3 shrink-0" />
+                        <span className="truncate">{inq.candidate.user?.college?.name ?? "Mellow Direct"}</span>
+                      </span>
+                      <span className="tabular">{inq.candidate.score_percent}% score</span>
+                      {inq.interview_scheduled_at && (
+                        <span className="tabular inline-flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-300">
+                          <CalendarClock className="h-3 w-3" />
+                          HR interview {fmtDateTime(inq.interview_scheduled_at)}
+                        </span>
+                      )}
+                      {inq.ctc_offered && (
+                        <span className="tabular inline-flex items-center gap-0.5 font-semibold text-text-secondary">
+                          <IndianRupee className="h-3 w-3" />
+                          {Number(inq.ctc_offered).toLocaleString("en-IN")}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-2 sm:hidden">
+                      <StatusPill status={inq.status} size="sm" />
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <span className="hidden sm:inline-flex">
+                      <StatusPill status={inq.status} />
+                    </span>
+                    <ChevronRight className="h-4 w-4 text-text-muted transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-indigo-500" />
+                  </div>
+                </button>
+              </motion.li>
+            );
+          })}
+        </ul>
+      </HpCard>
     </div>
   );
 }
 
-function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId: number; onClose: () => void; onToast: (msg: string) => void }) {
+/* ── Shared bits ────────────────────────────────────────────────────────── */
+
+function StatusPill({ status, size = "md" }: { status: string; size?: "sm" | "md" }) {
+  return (
+    <HpPill tone={STATUS_TONE[status] ?? "slate"} dot pulse={status === "interview_scheduled"} size={size}>
+      {STATUS_LABEL[status] ?? status}
+    </HpPill>
+  );
+}
+
+/** Small college identity tile — a deterministic monogram, or a teal "Mellow" mark for candidates with no college. */
+function CollegeMark({ name }: { name: string | null }) {
+  if (!name) {
+    return (
+      <span
+        className="relative inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[7px] bg-gradient-to-br from-teal-400 to-cyan-600 text-white ring-1 ring-inset ring-white/25"
+        aria-hidden
+      >
+        <Sparkles className="h-3 w-3" strokeWidth={2.4} />
+      </span>
+    );
+  }
+  return <HpCompanyLogo name={name} size="sm" className="h-6 w-6 rounded-[7px] text-[16px] shadow-none" />;
+}
+
+function FormError({ message }: { message: string | null }) {
+  return (
+    <AnimatePresence>
+      {message && (
+        <motion.div
+          role="alert"
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.2, ease: hpEase }}
+          className="flex items-start gap-2.5 rounded-xl bg-rose-500/[0.08] px-3.5 py-2.5 text-2xs font-medium text-rose-700 ring-1 ring-inset ring-rose-500/20 dark:text-rose-300"
+        >
+          <AlertCircle className="mt-px h-4 w-4 shrink-0" />
+          <span className="leading-relaxed">{message}</span>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function ProfileStat({
+  icon: Icon,
+  label,
+  value,
+  tone = "indigo",
+  children,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: ReactNode;
+  tone?: HpTone;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] p-3.5 shadow-[var(--hp-edge)] transition-colors duration-200 hover:border-indigo-500/25">
+      <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+        <Icon className={cn("h-3.5 w-3.5 shrink-0", HP_TONES[tone].text)} />
+        <span className="truncate">{label}</span>
+      </div>
+      <div className="tabular mt-1.5 break-words text-sm font-bold leading-snug text-primary">{value}</div>
+      {children}
+    </div>
+  );
+}
+
+function ProfileSkeleton() {
+  return (
+    <div className="space-y-5" role="status" aria-label="Loading profile">
+      <div className="flex items-center gap-4 rounded-[20px] border border-border-subtle p-5">
+        <HpSkeleton className="h-16 w-16 rounded-full" />
+        <div className="flex-1 space-y-2.5">
+          <HpSkeleton className="h-5 w-1/2" />
+          <HpSkeleton className="h-3.5 w-2/3" />
+        </div>
+        <HpSkeleton className="h-[84px] w-[84px] rounded-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <HpSkeleton key={i} className="h-[72px] rounded-2xl" />
+        ))}
+      </div>
+      <HpSkeleton className="h-28 w-full rounded-[20px]" />
+      <HpSkeleton className="h-12 w-full rounded-2xl" />
+    </div>
+  );
+}
+
+/* ── Profile modal ──────────────────────────────────────────────────────── */
+
+function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId: number; onClose: () => void; onToast: (msg: string, tone?: ToastTone) => void }) {
   const [detail, setDetail] = useState<{ candidate: TalentPoolCandidateDetail; readiness_score: number | null; display_rating: string | null; inquiry: Inquiry | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -383,7 +916,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       const res = await api.get<typeof detail>(`/company/talent-pool/${candidateId}`);
       setDetail(res);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load candidate profile.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load candidate profile.", "rose");
       onClose();
     } finally {
       setLoading(false);
@@ -402,7 +935,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       onToast("Marked interest — the candidate has been notified.");
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to express interest.");
+      onToast(err instanceof ApiError ? err.message : "Failed to express interest.", "rose");
     } finally {
       setBusy(false);
     }
@@ -421,7 +954,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to download resume.");
+      onToast(err instanceof ApiError ? err.message : "Failed to download resume.", "rose");
     } finally {
       setDownloadingResume(false);
     }
@@ -430,174 +963,225 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
   const inquiry = detail?.inquiry;
   const isTerminal = inquiry && ["hired", "declined_by_company", "declined_by_candidate", "withdrawn"].includes(inquiry.status);
 
+  const user = detail?.candidate.user;
+  const score = detail ? Number(detail.candidate.score_percent) : 0;
+  const completion = user?.profile_completion_percent ?? 0;
+  const location = [user?.college?.city, user?.college?.state].filter(Boolean).join(", ");
+
+  const footer =
+    !loading && detail && !isTerminal ? (
+      <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        <HpButton variant="ghost" size="sm" className="h-9 px-3.5" onClick={() => setShowMessageForm(true)} leftIcon={<Send className="h-3.5 w-3.5" />}>
+          Send Message
+        </HpButton>
+        <HpButton variant="secondary" size="sm" className="h-9 px-3.5" onClick={() => setShowInterviewForm(true)} leftIcon={<CalendarClock className="h-3.5 w-3.5" />}>
+          Schedule HR Interview
+        </HpButton>
+        <HpButton variant="success" size="sm" className="h-9 px-3.5" onClick={() => setShowHireForm(true)} leftIcon={<Briefcase className="h-3.5 w-3.5" />}>
+          Hire
+        </HpButton>
+        {!inquiry && (
+          <HpButton
+            variant="primary"
+            size="sm"
+            className="h-9 px-3.5"
+            onClick={handleInterest}
+            disabled={busy}
+            isLoading={busy}
+            leftIcon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          >
+            Express Interest
+          </HpButton>
+        )}
+      </div>
+    ) : undefined;
+
   return (
     <>
-      <Modal onClose={onClose} title="Talent Pool Profile" icon={Award} iconClassName="bg-teal-500/10 text-teal-500" size="xl">
+      <Modal
+        onClose={onClose}
+        title="Talent Pool Profile"
+        subtitle="Tested and scored by Mellow"
+        icon={Award}
+        variant="premium"
+        size="2xl"
+        footer={footer}
+      >
         {loading || !detail ? (
-          <div className="py-10 flex items-center justify-center gap-2 text-xs text-text-muted">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            Loading...
-          </div>
+          <ProfileSkeleton />
         ) : (
-          <>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-lg font-bold text-primary">{detail.candidate.user?.name}</div>
-                  <div className="text-xs text-text-muted mt-0.5 flex items-center gap-1">
-                    <GraduationCap className="w-3.5 h-3.5" />
-                    {detail.candidate.user?.college?.name ?? "Mellow Direct (no college)"}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: hpEase }}
+            className="space-y-5"
+          >
+            {/* Identity */}
+            <div className="relative overflow-hidden rounded-[20px] border border-border-subtle bg-elevated/40 p-5">
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(80%_130%_at_0%_0%,rgba(20,184,166,0.12),transparent_60%),radial-gradient(60%_120%_at_100%_0%,rgba(99,102,241,0.12),transparent_60%)]" />
+              <div aria-hidden className="hp-dots pointer-events-none absolute inset-0 opacity-30 [mask-image:radial-gradient(55%_80%_at_100%_0%,#000,transparent)]" />
+              <div className="relative flex items-center gap-4">
+                <HpAvatar name={user?.name ?? "Candidate"} size="lg" className="h-14 w-14 text-base sm:h-16 sm:w-16 sm:text-lg" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-lg font-extrabold tracking-tight text-primary sm:text-xl">{user?.name}</div>
+                  <div className="mt-1.5 flex min-w-0 items-center gap-2 text-xs text-text-secondary">
+                    <CollegeMark name={user?.college?.name ?? null} />
+                    <span className="truncate">{user?.college?.name ?? "Mellow Direct (no college)"}</span>
                   </div>
-                </div>
-                <span className="px-3 py-1.5 rounded-control bg-status-success/15 text-status-success text-sm font-extrabold shrink-0">{detail.candidate.score_percent}%</span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-3xs uppercase font-bold">Branch</div>
-                  <div className="text-primary font-semibold mt-0.5">{detail.candidate.user?.branch ?? "—"}</div>
-                </div>
-                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-3xs uppercase font-bold">CGPA</div>
-                  <div className="text-primary font-semibold mt-0.5">{detail.candidate.user?.cgpa ?? "—"}</div>
-                </div>
-                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-3xs uppercase font-bold">Platform Rating</div>
-                  <div className="text-primary font-semibold mt-0.5">{detail.display_rating ?? "Unrated"}</div>
-                </div>
-                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="text-text-muted text-3xs uppercase font-bold">Readiness Score</div>
-                  <div className="text-primary font-semibold mt-0.5">{detail.readiness_score ?? "—"}/100</div>
-                </div>
-              </div>
-
-              {(detail.candidate.user?.bio || detail.candidate.user?.linkedin_url || detail.candidate.user?.github_url || (detail.candidate.user?.skills?.length ?? 0) > 0 || detail.candidate.user?.has_resume) && (
-                <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-3xs uppercase font-bold text-text-muted">Recruiter Profile</span>
-                    {detail.candidate.user && detail.candidate.user.profile_completion_percent > 0 && (
-                      <span
-                        className={cn(
-                          "px-1.5 py-0.5 rounded text-3xs font-bold",
-                          detail.candidate.user.profile_completion_percent >= 100
-                            ? "bg-status-success/15 text-status-success"
-                            : "bg-teal-500/15 text-teal-600"
-                        )}
-                      >
-                        {detail.candidate.user.profile_completion_percent}% complete
-                      </span>
-                    )}
-                  </div>
-
-                  {detail.candidate.user?.bio && <p className="text-xs text-text-secondary leading-relaxed">{detail.candidate.user.bio}</p>}
-
-                  {detail.candidate.user?.skills && detail.candidate.user.skills.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5">
-                      {detail.candidate.user.skills.map((skill) => (
-                        <span key={skill} className="px-2 py-0.5 rounded bg-teal-500/10 text-teal-600 text-[10.5px] font-semibold">
-                          {skill}
-                        </span>
-                      ))}
+                  {location && (
+                    <div className="mt-1 flex items-center gap-1 text-2xs text-text-muted">
+                      <MapPin className="h-3 w-3 shrink-0" />
+                      <span className="truncate">{location}</span>
                     </div>
                   )}
+                </div>
+                <div className="shrink-0" title={`Assessment score ${detail.candidate.score_percent}%`}>
+                  <HpRing value={score} size={84} stroke={7} tone={scoreTone(score)}>
+                    <div className="text-center leading-none">
+                      <div className="tabular text-sm font-extrabold text-primary">{detail.candidate.score_percent}%</div>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.1em] text-text-muted">Score</div>
+                    </div>
+                  </HpRing>
+                </div>
+              </div>
+            </div>
 
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {detail.candidate.user?.linkedin_url && (
-                      <a
-                        href={detail.candidate.user.linkedin_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
-                      >
-                        <Linkedin className="w-3.5 h-3.5" />
+            {/* Key facts */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <ProfileStat icon={BookOpen} label="Branch" value={user?.branch ?? "—"} tone="sky" />
+              <ProfileStat icon={GraduationCap} label="CGPA" value={user?.cgpa ?? "—"} tone="indigo" />
+              <ProfileStat icon={Star} label="Platform Rating" value={detail.display_rating ?? "Unrated"} tone="amber" />
+              <ProfileStat icon={Gauge} label="Readiness Score" value={`${detail.readiness_score ?? "—"}/100`} tone="teal">
+                {detail.readiness_score !== null && <HpProgress value={detail.readiness_score} tone="teal" className="mt-2" />}
+              </ProfileStat>
+            </div>
+
+            {/* Recruiter profile */}
+            {(user?.bio || user?.linkedin_url || user?.github_url || (user?.skills?.length ?? 0) > 0 || user?.has_resume) && (
+              <section className="space-y-3.5 rounded-[20px] border border-border-subtle p-4 sm:p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">Recruiter Profile</span>
+                  {user && completion > 0 && (
+                    <HpPill tone={completion >= 100 ? "emerald" : "teal"} size="sm">
+                      <span className="tabular">{completion}% complete</span>
+                    </HpPill>
+                  )}
+                </div>
+                {user && completion > 0 && <HpProgress value={completion} tone={completion >= 100 ? "emerald" : "teal"} />}
+
+                {user?.bio && <p className="text-[13px] leading-relaxed text-text-secondary">{user.bio}</p>}
+
+                {user?.skills && user.skills.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.skills.map((skill) => (
+                      <HpPill key={skill} tone="teal">
+                        {skill}
+                      </HpPill>
+                    ))}
+                  </div>
+                )}
+
+                {(user?.linkedin_url || user?.github_url || user?.has_resume) && (
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    {user?.linkedin_url && (
+                      <a href={user.linkedin_url} target="_blank" rel="noopener noreferrer" className={hpBtn("secondary", "sm")}>
+                        <Linkedin className="h-3.5 w-3.5" />
                         LinkedIn
+                        <ArrowUpRight className="h-3 w-3 opacity-60" />
+                        <span className="sr-only">(opens in a new tab)</span>
                       </a>
                     )}
-                    {detail.candidate.user?.github_url && (
-                      <a
-                        href={detail.candidate.user.github_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors"
-                      >
-                        <Github className="w-3.5 h-3.5" />
+                    {user?.github_url && (
+                      <a href={user.github_url} target="_blank" rel="noopener noreferrer" className={hpBtn("secondary", "sm")}>
+                        <Github className="h-3.5 w-3.5" />
                         GitHub
+                        <ArrowUpRight className="h-3 w-3 opacity-60" />
+                        <span className="sr-only">(opens in a new tab)</span>
                       </a>
                     )}
-                    {detail.candidate.user?.has_resume && (
-                      <button
+                    {user?.has_resume && (
+                      <HpButton
+                        variant="soft"
+                        size="sm"
                         onClick={handleResumeDownload}
                         disabled={downloadingResume}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-control bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/25 text-2xs font-bold text-teal-600 transition-colors disabled:opacity-50"
+                        isLoading={downloadingResume}
+                        leftIcon={<FileText className="h-3.5 w-3.5" />}
+                        rightIcon={<Download className="h-3 w-3" />}
                       >
-                        {downloadingResume ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />}
                         {downloadingResume ? "Downloading..." : "Resume"}
-                        {!downloadingResume && <Download className="w-3 h-3" />}
-                      </button>
+                      </HpButton>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </section>
+            )}
 
-              <p className="text-2xs text-text-muted">
+            {/* Provenance */}
+            <div className="flex items-start gap-3 rounded-2xl bg-teal-500/[0.06] p-3.5 ring-1 ring-inset ring-teal-500/15">
+              <ShieldCheck className="mt-px h-4 w-4 shrink-0 text-teal-600 dark:text-teal-300" />
+              <p className="text-2xs leading-relaxed text-text-secondary">
                 Qualified via &quot;{detail.candidate.source_contest?.title ?? "a Mellow assessment"}&quot; on{" "}
-                {new Date(detail.candidate.qualified_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}.
+                {fmtDate(detail.candidate.qualified_at)}.
                 Contact details are never shared directly — every action below notifies the candidate through Mellow.
               </p>
             </div>
 
+            {/* Engagement */}
             {inquiry && (
-              <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xs font-bold text-text-secondary">Your Engagement</span>
-                  <span className={cn("px-2 py-0.5 rounded text-3xs font-bold", STATUS_BADGE[inquiry.status] ?? "bg-elevated text-text-muted")}>
-                    {STATUS_LABEL[inquiry.status] ?? inquiry.status}
+              <section className="space-y-3 rounded-[20px] border border-border-subtle bg-elevated/40 p-4 sm:p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-2 text-xs font-bold text-primary">
+                    <Handshake className="h-4 w-4 text-violet-600 dark:text-violet-300" />
+                    Your Engagement
                   </span>
+                  <StatusPill status={inquiry.status} />
                 </div>
-                {inquiry.interview_scheduled_at && (
-                  <div className="text-2xs text-text-muted flex items-center gap-1.5">
-                    <CalendarClock className="w-3 h-3" />
-                    {new Date(inquiry.interview_scheduled_at).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} · {inquiry.interview_mode} · {inquiry.interview_location}
-                  </div>
-                )}
-                {inquiry.ctc_offered && (
-                  <div className="text-2xs text-text-muted">Offered CTC: ₹{Number(inquiry.ctc_offered).toLocaleString("en-IN")}</div>
-                )}
-                {inquiry.messages && inquiry.messages.length > 0 && (
-                  <div className="pt-1.5 mt-1.5 border-t border-border-subtle space-y-1.5">
-                    {inquiry.messages.map((m) => (
-                      <div key={m.id} className="text-[10.5px] text-text-muted">
-                        <span className="font-semibold text-text-secondary">{m.sender?.name ?? "You"}:</span> {m.message}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
 
-            {!isTerminal && (
-              <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-border-subtle">
-                {!inquiry && (
-                  <button onClick={handleInterest} disabled={busy} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white text-2xs font-bold transition-colors disabled:opacity-60">
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Express Interest
-                  </button>
+                {inquiry.interview_scheduled_at && (
+                  <div className="flex items-center gap-3 rounded-xl bg-[rgb(var(--bg-surface-rgb))] p-3 ring-1 ring-inset ring-border-subtle">
+                    <HpIconTile icon={inquiry.interview_mode === "offline" ? MapPin : Video} tone="amber" size="sm" />
+                    <div className="min-w-0 text-2xs">
+                      <div className="tabular flex items-center gap-1.5 font-bold text-primary">
+                        <CalendarClock className="h-3 w-3 text-text-muted" />
+                        {fmtDateTime(inquiry.interview_scheduled_at)}
+                      </div>
+                      <div className="mt-0.5 truncate text-text-muted">
+                        <span className="capitalize">{inquiry.interview_mode}</span> · {inquiry.interview_location}
+                      </div>
+                    </div>
+                  </div>
                 )}
-                <button onClick={() => setShowInterviewForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
-                  <CalendarClock className="w-3.5 h-3.5" />
-                  Schedule HR Interview
-                </button>
-                <button onClick={() => setShowHireForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-2xs font-bold text-status-success transition-colors">
-                  <Briefcase className="w-3.5 h-3.5" />
-                  Hire
-                </button>
-                <button onClick={() => setShowMessageForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors">
-                  <Send className="w-3.5 h-3.5" />
-                  Send Message
-                </button>
-              </div>
+
+                {inquiry.ctc_offered && (
+                  <div className="flex items-center gap-2 text-2xs text-text-secondary">
+                    <IndianRupee className="h-3.5 w-3.5 text-text-muted" />
+                    Offered CTC:{" "}
+                    <span className="tabular font-bold text-primary">₹{Number(inquiry.ctc_offered).toLocaleString("en-IN")}</span>
+                  </div>
+                )}
+
+                {inquiry.messages && inquiry.messages.length > 0 && (
+                  <ul className="space-y-2.5 border-t border-border-subtle pt-3">
+                    {inquiry.messages.map((m) => (
+                      <li key={m.id} className="flex items-start gap-2.5">
+                        <HpAvatar name={m.sender?.name ?? "You"} size="xs" className="mt-0.5" />
+                        <div className="min-w-0 flex-1 rounded-xl rounded-tl-sm bg-[rgb(var(--bg-surface-rgb))] px-3 py-2 ring-1 ring-inset ring-border-subtle">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="truncate text-3xs font-bold text-text-secondary">{m.sender?.name ?? "You"}</span>
+                            <span className="tabular shrink-0 text-3xs text-text-muted">
+                              {new Date(m.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                            </span>
+                          </div>
+                          <p className="mt-0.5 break-words text-2xs leading-relaxed text-text-muted">{m.message}</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
             )}
-          </>
+          </motion.div>
         )}
       </Modal>
 
@@ -611,6 +1195,49 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
         <MessageForm candidateId={candidateId} onClose={() => setShowMessageForm(false)} onDone={(msg) => { onToast(msg); setShowMessageForm(false); load(); }} />
       )}
     </>
+  );
+}
+
+/* ── Action forms ───────────────────────────────────────────────────────── */
+
+function ModeOption({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  hint,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: LucideIcon;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-[0.98]",
+        active
+          ? "border-indigo-500/50 bg-indigo-500/[0.07] shadow-[0_0_0_4px_rgba(99,102,241,0.10)]"
+          : "border-border-strong hover:border-indigo-500/30 hover:bg-elevated/60"
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] transition-colors duration-200",
+          active ? "bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-[0_6px_14px_-6px_rgba(99,102,241,0.7)]" : "bg-elevated text-text-muted"
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs font-bold text-primary">{label}</span>
+        <span className="block truncate text-3xs text-text-muted">{hint}</span>
+      </span>
+    </button>
   );
 }
 
@@ -645,39 +1272,62 @@ function ScheduleInterviewForm({ candidateId, onClose, onDone }: { candidateId: 
     <Modal
       onClose={onClose}
       title="Schedule HR Interview"
+      subtitle="The candidate is notified through Mellow"
+      icon={CalendarClock}
+      variant="premium"
       size="md"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-          <button type="submit" form="schedule-hr-interview-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Scheduling..." : "Schedule"}</button>
+          <HpButton type="button" variant="ghost" size="sm" className="h-9 px-4" onClick={onClose} disabled={saving}>
+            Cancel
+          </HpButton>
+          <HpButton type="submit" form="schedule-hr-interview-form" variant="primary" size="sm" className="h-9 px-4" disabled={saving} isLoading={saving}>
+            {saving ? "Scheduling..." : "Schedule"}
+          </HpButton>
         </>
       }
     >
-      <form id="schedule-hr-interview-form" onSubmit={handleSubmit} className="space-y-3">
+      <form id="schedule-hr-interview-form" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">When *</label>
-          <input required type="datetime-local" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+          <label htmlFor="tp-interview-when" className={hpLabel}>When *</label>
+          <input
+            id="tp-interview-when"
+            required
+            type="datetime-local"
+            value={scheduledAt}
+            onChange={(e) => setScheduledAt(e.target.value)}
+            className={cn(hpInput, "tabular text-[13px]")}
+          />
         </div>
-        <div>
-          <label className="block font-semibold text-text-secondary mb-1">Mode *</label>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={() => setMode("online")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-2xs font-bold transition-colors", mode === "online" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
-              <Video className="w-3.5 h-3.5" /> Online
-            </button>
-            <button type="button" onClick={() => setMode("offline")} className={cn("flex items-center justify-center gap-1.5 px-3 py-2 rounded-control border text-2xs font-bold transition-colors", mode === "offline" ? "bg-teal-500 text-white border-teal-500" : "bg-elevated border-border-subtle text-text-secondary")}>
-              <MapPin className="w-3.5 h-3.5" /> In Person
-            </button>
+        <fieldset>
+          <legend className={hpLabel}>Mode *</legend>
+          <div className="grid grid-cols-2 gap-2.5">
+            <ModeOption active={mode === "online"} onClick={() => setMode("online")} icon={Video} label="Online" hint="Video meeting link" />
+            <ModeOption active={mode === "offline"} onClick={() => setMode("offline")} icon={MapPin} label="In Person" hint="At your office" />
           </div>
+        </fieldset>
+        <div>
+          <label htmlFor="tp-interview-location" className={hpLabel}>{mode === "online" ? "Meeting Link *" : "Location *"}</label>
+          <input
+            id="tp-interview-location"
+            required
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder={mode === "online" ? "https://meet.example.com/..." : "Office address"}
+            className={cn(hpInput, "text-[13px]")}
+          />
         </div>
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">{mode === "online" ? "Meeting Link *" : "Location *"}</label>
-          <input required value={location} onChange={(e) => setLocation(e.target.value)} placeholder={mode === "online" ? "https://meet.example.com/..." : "Office address"} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+          <label htmlFor="tp-interview-note" className={hpLabel}>Note</label>
+          <textarea
+            id="tp-interview-note"
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className={cn(hpInput, "resize-y text-[13px]")}
+          />
         </div>
-        <div>
-          <label className="block font-semibold text-text-secondary mb-1">Note</label>
-          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-        </div>
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        <FormError message={error} />
       </form>
     </Modal>
   );
@@ -707,25 +1357,52 @@ function HireForm({ candidateId, onClose, onDone }: { candidateId: number; onClo
     <Modal
       onClose={onClose}
       title="Hire This Candidate"
+      subtitle="Confirm the offer details"
+      icon={Briefcase}
+      variant="premium"
       size="md"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-          <button type="submit" form="hire-candidate-form" disabled={saving} className="px-4 py-2 rounded-control bg-status-success hover:bg-status-success/90 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Hiring..." : "Confirm Hire"}</button>
+          <HpButton type="button" variant="ghost" size="sm" className="h-9 px-4" onClick={onClose} disabled={saving}>
+            Cancel
+          </HpButton>
+          <HpButton type="submit" form="hire-candidate-form" variant="success" size="sm" className="h-9 px-4" disabled={saving} isLoading={saving}>
+            {saving ? "Hiring..." : "Confirm Hire"}
+          </HpButton>
         </>
       }
     >
-      <p className="text-2xs text-text-muted mb-3">This is final — the candidate is notified immediately and removed from every other partner&apos;s Talent Pool search.</p>
-      <form id="hire-candidate-form" onSubmit={handleSubmit} className="space-y-3">
+      <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-amber-500/[0.08] px-3.5 py-2.5 ring-1 ring-inset ring-amber-500/25">
+        <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+        <p className="text-2xs leading-relaxed text-text-secondary">
+          This is final — the candidate is notified immediately and removed from every other partner&apos;s Talent Pool search.
+        </p>
+      </div>
+      <form id="hire-candidate-form" onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">CTC Offered (₹/year)</label>
-          <input type="number" min={0} value={ctc} onChange={(e) => setCtc(e.target.value)} placeholder="e.g. 1200000" className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+          <label htmlFor="tp-hire-ctc" className={hpLabel}>CTC Offered (₹/year)</label>
+          <div className="group relative">
+            <IndianRupee className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted transition-colors group-focus-within:text-indigo-500" />
+            <input
+              id="tp-hire-ctc"
+              type="number"
+              min={0}
+              value={ctc}
+              onChange={(e) => setCtc(e.target.value)}
+              placeholder="e.g. 1200000"
+              className={cn(hpInput, "tabular pl-10 pr-16 text-[13px]")}
+            />
+            <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-2xs font-semibold text-text-muted">/ year</span>
+          </div>
+          {ctc && Number(ctc) > 0 && (
+            <p className="tabular mt-1.5 text-3xs text-text-muted">₹{Number(ctc).toLocaleString("en-IN")} per year</p>
+          )}
         </div>
         <div>
-          <label className="block font-semibold text-text-secondary mb-1">Note</label>
-          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
+          <label htmlFor="tp-hire-note" className={hpLabel}>Note</label>
+          <textarea id="tp-hire-note" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={cn(hpInput, "resize-y text-[13px]")} />
         </div>
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        <FormError message={error} />
       </form>
     </Modal>
   );
@@ -754,17 +1431,43 @@ function MessageForm({ candidateId, onClose, onDone }: { candidateId: number; on
     <Modal
       onClose={onClose}
       title="Send a Message"
+      subtitle="Delivered to the candidate by email through Mellow"
+      icon={Send}
+      variant="premium"
       size="md"
       footer={
         <>
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">Cancel</button>
-          <button type="submit" form="send-message-form" disabled={saving} className="px-4 py-2 rounded-control bg-teal-500 hover:bg-teal-600 text-white font-bold transition-colors disabled:opacity-60">{saving ? "Sending..." : "Send"}</button>
+          <HpButton type="button" variant="ghost" size="sm" className="h-9 px-4" onClick={onClose} disabled={saving}>
+            Cancel
+          </HpButton>
+          <HpButton
+            type="submit"
+            form="send-message-form"
+            variant="primary"
+            size="sm"
+            className="h-9 px-4"
+            disabled={saving}
+            isLoading={saving}
+            leftIcon={<Send className="h-3.5 w-3.5" />}
+          >
+            {saving ? "Sending..." : "Send"}
+          </HpButton>
         </>
       }
     >
       <form id="send-message-form" onSubmit={handleSubmit} className="space-y-3">
-        <textarea required rows={4} value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Write your message to the candidate..." className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-teal-500" />
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
+        <label htmlFor="tp-message" className="sr-only">Message</label>
+        <textarea
+          id="tp-message"
+          required
+          rows={5}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          placeholder="Write your message to the candidate..."
+          className={cn(hpInput, "resize-y text-[13px] leading-relaxed")}
+        />
+        <div className="tabular text-right text-3xs text-text-muted">{message.length} characters</div>
+        <FormError message={error} />
       </form>
     </Modal>
   );

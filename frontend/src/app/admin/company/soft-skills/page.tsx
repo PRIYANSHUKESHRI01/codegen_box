@@ -18,6 +18,7 @@ export default function CompanySoftSkillsPage() {
       title="Soft Skills"
       subtitle="Screen candidates on aptitude, reasoning and English before the technical rounds — visible to students at colleges you have live drives with."
       emptyMessage='No Soft Skills tests yet — click "New Soft Skills Test" to create one.'
+      variant="premium"
     />
   );
 }

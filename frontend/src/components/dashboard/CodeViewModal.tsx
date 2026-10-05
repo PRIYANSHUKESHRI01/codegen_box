@@ -139,7 +139,7 @@ export function CodeViewModal({ data, onClose }: CodeViewModalProps) {
             customStyle={{
               margin: 0,
               padding: "18px 16px",
-              fontSize: "12.5px",
+              fontSize: "13px",
               lineHeight: 1.6,
               background: "#1e1e1e",
               fontFamily: "var(--font-mono), monospace",

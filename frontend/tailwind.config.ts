@@ -83,6 +83,16 @@ const config: Config = {
           "chip-text": "var(--sb-chip-text)",
         },
       },
+      // Text-only overrides — `textColor` is consulted by text-* utilities
+      // alone, so bg-status-success / border-status-warning / fill-* keep the
+      // brand hue from `colors` above while text-status-success etc. resolve
+      // to the darker, projector-safe twins declared in globals.css.
+      textColor: {
+        "status-success": "rgb(var(--status-success-text-rgb) / <alpha-value>)",
+        "status-warning": "rgb(var(--status-warning-text-rgb) / <alpha-value>)",
+        "status-danger": "rgb(var(--status-danger-text-rgb) / <alpha-value>)",
+        "accent-secondary": "rgb(var(--accent-secondary-text-rgb) / <alpha-value>)",
+      },
       spacing: {
         // The two rail widths, shared by DashboardSidebar (the panel) and
         // DashboardShell (the content offset + SSR placeholder). Named so
@@ -119,12 +129,12 @@ const config: Config = {
       // is made of); the missing piece was a shared scale, not a new font.
       //
       // Sizes below, in order of how much of that cleanup each recovers:
-      //   3xs (10px) — decorative micro text: pill badges, count chips,
+      //   3xs (11px, was 10 — see PROJECTOR FLOOR below) — micro text: pill badges, count chips,
       //                 uppercase eyebrows, timestamps. Absorbs the old 9px
       //                 step too (113 call sites) — 9px is below where any
       //                 of this app's real UI copy should sit, and nothing
       //                 that used it was body text a user reads at length.
-      //   2xs (11px) — the dashboard's actual dominant caption/meta size
+      //   2xs (12px, was 11) — the dashboard's actual dominant caption/meta size
       //                 (hints, secondary labels, table meta). This was
       //                 already the single most-used text size in the
       //                 entire codebase before it had a name.
@@ -140,9 +150,28 @@ const config: Config = {
       // `tracking-wide`/`uppercase` utilities, and a tracking value living
       // in both places at once is a same-specificity coin flip decided by
       // generated-CSS order rather than markup order.
+      //
+      // PROJECTOR FLOOR (2026-10): the app is demoed to colleges and hiring
+      // partners on classroom projectors, where 10–12px text — even at a
+      // passing contrast ratio — dissolves. The whole low end of the scale
+      // moved up exactly one step so every call site follows without
+      // touching its markup, and the ORDER of the scale is unchanged (a
+      // caption is still smaller than a label, which is still smaller than
+      // body):
+      //   3xs 10 → 11   2xs 11 → 12   xs 12 → 13
+      // No text in the product is now under 11px, and 11px is reserved for
+      // uppercase/tracked micro-labels where cap-height reads larger than
+      // the number suggests. This matches the floor the large SaaS design
+      // systems settle on (Linear 11–12, Primer 12, Atlassian 12, Material
+      // body-small 12) with one extra step of headroom for projection.
+      // `xs` is overridden in `extend` (so it stays in Tailwind's xs→sm
+      // slot) and keeps its original rem unit so browser text-zoom still
+      // scales it. It now equals `13` — the two names are intentionally
+      // allowed to coincide rather than renumbering 107 call sites.
       fontSize: {
-        "3xs": ["10px", { lineHeight: "14px" }],
-        "2xs": ["11px", { lineHeight: "16px" }],
+        "3xs": ["11px", { lineHeight: "15px" }],
+        "2xs": ["12px", { lineHeight: "17px" }],
+        xs: ["0.8125rem", { lineHeight: "1.125rem" }],
         13: ["13px", { lineHeight: "18px" }],
         15: ["15px", { lineHeight: "20px" }],
       },

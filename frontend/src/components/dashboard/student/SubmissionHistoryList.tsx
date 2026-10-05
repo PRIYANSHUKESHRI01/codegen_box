@@ -121,7 +121,7 @@ export function SubmissionHistoryList({ submissions, onOpenCode, maxHeightClassN
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs">
                     <span className={cn("font-bold", VERDICT_TONE[s.status] ?? "text-text-muted")}>{VERDICT_LABEL[s.status] ?? s.status}</span>
                     <span className="text-text-muted">{s.language}</span>
-                    <span className={cn("rounded-full border px-1.5 py-0 text-[9px] font-bold uppercase tracking-wide", SOURCE_TONE[s.source])}>
+                    <span className={cn("rounded-full border px-1.5 py-0 text-3xs font-bold uppercase tracking-wide", SOURCE_TONE[s.source])}>
                       {SOURCE_LABEL[s.source]}
                     </span>
                     {s.contest_title && <span className="truncate text-text-muted">via {s.contest_title}</span>}

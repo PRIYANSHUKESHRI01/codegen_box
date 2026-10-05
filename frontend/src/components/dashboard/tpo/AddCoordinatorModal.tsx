@@ -126,7 +126,7 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
             <ul className="mt-2 space-y-1.5">
               {CAN.map((item) => (
                 <li key={item} className="flex items-start gap-2 text-2xs leading-relaxed text-text-secondary">
-                  <span aria-hidden className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-300">
+                  <span aria-hidden className="mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300">
                     <Check className="h-2.5 w-2.5" strokeWidth={3.2} />
                   </span>
                   {item}

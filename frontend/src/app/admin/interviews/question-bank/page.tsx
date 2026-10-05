@@ -162,7 +162,7 @@ export default function InterviewQuestionBankPage() {
                 </div>
                 <p className="text-xs font-medium text-primary">{q.question_text}</p>
                 {q.notes_for_reviewer && (
-                  <p className="text-[10.5px] text-text-muted mt-1 italic">Reviewer note: {q.notes_for_reviewer}</p>
+                  <p className="text-3xs text-text-muted mt-1 italic">Reviewer note: {q.notes_for_reviewer}</p>
                 )}
               </div>
               <button

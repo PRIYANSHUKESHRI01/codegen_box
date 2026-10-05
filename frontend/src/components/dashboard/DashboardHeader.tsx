@@ -419,7 +419,7 @@ export function DashboardHeader({
           {tenant && (
             <span
               className={cn(
-                "hidden flex-shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-semibold text-text-secondary lg:inline-flex",
+                "hidden min-w-[8.5rem] shrink-[4] items-center gap-1.5 rounded-full border px-2.5 py-1 text-2xs font-semibold text-text-secondary min-[1400px]:inline-flex",
                 identityRole === "admin_company"
                   ? "border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-cyan-500/5"
                   : identityRole === "admin_tpo"
@@ -428,7 +428,7 @@ export function DashboardHeader({
               )}
             >
               <Building2 className={cn("h-3 w-3 flex-shrink-0", identityRole === "admin_company" ? "text-teal-500" : identityRole === "admin_tpo" ? "text-sky-500" : "text-accent-primary")} />
-              <span className="max-w-[220px] truncate">{tenant}</span>
+              <span className="min-w-0 max-w-[280px] truncate" title={tenant}>{tenant}</span>
             </span>
           )}
         </div>

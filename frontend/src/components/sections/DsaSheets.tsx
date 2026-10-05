@@ -12,11 +12,11 @@ const ACCENT_STYLES: Record<DsaSheet["accent"], { poster: string; badge: string 
   },
   cyan: {
     poster: "from-cyan-500/20 via-cyan-500/5 to-transparent text-cyan-500",
-    badge: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+    badge: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
   },
   amber: {
     poster: "from-amber-500/20 via-amber-500/5 to-transparent text-amber-500",
-    badge: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    badge: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
   },
 };
 

@@ -294,8 +294,8 @@ export default function StudentCohortPage() {
                 tone="emerald"
                 loading={loading}
                 hint={
-                  eligibleOnly ? (
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-300">Filtering roster · tap to clear</span>
+                  loading ? undefined : eligibleOnly ? (
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-300">Filtering roster · tap to clear</span>
                   ) : (
                     "Tap to filter the roster"
                   )
@@ -395,7 +395,7 @@ export default function StudentCohortPage() {
                                 <span className="truncate font-medium text-text-secondary">{coordinator.name}</span>
                               </>
                             ) : (
-                              <span className="flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-300">
+                              <span className="flex items-center gap-1 font-semibold text-amber-700 dark:text-amber-300">
                                 <UserX className="h-3.5 w-3.5 shrink-0" />
                                 No coordinator
                               </span>
@@ -456,7 +456,7 @@ export default function StudentCohortPage() {
                               )}
                             </div>
                           ) : (
-                            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-300">
+                            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
                               <UserX className="h-4 w-4 shrink-0" />
                               No coordinator assigned to this section yet.
                             </span>
@@ -815,7 +815,7 @@ export default function StudentCohortPage() {
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col items-start gap-1">
-                                <BranchChip branch={s.branch} className="max-w-[10rem]" />
+                                <BranchChip branch={s.branch} className="max-w-[12rem]" />
                                 <SectionChip section={s.section} />
                               </div>
                             </td>
@@ -1148,7 +1148,7 @@ function BranchChip({ branch, className }: { branch: string | null; className?: 
     <span
       title={branch}
       className={cn(
-        "inline-flex max-w-[11rem] items-center rounded-md bg-sky-500/[0.08] px-1.5 py-px text-3xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/20 dark:text-sky-300",
+        "inline-flex max-w-[13rem] items-center rounded-md bg-sky-500/[0.08] px-1.5 py-px text-3xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/20 dark:text-sky-300",
         className
       )}
     >
@@ -1172,7 +1172,7 @@ function CgpaCell({ student: s }: { student: CohortStudent }) {
         {s.cgpa ?? <span className="font-semibold text-text-muted">—</span>}
       </div>
       {(s.backlogs ?? 0) > 0 && (
-        <div className="mt-0.5 inline-flex items-center gap-1 text-3xs font-semibold text-amber-600 dark:text-amber-300">
+        <div className="mt-0.5 inline-flex items-center gap-1 text-3xs font-semibold text-amber-700 dark:text-amber-300">
           <AlertTriangle className="h-2.5 w-2.5" aria-hidden />
           {s.backlogs} {s.backlogs === 1 ? "backlog" : "backlogs"}
         </div>

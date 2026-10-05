@@ -80,7 +80,10 @@ export function Modal({
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 overflow-y-auto animate-fade-in",
+        // !mt-0: pages render modals inside a `space-y-*` column, whose
+        // sibling margin otherwise nudges this fixed overlay down by 2rem
+        // and leaves a strip of live page above the backdrop.
+        "fixed inset-0 z-50 overflow-y-auto animate-fade-in !mt-0",
         premium ? "bg-slate-950/60 backdrop-blur-md" : "bg-black/70 backdrop-blur-sm"
       )}
       onClick={closeOnBackdrop ? onClose : undefined}

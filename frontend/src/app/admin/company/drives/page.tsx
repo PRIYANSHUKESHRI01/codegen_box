@@ -82,9 +82,9 @@ const STATUS_META: Record<DriveStatus, { label: string; tone: HpTone; dot: strin
 };
 
 const MAPPING_META: Record<AdminDriveCollegeMapping["status"], { label: string; dot: string; text: string }> = {
-  approved: { label: "Approved", dot: "bg-emerald-500", text: "text-emerald-600 dark:text-emerald-300" },
-  pending: { label: "Pending", dot: "bg-amber-500", text: "text-amber-600 dark:text-amber-300" },
-  declined: { label: "Declined", dot: "bg-rose-500", text: "text-rose-600 dark:text-rose-300" },
+  approved: { label: "Approved", dot: "bg-emerald-500", text: "text-emerald-700 dark:text-emerald-300" },
+  pending: { label: "Pending", dot: "bg-amber-500", text: "text-amber-700 dark:text-amber-300" },
+  declined: { label: "Declined", dot: "bg-rose-500", text: "text-rose-700 dark:text-rose-300" },
 };
 
 /** Gradient discs for the applicant stack — literal so Tailwind keeps them. */

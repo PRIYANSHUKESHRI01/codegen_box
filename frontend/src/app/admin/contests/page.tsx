@@ -375,7 +375,7 @@ function ManageVisibilityModal({
         </>
       }
     >
-      <p className="text-[10.5px] text-text-muted mb-3">
+      <p className="text-3xs text-text-muted mb-3">
         The drive may be live at more colleges than this contest targets — check only the ones this contest
         should actually go to.
       </p>
@@ -763,7 +763,7 @@ function ManageProblemsModal({
               </div>
               <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                 {availableProblems.length === 0 ? (
-                  <p className="text-[10.5px] text-text-muted text-center py-4">
+                  <p className="text-3xs text-text-muted text-center py-4">
                     {search ? "No problems match your search." : "No more problems available to add."}
                   </p>
                 ) : (
@@ -783,7 +783,7 @@ function ManageProblemsModal({
                       <button
                         onClick={() => handleAdd(p.id)}
                         disabled={addingId === p.id}
-                        className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-[10.5px] font-bold transition-colors disabled:opacity-50 shrink-0"
+                        className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-3xs font-bold transition-colors disabled:opacity-50 shrink-0"
                       >
                         {addingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
                       </button>

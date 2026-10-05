@@ -35,7 +35,7 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
   return (
     <div className="rounded-control border border-border-subtle bg-elevated/60 p-3.5 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-[10.5px] font-bold text-accent-primary shrink-0">
+        <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-3xs font-bold text-accent-primary shrink-0">
           {round.round_number}
         </span>
         <input
@@ -105,7 +105,7 @@ export function RoundConfigEditor({ round, onChange }: { round: RoundConfig; onC
               <div
                 key={c}
                 className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded-control border text-[10.5px] font-bold transition-colors",
+                  "flex items-center gap-1.5 px-2 py-1 rounded-control border text-3xs font-bold transition-colors",
                   included ? CATEGORY_COLORS[c] : "bg-surface border-border-subtle text-text-muted"
                 )}
               >

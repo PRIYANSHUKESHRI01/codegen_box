@@ -33,7 +33,7 @@ export function HpErrorCard({
       )}
     >
       <div className="flex min-w-0 items-start gap-3">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 ring-1 ring-inset ring-rose-500/20 dark:text-rose-300">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-700 ring-1 ring-inset ring-rose-500/20 dark:text-rose-300">
           <AlertCircle className="h-[18px] w-[18px]" />
         </span>
         <div className="min-w-0 pt-0.5">
@@ -155,8 +155,8 @@ export function HpSwitch({
 
 const CALLOUT_TONES = {
   indigo: { box: "border-indigo-500/20 bg-indigo-500/[0.05]", icon: "text-indigo-600 dark:text-indigo-300" },
-  teal: { box: "border-teal-500/20 bg-teal-500/[0.05]", icon: "text-teal-600 dark:text-teal-300" },
-  amber: { box: "border-amber-500/25 bg-amber-500/[0.06]", icon: "text-amber-600 dark:text-amber-300" },
+  teal: { box: "border-teal-500/20 bg-teal-500/[0.05]", icon: "text-teal-700 dark:text-teal-300" },
+  amber: { box: "border-amber-500/25 bg-amber-500/[0.06]", icon: "text-amber-700 dark:text-amber-300" },
 } as const;
 
 export function HpCallout({

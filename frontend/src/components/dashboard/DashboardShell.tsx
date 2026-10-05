@@ -137,7 +137,7 @@ export function DashboardShell({
             fullBleed
               ? "flex-1 min-h-0 flex flex-col overflow-hidden"
               : isHiring
-              ? "relative z-[1] flex-1 p-4 sm:p-6 lg:p-8 max-w-[1360px] w-full mx-auto space-y-8"
+              ? "flex-1 p-4 sm:p-6 lg:p-8 max-w-[1360px] w-full mx-auto space-y-8"
               : "flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto space-y-8"
           )}
         >

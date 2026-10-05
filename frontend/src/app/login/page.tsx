@@ -66,7 +66,7 @@ const ROLE_TABS: {
     cta: "Launch Candidate Arena",
     accent: {
       idleIcon: "text-emerald-500/60 dark:text-emerald-400/50",
-      activeIcon: "text-emerald-600 dark:text-emerald-400",
+      activeIcon: "text-emerald-700 dark:text-emerald-400",
       pill: "bg-emerald-500/10 border-emerald-500/40",
       glow: "shadow-[0_0_18px_-6px_rgba(16,185,129,0.55)]",
       ring: "from-emerald-400/30 via-emerald-300/10 to-accent-primary/25",
@@ -98,7 +98,7 @@ const ROLE_TABS: {
     cta: "Enter Hiring Console",
     accent: {
       idleIcon: "text-amber-500/60 dark:text-amber-400/50",
-      activeIcon: "text-amber-600 dark:text-amber-400",
+      activeIcon: "text-amber-700 dark:text-amber-400",
       pill: "bg-amber-500/10 border-amber-500/40",
       glow: "shadow-[0_0_18px_-6px_rgba(245,158,11,0.55)]",
       ring: "from-amber-400/30 via-amber-300/10 to-accent-secondary/25",
@@ -218,7 +218,7 @@ export default function LoginPage() {
               You Need.
             </h1>
 
-            <p className="text-sm text-text-secondary leading-relaxed">
+            <p className="text-base font-medium text-text-secondary leading-relaxed text-pretty">
               Sign in to prepare for your next placement drive, run your campus's recruitment pipeline,
               or manage your hiring pipeline — whichever dashboard is yours.
             </p>
@@ -231,25 +231,25 @@ export default function LoginPage() {
                 <Zap className="w-4.5 h-4.5" />
               </div>
               <div>
-                <div className="font-bold text-xs text-primary">Bulk Roster Onboarding</div>
-                <div className="text-2xs text-text-muted">Built for placement cells</div>
+                <div className="font-bold text-sm text-primary">Bulk Roster Onboarding</div>
+                <div className="text-xs font-medium text-text-muted">Built for placement cells</div>
               </div>
             </div>
-            <p className="text-xs text-text-secondary leading-relaxed">
+            <p className="text-sm font-medium text-text-secondary leading-relaxed">
               Onboard an entire batch from a single CSV, and map a new recruiter in minutes instead of a
               week of back-and-forth emails — account creation and welcome emails run automatically.
             </p>
           </div>
 
           {/* Real Platform Depth */}
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-subtle text-xs">
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border-subtle text-xs">
             <div>
-              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.problems_total : "—"}</strong>
-              <span className="text-2xs text-text-muted">Practice Problems</span>
+              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.problems_total : "—"}</strong>
+              <span className="text-xs font-medium text-text-muted">Practice Problems</span>
             </div>
             <div>
-              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.languages_total : "—"}</strong>
-              <span className="text-2xs text-text-muted">Judge Languages</span>
+              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.languages_total : "—"}</strong>
+              <span className="text-xs font-medium text-text-muted">Judge Languages</span>
             </div>
           </div>
         </motion.div>
@@ -314,7 +314,7 @@ export default function LoginPage() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 4 }}
                     transition={{ duration: 0.2 }}
-                    className="text-xs text-text-muted"
+                    className="text-sm font-medium leading-relaxed text-text-secondary text-balance"
                   >
                     {activeTab.subtitle}
                   </motion.p>
@@ -332,7 +332,7 @@ export default function LoginPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => handleTabClick(tab.id)}
-                      className="relative py-2.5 rounded-control text-xs font-semibold transition-colors duration-150"
+                      className="relative py-2.5 rounded-control text-sm font-semibold transition-colors duration-150"
                     >
                       {isActive && (
                         <motion.span
@@ -348,7 +348,7 @@ export default function LoginPage() {
                       <span
                         className={cn(
                           "relative z-10 flex items-center justify-center gap-1.5",
-                          isActive ? "text-primary" : "text-text-muted hover:text-primary transition-colors"
+                          isActive ? "text-primary" : "text-text-secondary hover:text-primary transition-colors"
                         )}
                       >
                         <motion.span
@@ -376,7 +376,7 @@ export default function LoginPage() {
                 initial="hidden"
                 animate="show"
                 onSubmit={handleLoginSubmit}
-                className="space-y-4 text-xs"
+                className="space-y-4 text-sm"
               >
                 <motion.div variants={fieldVariants}>
                   <FormField label={isStudent ? "Email or Handle *" : "Staff / Institutional Email *"} icon={Mail}>
@@ -399,7 +399,7 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setShowForgotModal(true)}
-                        className="text-2xs text-accent-primary hover:underline font-medium"
+                        className="text-xs text-accent-primary hover:underline font-semibold"
                       >
                         Forgot password?
                       </button>
@@ -456,7 +456,7 @@ export default function LoginPage() {
                         className="absolute left-0.5 top-[3px] h-3.5 w-3.5 rounded-full bg-white shadow-sm"
                       />
                     </button>
-                    <span className="text-text-secondary text-xs">Remember this device for 30 days</span>
+                    <span className="text-text-secondary text-sm font-medium">Remember this device for 30 days</span>
                   </label>
                 </motion.div>
 
@@ -469,7 +469,7 @@ export default function LoginPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="p-2.5 rounded-control bg-status-danger/10 border border-status-danger/30 text-2xs text-status-danger font-medium">
+                      <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/30 text-xs text-status-danger font-semibold">
                         {error}
                       </div>
                     </motion.div>
@@ -487,22 +487,22 @@ export default function LoginPage() {
                   of bare monospace text, so credibility signals read as
                   deliberate UI rather than a footnote. */}
               <div className="flex flex-wrap items-center justify-center gap-1.5 border-t border-border-subtle mt-2 pt-4">
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-3xs font-semibold text-emerald-600 dark:text-emerald-400">
-                  <ShieldCheck className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-2xs font-semibold text-emerald-700 dark:text-emerald-400">
+                  <ShieldCheck className="w-3.5 h-3.5" />
                   Encrypted Credentials
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-3xs font-semibold text-indigo-600 dark:text-indigo-400">
-                  <Fingerprint className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-2xs font-semibold text-indigo-700 dark:text-indigo-400">
+                  <Fingerprint className="w-3.5 h-3.5" />
                   Role-Based Access
                 </span>
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 text-3xs font-semibold text-sky-600 dark:text-sky-400">
-                  <CheckCircle2 className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-2xs font-semibold text-sky-700 dark:text-sky-400">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   Real Judge Execution
                 </span>
               </div>
 
               {/* Sign Up Redirect */}
-              <div className="text-center text-xs text-text-muted">
+              <div className="text-center text-sm font-medium text-text-secondary">
                 Don&apos;t have an account yet?{" "}
                 <Link href="/signup" className="text-accent-primary font-bold hover:underline">
                   Sign up now &rarr;

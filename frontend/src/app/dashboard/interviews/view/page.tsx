@@ -127,7 +127,7 @@ function InterviewDetailPageContent() {
             </div>
 
             {interview.is_mock && (
-              <p className="text-2xs text-amber-600 bg-amber-500/[0.06] border border-amber-500/20 rounded-control px-3 py-2">
+              <p className="text-2xs text-amber-700 bg-amber-500/[0.06] border border-amber-500/20 rounded-control px-3 py-2">
                 This is a practice round to help you prepare — it&apos;s never part of the actual hiring decision.
               </p>
             )}
@@ -184,7 +184,7 @@ function InterviewDetailPageContent() {
               <span>AI scores your answers right after you finish — a human reviewer can still adjust it afterward.</span>
             </div>
             {!ttsSupported && !sttSupported && (
-              <p className="text-[10.5px] text-status-warning pt-1">
+              <p className="text-3xs text-status-warning pt-1">
                 Voice features aren&apos;t available in this browser — try Chrome or Edge for the full spoken experience.
               </p>
             )}
@@ -235,7 +235,7 @@ function InterviewDetailPageContent() {
                             )}
                           </div>
                         )}
-                        <p className="text-[10.5px] text-text-secondary leading-relaxed pt-1 border-t border-border-subtle">
+                        <p className="text-3xs text-text-secondary leading-relaxed pt-1 border-t border-border-subtle">
                           <span className="font-bold text-text-muted">Feedback: </span>
                           {r.feedback}
                         </p>

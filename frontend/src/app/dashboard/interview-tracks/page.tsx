@@ -167,15 +167,15 @@ function RoundRow({ round, isLast }: { round: TrackPipelineRound; isLast: boolea
 
         <div className="shrink-0">
           {round.locked ? (
-            <span className="text-[10.5px] text-text-muted italic">Locked</span>
+            <span className="text-3xs text-text-muted italic">Locked</span>
           ) : isCompleted ? (
             isReviewed ? (
-              <span className="flex items-center gap-1 text-[10.5px] font-bold text-text-muted">
+              <span className="flex items-center gap-1 text-3xs font-bold text-text-muted">
                 <Award className="w-3.5 h-3.5" />
                 Reviewed
               </span>
             ) : (
-              <span className="text-[10.5px] text-text-muted italic">Awaiting review</span>
+              <span className="text-3xs text-text-muted italic">Awaiting review</span>
             )
           ) : (
             <Link

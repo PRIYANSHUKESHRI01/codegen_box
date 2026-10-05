@@ -307,7 +307,7 @@ function ReportsBody({
                   {dropOff && dropOff.rate < 100 && (
                     <div className="rounded-2xl bg-elevated/60 p-3 ring-1 ring-inset ring-border-subtle">
                       <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                        <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" />
+                        <TrendingDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" />
                         Biggest drop-off
                       </div>
                       <div className="mt-1 text-xs font-bold text-primary">

@@ -203,7 +203,7 @@ export function CreateInterviewTrackModal({
           {selectedTemplate && (
             <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle space-y-1">
               {selectedTemplate.rounds_config.map((r) => (
-                <div key={r.round_number} className="text-[10.5px] text-text-secondary">
+                <div key={r.round_number} className="text-3xs text-text-secondary">
                   <span className="font-bold text-primary">
                     Round {r.round_number} — {r.round_name}:
                   </span>{" "}
@@ -416,7 +416,7 @@ function GenerateRoundsStep({
           return (
             <div key={round.id} className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-[10.5px] font-bold text-accent-primary shrink-0">
+                <span className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-3xs font-bold text-accent-primary shrink-0">
                   {round.round_number}
                 </span>
                 <h4 className="text-xs font-bold text-primary">{round.round_name}</h4>

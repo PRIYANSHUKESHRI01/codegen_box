@@ -559,7 +559,7 @@ function CandidatesPageContent() {
                                             </span>
                                           )}
                                           {app.ctc_offered && (
-                                            <span className="tabular inline-flex items-center gap-1 font-mono text-2xs font-bold text-emerald-600 dark:text-emerald-300">
+                                            <span className="tabular inline-flex items-center gap-1 font-mono text-2xs font-bold text-emerald-700 dark:text-emerald-300">
                                               <Wallet className="h-3 w-3" />
                                               {app.ctc_offered} LPA
                                             </span>

@@ -157,7 +157,7 @@ export function CodeEditorPanel({
           </button>
 
           {savedAt !== null && (
-            <span className="hidden md:inline text-3xs text-text-muted/80 ml-1 whitespace-nowrap">
+            <span className="hidden md:inline text-3xs text-text-muted ml-1 whitespace-nowrap">
               Draft saved
             </span>
           )}

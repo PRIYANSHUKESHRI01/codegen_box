@@ -25,8 +25,15 @@ html.light {
   --bg-elevated: #F2F4FB;
   --bg-surface-hover: #EEF0FB;
   --text-primary: #12141F;    /* navy ink, not pure black — 18.5:1 on white */
-  --text-secondary: #4A5069;  /*  7.9:1 on white */
-  --text-muted: #6B7285;      /*  4.8:1 on white — AA */
+  /* Projector-grade ink. Projectors wash out light greys far more than a
+     monitor does, and the old muted #6B7285 was only 4.8:1 on white — and
+     4.4:1 on the --bg-elevated / page tints it actually sits on (inputs,
+     table heads, helper copy), i.e. below AA there. Ratios below are against
+     white / --bg-elevated; secondary + muted now clear AAA (7:1) on every
+     surface while staying visibly lighter than --text-primary, so the
+     hierarchy survives: primary 18.3 → secondary 10.6 → muted 7.3. */
+  --text-secondary: #383E54;  /* 10.6:1 on white,  9.6:1 on elevated */
+  --text-muted: #4F566C;      /*  7.3:1 on white,  6.6:1 on elevated */
   /* Opaque indigo hairlines rather than the old neutral-grey rgba(). The
      light theme's surfaces are all white or the near-white page tint, so
      these never needed to blend over a dark backdrop — and the nav rail is
@@ -54,8 +61,8 @@ html.light {
   --bg-elevated-rgb: 242 244 251;
   --bg-surface-hover-rgb: 238 240 251;
   --text-primary-rgb: 18 20 31;
-  --text-secondary-rgb: 74 80 105;
-  --text-muted-rgb: 107 114 133;
+  --text-secondary-rgb: 56 62 84;
+  --text-muted-rgb: 79 86 108;
   --accent-primary-rgb: 79 70 229;
   --accent-primary-hover-rgb: 67 56 202;
   --accent-secondary-rgb: 2 132 199;
@@ -63,6 +70,19 @@ html.light {
   --status-success-rgb: 5 150 105;
   --status-warning-rgb: 217 119 6;
   --status-danger-rgb: 220 38 38;
+
+  /* TEXT-ONLY twins of the status/accent colours above. The base values are
+     right for fills — bars, dots, borders, tints — but too light to read as
+     small TEXT on white: success 3.8:1, warning 3.2:1, danger 4.8:1, sky
+     4.1:1, and each drops further when the text sits on its own 10–12% tint
+     (a status pill). These are what `text-status-*` / `text-accent-secondary`
+     resolve to (tailwind.config.ts → theme.extend.textColor), so bg-/border-
+     utilities keep the original brand hue while every text use clears 4.5:1
+     on tinted surfaces too (success 4.7+, warning 5.5, danger 5.4, sky 5.5). */
+  --status-success-text-rgb: 4 108 78;
+  --status-warning-text-rgb: 160 70 7;
+  --status-danger-text-rgb: 185 28 28;
+  --accent-secondary-text-rgb: 2 105 159;
 
   /* Shadows are theme-owned rather than one hardcoded black in the Tailwind
      config, because the same value cannot serve both: a light theme wants a
@@ -90,8 +110,8 @@ html.dark {
   --bg-elevated: #151923;
   --bg-surface-hover: #191E2B;
   --text-primary: #FFFFFF;
-  --text-secondary: #CBD5E1;
-  --text-muted: #94A3B8;
+  --text-secondary: #D5DEE9;  /* 13.7:1 on surface */
+  --text-muted: #A9B6CA;      /*  9.1:1 on surface — was 7.3:1; lifted for the same projector reason as light */
   --border-subtle: rgba(255, 255, 255, 0.10);
   --border-strong: rgba(255, 255, 255, 0.22);
   --accent-primary: #6366F1;
@@ -108,8 +128,8 @@ html.dark {
   --bg-elevated-rgb: 21 25 35;
   --bg-surface-hover-rgb: 25 30 43;
   --text-primary-rgb: 255 255 255;
-  --text-secondary-rgb: 203 213 225;
-  --text-muted-rgb: 148 163 184;
+  --text-secondary-rgb: 213 222 233;
+  --text-muted-rgb: 169 182 202;
   --accent-primary-rgb: 99 102 241;
   --accent-primary-hover-rgb: 79 70 229;
   --accent-secondary-rgb: 6 182 212;
@@ -117,6 +137,13 @@ html.dark {
   --status-success-rgb: 16 185 129;
   --status-warning-rgb: 245 158 11;
   --status-danger-rgb: 239 68 68;
+
+  /* Dark surfaces already clear AA with the fill colours, so the text-only
+     twins just mirror them (see the light block for why they exist). */
+  --status-success-text-rgb: 16 185 129;
+  --status-warning-text-rgb: 245 158 11;
+  --status-danger-text-rgb: 239 68 68;
+  --accent-secondary-text-rgb: 6 182 212;
 
   /* Deliberately the exact values the Tailwind config hardcoded before these
      moved into the theme, so the dark theme renders identically to how it
@@ -164,8 +191,8 @@ html.dark {
   --sb-border-strong: rgba(255, 255, 255, 0.14);
   --sb-text: #C7CFDD;                          /* idle nav label       — 12.1:1 */
   --sb-text-strong: #FFFFFF;                   /* active label / name  — 17.4:1 */
-  --sb-text-dim: #97A1B5;                      /* secondary meta       —  7.2:1 */
-  --sb-text-faint: #7A8598;                    /* section eyebrows     —  5.1:1 */
+  --sb-text-dim: #AEB8CA;                      /* secondary meta       —  9.5:1 (was 7.2) */
+  --sb-text-faint: #9AA5BA;                    /* section eyebrows     —  7.6:1 (was 5.1 — the faintest text in the app, on a projector) */
   --sb-icon: #98A2B6;                          /* idle icon            —  7.2:1 */
   --sb-accent: #818CF8;                        /* active icon + rule   —  6.4:1 */
   --sb-accent-soft: rgba(129, 140, 248, 0.16);
@@ -416,24 +443,20 @@ html.dark {
   --hp-id2: 99 102 241;
 }
 
+/* Painted as the column's own background-image — NOT a ::before and NOT an
+   isolated stacking context. Any stacking context between the page and the
+   root would trap a page's fixed modals/drawers (z-50) beneath the sticky
+   header (z-20) and the sidebar (z-30), which is exactly what the earlier
+   isolation:isolate + positioned-<main> approach did. The gradients all
+   fade to transparent well inside the 560px box, so there is no hard edge. */
 .hp-canvas {
-  position: relative;
-  isolation: isolate;
-}
-
-.hp-canvas::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 560px;
-  z-index: 0;
-  pointer-events: none;
-  background:
+  background-image:
     radial-gradient(55% 75% at 12% 0%, var(--hp-aurora-a), transparent 70%),
     radial-gradient(45% 70% at 88% 0%, rgb(var(--hp-id) / var(--hp-aurora-b-a)), transparent 70%),
     radial-gradient(40% 60% at 50% 0%, var(--hp-aurora-c), transparent 75%);
-  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 40%, transparent 100%);
+  background-repeat: no-repeat;
+  background-size: 100% 560px;
+  background-position: top center;
 }
 
 /* Card: hairline border, layered navy shadow, a 1px top-edge highlight. */

@@ -446,8 +446,6 @@ export function DashboardSidebar({
               label: "Student Cohort",
               href: "/admin/students",
               icon: GraduationCap,
-              badge: "1,450",
-              badgeTone: "count",
             },
             {
               label: "Section Coordinators",
@@ -851,7 +849,7 @@ export function DashboardSidebar({
                 {/* The portal context ("Placement Hub", "Master Console"…).
                     Deliberately the quietest thing in the header: it labels
                     the rail, it isn't a destination. */}
-                <span className="mt-1.5 truncate text-[9.5px] font-bold uppercase leading-[13px] tracking-[0.14em] text-sidebar-faint">
+                <span className="mt-1.5 truncate text-3xs font-bold uppercase leading-[13px] tracking-[0.14em] text-sidebar-faint">
                   {currentRoleInfo.subtext}
                 </span>
               </motion.span>
@@ -941,7 +939,7 @@ export function DashboardSidebar({
                     delete the grouping a screen-reader user navigates by. */}
                 <h2
                   className={cn(
-                    "px-3 pb-2 text-[10.5px] font-bold uppercase leading-none tracking-[0.1em] text-sidebar-faint",
+                    "px-3 pb-2 text-3xs font-bold uppercase leading-none tracking-[0.1em] text-sidebar-faint",
                     !isExpanded && "sr-only"
                   )}
                 >

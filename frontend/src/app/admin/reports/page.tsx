@@ -835,7 +835,7 @@ function LiveStatLine({ stat }: { stat: LiveStat }) {
           : "bg-elevated/60 text-text-secondary ring-border-subtle"
       )}
     >
-      <Icon className={cn("h-3.5 w-3.5 shrink-0", !danger && !success && "text-sky-600 dark:text-sky-300")} aria-hidden />
+      <Icon className={cn("h-3.5 w-3.5 shrink-0", !danger && !success && "text-sky-700 dark:text-sky-300")} aria-hidden />
       <span className="tabular min-w-0">{stat.text}</span>
     </div>
   );
@@ -880,7 +880,7 @@ function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
               <tr>
                 <th scope="col" className={cn(hpTh, STICKY_TH)}>Drive</th>
                 <th scope="col" className={cn(hpTh, STICKY_TH)}>Date</th>
-                <th scope="col" className={cn(hpTh, STICKY_TH, "w-48")}>Fully eligible</th>
+                <th scope="col" className={cn(hpTh, STICKY_TH)}>Fully eligible</th>
                 <th scope="col" className={cn(hpTh, STICKY_TH, "text-right")}>Flags</th>
               </tr>
             </thead>
@@ -894,12 +894,14 @@ function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
                         <HpCompanyLogo name={d.company.name} logo={d.company.logo} size="sm" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="max-w-[15rem] truncate text-xs font-bold text-primary">{d.title}</span>
+                            <span className="max-w-[11rem] truncate text-xs font-bold text-primary 2xl:max-w-[15rem]" title={d.title}>
+                              {d.title}
+                            </span>
                             <HpPill tone={DRIVE_STATUS_TONE[d.status] ?? "slate"} size="sm" className="capitalize">
                               {d.status}
                             </HpPill>
                           </div>
-                          <div className="max-w-[18rem] truncate text-3xs text-text-muted">
+                          <div className="max-w-[16rem] truncate text-3xs text-text-muted">
                             {d.company.name} · {d.role_title}
                           </div>
                         </div>
@@ -912,7 +914,7 @@ function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
                       </span>
                     </td>
                     <td className="px-5 py-3">
-                      <div className="flex min-w-[9rem] items-center gap-2.5">
+                      <div className="flex min-w-[7rem] items-center gap-2.5">
                         <HpProgress value={eligiblePct} tone="indigo" className="flex-1" />
                         <span className="tabular w-12 shrink-0 text-right text-2xs font-semibold text-text-secondary">
                           {d.funnel.fully_eligible}/{d.funnel.total}

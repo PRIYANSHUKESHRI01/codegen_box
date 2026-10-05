@@ -229,7 +229,7 @@ export default function StudentTalentPoolPage() {
                   <div key={inq.id} className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-2">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div className="text-sm font-bold text-primary">{inq.company?.name ?? "A hiring partner"}</div>
-                      <span className={cn("px-2 py-0.5 rounded-control text-[10.5px] font-bold", STATUS_BADGE[inq.status] ?? "bg-elevated text-text-muted")}>
+                      <span className={cn("px-2 py-0.5 rounded-control text-3xs font-bold", STATUS_BADGE[inq.status] ?? "bg-elevated text-text-muted")}>
                         {STATUS_LABEL[inq.status] ?? inq.status}
                       </span>
                     </div>
@@ -248,15 +248,15 @@ export default function StudentTalentPoolPage() {
 
                         {!inq.responded_at ? (
                           <div className="flex items-center gap-2 pt-1">
-                            <button onClick={() => handleRespond(inq, "accept")} disabled={busy} className="flex items-center gap-1 px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-[10.5px] font-bold text-status-success transition-colors disabled:opacity-60">
+                            <button onClick={() => handleRespond(inq, "accept")} disabled={busy} className="flex items-center gap-1 px-3 py-1.5 rounded-control bg-status-success/15 hover:bg-status-success/25 border border-status-success/30 text-3xs font-bold text-status-success transition-colors disabled:opacity-60">
                               <CheckCircle2 className="w-3 h-3" /> Confirm
                             </button>
-                            <button onClick={() => handleRespond(inq, "decline")} disabled={busy} className="flex items-center gap-1 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[10.5px] font-bold text-text-secondary transition-colors disabled:opacity-60">
+                            <button onClick={() => handleRespond(inq, "decline")} disabled={busy} className="flex items-center gap-1 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-3xs font-bold text-text-secondary transition-colors disabled:opacity-60">
                               <XCircle className="w-3 h-3" /> Decline
                             </button>
                           </div>
                         ) : (
-                          <p className="text-[10.5px] text-status-success font-semibold pt-1">You confirmed this interview.</p>
+                          <p className="text-3xs text-status-success font-semibold pt-1">You confirmed this interview.</p>
                         )}
                       </div>
                     )}

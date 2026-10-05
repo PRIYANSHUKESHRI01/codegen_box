@@ -228,7 +228,7 @@ export function ManageInterviewQuestionsModal({
 
                   <div className="max-h-64 overflow-y-auto space-y-1.5 pr-1">
                     {available.length === 0 ? (
-                      <p className="text-[10.5px] text-text-muted text-center py-4">
+                      <p className="text-3xs text-text-muted text-center py-4">
                         {search ? "No questions match your search." : "No more questions available to add."}
                       </p>
                     ) : (
@@ -249,7 +249,7 @@ export function ManageInterviewQuestionsModal({
                           <button
                             onClick={() => handleAddBankQuestion(q.id)}
                             disabled={addingBankId === q.id}
-                            className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-[10.5px] font-bold transition-colors disabled:opacity-50 shrink-0"
+                            className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-3xs font-bold transition-colors disabled:opacity-50 shrink-0"
                           >
                             {addingBankId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
                           </button>

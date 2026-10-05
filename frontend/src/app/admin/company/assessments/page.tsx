@@ -487,7 +487,7 @@ function AssessmentCard({
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <ScMeta icon={Timer}>{formatSpan(windowMs)} window</ScMeta>
-                <ScMeta icon={phase === "live" ? Radio : CalendarClock} className={cn(phase === "live" && "text-teal-600 dark:text-teal-300")}>
+                <ScMeta icon={phase === "live" ? Radio : CalendarClock} className={cn(phase === "live" && "text-teal-700 dark:text-teal-300")}>
                   {relative}
                 </ScMeta>
               </div>

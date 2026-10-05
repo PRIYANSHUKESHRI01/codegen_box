@@ -336,7 +336,7 @@ function SessionResponses({
               <button
                 onClick={handleReinstate}
                 disabled={reinstating}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-[10.5px] font-bold text-primary transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-control bg-surface hover:bg-elevated border border-border-subtle text-3xs font-bold text-primary transition-colors disabled:opacity-50"
               >
                 {reinstating ? <Loader2 className="w-3 h-3 animate-spin" /> : <RotateCcw className="w-3 h-3" />}
                 <ShieldCheck className="w-3 h-3 text-status-success" />
@@ -347,7 +347,7 @@ function SessionResponses({
           {proctoring.violations && proctoring.violations.length > 0 && (
             <ul className="space-y-1">
               {proctoring.violations.map((v) => (
-                <li key={v.id} className="text-[10.5px] text-text-secondary flex items-center gap-1.5">
+                <li key={v.id} className="text-3xs text-text-secondary flex items-center gap-1.5">
                   <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", v.counted_toward_lock ? "bg-status-danger" : "bg-text-muted")} />
                   {VIOLATION_TYPE_LABEL[v.type] ?? v.type} · {new Date(v.occurred_at).toLocaleString("en-IN", { hour: "numeric", minute: "2-digit", day: "numeric", month: "short" })}
                 </li>
@@ -470,7 +470,7 @@ function SessionResponses({
                     <button
                       onClick={() => handleSaveScore(r)}
                       disabled={savingScoreId === r.id}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white transition-colors disabled:opacity-50 text-[10.5px] font-bold"
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white transition-colors disabled:opacity-50 text-3xs font-bold"
                     >
                       {savingScoreId === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : r.score != null ? "Update" : "Save"}
                     </button>

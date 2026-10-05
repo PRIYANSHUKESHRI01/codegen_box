@@ -314,7 +314,7 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
                   {dropOff && dropOff.rate < 100 && (
                     <div className="rounded-2xl bg-elevated/60 p-3 ring-1 ring-inset ring-border-subtle">
                       <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                        <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" aria-hidden />
+                        <TrendingDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" aria-hidden />
                         Biggest drop-off
                       </div>
                       <div className="mt-1 text-xs font-bold text-primary">
@@ -349,7 +349,7 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
                 </HpPill>
               }
             />
-            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
               <BarChart
                 variant="premium"
                 ariaLabel="Branch-wise average readiness and practice consistency"

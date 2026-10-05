@@ -179,7 +179,7 @@ export function DriveVisibilityPanel({
       </div>
 
       {targetedLiveCount === 0 && (
-        <div className="flex items-start gap-1.5 text-[10.5px] text-status-warning bg-status-warning/10 border border-status-warning/25 rounded px-2 py-1.5">
+        <div className="flex items-start gap-1.5 text-3xs text-status-warning bg-status-warning/10 border border-status-warning/25 rounded px-2 py-1.5">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
           <span>
             {liveMappings.length === 0
@@ -239,7 +239,7 @@ export function DriveVisibilityPanel({
             </button>
           </div>
           {pickableColleges.length === 0 ? (
-            <p className="text-[10.5px] text-text-muted">Every partner college is already mapped or has a pending proposal.</p>
+            <p className="text-3xs text-text-muted">Every partner college is already mapped or has a pending proposal.</p>
           ) : (
             <>
               <div className="max-h-32 overflow-y-auto space-y-1 pr-1">

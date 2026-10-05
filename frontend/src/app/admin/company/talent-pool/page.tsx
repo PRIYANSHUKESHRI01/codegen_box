@@ -246,7 +246,7 @@ export default function CompanyTalentPoolPage() {
                 className="self-start"
               />
               <p className="flex items-center gap-2 text-2xs text-text-muted">
-                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-600 dark:text-teal-300" />
+                <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-700 dark:text-teal-300" />
                 Contact details stay private — every touchpoint goes through Mellow.
               </p>
             </div>
@@ -1039,7 +1039,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
                   <HpRing value={score} size={84} stroke={7} tone={scoreTone(score)}>
                     <div className="text-center leading-none">
                       <div className="tabular text-sm font-extrabold text-primary">{detail.candidate.score_percent}%</div>
-                      <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.1em] text-text-muted">Score</div>
+                      <div className="mt-1 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Score</div>
                     </div>
                   </HpRing>
                 </div>
@@ -1119,7 +1119,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
 
             {/* Provenance */}
             <div className="flex items-start gap-3 rounded-2xl bg-teal-500/[0.06] p-3.5 ring-1 ring-inset ring-teal-500/15">
-              <ShieldCheck className="mt-px h-4 w-4 shrink-0 text-teal-600 dark:text-teal-300" />
+              <ShieldCheck className="mt-px h-4 w-4 shrink-0 text-teal-700 dark:text-teal-300" />
               <p className="text-2xs leading-relaxed text-text-secondary">
                 Qualified via &quot;{detail.candidate.source_contest?.title ?? "a Mellow assessment"}&quot; on{" "}
                 {fmtDate(detail.candidate.qualified_at)}.
@@ -1373,7 +1373,7 @@ function HireForm({ candidateId, onClose, onDone }: { candidateId: number; onClo
       }
     >
       <div className="mb-4 flex items-start gap-2.5 rounded-xl bg-amber-500/[0.08] px-3.5 py-2.5 ring-1 ring-inset ring-amber-500/25">
-        <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-300" />
+        <AlertTriangle className="mt-px h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
         <p className="text-2xs leading-relaxed text-text-secondary">
           This is final — the candidate is notified immediately and removed from every other partner&apos;s Talent Pool search.
         </p>

@@ -146,7 +146,7 @@ function ArticleReaderPageContent() {
                 <TopicIcon name={article.icon ?? article.article_topic.icon} className="w-4.5 h-4.5" />
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-primary leading-tight">{article.title}</h1>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11.5px] text-text-muted">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-2xs text-text-muted">
                 {article.created_by && <span className="font-semibold text-text-secondary">{article.created_by.name}</span>}
                 {article.published_at && (
                   <span className="flex items-center gap-1">

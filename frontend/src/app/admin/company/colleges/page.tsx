@@ -361,7 +361,7 @@ export default function PartnerCollegesPage() {
                                 Placed
                               </dt>
                               <dd className="mt-1">
-                                <span className="tabular text-15 font-extrabold text-emerald-600 dark:text-emerald-300">{rate.toFixed(0)}%</span>
+                                <span className="tabular text-15 font-extrabold text-emerald-700 dark:text-emerald-300">{rate.toFixed(0)}%</span>
                                 <HpProgress value={rate} tone="emerald" className="mt-1.5" />
                               </dd>
                             </div>

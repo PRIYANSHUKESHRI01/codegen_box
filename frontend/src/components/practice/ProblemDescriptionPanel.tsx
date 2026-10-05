@@ -35,7 +35,7 @@ export function ProblemDescriptionPanel({
           {problem.examples.map((example, idx) => (
             <div key={idx} className="rounded-control bg-elevated/60 border border-border-subtle p-4 space-y-1.5">
               <div className="text-xs font-bold text-primary mb-1.5">Example {idx + 1}</div>
-              <div className="font-mono text-[12.5px] text-text-secondary space-y-1">
+              <div className="font-mono text-13 text-text-secondary space-y-1">
                 <div>
                   <span className="text-text-muted">Input: </span>
                   {example.input}
@@ -45,7 +45,7 @@ export function ProblemDescriptionPanel({
                   {example.output}
                 </div>
                 {example.explanation && (
-                  <div className="pt-1.5 text-text-muted font-sans text-[12.5px] leading-relaxed">
+                  <div className="pt-1.5 text-text-muted font-sans text-13 leading-relaxed">
                     <span className="font-semibold text-text-secondary">Explanation: </span>
                     {example.explanation}
                   </div>
@@ -84,7 +84,7 @@ export function ProblemDescriptionPanel({
               {problem.hints.slice(0, revealedHints).map((hint, idx) => (
                 <div
                   key={idx}
-                  className="text-[12.5px] text-text-secondary leading-relaxed bg-amber-500/5 border border-amber-500/20 rounded-control p-3"
+                  className="text-13 text-text-secondary leading-relaxed bg-amber-500/5 border border-amber-500/20 rounded-control p-3"
                 >
                   <span className="font-bold text-amber-400">Hint {idx + 1}: </span>
                   {hint}

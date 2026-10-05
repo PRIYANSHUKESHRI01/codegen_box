@@ -181,7 +181,7 @@ export function LeadKanbanBoard({
               </AnimatePresence>
 
               {columnLeads.length === 0 && (
-                <div className="h-full min-h-[80px] flex items-center justify-center text-3xs text-text-muted/70 border border-dashed border-border-subtle rounded-control">
+                <div className="h-full min-h-[80px] flex items-center justify-center text-2xs font-medium text-text-muted border border-dashed border-border-subtle rounded-control">
                   Drop here
                 </div>
               )}

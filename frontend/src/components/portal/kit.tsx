@@ -99,7 +99,7 @@ export const HP_TONES: Record<HpTone, ToneStyle> = {
   teal: {
     tile: "bg-gradient-to-br from-teal-400 to-cyan-600 shadow-[0_8px_18px_-6px_rgba(20,184,166,0.65)]",
     soft: "bg-teal-500/10 text-teal-700 dark:text-teal-300 ring-teal-500/20",
-    text: "text-teal-600 dark:text-teal-300",
+    text: "text-teal-700 dark:text-teal-300",
     fill: "bg-teal-500",
     bar: "bg-gradient-to-r from-teal-400 to-cyan-500",
     hex: "#14B8A6",
@@ -107,7 +107,7 @@ export const HP_TONES: Record<HpTone, ToneStyle> = {
   emerald: {
     tile: "bg-gradient-to-br from-emerald-400 to-green-600 shadow-[0_8px_18px_-6px_rgba(16,185,129,0.65)]",
     soft: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 ring-emerald-500/20",
-    text: "text-emerald-600 dark:text-emerald-300",
+    text: "text-emerald-700 dark:text-emerald-300",
     fill: "bg-emerald-500",
     bar: "bg-gradient-to-r from-emerald-400 to-green-500",
     hex: "#10B981",
@@ -115,7 +115,7 @@ export const HP_TONES: Record<HpTone, ToneStyle> = {
   amber: {
     tile: "bg-gradient-to-br from-amber-400 to-orange-500 shadow-[0_8px_18px_-6px_rgba(245,158,11,0.65)]",
     soft: "bg-amber-500/10 text-amber-700 dark:text-amber-300 ring-amber-500/25",
-    text: "text-amber-600 dark:text-amber-300",
+    text: "text-amber-700 dark:text-amber-300",
     fill: "bg-amber-500",
     bar: "bg-gradient-to-r from-amber-400 to-orange-500",
     hex: "#F59E0B",
@@ -123,7 +123,7 @@ export const HP_TONES: Record<HpTone, ToneStyle> = {
   rose: {
     tile: "bg-gradient-to-br from-rose-400 to-red-600 shadow-[0_8px_18px_-6px_rgba(244,63,94,0.65)]",
     soft: "bg-rose-500/10 text-rose-700 dark:text-rose-300 ring-rose-500/20",
-    text: "text-rose-600 dark:text-rose-300",
+    text: "text-rose-700 dark:text-rose-300",
     fill: "bg-rose-500",
     bar: "bg-gradient-to-r from-rose-400 to-red-500",
     hex: "#F43F5E",
@@ -131,7 +131,7 @@ export const HP_TONES: Record<HpTone, ToneStyle> = {
   sky: {
     tile: "bg-gradient-to-br from-sky-400 to-blue-600 shadow-[0_8px_18px_-6px_rgba(14,165,233,0.65)]",
     soft: "bg-sky-500/10 text-sky-700 dark:text-sky-300 ring-sky-500/20",
-    text: "text-sky-600 dark:text-sky-300",
+    text: "text-sky-700 dark:text-sky-300",
     fill: "bg-sky-500",
     bar: "bg-gradient-to-r from-sky-400 to-blue-500",
     hex: "#0EA5E9",
@@ -467,7 +467,7 @@ export function HpSectionHeader({
         {icon && <HpIconTile icon={icon} tone={tone} size="sm" />}
         <div className="min-w-0">
           <h2 className="truncate text-15 font-bold tracking-tight text-primary">{title}</h2>
-          {subtitle && <p className="truncate text-2xs text-text-muted">{subtitle}</p>}
+          {subtitle && <p className="line-clamp-2 text-2xs text-text-muted">{subtitle}</p>}
         </div>
       </div>
       {action && <div className="shrink-0">{action}</div>}
@@ -581,7 +581,7 @@ export function HpStatCard({
               <span
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-3xs font-bold",
-                  delta.positive === false ? "bg-rose-500/10 text-rose-600 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
+                  delta.positive === false ? "bg-rose-500/10 text-rose-700 dark:text-rose-300" : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                 )}
               >
                 {delta.label}

@@ -445,7 +445,7 @@ function MockContestCard({
               </p>
               <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
                 <ScMeta icon={Timer}>{formatSpan(windowMs)} window</ScMeta>
-                <ScMeta icon={phase === "live" ? Radio : CalendarClock} className={cn(phase === "live" && "text-sky-600 dark:text-sky-300")}>
+                <ScMeta icon={phase === "live" ? Radio : CalendarClock} className={cn(phase === "live" && "text-sky-700 dark:text-sky-300")}>
                   {relative}
                 </ScMeta>
               </div>

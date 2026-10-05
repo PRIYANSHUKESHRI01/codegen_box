@@ -151,7 +151,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
             {form.cgpa.trim() && (
               <span className="tabular relative shrink-0 rounded-xl bg-[rgb(var(--bg-surface-rgb))] px-2.5 py-1.5 text-center ring-1 ring-inset ring-border-subtle">
                 <span className="block text-13 font-extrabold leading-none text-primary">{form.cgpa}</span>
-                <span className="mt-0.5 block text-[9px] font-bold uppercase tracking-[0.1em] text-text-muted">CGPA</span>
+                <span className="mt-0.5 block text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">CGPA</span>
               </span>
             )}
           </div>
@@ -245,7 +245,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
                       value={form.cgpa}
                       onChange={set("cgpa")}
                       placeholder="0-10"
-                      className={cn(hpInput, "tabular pl-10 font-mono")}
+                      className={cn(hpInput, "tabular pl-10 font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
                     />
                   </IconField>
                 </div>
@@ -261,7 +261,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
                       value={form.backlogs}
                       onChange={set("backlogs")}
                       placeholder="0"
-                      className={cn(hpInput, "tabular pl-10 font-mono")}
+                      className={cn(hpInput, "tabular pl-10 font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none")}
                     />
                   </IconField>
                 </div>

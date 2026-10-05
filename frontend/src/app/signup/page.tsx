@@ -140,7 +140,7 @@ export default function SignupPage() {
               .
             </h1>
 
-            <p className="text-sm text-text-secondary leading-relaxed">
+            <p className="text-base font-medium text-text-secondary leading-relaxed text-pretty">
               Create your account to unlock company-specific interview prep, a real practice arena, and
               a live countdown to every drive your campus maps.
             </p>
@@ -160,19 +160,19 @@ export default function SignupPage() {
                 <div className="w-8 h-8 rounded-control bg-accent-primary/10 border border-accent-primary/20 flex items-center justify-center text-accent-primary shrink-0">
                   <item.icon className="w-4 h-4" />
                 </div>
-                <span className="text-xs text-text-secondary">{item.text}</span>
+                <span className="text-sm font-medium text-text-secondary">{item.text}</span>
               </motion.div>
             ))}
           </motion.div>
 
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border-subtle text-xs">
+          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border-subtle text-xs">
             <div>
-              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.problems_total : "—"}</strong>
-              <span className="text-2xs text-text-muted">Practice Problems</span>
+              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.problems_total : "—"}</strong>
+              <span className="text-xs font-medium text-text-muted">Practice Problems</span>
             </div>
             <div>
-              <strong className="block text-primary font-mono text-base">{publicStats ? publicStats.topics_total : "—"}</strong>
-              <span className="text-2xs text-text-muted">DSA Topics</span>
+              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.topics_total : "—"}</strong>
+              <span className="text-xs font-medium text-text-muted">DSA Topics</span>
             </div>
           </div>
         </motion.div>
@@ -198,14 +198,14 @@ export default function SignupPage() {
                   this same role. */}
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-control bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <div className="w-9 h-9 rounded-control bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center text-emerald-700 dark:text-emerald-400 shrink-0">
                     <GraduationCap className="w-4.5 h-4.5" />
                   </div>
                   <h1 className="text-2xl font-bold text-primary tracking-tight">
                     Create your student account
                   </h1>
                 </div>
-                <p className="text-xs text-text-muted">
+                <p className="text-sm font-medium leading-relaxed text-text-secondary">
                   Free, instant access — practice, prep, and track every drive.
                 </p>
               </div>
@@ -215,9 +215,9 @@ export default function SignupPage() {
                   competing with the form for attention. Routes to the same
                   lead-capture flow the marketing site already uses, instead
                   of a form that was always going to dead-end on submit. */}
-              <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-control bg-indigo-500/5 border border-indigo-500/15">
-                <span className="flex items-center gap-2 text-2xs text-text-muted leading-snug">
-                  <Info className="w-3.5 h-3.5 text-indigo-500 dark:text-indigo-400 shrink-0" />
+              <div className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-control bg-indigo-500/[0.07] border border-indigo-500/25">
+                <span className="flex items-center gap-2.5 text-xs font-medium text-text-secondary leading-snug">
+                  <Info className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
                   <span>
                     <span className="font-bold text-primary">Not a student?</span> College & hiring-partner
                     access is set up by our team.
@@ -226,10 +226,10 @@ export default function SignupPage() {
                 <button
                   type="button"
                   onClick={() => setContactOpen(true)}
-                  className="shrink-0 inline-flex items-center gap-0.5 text-2xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="shrink-0 inline-flex items-center gap-0.5 text-xs font-bold text-indigo-700 dark:text-indigo-400 hover:underline"
                 >
                   Talk to us
-                  <ArrowUpRight className="w-3 h-3" />
+                  <ArrowUpRight className="w-3.5 h-3.5" />
                 </button>
               </div>
 
@@ -239,7 +239,7 @@ export default function SignupPage() {
                 initial="hidden"
                 animate="show"
                 onSubmit={handleSignupSubmit}
-                className="space-y-4 text-xs"
+                className="space-y-4 text-sm"
               >
                 {/* Name and email each get their own row rather than a 2-up
                     grid — keeps a real email address from ever clipping,
@@ -305,8 +305,8 @@ export default function SignupPage() {
                       text rather than a boxed callout — this is useful
                       context, not a warning, so it shouldn't carry the same
                       visual weight as one. */}
-                  <p className="text-3xs text-text-muted leading-snug flex items-start gap-1.5">
-                    <GraduationCap className="w-3 h-3 text-text-muted shrink-0 mt-px" />
+                  <p className="text-xs font-medium text-text-secondary leading-snug flex items-start gap-2">
+                    <GraduationCap className="w-4 h-4 text-emerald-700 dark:text-emerald-400 shrink-0 -mt-px" />
                     <span>
                       No college required. Already on a partner campus? Your TPO emails you official
                       login credentials directly — no need to sign up here.
@@ -345,7 +345,7 @@ export default function SignupPage() {
                               transition={{ duration: 0.3, ease: "easeOut" }}
                             />
                           </div>
-                          <div className="text-3xs text-text-muted">{STRENGTH_META[strength].label}</div>
+                          <div className="text-xs font-semibold text-text-secondary">{STRENGTH_META[strength].label}</div>
                         </div>
                       </motion.div>
                     )}
@@ -381,7 +381,7 @@ export default function SignupPage() {
                         )}
                       </AnimatePresence>
                     </button>
-                    <span className="text-text-secondary text-xs leading-tight">
+                    <span className="text-text-secondary text-sm font-medium leading-snug">
                       I agree to the CodeGen Box{" "}
                       <Link href="/#" className="text-accent-primary hover:underline">
                         Terms of Service
@@ -408,7 +408,7 @@ export default function SignupPage() {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/30 text-2xs text-status-danger leading-relaxed">
+                      <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/30 text-xs font-semibold text-status-danger leading-relaxed">
                         {error}
                       </div>
                     </motion.div>
@@ -424,7 +424,7 @@ export default function SignupPage() {
               </motion.form>
 
               {/* Already have an account */}
-              <div className="text-center text-xs text-text-muted pt-2 border-t border-border-subtle">
+              <div className="text-center text-sm font-medium text-text-secondary pt-3 border-t border-border-subtle">
                 Already registered?{" "}
                 <Link href="/login" className="text-accent-primary font-bold hover:underline">
                   Sign in to your dashboard &rarr;

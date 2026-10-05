@@ -166,7 +166,7 @@ export default function AdminInterviewTracksPage() {
                     {t.tech_stack_tags && t.tech_stack_tags.length > 0 && (
                       <div className="text-3xs text-text-muted mt-0.5">{t.tech_stack_tags.join(" · ")}</div>
                     )}
-                    <div className="text-[10.5px] text-text-secondary mt-1.5 space-y-0.5">
+                    <div className="text-3xs text-text-secondary mt-1.5 space-y-0.5">
                       {t.rounds_config.map((r) => (
                         <div key={r.round_number}>
                           R{r.round_number} {r.round_name}: {r.question_count}q, qualifying {r.qualifying_score_percent}%
@@ -206,13 +206,13 @@ export default function AdminInterviewTracksPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-bold text-primary">{track.title}</span>
                         <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", STATUS_COLOR[track.status])}>{track.status}</span>
-                        {track.role_template && <span className="text-[10.5px] text-text-muted">{track.role_template.name}</span>}
+                        {track.role_template && <span className="text-3xs text-text-muted">{track.role_template.name}</span>}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {track.track_type === "company" && (
                           <button
                             onClick={() => setVisibilityTrack(track)}
-                            className="px-2.5 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[10.5px] font-bold text-text-secondary hover:text-primary transition-colors"
+                            className="px-2.5 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-3xs font-bold text-text-secondary hover:text-primary transition-colors"
                           >
                             Manage Visibility
                           </button>
@@ -220,7 +220,7 @@ export default function AdminInterviewTracksPage() {
                         {track.status === "draft" && (
                           <button
                             onClick={() => handlePublishTrack(track)}
-                            className="px-2.5 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-[10.5px] font-bold transition-colors"
+                            className="px-2.5 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-3xs font-bold transition-colors"
                           >
                             Publish
                           </button>
@@ -249,7 +249,7 @@ export default function AdminInterviewTracksPage() {
                             </div>
                             <button
                               onClick={() => setReviewingRound({ track, round })}
-                              className="flex items-center gap-1 text-[10.5px] font-semibold text-accent-primary hover:underline"
+                              className="flex items-center gap-1 text-3xs font-semibold text-accent-primary hover:underline"
                             >
                               <Users className="w-3 h-3" />
                               Review Candidates

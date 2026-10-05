@@ -184,7 +184,7 @@ export default function AdminInterviewsPage() {
                       {interview.status}
                     </span>
                     {interview.is_mock && (
-                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/15 text-amber-600">
+                      <span className="flex items-center gap-1 px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/15 text-amber-700">
                         <Sparkles className="w-2.5 h-2.5" />
                         Practice Round
                       </span>
@@ -345,7 +345,7 @@ function ManageVisibilityModal({
         </>
       }
     >
-        <p className="text-[10.5px] text-text-muted mb-3">
+        <p className="text-3xs text-text-muted mb-3">
           The drive may be live at more colleges than this interview targets — check only the ones this interview
           should actually go to.
         </p>

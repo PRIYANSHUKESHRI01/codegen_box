@@ -111,7 +111,7 @@ export function StatTile({
           <span
             className={cn(
               "text-[26px] leading-none tracking-tight sm:text-[28px]",
-              isPlaceholder ? "font-bold text-text-muted/60" : "font-black text-primary"
+              isPlaceholder ? "font-bold text-text-muted" : "font-black text-primary"
             )}
           >
             {value}

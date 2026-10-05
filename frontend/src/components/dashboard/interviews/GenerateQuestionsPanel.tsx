@@ -336,7 +336,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
                 type="button"
                 onClick={() => toggleCategory(c)}
                 className={cn(
-                  "px-2.5 py-1 rounded-control text-[10.5px] font-bold border transition-colors",
+                  "px-2.5 py-1 rounded-control text-3xs font-bold border transition-colors",
                   categories.has(c) ? CATEGORY_COLORS[c] : "bg-elevated border-border-subtle text-text-muted hover:text-text-secondary"
                 )}
               >
@@ -398,7 +398,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
 
       {questions.length > 0 && (
         <div className="space-y-2 pt-1">
-          <div className="flex items-center gap-1.5 text-[10.5px] font-semibold text-status-success">
+          <div className="flex items-center gap-1.5 text-3xs font-semibold text-status-success">
             <CheckCircle2 className="w-3.5 h-3.5" />
             {questions.length} question{questions.length === 1 ? "" : "s"} ready
             {onAddNow ? " — click Add to attach one to this interview" : " — attached when you create the interview"}
@@ -433,7 +433,7 @@ export function GenerateQuestionsPanel({ defaultRole, companyId, onAcceptedChang
                     onClick={() => handleAddNow(q)}
                     disabled={addingId === q.id || regeneratingId === q.id}
                     title="Add to interview"
-                    className="flex items-center gap-1 px-2 py-1.5 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white transition-colors disabled:opacity-50 text-[10.5px] font-bold"
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white transition-colors disabled:opacity-50 text-3xs font-bold"
                   >
                     {addingId === q.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                     Add

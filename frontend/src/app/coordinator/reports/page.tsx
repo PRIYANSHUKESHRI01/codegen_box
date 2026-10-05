@@ -285,7 +285,7 @@ export default function CoordinatorReportsPage() {
               {liveStat && (
                 <p
                   className={cn(
-                    "text-[10.5px] font-bold mb-4 flex items-center gap-1.5",
+                    "text-3xs font-bold mb-4 flex items-center gap-1.5",
                     liveStat.tone === "danger"
                       ? "text-status-danger"
                       : liveStat.tone === "success"

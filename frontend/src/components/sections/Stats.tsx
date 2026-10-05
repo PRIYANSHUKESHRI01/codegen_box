@@ -25,17 +25,17 @@ const SCHEME_STYLES: Record<
     topBorder: "from-indigo-500 via-indigo-400 to-transparent",
   },
   cyan: {
-    iconBox: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20",
+    iconBox: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-400 border-cyan-500/20",
     glow: "from-cyan-500/10 to-transparent",
     topBorder: "from-cyan-500 via-cyan-400 to-transparent",
   },
   amber: {
-    iconBox: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20",
+    iconBox: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20",
     glow: "from-amber-500/10 to-transparent",
     topBorder: "from-amber-500 via-amber-400 to-transparent",
   },
   emerald: {
-    iconBox: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20",
+    iconBox: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20",
     glow: "from-emerald-500/10 to-transparent",
     topBorder: "from-emerald-500 via-emerald-400 to-transparent",
   },

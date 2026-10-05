@@ -606,7 +606,7 @@ function InterviewSessionPageContent() {
                                 <span className="text-2xs font-semibold text-primary line-clamp-1">{r.question_text}</span>
                                 <span className="text-2xs font-bold text-accent-primary shrink-0">{r.score}/100</span>
                               </div>
-                              <p className="text-[10.5px] text-text-secondary mt-1 leading-relaxed">{r.feedback}</p>
+                              <p className="text-3xs text-text-secondary mt-1 leading-relaxed">{r.feedback}</p>
                             </div>
                           ))}
                         </div>
@@ -725,7 +725,7 @@ function InterviewSessionPageContent() {
                           </span>
 
                           {interimCaption ? (
-                            <p className="max-w-sm min-h-[2.5em] text-[11.5px] text-text-secondary italic leading-relaxed flex items-start gap-1.5">
+                            <p className="max-w-sm min-h-[2.5em] text-2xs text-text-secondary italic leading-relaxed flex items-start gap-1.5">
                               <span className="w-1.5 h-1.5 rounded-full bg-status-danger animate-pulse shrink-0 mt-1" />
                               <span>{interimCaption.length > 180 ? `…${interimCaption.slice(-180)}` : interimCaption}</span>
                             </p>

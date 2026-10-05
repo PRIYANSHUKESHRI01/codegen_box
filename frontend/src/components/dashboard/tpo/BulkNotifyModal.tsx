@@ -80,7 +80,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
           title="Notify Students"
           subtitle={`Sending to ${target.label}`}
           icon={Mail}
-          size="lg"
+          size="xl"
           variant="premium"
           footer={
             <>
@@ -385,7 +385,7 @@ function OptionCard({
         <Icon className={compact ? "h-4 w-4" : "h-[18px] w-[18px]"} strokeWidth={2.2} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className={cn("block truncate font-bold", compact ? "text-xs" : "text-13", active ? "text-primary" : "text-text-secondary")}>{title}</span>
+        <span className={cn("block font-bold leading-snug", compact ? "text-xs" : "text-13", active ? "text-primary" : "text-text-secondary")}>{title}</span>
         {description && <span className="mt-0.5 block text-2xs leading-snug text-text-muted">{description}</span>}
       </span>
       <span

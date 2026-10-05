@@ -430,7 +430,7 @@ function PremiumDrawer({
                           student.backlogs === null ? (
                             <span className="font-semibold text-text-muted">Not on file</span>
                           ) : (
-                            <span className={cn(student.backlogs > 0 ? "text-rose-600 dark:text-rose-300" : "text-emerald-600 dark:text-emerald-300")}>
+                            <span className={cn(student.backlogs > 0 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300")}>
                               {student.backlogs}
                             </span>
                           )

@@ -123,7 +123,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
                 type="button"
                 onClick={() => setStatus(s)}
                 className={cn(
-                  "px-2.5 py-1 rounded-control text-[10.5px] font-bold capitalize transition-all",
+                  "px-2.5 py-1 rounded-control text-3xs font-bold capitalize transition-all",
                   status === s ? "bg-accent-primary text-white" : "text-text-secondary hover:text-primary"
                 )}
               >
@@ -131,7 +131,7 @@ export function ArticleEditor({ mode, initialArticle }: ArticleEditorProps) {
               </button>
             ))}
           </div>
-          <span className="flex items-center gap-1 text-[10.5px] text-text-muted ml-auto">
+          <span className="flex items-center gap-1 text-3xs text-text-muted ml-auto">
             <Clock3 className="w-3 h-3" />
             {readingMinutes} min read · {wordCount} words
           </span>

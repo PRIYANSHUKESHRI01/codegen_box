@@ -1,7 +1,7 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useId, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
   Plus,
@@ -456,9 +456,15 @@ export default function CampusDrivesPage() {
   const toastTone = toastMessage && /^(Failed|No applicants|Enter a valid)/.test(toastMessage) ? "rose" : "emerald";
 
   const tabItems: DriveFilterItem[] = [
-    { id: "mapped", label: "Mapped", count: mappedDrives.length, icon: Link2 },
-    { id: "available", label: "Available to Map", count: availableDrives.length, icon: Compass },
-    { id: "pending", label: "Pending Approvals", count: pendingMappings.length, icon: Inbox, attention: pendingMappings.length > 0 },
+    { id: "mapped", label: "Mapped", count: initialLoading ? undefined : mappedDrives.length, icon: Link2 },
+    { id: "available", label: "Available to Map", count: initialLoading ? undefined : availableDrives.length, icon: Compass },
+    {
+      id: "pending",
+      label: "Pending Approvals",
+      count: initialLoading ? undefined : pendingMappings.length,
+      icon: Inbox,
+      attention: pendingMappings.length > 0,
+    },
   ];
 
   const renderMappedCard = (drv: DriveRow, idx: number) => {
@@ -529,7 +535,7 @@ export default function CampusDrivesPage() {
                 icon={Link2}
                 tone="sky"
                 loading={initialLoading}
-                hint={completedCount > 0 ? `${completedCount} completed` : "live in your catalog"}
+                hint={initialLoading ? undefined : completedCount > 0 ? `${completedCount} completed` : "live in your catalog"}
               />
               <HpStatCard
                 label="Upcoming"
@@ -537,7 +543,7 @@ export default function CampusDrivesPage() {
                 icon={CalendarClock}
                 tone="indigo"
                 loading={initialLoading}
-                hint={nextDrive ? `next on ${formatShortDay(nextDrive.driveDateIso)}` : "none scheduled"}
+                hint={initialLoading ? undefined : nextDrive ? `next on ${formatShortDay(nextDrive.driveDateIso)}` : "none scheduled"}
               />
               <HpStatCard
                 label="Pending approvals"
@@ -545,7 +551,7 @@ export default function CampusDrivesPage() {
                 icon={Inbox}
                 tone="amber"
                 loading={initialLoading}
-                hint={pendingMappings.length > 0 ? "awaiting your review" : "all caught up"}
+                hint={initialLoading ? undefined : pendingMappings.length > 0 ? "awaiting your review" : "all caught up"}
               />
               <HpStatCard
                 label="Available to map"
@@ -773,7 +779,8 @@ export default function CampusDrivesPage() {
 interface DriveFilterItem {
   id: DriveTab;
   label: string;
-  count: number;
+  /** Omitted while the lists are still loading, so the badge never shows a false 0. */
+  count?: number;
   icon: LucideIcon;
   /** Tints the count amber while the list holds something waiting on the TPO. */
   attention?: boolean;
@@ -801,7 +808,7 @@ function DriveFilter({ items, value, onChange }: { items: DriveFilterItem[]; val
             key={t.id}
             type="button"
             aria-pressed={active}
-            aria-label={`${t.label} (${t.count})`}
+            aria-label={t.count !== undefined ? `${t.label} (${t.count})` : t.label}
             onClick={() => onChange(t.id)}
             className={cn(
               "relative flex shrink-0 items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
@@ -816,20 +823,22 @@ function DriveFilter({ items, value, onChange }: { items: DriveFilterItem[]; val
               />
             )}
             <span className="relative flex items-center gap-1.5" aria-hidden>
-              <Icon className={cn("h-3.5 w-3.5", active && "text-sky-600 dark:text-sky-300")} />
+              <Icon className={cn("h-3.5 w-3.5", active && "text-sky-700 dark:text-sky-300")} />
               {t.label}
-              <span
-                className={cn(
-                  "tabular rounded-full px-1.5 py-px text-3xs font-bold",
-                  t.attention
-                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
-                    : active
-                    ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
-                    : "bg-border-subtle text-text-muted"
-                )}
-              >
-                {t.count}
-              </span>
+              {t.count !== undefined && (
+                <span
+                  className={cn(
+                    "tabular rounded-full px-1.5 py-px text-3xs font-bold",
+                    t.attention
+                      ? "bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                      : active
+                      ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300"
+                      : "bg-border-subtle text-text-muted"
+                  )}
+                >
+                  {t.count}
+                </span>
+              )}
             </span>
           </button>
         );
@@ -1059,7 +1068,7 @@ function MappedDriveCard({
           <div className="mt-2 flex flex-wrap items-center gap-x-3.5 gap-y-1">
             <ScMeta icon={Calendar}>{formatDriveDate(drv.driveDateIso)}</ScMeta>
             {drv.durationMinutes ? <ScMeta icon={Timer}>{drv.durationMinutes} minutes</ScMeta> : null}
-            <ScMeta icon={Clock} className={cn(soon && "text-amber-600 dark:text-amber-300")}>
+            <ScMeta icon={Clock} className={cn(soon && "text-amber-700 dark:text-amber-300")}>
               {formatRelative(date)}
             </ScMeta>
           </div>
@@ -1088,7 +1097,7 @@ function MappedDriveCard({
                 {placedCount > 0 && (
                   <>
                     <span className="text-text-muted"> · </span>
-                    <span className="tabular font-semibold text-emerald-600 dark:text-emerald-300">{placedCount} placed</span>
+                    <span className="tabular font-semibold text-emerald-700 dark:text-emerald-300">{placedCount} placed</span>
                   </>
                 )}
               </span>
@@ -1224,6 +1233,8 @@ function ApplicantRow({
   const isTerminal = DRIVE_APPLICATION_TERMINAL_STAGES.includes(app.stage);
   const isPromptingThisRow = ctcPrompt !== null;
   const ctcInputId = `drive-ctc-${app.id}`;
+  const promptRef = useRef<HTMLDivElement>(null);
+  const reduce = useReducedMotion();
 
   return (
     <motion.li
@@ -1239,7 +1250,7 @@ function ApplicantRow({
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <p className="truncate text-13 font-bold text-primary">{app.user.name}</p>
               {app.ctc_offered && (
-                <span className="tabular inline-flex items-center gap-1 font-mono text-2xs font-bold text-emerald-600 dark:text-emerald-300">
+                <span className="tabular inline-flex items-center gap-1 font-mono text-2xs font-bold text-emerald-700 dark:text-emerald-300">
                   <Wallet className="h-3 w-3" aria-hidden />
                   {app.ctc_offered} LPA
                 </span>
@@ -1293,7 +1304,19 @@ function ApplicantRow({
       {/* Inline CTC capture for an offer stage */}
       <AnimatePresence initial={false}>
         {ctcPrompt && (
-          <ScCollapse>
+          <motion.div
+            ref={promptRef}
+            initial={reduce ? false : { height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={reduce ? { opacity: 0, transition: { duration: 0 } } : { height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: hpEase }}
+            // The applicant list scrolls inside a capped box, so a prompt opened
+            // on a lower row can land clipped — bring it into view once it's open.
+            onAnimationComplete={(def) => {
+              if ((def as { opacity?: number }).opacity === 1) promptRef.current?.scrollIntoView({ block: "nearest", behavior: reduce ? "auto" : "smooth" });
+            }}
+            className="overflow-hidden"
+          >
             <div className="mx-4 mb-4 flex flex-col gap-3 rounded-2xl border border-amber-500/25 bg-gradient-to-r from-amber-500/[0.08] to-transparent p-4 sm:flex-row sm:items-end">
               <div className="min-w-0 flex-1">
                 <label htmlFor={ctcInputId} className={hpLabel}>
@@ -1330,7 +1353,7 @@ function ApplicantRow({
                 </HpButton>
               </div>
             </div>
-          </ScCollapse>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.li>

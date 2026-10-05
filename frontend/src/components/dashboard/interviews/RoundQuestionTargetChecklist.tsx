@@ -36,7 +36,7 @@ export function RoundQuestionTargetChecklist({
           <div
             key={category}
             className={cn(
-              "flex items-center gap-1.5 px-2.5 py-1 rounded-control border text-[10.5px] font-semibold",
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-control border text-3xs font-semibold",
               met ? "bg-status-success/10 border-status-success/25 text-status-success" : "bg-elevated border-border-subtle text-text-secondary"
             )}
           >

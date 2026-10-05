@@ -40,7 +40,7 @@ export function HowItWorks() {
                       <div className="w-12 h-12 rounded-control bg-elevated border border-border-subtle flex items-center justify-center text-accent-primary group-hover:bg-accent-primary group-hover:text-white transition-all duration-200">
                         <Icon className="w-5 h-5" />
                       </div>
-                      <span className="font-mono text-2xl font-black text-text-muted/40 group-hover:text-accent-primary/60 transition-colors">
+                      <span className="font-mono text-2xl font-black text-text-muted/60 group-hover:text-accent-primary transition-colors">
                         {step.step}
                       </span>
                     </div>

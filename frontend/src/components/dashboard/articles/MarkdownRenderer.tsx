@@ -55,7 +55,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
       <SyntaxHighlighter
         language={language || "text"}
         style={vscDarkPlus}
-        customStyle={{ margin: 0, padding: "14px 16px", fontSize: "12.5px", lineHeight: 1.6, background: "#1e1e1e" }}
+        customStyle={{ margin: 0, padding: "14px 16px", fontSize: "13px", lineHeight: 1.6, background: "#1e1e1e" }}
         wrapLongLines
       >
         {code}

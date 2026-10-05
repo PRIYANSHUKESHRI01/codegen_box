@@ -65,7 +65,6 @@ import {
   HpIconTile,
   HpItem,
   HpPill,
-  HpProgress,
   HpRing,
   HpSectionHeader,
   HpSkeleton,
@@ -332,6 +331,34 @@ function TargetRing({
         {marker && <line {...marker} strokeWidth={3} strokeLinecap="round" className="stroke-primary" />}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * Same look as the kit's HpProgress, but it animates on mount rather than on
+ * scroll-into-view: most of these bars sit below the fold, and an in-view
+ * trigger can be skipped by a fast scroll (or never fire in a print/capture),
+ * leaving the bar empty. Deterministic beats a missed reveal.
+ */
+function TpoBar({ value, tone = "sky", className, label }: { value: number; tone?: HpTone; className?: string; label?: string }) {
+  const reduce = useReducedMotion();
+  const pct = Math.max(0, Math.min(100, value));
+  return (
+    <div
+      className={cn("h-1.5 w-full overflow-hidden rounded-full bg-elevated", className)}
+      role="progressbar"
+      aria-valuenow={Math.round(pct)}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-label={label}
+    >
+      <motion.div
+        className={cn("h-full rounded-full", HP_TONES[tone].bar)}
+        initial={reduce ? false : { width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: reduce ? 0 : 0.9, ease: hpEase, delay: reduce ? 0 : 0.2 }}
+      />
     </div>
   );
 }
@@ -805,7 +832,7 @@ export function TpoCommandCenter({ user }: Props) {
               {targetPct !== null ? (
                 <dl className="min-w-0 flex-1 space-y-3">
                   <Fact label="Target">{fmtPct(targetPct)}%</Fact>
-                  <Fact label="To go" className={reached ? "text-emerald-600 dark:text-emerald-300" : undefined}>
+                  <Fact label="To go" className={reached ? "text-emerald-700 dark:text-emerald-300" : undefined}>
                     {reached
                       ? "Target reached"
                       : offersToGo !== null
@@ -814,7 +841,7 @@ export function TpoCommandCenter({ user }: Props) {
                   </Fact>
                   <Fact
                     label="Deadline"
-                    className={deadlineDays !== null && deadlineDays < 0 && !reached ? "text-amber-600 dark:text-amber-300" : undefined}
+                    className={deadlineDays !== null && deadlineDays < 0 && !reached ? "text-amber-700 dark:text-amber-300" : undefined}
                   >
                     {deadlineDays === null
                       ? "Not set"
@@ -866,7 +893,7 @@ export function TpoCommandCenter({ user }: Props) {
                   <span className="font-semibold text-text-secondary">Progress to goal</span>
                   <span className="tabular font-bold text-primary">{Math.round(progressToGoal)}%</span>
                 </div>
-                <HpProgress value={progressToGoal} tone={reached ? "emerald" : "sky"} />
+                <TpoBar value={progressToGoal} tone={reached ? "emerald" : "sky"} label="Progress to placement target" />
                 <div className="tabular mt-1.5 flex justify-between text-3xs font-medium text-text-muted">
                   <span>0%</span>
                   <span>Target {fmtPct(targetPct)}%</span>
@@ -879,7 +906,7 @@ export function TpoCommandCenter({ user }: Props) {
                 <ScCollapse key="target-editor" id={editorId}>
                   <div className="mt-5 rounded-2xl border border-sky-500/25 bg-gradient-to-br from-sky-500/[0.08] via-indigo-500/[0.04] to-transparent p-4">
                     <div className="flex items-center gap-2 text-xs font-bold text-primary">
-                      <CalendarClock className="h-4 w-4 text-sky-600 dark:text-sky-300" aria-hidden />
+                      <CalendarClock className="h-4 w-4 text-sky-700 dark:text-sky-300" aria-hidden />
                       {hasTarget ? "Update your target" : "Set your target"}
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 2xl:grid-cols-2">
@@ -978,7 +1005,7 @@ export function TpoCommandCenter({ user }: Props) {
                   {dropOff && dropOff.rate < 100 && (
                     <div className="rounded-2xl bg-elevated/60 p-3 ring-1 ring-inset ring-border-subtle">
                       <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                        <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-300" aria-hidden />
+                        <TrendingDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" aria-hidden />
                         Biggest drop-off
                       </div>
                       <div className="mt-1 text-xs font-bold text-primary">
@@ -1057,10 +1084,10 @@ export function TpoCommandCenter({ user }: Props) {
                                 <span className="font-semibold text-text-muted"> / {rd.funnel.total}</span>
                               </span>
                             </div>
-                            <HpProgress value={eligiblePct} tone="sky" />
+                            <TpoBar value={eligiblePct} tone="sky" label={`Eligible students for ${d.company.name}`} />
                           </div>
                         )}
-                        <div className="mt-auto flex items-center justify-between gap-2 pt-4">
+                        <div className="mt-auto flex flex-wrap items-center justify-between gap-x-2 gap-y-1 pt-4">
                           <HpPill tone={when.tone} size="sm" dot={when.soon} pulse={when.soon}>
                             {when.label}
                           </HpPill>
@@ -1115,7 +1142,7 @@ export function TpoCommandCenter({ user }: Props) {
                       className="group rounded-xl border border-amber-500/20 bg-amber-500/[0.06] p-3.5 transition-colors hover:border-amber-500/40 hover:bg-amber-500/10"
                     >
                       <div className="flex items-start gap-3">
-                        <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-600 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300">
+                        <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300">
                           <Icon className="h-3.5 w-3.5" aria-hidden />
                         </span>
                         <div className="min-w-0 flex-1">
@@ -1235,7 +1262,7 @@ export function TpoCommandCenter({ user }: Props) {
                         <div className="tabular text-2xs text-text-muted">{plural(s.studentCount, "student")}</div>
                       </div>
                       <div className="flex min-w-[8rem] flex-1 items-center gap-3">
-                        <HpProgress value={s.avgReadiness} tone={readinessTone(s.avgReadiness)} className="flex-1" />
+                        <TpoBar value={s.avgReadiness} tone={readinessTone(s.avgReadiness)} className="flex-1" label={`${label} average readiness`} />
                         <span className="tabular w-14 shrink-0 text-right text-xs font-bold text-primary">
                           {s.avgReadiness}
                           <span className="text-3xs font-semibold text-text-muted">/100</span>
@@ -1368,7 +1395,7 @@ export function TpoCommandCenter({ user }: Props) {
                               </span>
                             </span>
                           </div>
-                          <HpProgress value={b.avg} tone={readinessTone(b.avg)} />
+                          <TpoBar value={b.avg} tone={readinessTone(b.avg)} label={`${b.branch} average readiness`} />
                         </li>
                       ))}
                     </ul>
@@ -1475,9 +1502,8 @@ export function TpoCommandCenter({ user }: Props) {
                         {p.count > 0 && <span className="tabular mb-1 text-2xs font-bold text-primary">{p.count}</span>}
                         <motion.div
                           className="w-full max-w-[44px] rounded-t-[5px] bg-gradient-to-t from-sky-500 to-sky-400 transition-[filter] duration-200 group-hover:brightness-110"
-                          initial={{ height: reduce ? `${height}%` : 0 }}
-                          whileInView={{ height: `${height}%` }}
-                          viewport={{ once: true }}
+                          initial={reduce ? false : { height: 0 }}
+                          animate={{ height: `${height}%` }}
                           transition={{ duration: 0.8, ease: hpEase, delay: i * 0.06 }}
                         />
                       </div>

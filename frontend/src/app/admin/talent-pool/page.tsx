@@ -491,7 +491,7 @@ function CreateContestModal({ colleges, onClose, onCreated }: { colleges: Colleg
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Qualifying Score (%) *</label>
             <input required type="number" min={1} max={100} value={threshold} onChange={(e) => setThreshold(e.target.value)} className="w-28 px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary" />
-            <p className="text-[10.5px] text-text-muted mt-1">A participant scoring at or above this on finalize is added to the Talent Pool.</p>
+            <p className="text-3xs text-text-muted mt-1">A participant scoring at or above this on finalize is added to the Talent Pool.</p>
           </div>
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Audience *</label>
@@ -516,7 +516,7 @@ function CreateContestModal({ colleges, onClose, onCreated }: { colleges: Colleg
               <label className="block font-semibold text-text-secondary mb-1">Colleges *</label>
               <div className="max-h-40 overflow-y-auto space-y-1 p-2 rounded-control bg-elevated border border-border-subtle">
                 {colleges.length === 0 ? (
-                  <p className="text-[10.5px] text-text-muted py-2 text-center">No colleges found.</p>
+                  <p className="text-3xs text-text-muted py-2 text-center">No colleges found.</p>
                 ) : (
                   colleges.map((c) => (
                     <label key={c.id} className="flex items-center gap-2 px-1.5 py-1 rounded hover:bg-surface-hover cursor-pointer">
@@ -725,7 +725,7 @@ function ManageContestProblemsModal({ contest, onClose, onToast }: { contest: Ta
                 {availableProblems.map((p) => (
                   <div key={p.id} className="flex items-center justify-between gap-3 p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-xs">
                     <span className="text-primary truncate">{p.title}</span>
-                    <button onClick={() => handleAdd(p.id)} disabled={addingId === p.id} className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-[10.5px] font-bold transition-colors disabled:opacity-50 shrink-0">
+                    <button onClick={() => handleAdd(p.id)} disabled={addingId === p.id} className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-3xs font-bold transition-colors disabled:opacity-50 shrink-0">
                       {addingId === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
                     </button>
                   </div>
@@ -815,7 +815,7 @@ function ManageInterviewQuestionsModal({ interview, onClose, onToast }: { interv
               {available.map((b) => (
                 <div key={b.id} className="flex items-center justify-between gap-3 p-2.5 rounded-control bg-elevated/60 border border-border-subtle text-xs">
                   <span className="text-primary truncate">{b.question_text}</span>
-                  <button onClick={() => handleAdd(b.id)} disabled={addingId === b.id} className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-[10.5px] font-bold transition-colors disabled:opacity-50 shrink-0">
+                  <button onClick={() => handleAdd(b.id)} disabled={addingId === b.id} className="px-2.5 py-1 rounded-control bg-accent-primary/10 text-accent-primary hover:bg-accent-primary hover:text-white text-3xs font-bold transition-colors disabled:opacity-50 shrink-0">
                     {addingId === b.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Add"}
                   </button>
                 </div>
@@ -910,7 +910,7 @@ function CandidatesTab({ onToast }: { onToast: (msg: string) => void }) {
                 <tr key={row.id} className="hover:bg-surface-hover/50">
                   <td className="px-4 py-3">
                     <div className="font-semibold text-primary">{row.user?.name ?? "—"}</div>
-                    <div className="text-text-muted text-[10.5px]">{row.user?.email}</div>
+                    <div className="text-text-muted text-3xs">{row.user?.email}</div>
                   </td>
                   <td className="px-4 py-3 text-text-secondary">{row.user?.college?.name ?? "Mellow Direct"}</td>
                   <td className="px-4 py-3 font-mono font-bold text-accent-primary">{row.score_percent}%</td>
@@ -928,7 +928,7 @@ function CandidatesTab({ onToast }: { onToast: (msg: string) => void }) {
                     {row.visibility_status !== "hired" && (row.visibility_status === "visible" || row.visibility_status === "pending_consent" || row.visibility_status === "hidden_by_mellow") && (
                       <button
                         onClick={() => handleToggleVisibility(row)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-[10.5px] font-bold text-text-secondary hover:text-primary transition-colors"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-3xs font-bold text-text-secondary hover:text-primary transition-colors"
                       >
                         {row.visibility_status === "hidden_by_mellow" ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
                         {row.visibility_status === "hidden_by_mellow" ? "Unhide" : "Hide"}

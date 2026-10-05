@@ -302,7 +302,7 @@ export function BulkImportCandidatesPanel({ placementDriveId, openingTitle, onIm
                     </div>
                   ) : (
                     <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-2xs">
-                      <span className="tabular inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-300">
+                      <span className="tabular inline-flex items-center gap-1.5 font-semibold text-emerald-700 dark:text-emerald-300">
                         <CheckCircle2 className="h-3.5 w-3.5" />
                         {imp.successful_rows} added
                       </span>
@@ -311,7 +311,7 @@ export function BulkImportCandidatesPanel({ placementDriveId, openingTitle, onIm
                           type="button"
                           onClick={() => setExpandedErrorsId(expandedErrorsId === imp.id ? null : imp.id)}
                           aria-expanded={expanded}
-                          className="tabular inline-flex items-center gap-1 rounded-md font-semibold text-amber-600 transition-colors hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-300 dark:hover:text-amber-200"
+                          className="tabular inline-flex items-center gap-1 rounded-md font-semibold text-amber-700 transition-colors hover:text-amber-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-amber-300 dark:hover:text-amber-200"
                         >
                           {imp.failed_rows} failed — {expanded ? "hide" : "view"} details
                           <ChevronDown className={cn("h-3.5 w-3.5 transition-transform duration-300", expanded && "rotate-180")} />
@@ -333,7 +333,7 @@ export function BulkImportCandidatesPanel({ placementDriveId, openingTitle, onIm
                           {imp.errors.map((err, i) => (
                             <p key={i} className="font-mono text-3xs leading-relaxed text-text-muted">
                               <span className="font-semibold text-text-secondary">{err.row ? `Row ${err.row}` : "General"}</span>
-                              {err.email ? ` (${err.email})` : ""}: <span className="text-rose-600 dark:text-rose-300">{err.error}</span>
+                              {err.email ? ` (${err.email})` : ""}: <span className="text-rose-700 dark:text-rose-300">{err.error}</span>
                             </p>
                           ))}
                         </div>

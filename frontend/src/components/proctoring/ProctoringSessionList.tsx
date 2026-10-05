@@ -157,7 +157,7 @@ export function ProctoringSessionList({
                           </ScMeta>
                         )}
                         {session.status === "locked" && session.locked_at && (
-                          <ScMeta icon={Lock} className="text-rose-600 dark:text-rose-300">
+                          <ScMeta icon={Lock} className="text-rose-700 dark:text-rose-300">
                             Locked {formatRelative(new Date(session.locked_at))}
                           </ScMeta>
                         )}

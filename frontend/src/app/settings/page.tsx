@@ -1177,7 +1177,7 @@ export default function SettingsPage() {
               {!entitlements.drive_access && (
                 <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
                   <span className="text-2xs text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
-                  <Link href="/dashboard/billing" className="text-[10.5px] font-bold text-accent-primary hover:underline shrink-0">
+                  <Link href="/dashboard/billing" className="text-3xs font-bold text-accent-primary hover:underline shrink-0">
                     Upgrade →
                   </Link>
                 </div>

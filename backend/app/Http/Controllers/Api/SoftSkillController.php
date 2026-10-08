@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
 use App\Models\SoftSkillResponse;
 use App\Models\SoftSkillSession;
+use App\Services\SoftSkillGradingService;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -60,6 +61,9 @@ class SoftSkillController extends Controller
             'assessment' => $this->assessmentSummary($softSkillAssessment, $completedSessions),
             'in_progress_session_id' => $inProgressSession?->id,
             'completed_session_ids' => $completedSessions->pluck('id'),
+            // Tells the client whether to put this test behind the camera /
+            // fullscreen consent gate (config/proctoring.php's kill switch).
+            'proctoring_required' => (bool) config('proctoring.soft_skills_enabled', true),
         ]);
     }
 
@@ -120,6 +124,7 @@ class SoftSkillController extends Controller
     public function answer(Request $request, SoftSkillSession $softSkillSession)
     {
         abort_unless($softSkillSession->user_id === $request->user()->id, 404);
+        $this->assertNotLocked($softSkillSession);
         abort_if($softSkillSession->status === SoftSkillSession::STATUS_COMPLETED, 422, 'This assessment has already been submitted.');
 
         $validated = $request->validate([
@@ -140,42 +145,17 @@ class SoftSkillController extends Controller
     }
 
     /** The one moment everything gets graded — exact selected_index === correct_index match, never trusted or precomputed from the client. */
-    public function submit(Request $request, SoftSkillSession $softSkillSession)
+    public function submit(Request $request, SoftSkillSession $softSkillSession, SoftSkillGradingService $grader)
     {
         abort_unless($softSkillSession->user_id === $request->user()->id, 404);
+        $this->assertNotLocked($softSkillSession);
         abort_if($softSkillSession->status === SoftSkillSession::STATUS_COMPLETED, 422, 'This assessment has already been submitted.');
 
-        $softSkillSession->loadMissing('assessment');
-        $responses = $softSkillSession->responses()->with('assessmentQuestion.question')->get();
+        // Grading itself lives in SoftSkillGradingService so a proctoring
+        // lock (SoftSkillProctoringService) scores an attempt identically.
+        $graded = $grader->finalize($softSkillSession);
 
-        $categoryTally = [];
-        $correctCount = 0;
-
-        foreach ($responses as $response) {
-            $question = $response->assessmentQuestion->question;
-            $isCorrect = $response->selected_index !== null && (int) $response->selected_index === (int) $question->correct_index;
-            $response->update(['is_correct' => $isCorrect]);
-
-            $categoryTally[$question->category] ??= ['correct' => 0, 'total' => 0];
-            $categoryTally[$question->category]['total']++;
-            if ($isCorrect) {
-                $categoryTally[$question->category]['correct']++;
-                $correctCount++;
-            }
-        }
-
-        $totalQuestions = $responses->count();
-        $scorePercent = $totalQuestions > 0 ? round(($correctCount / $totalQuestions) * 100, 2) : 0;
-
-        $softSkillSession->update([
-            'status' => SoftSkillSession::STATUS_COMPLETED,
-            'completed_at' => now(),
-            'score_percent' => $scorePercent,
-            'passed' => $scorePercent >= $softSkillSession->assessment->pass_percentage,
-            'category_breakdown' => $categoryTally,
-        ]);
-
-        return response()->json(['session' => $this->resultPayload($softSkillSession->fresh())]);
+        return response()->json(['session' => $this->resultPayload($graded)]);
     }
 
     /** Reviewing a completed attempt — reached both right after submit() and from the Reports history card. */
@@ -190,6 +170,20 @@ class SoftSkillController extends Controller
     public function history(Request $request, StudentReportService $service)
     {
         return response()->json(['soft_skills' => $service->softSkillHistory($request->user())]);
+    }
+
+    /**
+     * The server-side authority that makes a proctoring lock real rather than
+     * cosmetic — even a tampered client that stops reporting violations still
+     * hits this on its very next answer/submit call. Mirrors
+     * InterviewController::assertNotLocked() and
+     * ContestSubmissionController::assertRegistered().
+     */
+    private function assertNotLocked(SoftSkillSession $session): void
+    {
+        if ($session->proctoringSession?->isLocked()) {
+            abort(403, 'This attempt was ended because of repeated proctoring violations. Your saved answers were submitted.');
+        }
     }
 
     private function assessmentSummary(SoftSkillAssessment $assessment, Collection $completedSessions): array
@@ -251,7 +245,7 @@ class SoftSkillController extends Controller
 
     private function resultPayload(SoftSkillSession $session): array
     {
-        $session->loadMissing('assessment');
+        $session->loadMissing('assessment', 'proctoringSession');
 
         $responses = $session->responses()
             ->with('assessmentQuestion.question')
@@ -269,6 +263,12 @@ class SoftSkillController extends Controller
             'passed' => $session->passed,
             'category_breakdown' => $session->category_breakdown,
             'completed_at' => $session->completed_at,
+            // null for attempts taken without proctoring (before it existed,
+            // or with the kill switch off). `terminated` = the strike limit
+            // ended the attempt, so the score reflects only what was saved.
+            'proctoring' => $session->proctoringSession
+                ? ['violation_count' => $session->proctoringSession->violation_count, 'terminated' => $session->proctoringSession->isLocked()]
+                : null,
             'results' => $responses->map(fn (SoftSkillResponse $r) => [
                 'category' => $r->assessmentQuestion->question->category,
                 'question_text' => $r->assessmentQuestion->question->question_text,

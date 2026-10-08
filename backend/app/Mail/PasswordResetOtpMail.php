@@ -18,7 +18,7 @@ class PasswordResetOtpMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject('Your CodeGen Box password reset code')
+        return $this->subject('Your AptRun password reset code')
             ->view('emails.password-reset-otp');
     }
 }

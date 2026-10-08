@@ -1,4 +1,4 @@
-@include('emails.partials.header', ['preheader' => 'Use this code to reset your CodeGen Box password. It expires in 10 minutes.'])
+@include('emails.partials.header', ['preheader' => 'Use this code to reset your AptRun password. It expires in 10 minutes.'])
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:#E0E7FF; color:#3730A3; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
@@ -6,7 +6,7 @@
                             </span>
                             <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">Reset your password</h1>
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
-                                Hi {{ $user->name }}, use the code below to reset your CodeGen Box password. It expires in
+                                Hi {{ $user->name }}, use the code below to reset your AptRun password. It expires in
                                 10 minutes and can only be used once.
                             </p>
                         </td>

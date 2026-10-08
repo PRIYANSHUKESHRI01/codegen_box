@@ -5,7 +5,7 @@
                                 {{ $note }}
                             </p>
                             <p style="font-size:11px; line-height:1.6; color:#C4C8D4; margin:16px 0 0 0;">
-                                CodeGen Box &middot; Practice, compete, and get placement-ready.
+                                AptRun &middot; The placement sandbox for colleges.
                             </p>
                         </td>
                     </tr>

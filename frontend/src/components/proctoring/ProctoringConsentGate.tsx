@@ -3,6 +3,7 @@
 import { AlertTriangle, Camera, CheckCircle2, Maximize, Mic, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
+import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
 
 /**
  * Shown BEFORE any contest problem content is ever rendered — a student
@@ -24,6 +25,7 @@ export function ProctoringConsentGate({
   previewVideoRef,
   onEnableDevices,
   onConsent,
+  activity = "contest",
 }: {
   phase: ProctoringPhase;
   consentError: string | null;
@@ -31,9 +33,12 @@ export function ProctoringConsentGate({
   previewVideoRef: React.RefObject<HTMLVideoElement>;
   onEnableDevices: () => void;
   onConsent: () => void;
+  /** Which kind of attempt this gates — only changes the wording (see proctoringCopy.ts). Defaults to the original contest copy. */
+  activity?: ProctoringActivity;
 }) {
   const starting = phase === "starting";
   const blocked = phase === "blocked";
+  const copy = CONSENT_COPY[activity];
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">
@@ -43,8 +48,8 @@ export function ProctoringConsentGate({
             <ShieldCheck className="w-5.5 h-5.5" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-primary">This is a proctored contest</h2>
-            <p className="text-2xs text-text-muted">Required for every contest problem — not for practice.</p>
+            <h2 className="text-sm font-bold text-primary">{copy.title}</h2>
+            <p className="text-2xs text-text-muted">{copy.subtitle}</p>
           </div>
         </div>
 
@@ -84,7 +89,7 @@ export function ProctoringConsentGate({
           </li>
           <li className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-            <span>Switching tabs, exiting fullscreen, or opening developer tools counts as a strike. You get 2 warnings — a 3rd strike submits your current code and ends your attempt. This is reported to your TPO and section coordinator.</span>
+            <span>{copy.strikes}</span>
           </li>
         </ul>
 
@@ -104,9 +109,7 @@ export function ProctoringConsentGate({
           </Button>
         )}
 
-        <p className="text-3xs text-text-muted text-center">
-          By continuing you consent to being recorded and monitored for the duration of this contest attempt.
-        </p>
+        <p className="text-3xs text-text-muted text-center">{copy.footer}</p>
       </div>
     </div>
   );

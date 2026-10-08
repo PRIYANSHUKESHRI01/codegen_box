@@ -26,7 +26,7 @@
                         <td style="padding:20px 32px 0 32px;">
                             <p style="font-size:13px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
                                 The full list — CGPA, backlogs, and how consistently each student has been practicing on
-                                CodeGen Box over the last 7 days — is attached as an Excel sheet. Use the Student Cohort page
+                                AptRun over the last 7 days — is attached as an Excel sheet. Use the Student Cohort page
                                 to send a notification (email or WhatsApp) to any of them directly.
                             </p>
                         </td>

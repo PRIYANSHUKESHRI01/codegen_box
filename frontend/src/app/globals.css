@@ -328,7 +328,7 @@ body {
 code,
 pre,
 kbd {
-  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-mono, ui-monospace), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Premium utility classes */
@@ -574,3 +574,145 @@ html.dark {
 }
 
 .tabular { font-variant-numeric: tabular-nums; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Landing page motion + surface system ("lp-*"). Public marketing page
+   only. Everything here is decoration layered on the shared tokens, so both
+   themes work unchanged, and the global prefers-reduced-motion rule above
+   already flattens every animation/transition defined here.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Cursor-following spotlight on cards (Linear / Vercel style). The
+   --mx/--my vars are written by components/ui/SpotlightCard.tsx. */
+.lp-spot {
+  position: relative;
+}
+
+.lp-spot::before,
+.lp-spot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+/* soft fill glow under the cursor */
+.lp-spot::before {
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 50%), rgb(var(--accent-primary-rgb) / 0.10), transparent 65%);
+}
+
+/* lit 1px border that only shows near the cursor */
+.lp-spot::after {
+  padding: 1px;
+  background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 50%), rgb(var(--accent-primary-rgb) / 0.75), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+.lp-spot:hover::before,
+.lp-spot:hover::after {
+  opacity: 1;
+}
+
+/* Rotating conic border for the one featured card per section. */
+@property --lp-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes lp-spin {
+  to { --lp-angle: 360deg; }
+}
+
+.lp-gborder {
+  position: relative;
+}
+
+.lp-gborder::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  background: conic-gradient(from var(--lp-angle), transparent 0 50%, rgb(var(--accent-primary-rgb)) 70%, rgb(var(--accent-secondary-rgb)) 85%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: lp-spin 7s linear infinite;
+}
+
+/* Slowly drifting aurora blobs behind the hero / closing CTA. */
+@keyframes lp-float-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(60px, 30px, 0) scale(1.12); }
+}
+
+@keyframes lp-float-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-70px, 40px, 0) scale(0.95); }
+}
+
+.lp-blob-a { animation: lp-float-a 18s ease-in-out infinite; }
+.lp-blob-b { animation: lp-float-b 22s ease-in-out infinite; }
+
+/* Headline gradient that gently travels. The palette is mirrored
+   (A B C B A) so the loop is seamless instead of snapping back. */
+@keyframes lp-gradient-pan {
+  to { background-position: 200% 50%; }
+}
+
+.lp-gradient-text {
+  background-image: linear-gradient(90deg,
+    rgb(var(--accent-primary-rgb)),
+    #818cf8,
+    rgb(var(--accent-secondary-rgb)),
+    #818cf8,
+    rgb(var(--accent-primary-rgb)));
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: lp-gradient-pan 9s linear infinite;
+}
+
+/* Infinite marquee with faded edges. Track holds two copies of the list. */
+@keyframes lp-marquee {
+  to { transform: translateX(-50%); }
+}
+
+.lp-marquee {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.lp-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: lp-marquee 45s linear infinite;
+}
+
+.lp-marquee:hover .lp-marquee-track {
+  animation-play-state: paused;
+}
+
+/* Auto-rotate progress under the preview tabs. */
+@keyframes lp-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Soft pulse for "live" dots / proctoring chips. */
+@keyframes lp-soft-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--status-success-rgb) / 0.35); }
+  50% { box-shadow: 0 0 0 6px rgb(var(--status-success-rgb) / 0); }
+}
+
+.lp-pulse {
+  animation: lp-soft-pulse 2.4s ease-in-out infinite;
+}

@@ -4,7 +4,7 @@
                             <span style="display:inline-block; background-color:#D1FAE5; color:#065F46; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
                                 Account Created
                             </span>
-                            <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">Welcome to CodeGen Box, {{ $user->name }}</h1>
+                            <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">Welcome to AptRun, {{ $user->name }}</h1>
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
                                 Your account is ready. Solve problems in the practice arena, enter rated contests against
                                 other coders, and track your rating and streak as you build toward placement season.
@@ -53,4 +53,4 @@
                             </a>
                         </td>
                     </tr>
-@include('emails.partials.footer', ['note' => "You're receiving this because this email address was used to create a CodeGen Box account. If this wasn't you, no further action is needed."])
+@include('emails.partials.footer', ['note' => "You're receiving this because this email address was used to create an AptRun account. If this wasn't you, no further action is needed."])

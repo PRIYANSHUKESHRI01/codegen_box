@@ -4,12 +4,16 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, ArrowRight, Brain, Clock, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Brain, Clock, Loader2, AlertTriangle, CheckCircle2, ShieldCheck } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { useInterviewProctoring } from "@/lib/proctoring/useInterviewProctoring";
+import { ProctoringConsentGate } from "@/components/proctoring/ProctoringConsentGate";
+import { ProctoringOverlay } from "@/components/proctoring/ProctoringOverlay";
+import { ProctoringLockedScreen } from "@/components/proctoring/ProctoringLockedScreen";
 import {
   ASSESSMENT_TYPE_LABELS,
   CATEGORY_LABELS,
@@ -19,16 +23,29 @@ import {
   type SoftSkillSessionQuestion,
 } from "@/types/softSkill";
 
-type Stage = "loading" | "intro" | "taking" | "submitting" | "not_found";
+/** "proctoring" = the attempt exists server-side but is held behind the camera/fullscreen consent gate: no question is shown and no clock runs until the proctored session is active. */
+type Stage = "loading" | "intro" | "proctoring" | "taking" | "submitting" | "not_found";
 
 interface ShowResponse {
   assessment: SoftSkillAssessmentSummary;
   in_progress_session_id: number | null;
   completed_session_ids: number[];
+  /** Absent from an older API — treated as "not required", i.e. exactly the pre-proctoring behaviour. */
+  proctoring_required?: boolean;
 }
 
+/**
+ * Soft Skills attempts run under the same camera / fullscreen / tab-switch
+ * proctoring as coding contests (see useInterviewProctoring for why the
+ * non-coding hook fits an option-based test): consent gate -> proctored test
+ * with the watermark/strike overlay -> 3 strikes ends the attempt. The
+ * server owns the lock (SoftSkillProctoringService) and grades the saved
+ * answers when it fires, so this page only has to show it. When the server
+ * says proctoring isn't required, none of that mounts and the page behaves
+ * exactly as it did before proctoring existed.
+ */
 export default function SoftSkillSessionPage() {
-  const { status } = useAuthGuard(["user"]);
+  const { user, status } = useAuthGuard(["user"]);
   const router = useRouter();
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
@@ -42,8 +59,20 @@ export default function SoftSkillSessionPage() {
   const [confirmingSubmit, setConfirmingSubmit] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /** Set once the attempt exists and proctoring is required — the proctoring endpoints hang off this session id. */
+  const [proctoredSessionId, setProctoredSessionId] = useState<number | null>(null);
+
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const submittingRef = useRef(false);
+  /** The payload from the click-time start call, kept as a fallback if the post-consent refresh fails. */
+  const preConsentStartRef = useRef<SoftSkillActiveSession | null>(null);
+  const enteredTakingRef = useRef(false);
+
+  const proctoring = useInterviewProctoring({
+    basePath: `/soft-skills/sessions/${proctoredSessionId ?? 0}`,
+    enabled: stage === "proctoring" && proctoredSessionId !== null,
+    activityLabel: "test",
+  });
 
   const loadOverview = useCallback(async () => {
     if (!slug) {
@@ -77,39 +106,94 @@ export default function SoftSkillSessionPage() {
     setStage("submitting");
     try {
       await api.post(`/soft-skills/sessions/${active.session.id}/submit`);
+      // Stop the camera/mic and leave fullscreen BEFORE navigating away, so
+      // the exit isn't misread as a violation (endSession blocks reporting).
+      if (proctoredSessionId !== null) proctoring.endSession();
       router.push(`/dashboard/soft-skills/view?sessionId=${active.session.id}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't submit your test. Please try again.");
       setStage("taking");
       submittingRef.current = false;
     }
-  }, [active, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, router, proctoredSessionId, proctoring.endSession]);
+
+  /**
+   * Shows the questions and starts the countdown from the server's deadline.
+   * This is the original begin-test body, moved here unchanged so both paths
+   * (straight in, or after the proctoring gate) share it — including the
+   * timer's existing behaviour.
+   */
+  const enterTaking = (res: SoftSkillActiveSession) => {
+    setActive(res);
+    const initialAnswers: Record<number, number> = {};
+    res.questions.forEach((q) => {
+      if (q.selected_index !== null) initialAnswers[q.response_id] = q.selected_index;
+    });
+    setAnswers(initialAnswers);
+    setStage("taking");
+
+    const deadline = new Date(res.session.deadline_at).getTime();
+    const tick = () => {
+      const secs = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+      setRemainingSeconds(secs);
+      if (secs <= 0) handleSubmit();
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+  };
 
   const beginOrResume = async () => {
     if (!overview) return;
     setError(null);
     try {
       const res = await api.post<SoftSkillActiveSession>(`/soft-skills/${slug}/start`);
-      setActive(res);
-      const initialAnswers: Record<number, number> = {};
-      res.questions.forEach((q) => {
-        if (q.selected_index !== null) initialAnswers[q.response_id] = q.selected_index;
-      });
-      setAnswers(initialAnswers);
-      setStage("taking");
 
-      const deadline = new Date(res.session.deadline_at).getTime();
-      const tick = () => {
-        const secs = Math.max(0, Math.round((deadline - Date.now()) / 1000));
-        setRemainingSeconds(secs);
-        if (secs <= 0) handleSubmit();
-      };
-      tick();
-      timerRef.current = setInterval(tick, 1000);
+      if (overview.proctoring_required) {
+        // The attempt now exists server-side (the proctoring endpoints hang
+        // off it), but the questions stay hidden and no clock runs here until
+        // the student has cleared the camera/fullscreen consent gate.
+        preConsentStartRef.current = res;
+        enteredTakingRef.current = false;
+        setProctoredSessionId(res.session.id);
+        setStage("proctoring");
+        return;
+      }
+
+      enterTaking(res);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't start this test. Please try again.");
     }
   };
+
+  // Consent cleared and the proctored session is live -> reveal the test.
+  // Re-reads the attempt first: on a first attempt, consenting restarts its
+  // clock server-side (the seconds spent granting camera access aren't taken
+  // out of the test), so the deadline from the click-time call is stale.
+  useEffect(() => {
+    if (stage !== "proctoring" || proctoring.phase !== "active" || enteredTakingRef.current) return;
+    enteredTakingRef.current = true;
+    (async () => {
+      let res = preConsentStartRef.current;
+      try {
+        res = await api.post<SoftSkillActiveSession>(`/soft-skills/${slug}/start`);
+      } catch {
+        // Fall back to the click-time payload: same questions and answers,
+        // just a deadline a few seconds early. Never strand a live session.
+      }
+      if (res) enterTaking(res);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, proctoring.phase, slug]);
+
+  // The server ended the attempt (and already graded the saved answers):
+  // nothing here may submit, autosave or tick any more.
+  useEffect(() => {
+    if (proctoring.phase !== "locked") return;
+    submittingRef.current = true;
+    stopTimer();
+    setConfirmingSubmit(false);
+  }, [proctoring.phase]);
 
   useEffect(() => stopTimer, []);
 
@@ -150,10 +234,24 @@ export default function SoftSkillSessionPage() {
 
   const { assessment, in_progress_session_id, completed_session_ids } = overview;
 
+  // Proctoring view state. All false/idle for an un-proctored attempt, so the
+  // layout below collapses to exactly what it was before proctoring existed.
+  const isLocked = proctoring.phase === "locked";
+  const examActive = proctoring.phase === "active" || proctoring.phase === "fullscreen_lost";
+  const showGate = stage === "proctoring" && (proctoring.phase === "consent" || proctoring.phase === "starting" || proctoring.phase === "blocked");
+  const fullBleed = stage === "taking" || stage === "proctoring" || isLocked || (stage === "submitting" && examActive);
+  const lockedSessionId = active?.session.id ?? proctoredSessionId;
+
   return (
-    <DashboardShell role="user" title="Soft Skills" subtitle={stage === "intro" ? assessment.title : undefined} fullBleed={stage === "taking"}>
-      <div className={cn(stage === "taking" ? "flex-1 min-h-0 flex flex-col p-4 sm:p-6" : "max-w-2xl mx-auto space-y-4")}>
-        {stage !== "taking" && (
+    <DashboardShell
+      role="user"
+      title="Soft Skills"
+      subtitle={stage === "intro" ? assessment.title : undefined}
+      fullBleed={fullBleed}
+      hideChrome={examActive && !isLocked}
+    >
+      <div className={cn(fullBleed ? "flex-1 min-h-0 flex flex-col p-4 sm:p-6" : "max-w-2xl mx-auto space-y-4")}>
+        {!fullBleed && (
           <Link href="/dashboard/soft-skills" className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors">
             <ArrowLeft className="w-3.5 h-3.5" />
             All Soft Skills tests
@@ -208,6 +306,16 @@ export default function SoftSkillSessionPage() {
               ))}
             </div>
 
+            {assessment.can_attempt && overview.proctoring_required && (
+              <div className="flex items-start gap-2.5 p-3 rounded-control bg-accent-primary/5 border border-accent-primary/20 text-xs text-text-secondary">
+                <ShieldCheck className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+                <span>
+                  <strong className="font-bold text-primary">This test is proctored.</strong> You&apos;ll need a camera and microphone, and your screen goes
+                  fullscreen. Switching tabs or leaving fullscreen counts as a strike — 3 strikes ends the test.
+                </span>
+              </div>
+            )}
+
             {!assessment.can_attempt ? (
               <p className="text-xs font-semibold text-status-warning bg-status-warning/10 border border-status-warning/25 rounded-control p-3">
                 You&apos;ve used all {assessment.max_attempts} attempt(s) for this test.
@@ -232,19 +340,56 @@ export default function SoftSkillSessionPage() {
           </div>
         )}
 
-        {(stage === "taking" || stage === "submitting") && active && (
-          <TakingTest
-            active={active}
-            answers={answers}
-            currentIndex={currentIndex}
-            setCurrentIndex={setCurrentIndex}
-            timeLabel={timeLabel}
-            remainingSeconds={remainingSeconds}
-            answeredCount={answeredCount}
-            onSelect={handleSelect}
-            onSubmit={() => setConfirmingSubmit(true)}
-            submitting={stage === "submitting"}
+        {showGate && (
+          <ProctoringConsentGate
+            activity="soft_skill"
+            phase={proctoring.phase}
+            consentError={proctoring.consentError}
+            devicePreviewReady={proctoring.devicePreviewReady}
+            previewVideoRef={proctoring.previewVideoRef}
+            onEnableDevices={proctoring.enableDevicePreview}
+            onConsent={proctoring.grantConsentAndStart}
           />
+        )}
+
+        {isLocked && (
+          <ProctoringLockedScreen
+            activity="soft_skill"
+            session={proctoring.session}
+            onBack={() => router.push("/dashboard/soft-skills")}
+            secondary={
+              lockedSessionId !== null
+                ? { label: "View result", onClick: () => router.push(`/dashboard/soft-skills/view?sessionId=${lockedSessionId}`) }
+                : undefined
+            }
+          />
+        )}
+
+        {!isLocked && (stage === "taking" || stage === "submitting") && active && (
+          <>
+            {examActive && (
+              <ProctoringOverlay
+                phase={proctoring.phase}
+                session={proctoring.session}
+                lastViolation={proctoring.lastViolation}
+                studentName={user?.name ?? "Student"}
+                rollNumber={user?.roll_number ?? null}
+                onResumeFullscreen={proctoring.resumeFullscreen}
+              />
+            )}
+            <TakingTest
+              active={active}
+              answers={answers}
+              currentIndex={currentIndex}
+              setCurrentIndex={setCurrentIndex}
+              timeLabel={timeLabel}
+              remainingSeconds={remainingSeconds}
+              answeredCount={answeredCount}
+              onSelect={handleSelect}
+              onSubmit={() => setConfirmingSubmit(true)}
+              submitting={stage === "submitting"}
+            />
+          </>
         )}
       </div>
 

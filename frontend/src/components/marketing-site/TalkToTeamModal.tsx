@@ -13,6 +13,8 @@ type Audience = "institution" | "company";
 interface TalkToTeamModalProps {
   open: boolean;
   onClose: () => void;
+  /** Which tab the form opens on — "company" for hiring-intent CTAs. Defaults to a college. */
+  defaultAudience?: Audience;
 }
 
 const AUDIENCE_COPY: Record<Audience, { orgLabel: string; orgPlaceholder: string; subtitle: string }> = {
@@ -34,8 +36,8 @@ const AUDIENCE_COPY: Record<Audience, { orgLabel: string; orgPlaceholder: string
  * backdrop/panel chrome; form/loading/error/success flow copies
  * ForgotPasswordModal's step-based conventions.
  */
-export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
-  const [audience, setAudience] = useState<Audience>("institution");
+export function TalkToTeamModal({ open, onClose, defaultAudience = "institution" }: TalkToTeamModalProps) {
+  const [audience, setAudience] = useState<Audience>(defaultAudience);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -53,7 +55,7 @@ export function TalkToTeamModal({ open, onClose }: TalkToTeamModalProps) {
     // back to blank while the modal is still on its way out.
     setTimeout(() => {
       setSubmitted(false);
-      setAudience("institution");
+      setAudience(defaultAudience);
       setName("");
       setEmail("");
       setPhone("");

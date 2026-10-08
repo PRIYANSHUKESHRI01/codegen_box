@@ -18,7 +18,7 @@ class NewsletterWelcomeMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject("You're on the list — CodeGen Box")
+        return $this->subject("You're on the list — AptRun")
             ->view('emails.newsletter-welcome');
     }
 }

@@ -14,7 +14,7 @@
                     <tr>
                         <td style="padding:24px 32px;">
                             <a href="{{ config('app.frontend_url') }}/dashboard" style="display:inline-block; background-color:#4F46E5; color:#FFFFFF; text-decoration:none; font-size:14px; font-weight:700; padding:12px 24px; border-radius:10px;">
-                                Explore CodeGen Box
+                                Explore AptRun
                             </a>
                         </td>
                     </tr>

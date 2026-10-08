@@ -2,6 +2,7 @@
 
 import { Container } from "@/components/layout/Container";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
+import { SpotlightCard } from "@/components/ui/SpotlightCard";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 import { Code2, Layers, FlaskConical, Terminal } from "lucide-react";
 
@@ -96,6 +97,9 @@ export function Stats() {
   return (
     <section className="py-8 sm:py-14 border-y border-border-subtle bg-surface/30 relative">
       <Container size="xl">
+        <p className="text-center text-xs font-mono font-bold uppercase tracking-wider text-text-secondary mb-5 sm:mb-7">
+          The practice arena inside every student&apos;s learning centre
+        </p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-5">
           {(stats ? cards : Array.from({ length: 4 })).map((stat, i) => {
             if (!stats) {
@@ -112,7 +116,7 @@ export function Stats() {
             const Icon = card.icon;
 
             return (
-              <div
+              <SpotlightCard
                 key={card.id}
                 className="relative rounded-2xl bg-white dark:bg-[#0E121B] border border-border-subtle hover:border-border-strong p-3.5 sm:p-5 lg:p-6 flex flex-col justify-between group hover:-translate-y-1 transition-all duration-300 shadow-sm dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.4)] overflow-hidden"
               >
@@ -144,7 +148,7 @@ export function Stats() {
                 <div className="text-2xs sm:text-xs text-secondary mt-2.5 sm:mt-3 pt-2 sm:pt-2.5 border-t border-border-subtle/80 line-clamp-1 sm:line-clamp-2 leading-relaxed">
                   {card.sublabel}
                 </div>
-              </div>
+              </SpotlightCard>
             );
           })}
         </div>

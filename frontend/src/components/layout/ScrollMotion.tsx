@@ -48,6 +48,9 @@ export function ScrollMotion() {
           duration: 0.5,
           ease: "power2.out",
           stagger: 0.08,
+          // Hand the transform back to CSS once settled: gsap leaves an inline
+          // translate behind, which would silently cancel every hover lift.
+          clearProps: "transform,opacity",
           scrollTrigger: {
             trigger: grid,
             start: "top 88%",

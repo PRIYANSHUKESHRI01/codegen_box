@@ -5,11 +5,14 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
 export class ApiError extends Error {
   status: number;
   errors?: Record<string, string[]>;
+  /** Machine-readable reason some endpoints add next to `message` (e.g. "no_speech"), so the UI can react without parsing text. */
+  code?: string;
 
-  constructor(message: string, status: number, errors?: Record<string, string[]>) {
+  constructor(message: string, status: number, errors?: Record<string, string[]>, code?: string) {
     super(message);
     this.status = status;
     this.errors = errors;
+    this.code = code;
   }
 }
 
@@ -18,7 +21,7 @@ async function throwForFailedResponse(res: Response): Promise<never> {
   const firstError = data?.errors ? Object.values(data.errors)[0] : undefined;
   const message =
     data?.message ?? (Array.isArray(firstError) ? firstError[0] : "Something went wrong. Please try again.");
-  throw new ApiError(message, res.status, data?.errors);
+  throw new ApiError(message, res.status, data?.errors, typeof data?.code === "string" ? data.code : undefined);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {

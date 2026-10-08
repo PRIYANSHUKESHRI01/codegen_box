@@ -23,7 +23,7 @@ class PlacementDriveTerminationMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject('Action Required: Placement Drive Eligibility Notice — '.($this->user->college?->name ?? 'CodeGen Box'))
+        return $this->subject('Action Required: Placement Drive Eligibility Notice — '.($this->user->college?->name ?? 'AptRun'))
             ->view('emails.placement-drive-termination');
     }
 }

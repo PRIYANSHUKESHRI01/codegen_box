@@ -109,8 +109,12 @@ const config: Config = {
         panel: "24px",
       },
       fontFamily: {
-        sans: ["var(--font-sans)", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
-        mono: ["var(--font-mono)", "Geist Mono", "JetBrains Mono", "Fira Code", "monospace"],
+        // The var() carries its own fallback: a bare `var(--font-sans)` whose
+        // variable is undefined makes the entire declaration invalid at
+        // computed-value time, and the browser then drops to its default
+        // serif. With a fallback the worst case is a system sans, not Times.
+        sans: ["var(--font-sans, Inter)", "Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        mono: ["var(--font-mono, JetBrains Mono)", "Geist Mono", "JetBrains Mono", "Fira Code", "monospace"],
       },
       // One declared type scale for the whole app, extending (never
       // overriding) Tailwind's own xs/sm/base/lg/xl/2xl/3xl — those keep

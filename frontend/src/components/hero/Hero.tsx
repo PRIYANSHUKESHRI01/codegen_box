@@ -5,7 +5,7 @@ import { ProductPreview } from "./ProductPreview";
 
 export function Hero() {
   return (
-    <section className="relative w-full pt-4 pb-16 sm:pb-24 overflow-hidden">
+    <section className="relative isolate w-full pt-4 pb-16 sm:pb-24 overflow-hidden">
       <HeroBackground />
       <Container size="xl">
         <HeroContent />

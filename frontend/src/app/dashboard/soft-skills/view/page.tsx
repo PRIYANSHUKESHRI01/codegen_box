@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, ShieldAlert } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
@@ -57,6 +57,8 @@ export default function SoftSkillResultPage() {
     );
   }
 
+  const endedByProctoring = result.proctoring?.terminated === true;
+
   return (
     <DashboardShell role="user" title="Soft Skills" subtitle={result.assessment_title}>
       <div className="max-w-3xl mx-auto space-y-4">
@@ -67,8 +69,15 @@ export default function SoftSkillResultPage() {
 
         <div className="rounded-panel bg-surface border border-border-subtle shadow-card p-6 space-y-5">
           <div className="flex flex-col items-center gap-3 text-center">
-            <ReadinessRing value={Math.round(result.score_percent)} label={result.passed ? "Passed" : "Below Target"} />
-            {result.passed ? (
+            <ReadinessRing value={Math.round(result.score_percent)} label={endedByProctoring ? "Ended" : result.passed ? "Passed" : "Below Target"} />
+            {endedByProctoring ? (
+              <p className="flex items-start justify-center gap-1.5 text-sm font-bold text-status-danger max-w-md">
+                <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>
+                  This attempt was ended by proctoring after {result.proctoring?.violation_count} strikes. Your saved answers were graded, but it can&apos;t count as a pass.
+                </span>
+              </p>
+            ) : result.passed ? (
               <motion.div
                 initial={{ scale: 0.7, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}

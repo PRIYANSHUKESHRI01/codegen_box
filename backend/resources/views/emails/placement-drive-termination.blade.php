@@ -41,4 +41,4 @@
                             </a>
                         </td>
                     </tr>
-@include('emails.partials.footer', ['note' => "You're receiving this because your placement cell added you to CodeGen Box."])
+@include('emails.partials.footer', ['note' => "You're receiving this because your placement cell added you to AptRun."])

@@ -63,7 +63,7 @@ class StudentBulkNotificationService
         $college = $student->college?->name ?? 'your college';
 
         return $template === SendStudentBulkNotification::TEMPLATE_TERMINATION
-            ? "Hi {$student->name}, this is a placeholder Placement Drive Eligibility Notice from {$college}'s placement cell (via CodeGen Box). Please contact your TPO immediately regarding your placement readiness standing."
-            : "Hi {$student->name}, this is a placeholder update from {$college}'s placement cell (via CodeGen Box). A real message will follow from your TPO.";
+            ? "Hi {$student->name}, this is a placeholder Placement Drive Eligibility Notice from {$college}'s placement cell (via AptRun). Please contact your TPO immediately regarding your placement readiness standing."
+            : "Hi {$student->name}, this is a placeholder update from {$college}'s placement cell (via AptRun). A real message will follow from your TPO.";
     }
 }

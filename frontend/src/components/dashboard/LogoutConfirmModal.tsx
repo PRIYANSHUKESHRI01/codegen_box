@@ -16,7 +16,7 @@ export function LogoutConfirmModal({ open, onCancel, onConfirm }: LogoutConfirmM
   return (
     <Modal
       onClose={onCancel}
-      title="Sign out of CodeGen Box?"
+      title="Sign out of AptRun?"
       icon={LogOut}
       iconClassName="bg-status-danger/10 text-status-danger"
       size="sm"

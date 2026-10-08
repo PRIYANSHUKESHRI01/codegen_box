@@ -1,4 +1,4 @@
-// Comprehensive mock data store for CodeGen Box dashboards
+// Comprehensive mock data store for AptRun dashboards
 
 export interface PartnerCollege {
   id: string;
@@ -227,5 +227,5 @@ export const STUDENT_SUBMISSIONS: StudentSubmission[] = [
 export const STUDENT_ASSESSMENTS: StudentAssessment[] = [
   { id: "asm-01", title: "Google SDE-1 On-Campus Placement Test", organizer: "Apex TPO Cell x Google", type: "Campus Drive", scheduledTime: "Tomorrow at 10:00 AM", duration: "90 Mins", totalQuestions: 3, status: "Mandatory", badgeColor: "bg-status-danger/15 text-status-danger border-status-danger/30" },
   { id: "asm-02", title: "Microsoft Coding Assessment Prep Mock", organizer: "Apex Placement Cell", type: "College Mock Test", scheduledTime: "Sunday, 4:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-primary/15 text-accent-primary border-accent-primary/30" },
-  { id: "asm-03", title: "CodeGen Box Weekly Challenge #25", organizer: "CodeGen Box Global", type: "Mellow Weekly", scheduledTime: "Saturday, 8:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30" },
+  { id: "asm-03", title: "AptRun Weekly Challenge #25", organizer: "AptRun Global", type: "Mellow Weekly", scheduledTime: "Saturday, 8:00 PM", duration: "120 Mins", totalQuestions: 4, status: "Optional", badgeColor: "bg-accent-secondary/15 text-accent-secondary border-accent-secondary/30" },
 ];

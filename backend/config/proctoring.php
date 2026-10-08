@@ -34,4 +34,13 @@ return [
     // the judge queue is unavailable (see ProctoringService::lock()).
     'auto_submit_on_lock' => (bool) env('PROCTORING_AUTO_SUBMIT_ON_LOCK', true),
 
+    // Soft Skills tests (App\Http\Controllers\Api\SoftSkillProctoringController)
+    // run under the same camera/fullscreen/tab-switch proctoring as contests
+    // and AI interviews. This is the kill switch: set PROCTORING_SOFT_SKILLS=false
+    // to run them un-proctored again (e.g. a campus whose lab machines have no
+    // webcams). The strike threshold above is shared. On the locking strike the
+    // answers already autosaved are graded and the attempt is ended — see
+    // SoftSkillProctoringService.
+    'soft_skills_enabled' => (bool) env('PROCTORING_SOFT_SKILLS', true),
+
 ];

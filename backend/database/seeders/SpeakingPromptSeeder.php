@@ -14,14 +14,32 @@ use Illuminate\Database\Seeder;
  */
 class SpeakingPromptSeeder extends Seeder
 {
+    /**
+     * The launch passages predate the job-seeker categories. Folding them onto the four labels the
+     * passage generator also uses (GeminiSpeakingPassageService::PURPOSES) keeps the category filter
+     * to four chips instead of thirteen, and a generated passage sits in the same bucket as its library twin.
+     */
+    private const CATEGORY_MAP = [
+        'Everyday Life' => 'Everyday English',
+        'Professional Skills' => 'Workplace English',
+        'Business' => 'Workplace English',
+        'Career Readiness' => 'Interview Ready',
+        'Technology' => 'Tech & Career',
+    ];
+
+    public static function categoryFor(string $category): string
+    {
+        return self::CATEGORY_MAP[$category] ?? $category;
+    }
+
     public function run(): void
     {
-        foreach ($this->prompts() as $order => $prompt) {
+        foreach ([...$this->prompts(), ...$this->jobSeekerPrompts()] as $order => $prompt) {
             SpeakingPrompt::updateOrCreate(
                 ['title' => $prompt['title']],
                 [
                     'passage_text' => $prompt['passage_text'],
-                    'category' => $prompt['category'],
+                    'category' => self::categoryFor($prompt['category']),
                     'difficulty' => $prompt['difficulty'],
                     'target_wpm_min' => 110,
                     'target_wpm_max' => 160,
@@ -111,6 +129,111 @@ class SpeakingPromptSeeder extends Seeder
                 'category' => 'Business',
                 'difficulty' => SpeakingPrompt::DIFFICULTY_ADVANCED,
                 'passage_text' => 'Sustainable business growth rarely emerges from a single breakthrough idea; it is far more often the cumulative result of a culture that consistently rewards thoughtful experimentation over blind adherence to existing methods. Organizations that institutionalize innovation treat failure not as something to be avoided at all costs, but as an anticipated and informative byproduct of genuine progress. This mindset requires leadership to tolerate short-term inefficiency in exchange for long-term adaptability, a trade-off that becomes increasingly difficult to justify as an organization scales and risk aversion naturally sets in.',
+            ],
+        ];
+    }
+
+    /**
+     * Passages for the thing these students are actually preparing for: job
+     * interviews and everyday workplace English. Every number is spelled out
+     * (no digits) so the read-aloud text is unambiguous, and word counts sit
+     * inside the band for their level — SpeakingPromptContentTest enforces both.
+     */
+    private function jobSeekerPrompts(): array
+    {
+        $b = SpeakingPrompt::DIFFICULTY_BEGINNER;
+        $i = SpeakingPrompt::DIFFICULTY_INTERMEDIATE;
+        $a = SpeakingPrompt::DIFFICULTY_ADVANCED;
+
+        return [
+            // Beginner
+            [
+                'title' => 'Introducing Myself',
+                'category' => 'Interview Ready',
+                'difficulty' => $b,
+                'passage_text' => 'Good morning, and thank you for meeting me today. I am a final-year engineering student, and I enjoy solving problems and learning new tools. During my studies, I built a small website for my college library, and it taught me how to work with a team. I am hardworking, I learn quickly, and I am excited to start my career with a company like yours.',
+            ],
+            [
+                'title' => 'My Strengths',
+                'category' => 'Interview Ready',
+                'difficulty' => $b,
+                'passage_text' => 'My biggest strength is that I stay calm when work becomes difficult. When I face a problem, I break it into small steps and solve one step at a time. I also ask questions when I am not sure, because I would rather learn early than make a mistake later. My friends say I am a good listener, and I try to bring that habit to every team I join.',
+            ],
+            [
+                'title' => 'Asking for Help Politely',
+                'category' => 'Workplace English',
+                'difficulty' => $b,
+                'passage_text' => 'Excuse me, do you have a few minutes to help me? I am working on a report, and I am not sure how to arrange the data. I have tried two ways, but neither looks clear. Could you please look at it and give me some advice? I will make the changes quickly. Thank you so much for your time. I really appreciate your support.',
+            ],
+            [
+                'title' => 'Meeting My New Team',
+                'category' => 'Workplace English',
+                'difficulty' => $b,
+                'passage_text' => 'Hello everyone, it is nice to meet you all. I joined the company this week as a junior developer. Before this, I studied computer science and worked on a few small projects. I am still learning how things work here, so please tell me if I can do something better. I am happy to help with anything, and I am looking forward to working with you.',
+            ],
+
+            // Intermediate
+            [
+                'title' => 'Why Should We Hire You?',
+                'category' => 'Interview Ready',
+                'difficulty' => $i,
+                'passage_text' => 'You should hire me because I combine strong fundamentals with a genuine willingness to learn. In my final year, I led a small team to build a booking application, and we delivered it two weeks before the deadline. That experience taught me how to plan, communicate clearly, and take responsibility for results. I may not know everything yet, but I adapt quickly, I accept feedback well, and I will work hard to become a dependable member of your team.',
+            ],
+            [
+                'title' => 'Describing My Final-Year Project',
+                'category' => 'Interview Ready',
+                'difficulty' => $i,
+                'passage_text' => 'For my final-year project, I built a web application that helps students track their attendance and assignments in one place. I chose this problem because many of my classmates missed deadlines simply because information was scattered across different apps. I designed the database, created the user interface, and tested the system with fifty students. The biggest challenge was making it fast on slow networks, and solving it taught me a great deal about optimization.',
+            ],
+            [
+                'title' => 'A Time I Worked in a Team',
+                'category' => 'Interview Ready',
+                'difficulty' => $i,
+                'passage_text' => 'During my third year, I worked with four classmates on a robotics competition. At first, we struggled because everyone wanted to follow a different plan. I suggested that we hold a short meeting, list our ideas, and vote on the best approach. After that, each person took one responsibility, and we checked our progress every evening. We did not win first place, but we finished the project on time and learned how important communication is.',
+            ],
+            [
+                'title' => 'Where I See Myself in Five Years',
+                'category' => 'Interview Ready',
+                'difficulty' => $i,
+                'passage_text' => 'In five years, I hope to be a confident professional who is trusted with important responsibilities. In the first year, my goal is to learn the tools and processes of the company as quickly as possible. After that, I would like to take ownership of small projects and eventually guide new team members. I am also planning to keep improving my technical and communication skills, because I believe steady learning is the best way to grow.',
+            ],
+            [
+                'title' => 'Questions I Ask at the End',
+                'category' => 'Interview Ready',
+                'difficulty' => $i,
+                'passage_text' => 'Thank you for explaining the role so clearly. Before we finish, I would like to ask a few questions. What does success look like in this position during the first six months? How does the team handle feedback and professional development? And what are the biggest challenges that someone in this role might face? Your answers will help me understand how I can contribute from the very first day, and I am genuinely excited about this opportunity.',
+            ],
+            [
+                'title' => 'Giving a Status Update',
+                'category' => 'Workplace English',
+                'difficulty' => $i,
+                'passage_text' => 'Here is a quick update on the project. We have completed the login module and the dashboard, and both are working well in testing. The payment feature is taking longer than expected because the provider changed their requirements. I expect to finish it by Thursday if there are no further changes. If the schedule moves, I will let you know immediately so that we can adjust our plan together.',
+            ],
+
+            // Advanced
+            [
+                'title' => 'Handling a Tight Deadline',
+                'category' => 'Interview Ready',
+                'difficulty' => $a,
+                'passage_text' => 'There was a time when our team received an unexpected request to deliver a major feature three days earlier than planned. Instead of panicking, I reviewed the remaining tasks with my teammates and identified which ones were essential for the launch. We postponed the minor improvements, divided the critical work according to everyone\'s strengths, and held a short check-in every morning to remove obstacles quickly. As a result, we released the feature on time without compromising quality, and the experience taught me that clear priorities matter far more than working longer hours.',
+            ],
+            [
+                'title' => 'Owning a Mistake',
+                'category' => 'Interview Ready',
+                'difficulty' => $a,
+                'passage_text' => 'Last semester, I submitted a project report without double-checking one important calculation, and the error affected our final result. When I realized it, I told my professor immediately instead of hoping that nobody would notice. I explained what had gone wrong, corrected the calculation, and prepared a checklist to review every report before submission. My professor appreciated the honesty, and the checklist has prevented similar mistakes ever since. I believe that accepting responsibility openly is the quickest way to earn the trust of a team.',
+            ],
+            [
+                'title' => 'Explaining Technology Simply',
+                'category' => 'Tech & Career',
+                'difficulty' => $a,
+                'passage_text' => 'When I explain a technical idea to someone outside the field, I begin with a familiar comparison. For example, an application programming interface works like a waiter in a restaurant: it takes your request to the kitchen and brings the response back to your table. You do not need to know how the kitchen operates; you only need to know what you can order. This approach keeps the explanation simple, and it helps the listener remember the idea long after the conversation has ended.',
+            ],
+            [
+                'title' => 'Disagreeing Respectfully',
+                'category' => 'Workplace English',
+                'difficulty' => $a,
+                'passage_text' => 'I understand the reasoning behind this proposal, and I appreciate the effort that went into it. However, I would like to share a concern about the timeline. Based on my experience with similar projects, the testing phase usually takes longer than we expect, which could affect the quality of the release. Would it be possible to extend the schedule by one week, or to reduce the scope of the first version? I am happy to work out the details with you.',
             ],
         ];
     }

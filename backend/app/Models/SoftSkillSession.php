@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SoftSkillSession extends Model
 {
@@ -51,6 +52,12 @@ class SoftSkillSession extends Model
     public function responses(): HasMany
     {
         return $this->hasMany(SoftSkillResponse::class);
+    }
+
+    /** Present once the student passed the proctoring consent gate (SoftSkillProctoringController::start()). */
+    public function proctoringSession(): HasOne
+    {
+        return $this->hasOne(SoftSkillProctoringSession::class);
     }
 
     public function isCompleted(): bool

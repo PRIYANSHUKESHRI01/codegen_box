@@ -93,7 +93,7 @@ export function reportFooter(doc: jsPDF) {
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
     doc.text(
-      `CodeGen Box · Generated ${new Date().toLocaleString("en-IN")} · Page ${i} of ${pageCount} · All figures reflect live records at generation time`,
+      `AptRun · Generated ${new Date().toLocaleString("en-IN")} · Page ${i} of ${pageCount} · All figures reflect live records at generation time`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 20,
       { align: "center" }
@@ -326,7 +326,7 @@ export function complianceAuditRows(data: TpoReportsData, sectionFilter: string 
 // ---------------------------------------------------------------------------
 export async function generateCohortExcelReport(data: TpoReportsData, sectionFilter: string | null = null): Promise<GeneratedReport> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
   const sheet = workbook.addWorksheet(sectionFilter ? `Section ${sectionFilter}` : "Student Cohort");
   const { headers, rows } = cohortRows(data, sectionFilter);
@@ -351,7 +351,7 @@ export async function generateCohortExcelReport(data: TpoReportsData, sectionFil
 // ---------------------------------------------------------------------------
 export async function generateDriveDirectoryReport(data: TpoReportsData): Promise<GeneratedReport> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
   const sheet = workbook.addWorksheet("Company & Drive Directory");
   const { headers, rows } = driveDirectoryRows(data);

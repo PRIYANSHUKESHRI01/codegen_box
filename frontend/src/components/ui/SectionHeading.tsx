@@ -22,20 +22,23 @@ export function SectionHeading({
   return (
     <div
       className={cn(
-        "max-w-3xl mb-12 sm:mb-16",
+        "max-w-3xl mb-10 sm:mb-14",
         align === "center" ? "mx-auto text-center" : "text-left",
         className
       )}
       {...props}
     >
       {badge && (
-        <div className="mb-3">
+        <div className="mb-4">
           <Badge variant="primary" size="md">
             {badge}
           </Badge>
         </div>
       )}
-      <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-primary leading-[1.15]">
+      {/* 28 -> 40px, bold, tight tracking. Section titles are one short
+          line of benefit copy; the old 48px/bold stack out-shouted the
+          product visuals beneath it. */}
+      <h2 className="text-[1.75rem] sm:text-3xl md:text-4xl lg:text-[2.5rem] font-bold tracking-[-0.03em] text-primary leading-[1.12] text-balance">
         {title}{" "}
         {highlight && (
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary via-indigo-400 to-accent-secondary">
@@ -44,7 +47,12 @@ export function SectionHeading({
         )}
       </h2>
       {description && (
-        <p className="mt-4 text-base sm:text-lg text-text-secondary leading-relaxed">
+        <p
+          className={cn(
+            "mt-4 max-w-2xl text-base sm:text-[1.0625rem] font-medium text-text-secondary leading-relaxed text-balance",
+            align === "center" && "mx-auto"
+          )}
+        >
           {description}
         </p>
       )}

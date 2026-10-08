@@ -1,7 +1,8 @@
 const FLOATING_CHIPS: { label: string; className: string; delay: number }[] = [
-  { label: "✓ Two Sum · Easy", className: "top-[18%] left-[6%] hidden lg:flex", delay: 0 },
-  { label: "✓ Merge Intervals · Medium", className: "top-[12%] right-[8%] hidden lg:flex", delay: 0.4 },
-  { label: "AI Interview · Scored", className: "bottom-[22%] left-[4%] hidden xl:flex", delay: 0.8 },
+  { label: "✓ Drive published to students", className: "top-[20%] left-[2%] hidden 2xl:flex", delay: 0 },
+  { label: "Eligibility set · CGPA, branch", className: "top-[14%] right-[2%] hidden 2xl:flex", delay: 0.4 },
+  { label: "★ Shortlisted by a recruiter", className: "top-[46%] right-[2%] hidden 2xl:flex", delay: 0.8 },
+  { label: "Learning centre · on track", className: "top-[42%] left-[2%] hidden 2xl:flex", delay: 1.2 },
 ];
 
 export function HeroBackground() {
@@ -10,18 +11,16 @@ export function HeroBackground() {
       {/* Fine grid pattern — tightened opacity so it reads as texture, not a template backdrop */}
       <div className="absolute inset-0 bg-grid-pattern opacity-40 dark:opacity-25 [mask-image:radial-gradient(ellipse_65%_55%_at_50%_0%,black,transparent)]" />
 
-      {/* Subtle radial glow from top center */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[460px] bg-gradient-to-b from-accent-primary/12 via-accent-secondary/6 to-transparent blur-3xl opacity-70 dark:opacity-50" />
+      {/* Aurora: three slow-drifting colour blobs (Stripe-style mesh) */}
+      <div className="lp-blob-a absolute -top-24 left-[8%] w-[520px] h-[420px] rounded-full bg-accent-primary/20 blur-[90px] dark:bg-accent-primary/25" />
+      <div className="lp-blob-b absolute -top-10 right-[6%] w-[480px] h-[400px] rounded-full bg-accent-secondary/20 blur-[90px] dark:bg-accent-secondary/20" />
+      <div className="lp-blob-a absolute top-[38%] left-1/2 -translate-x-1/2 w-[620px] h-[320px] rounded-full bg-violet-400/15 blur-[100px] dark:bg-violet-500/15" />
 
-      {/* Side ambient color patches */}
-      <div className="absolute top-1/4 -left-48 w-96 h-96 rounded-full bg-accent-primary/5 blur-3xl" />
-      <div className="absolute top-1/3 -right-48 w-96 h-96 rounded-full bg-accent-secondary/5 blur-3xl" />
-
-      {/* Small, product-tied floating chips instead of pure abstract shapes */}
+      {/* Product-tied floating chips: the moments the platform actually produces */}
       {FLOATING_CHIPS.map((chip) => (
         <div
           key={chip.label}
-          className={`absolute items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface/80 border border-border-subtle shadow-subtle backdrop-blur-sm text-3xs font-mono font-semibold text-text-secondary animate-float ${chip.className}`}
+          className={`absolute items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface/90 border border-border-strong shadow-subtle backdrop-blur-sm text-2xs font-mono font-semibold text-text-secondary animate-float ${chip.className}`}
           style={{ animationDelay: `${chip.delay}s` }}
         >
           {chip.label}

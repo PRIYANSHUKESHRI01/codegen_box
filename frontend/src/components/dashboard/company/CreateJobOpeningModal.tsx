@@ -278,7 +278,7 @@ export function CreateJobOpeningModal({ companyName, onClose, onCreated }: Creat
             >
               <HpCallout icon={audience === "open_to_all" ? Globe2 : Info} tone={audience === "open_to_all" ? "teal" : "indigo"}>
                 {audience === "open_to_all"
-                  ? "Every registered candidate on CodeGen Box — every college's students, plus candidates with no college — will be able to see and self-register for this opening's assessment once it's published and the assessment is live. No TPO approval, no invite step."
+                  ? "Every registered candidate on AptRun — every college's students, plus candidates with no college — will be able to see and self-register for this opening's assessment once it's published and the assessment is live. No TPO approval, no invite step."
                   : "This opening is only visible to your own hiring team by default — candidates see it once you invite or import them into its pipeline, or once a college you propose it to approves it."}
               </HpCallout>
             </motion.div>

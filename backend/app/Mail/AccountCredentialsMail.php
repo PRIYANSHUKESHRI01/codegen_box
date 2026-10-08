@@ -28,7 +28,7 @@ class AccountCredentialsMail extends Mailable
 
     public function build(): self
     {
-        $subject = 'Your CodeGen Box account is ready';
+        $subject = 'Your AptRun account is ready';
 
         if ($this->user->college) {
             $subject .= " — {$this->user->college->name}";

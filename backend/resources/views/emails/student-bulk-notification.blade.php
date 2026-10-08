@@ -8,12 +8,12 @@
                                 <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">An update from your Placement Cell</h1>
                                 <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
                                     Hi {{ $user->name }}, your Training &amp; Placement Officer at {{ $user->college->name }}
-                                    sent you a notification through CodeGen Box.
+                                    sent you a notification through AptRun.
                                 </p>
                             @else
                                 <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">An update from the Mellow team</h1>
                                 <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
-                                    Hi {{ $user->name }}, the Mellow team sent you a notification through CodeGen Box.
+                                    Hi {{ $user->name }}, the Mellow team sent you a notification through AptRun.
                                 </p>
                             @endif
                         </td>
@@ -24,7 +24,7 @@
                                 <tr>
                                     <td style="padding:16px 20px;">
                                         <p style="font-size:13px; color:#374151; margin:0; line-height:1.6;">
-                                            Sign in to your CodeGen Box dashboard for the details, or contact
+                                            Sign in to your AptRun dashboard for the details, or contact
                                             @if ($user->college) your placement office @else Mellow support @endif
                                             directly for anything time-sensitive.
                                         </p>
@@ -36,13 +36,13 @@
                     <tr>
                         <td style="padding:24px 32px;">
                             <a href="{{ config('app.frontend_url') }}/dashboard" style="display:inline-block; background-color:#4F46E5; color:#FFFFFF; text-decoration:none; font-size:14px; font-weight:700; padding:12px 24px; border-radius:10px;">
-                                Open CodeGen Box
+                                Open AptRun
                             </a>
                         </td>
                     </tr>
 @php
     $note = $user->college
-        ? "You're receiving this because your placement cell added you to CodeGen Box."
-        : "You're receiving this because you have a CodeGen Box account.";
+        ? "You're receiving this because your placement cell added you to AptRun."
+        : "You're receiving this because you have an AptRun account.";
 @endphp
 @include('emails.partials.footer', ['note' => $note])

@@ -3,6 +3,7 @@
 import { Ban } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ProctoringSessionState } from "@/lib/proctoring/types";
+import { LOCKED_COPY, type ProctoringActivity } from "./proctoringCopy";
 
 /**
  * Replaces the entire problem UI once a student hits 3 strikes — there is
@@ -12,26 +13,42 @@ import type { ProctoringSessionState } from "@/lib/proctoring/types";
  * had open was already auto-submitted server-side before this screen ever
  * renders.
  */
-export function ProctoringLockedScreen({ session, onBack }: { session: ProctoringSessionState | null; onBack: () => void }) {
+export function ProctoringLockedScreen({
+  session,
+  onBack,
+  activity = "contest",
+  secondary,
+}: {
+  session: ProctoringSessionState | null;
+  onBack: () => void;
+  /** Which kind of attempt ended — only changes the wording (see proctoringCopy.ts). Defaults to the original contest copy. */
+  activity?: ProctoringActivity;
+  /** Optional second action next to the main button (e.g. "View your result" once a Soft Skills attempt has been graded). */
+  secondary?: { label: string; onClick: () => void };
+}) {
+  const copy = LOCKED_COPY[activity];
+
   return (
     <div className="flex-1 flex items-center justify-center p-6">
       <div className="max-w-md text-center space-y-4">
         <div className="w-16 h-16 mx-auto rounded-full bg-status-danger/15 border border-status-danger/30 flex items-center justify-center text-status-danger">
           <Ban className="w-8 h-8" />
         </div>
-        <h2 className="text-lg font-bold text-primary">You've been locked out of this contest</h2>
+        <h2 className="text-lg font-bold text-primary">{copy.title}</h2>
         <p className="text-sm text-text-secondary leading-relaxed">
-          Your session recorded {session?.violation_count ?? 3} proctoring strikes — exiting fullscreen, switching
-          tabs, or a detected developer-tools open. Whatever code you had open was submitted for judging before
-          access was revoked.
+          Your session recorded {session?.violation_count ?? 3} proctoring strikes — {copy.body}
         </p>
-        <p className="text-xs text-text-muted">
-          This has been reported to your TPO and section coordinator. If you believe this was a mistake, contact
-          them directly — they can reinstate your attempt.
-        </p>
-        <Button variant="outline" onClick={onBack}>
-          Back to Contest
-        </Button>
+        <p className="text-xs text-text-muted">{copy.note}</p>
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={onBack}>
+            {copy.backLabel}
+          </Button>
+          {secondary && (
+            <Button variant="outline" onClick={secondary.onClick}>
+              {secondary.label}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -2,29 +2,90 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Zap, Mail, Command, Send, CheckCircle2, Facebook, Instagram, Linkedin, Youtube } from "lucide-react";
+import { ArrowRight, ArrowUp, ArrowUpRight, Building2, CheckCircle2, Mail, Send } from "lucide-react";
 import { Container } from "./Container";
-import { Button } from "@/components/ui/Button";
 import { LogoBadge, LogoMark, Wordmark } from "@/components/brand/Logo";
-import { TalkToTeamModal } from "@/components/marketing-site/TalkToTeamModal";
+import { ThemeToggle } from "@/components/navigation/ThemeToggle";
+import { TONES, type Tone } from "@/components/ui/tones";
+import { FEATURE_PAGES, FOOTER_FEATURE_GROUPS, featureHref } from "@/data/featurePages";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-const CONTACT_SALES_LABEL = "Contact Sales";
+const SUPPORT_EMAIL = "support@mellowvault.com";
 
-// Real profile URLs go here once Mellow Vault's social accounts are handed
-// over — left as "#" for now rather than a guessed/fabricated link, same
-// convention this file already used for Privacy Policy/Terms before real
-// pages existed.
-const SOCIAL_LINKS = [
-  { label: "Facebook", href: "#", icon: Facebook },
-  { label: "Instagram", href: "#", icon: Instagram },
-  { label: "LinkedIn", href: "#", icon: Linkedin },
-  { label: "YouTube", href: "#", icon: Youtube },
+interface FooterLink {
+  label: string;
+  href: string;
+  external?: boolean;
+}
+
+interface FooterColumn {
+  title: string;
+  /** The hub page the heading links to. */
+  href: string;
+  tone: Tone;
+  icon: typeof Building2;
+  links: FooterLink[];
+}
+
+const COLUMNS: FooterColumn[] = [
+  ...FOOTER_FEATURE_GROUPS.map((g) => ({
+    title: g.title,
+    href: g.href,
+    tone: g.tone,
+    icon: g.icon,
+    links: g.slugs.map((slug) => {
+      const page = FEATURE_PAGES.find((p) => p.slug === slug);
+      return { label: page?.label ?? slug, href: featureHref(slug) };
+    }),
+  })),
+  {
+    title: "Company",
+    href: "/about",
+    tone: "amber",
+    icon: Building2,
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "FAQ", href: "/#faq" },
+      { label: "Contact", href: "/contact" },
+      { label: "Mellow Vault", href: "https://mellowvault.com", external: true },
+    ],
+  },
 ];
 
+const LEGAL_LINKS: FooterLink[] = [
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
+  { label: "Contact", href: "/contact" },
+];
+
+function FooterAnchor({ link }: { link: FooterLink }) {
+  const className =
+    "group inline-flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-primary transition-colors";
+  const label = (
+    <span className="relative after:absolute after:left-0 after:-bottom-0.5 after:h-px after:w-0 after:bg-current after:transition-all after:duration-300 group-hover:after:w-full">
+      {link.label}
+    </span>
+  );
+  const arrow = (
+    <ArrowUpRight className="w-3.5 h-3.5 opacity-0 -translate-x-1 translate-y-0.5 group-hover:opacity-100 group-hover:translate-x-0 group-hover:translate-y-0 transition-all duration-200" />
+  );
+
+  return link.external ? (
+    <a href={link.href} target="_blank" rel="noopener noreferrer" className={className}>
+      {label}
+      {arrow}
+    </a>
+  ) : (
+    <Link href={link.href} className={className}>
+      {label}
+      {arrow}
+    </Link>
+  );
+}
+
 export function Footer() {
-  const [contactOpen, setContactOpen] = useState(false);
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [newsletterError, setNewsletterError] = useState<string | null>(null);
@@ -40,248 +101,148 @@ export function Footer() {
       setNewsletterEmail("");
     } catch (err) {
       setNewsletterStatus("error");
-      setNewsletterError(err instanceof ApiError ? err.message : "Couldn't subscribe right now — please try again.");
+      setNewsletterError(err instanceof ApiError ? err.message : "Couldn't subscribe right now. Please try again.");
     }
   };
 
-  const footerLinks = [
-    {
-      title: "For Colleges",
-      links: [
-        { label: "Campus Drive Management", href: "#features" },
-        { label: "Bulk Roster Onboarding", href: "#features" },
-        { label: "Placement Analytics", href: "#features" },
-        { label: "How Onboarding Works", href: "#how-it-works" },
-        { label: "Pricing for Institutions", href: "/pricing" },
-      ],
-    },
-    {
-      title: "For Students",
-      links: [
-        { label: "Practice Arena", href: "#problems" },
-        { label: "Famous DSA Sheets", href: "#dsa-sheets" },
-        { label: "Company-Specific Prep", href: "#features" },
-        { label: "Student Plans", href: "/pricing" },
-      ],
-    },
-    {
-      title: "Platform",
-      links: [
-        { label: "Role-Based Dashboards", href: "#platform-preview" },
-        { label: "Supported Languages", href: "#languages" },
-        { label: "Pricing", href: "/pricing" },
-        { label: "Security & Compliance", href: "#" },
-      ],
-    },
-    {
-      title: "Company",
-      links: [
-        { label: "About Mellow", href: "#" },
-        { label: "Careers", href: "#", badge: "Hiring" },
-        { label: "Contact Sales", href: "/pricing" },
-        {
-          label: "Mellow Vault",
-          href: "https://mellowvault.com",
-          external: true,
-        },
-        { label: "Privacy Policy", href: "#" },
-        { label: "Terms of Service", href: "#" },
-      ],
-    },
-  ];
-
   return (
-    <footer className="relative w-full border-t border-border-subtle bg-surface/40 backdrop-blur-sm transition-colors pt-16 pb-10 overflow-hidden">
-      {/* Top subtle gradient hairline */}
-      <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-60" />
-
-      {/* Subtle ambient lighting */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-32 bg-accent-primary/5 blur-3xl pointer-events-none" />
+    <footer className="relative isolate w-full overflow-hidden border-t border-border-subtle bg-surface/40 pt-16 sm:pt-20">
+      {/* Atmosphere: hairline, two soft glows and a faint dot texture */}
+      <div aria-hidden="true" className="absolute inset-0 -z-10 pointer-events-none">
+        <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-70" />
+        <div className="absolute -top-24 left-[10%] w-[420px] h-[260px] rounded-full bg-accent-primary/10 blur-[90px]" />
+        <div className="absolute -top-16 right-[8%] w-[380px] h-[240px] rounded-full bg-accent-secondary/10 blur-[90px]" />
+        <div className="absolute inset-0 bg-dot-pattern opacity-50 [mask-image:radial-gradient(ellipse_70%_50%_at_50%_0%,black,transparent)]" />
+      </div>
 
       <Container size="xl">
-        {/* Get in Touch Card — a real mailto CTA, not a newsletter form with nowhere for the email to go */}
-        <div className="relative rounded-card lg:rounded-panel bg-elevated/70 border border-border-strong p-6 sm:p-8 lg:p-10 mb-14 shadow-card overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-accent-secondary/5 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-6">
-            <div>
-              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-accent-primary/10 border border-accent-primary/25 text-xs font-semibold text-accent-primary mb-3">
-                <Zap className="w-3.5 h-3.5" />
-                <span>Let&apos;s Talk</span>
+        <div className="grid gap-12 lg:grid-cols-12 lg:gap-10">
+          {/* Brand */}
+          <div className="lg:col-span-4 flex flex-col">
+            <Link href="/" className="flex w-fit items-center gap-2.5 group mb-4">
+              <LogoBadge className="w-10 h-10 transition-transform duration-200 group-hover:scale-105" />
+              <div className="flex flex-col">
+                <Wordmark className="text-xl" />
+                <span className="text-3xs font-mono text-text-secondary tracking-wider uppercase mt-0.5">Placement Sandbox</span>
               </div>
-              <h3 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-primary tracking-tight mb-2">
-                Bringing a college or hiring team on board?
-              </h3>
-              <p className="text-sm text-text-secondary max-w-xl leading-relaxed">
-                Reach out directly — a real person on the team replies, not an automated sequence.
-              </p>
-            </div>
+            </Link>
 
-            <a href="mailto:support@mellowvault.com" className="shrink-0">
-              <Button variant="primary" size="lg" rightIcon={<Mail className="w-4 h-4" />} className="shadow-glow">
-                support@mellowvault.com
-              </Button>
+            <p className="text-sm text-text-secondary leading-relaxed max-w-sm mb-6">
+              The placement sandbox for colleges: campus drives, a personal learning centre for every student, and a
+              network of hiring partners.
+            </p>
+
+            <a
+              href={`mailto:${SUPPORT_EMAIL}`}
+              className="group inline-flex w-fit items-center gap-2.5 px-3.5 py-2 rounded-btn bg-surface border border-border-strong shadow-subtle text-sm font-semibold text-primary hover:border-accent-primary/50 hover:shadow-card transition-all mb-6"
+            >
+              <span className="w-7 h-7 rounded-md bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary">
+                <Mail className="w-3.5 h-3.5" />
+              </span>
+              {SUPPORT_EMAIL}
             </a>
-          </div>
-        </div>
 
-        {/* Links Columns & Brand Section */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-8 lg:gap-10 pb-12 border-b border-border-subtle">
-          {/* Brand Info (2 cols) */}
-          <div className="col-span-2 flex flex-col justify-between space-y-6">
-            <div>
-              <Link href="/" className="inline-flex items-center gap-2.5 mb-3 group">
-                <LogoBadge className="w-9 h-9 transition-transform group-hover:scale-105" />
-                <div className="flex flex-col">
-                  <Wordmark className="font-bold text-lg tracking-tight text-primary" />
-                  <span className="text-3xs font-mono text-text-muted tracking-wider uppercase">
-                    Placements &bull; Practice
-                  </span>
-                </div>
-              </Link>
-
-              <a
-                href="https://mellowvault.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-2xs font-mono text-text-muted hover:text-accent-primary transition-colors mb-4"
-              >
-                <span>A product of</span>
-                <span className="font-bold text-text-secondary">Mellow Vault</span>
-              </a>
-
-              <p className="text-sm text-text-secondary max-w-sm leading-relaxed mb-6">
-                The placement-readiness platform colleges run their TPO cell on — campus drives,
-                bulk onboarding, and company-specific prep, plus a real practice arena for students.
-              </p>
-
-              {/* Newsletter signup — a real, working subscribe, not decoration */}
-              {newsletterStatus === "success" ? (
-                <div className="flex items-center gap-2 px-3 py-2.5 rounded-control bg-status-success/10 border border-status-success/25 text-xs font-semibold text-status-success max-w-sm">
-                  <CheckCircle2 className="w-4 h-4 shrink-0" />
-                  <span>You&apos;re subscribed — check your inbox.</span>
-                </div>
-              ) : (
-                <form onSubmit={handleNewsletterSubmit} className="max-w-sm">
-                  <label htmlFor="footer-newsletter-email" className="block text-xs font-semibold text-text-secondary mb-1.5">
-                    Get product updates in your inbox
-                  </label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      id="footer-newsletter-email"
-                      type="email"
-                      required
-                      value={newsletterEmail}
-                      onChange={(e) => setNewsletterEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="flex-1 min-w-0 px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary text-xs placeholder:text-text-muted outline-none focus:border-accent-primary transition-colors"
-                    />
-                    <button
-                      type="submit"
-                      disabled={newsletterStatus === "loading"}
-                      className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-60"
-                    >
-                      <span>{newsletterStatus === "loading" ? "..." : "Subscribe"}</span>
-                      {newsletterStatus !== "loading" && <Send className="w-3.5 h-3.5" />}
-                    </button>
-                  </div>
-                  {newsletterStatus === "error" && newsletterError && (
-                    <p className="text-2xs text-status-danger mt-1.5">{newsletterError}</p>
-                  )}
-                </form>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              {/* Shortcut command helper */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-control bg-elevated border border-border-subtle text-xs font-mono text-text-muted">
-                <Command className="w-3.5 h-3.5 text-accent-primary" />
-                <span>Quick Search:</span>
-                <kbd className="px-1.5 py-0.5 rounded bg-surface border border-border-subtle text-3xs font-bold text-primary">
-                  ⌘K
-                </kbd>
+            {newsletterStatus === "success" ? (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-control bg-status-success/10 border border-status-success/25 text-xs font-semibold text-status-success max-w-sm">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>You&apos;re subscribed. Check your inbox.</span>
               </div>
-
-              {/* Social — real icons, placeholder hrefs until Mellow Vault's profile URLs are handed over */}
-              <div className="flex items-center gap-2">
-                {SOCIAL_LINKS.map(({ label, href, icon: Icon }) => (
-                  <a
-                    key={label}
-                    href={href}
-                    aria-label={label}
-                    className="w-8 h-8 rounded-control bg-elevated border border-border-subtle flex items-center justify-center text-text-muted hover:text-accent-primary hover:border-accent-primary/40 transition-colors"
+            ) : (
+              <form onSubmit={handleNewsletterSubmit} className="max-w-sm">
+                <label htmlFor="footer-newsletter-email" className="block text-xs font-bold text-text-secondary mb-1.5">
+                  Product updates
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="footer-newsletter-email"
+                    type="email"
+                    required
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    placeholder="you@college.edu"
+                    className="flex-1 min-w-0 px-3 py-2 rounded-control bg-surface border border-border-strong text-primary text-sm placeholder:text-text-muted outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-primary/20 transition-all"
+                  />
+                  <button
+                    type="submit"
+                    disabled={newsletterStatus === "loading"}
+                    aria-label="Subscribe to product updates"
+                    className="shrink-0 flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-sm font-bold transition-colors disabled:opacity-60"
                   >
-                    <Icon className="w-3.5 h-3.5" />
-                  </a>
-                ))}
-              </div>
-            </div>
+                    <span>{newsletterStatus === "loading" ? "..." : "Subscribe"}</span>
+                    {newsletterStatus !== "loading" && <Send className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+                {newsletterStatus === "error" && newsletterError && (
+                  <p className="text-2xs font-medium text-status-danger mt-1.5">{newsletterError}</p>
+                )}
+              </form>
+            )}
           </div>
 
-          {/* Categorized Link Columns (4 cols) */}
-          {footerLinks.map((col) => (
-            <div key={col.title} className="col-span-1">
-              <h4 className="text-xs font-mono font-semibold uppercase tracking-wider text-text-primary mb-4">
-                {col.title}
-              </h4>
-              <ul className="space-y-2.5 text-sm">
-                {col.links.map((link) =>
-                  link.label === CONTACT_SALES_LABEL ? (
-                    <li key={link.label}>
-                      <button
-                        type="button"
-                        onClick={() => setContactOpen(true)}
-                        className="text-text-secondary hover:text-primary transition-colors inline-flex items-center gap-1.5 group"
-                      >
-                        <span className="group-hover:translate-x-0.5 transition-transform">{link.label}</span>
-                      </button>
-                    </li>
-                  ) : (
-                    <li key={link.label}>
-                      <a
-                        href={link.href}
-                        {...("external" in link && link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
-                        className={cn(
-                          "text-text-secondary hover:text-primary transition-colors inline-flex items-center gap-1.5 group",
-                          "external" in link && link.external && "text-accent-primary/80 hover:text-accent-primary"
-                        )}
-                      >
-                        <span className="group-hover:translate-x-0.5 transition-transform">
-                          {link.label}
-                        </span>
-                        {"badge" in link && link.badge && (
-                          <span className="px-1.5 py-0.2 text-3xs font-mono font-bold uppercase rounded bg-accent-primary/20 text-accent-primary border border-accent-primary/30">
-                            {link.badge}
-                          </span>
-                        )}
-                      </a>
-                    </li>
-                  )
-                )}
-              </ul>
-            </div>
-          ))}
+          {/* Link columns */}
+          <nav aria-label="Footer" className="lg:col-span-8 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-10">
+            {COLUMNS.map((col) => {
+              const Icon = col.icon;
+              const tone = TONES[col.tone];
+              return (
+                <div key={col.title}>
+                  <h3 className="mb-5">
+                    <Link href={col.href} className="group inline-flex items-center gap-2">
+                      <span className={cn("w-6 h-6 rounded-md border flex items-center justify-center transition-all duration-200", tone.icon, tone.iconHover)}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </span>
+                      <span className="text-2xs sm:text-xs font-mono font-bold uppercase tracking-wide sm:tracking-wider whitespace-nowrap text-primary group-hover:text-accent-primary transition-colors">
+                        {col.title}
+                      </span>
+                      <ArrowRight className="w-3.5 h-3.5 text-accent-primary opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200" />
+                    </Link>
+                  </h3>
+                  <ul className="space-y-3">
+                    {col.links.map((link) => (
+                      <li key={link.label}>
+                        <FooterAnchor link={link} />
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </nav>
         </div>
 
-        {/* Bottom Bar: Legal entity, Copyright, and Compliance */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <LogoMark className="w-5 h-5 opacity-70" />
-            <p className="text-xs font-mono text-text-muted">
+        {/* Bottom bar */}
+        <div className="mt-14 pt-6 border-t border-border-subtle flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <LogoMark className="w-5 h-5 shrink-0 opacity-80" />
+            <p className="text-xs font-medium text-text-secondary leading-relaxed">
               &copy; {new Date().getFullYear()} Mellow Vault. A Unit of Prayukti Development Private Limited.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-5 text-xs font-mono text-text-muted">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <span className="text-border-strong">&bull;</span>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-            <span className="text-border-strong">&bull;</span>
-            <a href="#" className="hover:text-primary transition-colors">Help Center</a>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+            {LEGAL_LINKS.map((link) => (
+              <FooterAnchor key={link.label} link={link} />
+            ))}
+            <ThemeToggle compact />
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              aria-label="Back to top"
+              className="w-9 h-9 rounded-full bg-surface border border-border-strong shadow-subtle flex items-center justify-center text-text-secondary hover:text-white hover:bg-accent-primary hover:border-accent-primary hover:-translate-y-0.5 transition-all duration-200"
+            >
+              <ArrowUp className="w-4 h-4" />
+            </button>
           </div>
         </div>
       </Container>
-      <TalkToTeamModal open={contactOpen} onClose={() => setContactOpen(false)} />
+
+      {/* Oversized, faded wordmark: a quiet brand moment under the legal line. Uses the real logo lettering at low opacity, fading out toward the page edge. */}
+      <div
+        aria-hidden="true"
+        className="select-none pointer-events-none mt-8 flex justify-center overflow-hidden [mask-image:linear-gradient(to_bottom,black_25%,transparent_95%)] h-[17vw] lg:h-[190px]"
+      >
+        <Wordmark className="text-[13vw] lg:text-[140px] opacity-[0.07] dark:opacity-[0.06]" />
+      </div>
     </footer>
   );
 }

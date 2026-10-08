@@ -162,7 +162,7 @@ export function sectionCohortRows(data: CoordinatorReportsData): ReportPreview {
 
 export async function generateSectionCohortReport(data: CoordinatorReportsData): Promise<GeneratedReport> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
   const sheet = workbook.addWorksheet(`Section ${data.section}`);
   const { headers, rows } = sectionCohortRows(data);

@@ -83,8 +83,8 @@ export default function LearningCentrePage() {
           />
           <StatTile
             label="Words Mastered"
-            value={loading ? "—" : overview?.words_mastered_this_week ?? 0}
-            hint="This week"
+            value={loading ? "—" : overview?.words_mastered_total ?? overview?.words_mastered_this_week ?? 0}
+            hint={overview?.words_mastered_total !== undefined ? `${overview.words_mastered_this_week} this week` : "This week"}
             icon={SpellCheck2}
             tone="secondary"
           />
@@ -118,18 +118,36 @@ export default function LearningCentrePage() {
             icon={Headphones}
             color="sky"
             title="Listening Lab"
-            description="Listen to a short passage, then answer comprehension questions. A live AI voice tutor is coming soon."
-            meta="8 lessons available"
-            badge="Voice Agent Soon"
+            description="Train your ear with passages, real conversations and dictation — then see exactly which listening skill to work on next."
+            meta={
+              overview?.listening_lessons_total
+                ? `${overview.listening_lessons_passed ?? 0} of ${overview.listening_lessons_total} lessons passed`
+                : "Passages, conversations & dictation"
+            }
+            progressPct={
+              overview?.listening_lessons_total
+                ? Math.round((100 * (overview.listening_lessons_passed ?? 0)) / overview.listening_lessons_total)
+                : undefined
+            }
+            badge="New"
           />
           <ModuleCard
             href="/dashboard/learning-centre/vocabulary"
             icon={SpellCheck2}
             color="amber"
             title="Vocabulary Sprint"
-            description="Pick any topic and difficulty — Gemini builds you a fresh word-in-context quiz on the spot."
-            meta="Any topic, instantly"
-            badge="AI Generated"
+            description="Learn words that stay learned: daily sprints that bring each word back just before you'd forget it, plus a quick quiz on any topic."
+            meta={
+              overview?.vocabulary_words_total
+                ? `${overview.words_mastered_total ?? 0} of ${overview.vocabulary_words_total} mastered${overview.vocabulary_due ? ` · ${overview.vocabulary_due} due` : ""}`
+                : "Daily word sprints"
+            }
+            progressPct={
+              overview?.vocabulary_words_total
+                ? Math.round((100 * (overview.words_mastered_total ?? 0)) / overview.vocabulary_words_total)
+                : undefined
+            }
+            badge="Smart review"
           />
         </div>
       </div>

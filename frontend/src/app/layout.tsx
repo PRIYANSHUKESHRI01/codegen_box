@@ -1,48 +1,69 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/lib/AuthContext";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
+// Inter + JetBrains Mono are self-hosted (the latin-subset variable woff2
+// files in ./fonts, the same files next/font/google used to fetch) instead of
+// downloaded from Google at compile time. With next/font/google, a failed or
+// flaky download made `next dev` compile the server and client bundles with
+// different font class hashes, so <body> asked for `.__variable_X` classes the
+// stylesheet never defined, `--font-sans` came out empty, the whole font stack
+// became invalid and every page rendered in Times New Roman. Local files can't
+// diverge, and `next build` for the BigRock/Vercel export no longer needs
+// network access to Google.
+const inter = localFont({
+  src: "./fonts/Inter-latin-variable.woff2",
+  weight: "100 900",
+  style: "normal",
   variable: "--font-sans",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = localFont({
+  src: "./fonts/JetBrainsMono-latin-variable.woff2",
+  weight: "100 800",
+  style: "normal",
   variable: "--font-mono",
   display: "swap",
 });
 
+// Absolute base for social cards and canonical links. Vercel exposes the
+// production domain at build time; anywhere else (e.g. BigRock) set
+// NEXT_PUBLIC_SITE_URL=https://your-domain before running the build.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined);
+
 export const metadata: Metadata = {
-  title: "CodeGen Box — Master Competitive Programming",
-  description: "Solve challenging algorithmic problems, compete in rated global contests, track your progress, and accelerate your engineering career.",
+  ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
+  applicationName: "AptRun",
+  title: "AptRun — The Placement Sandbox for Colleges",
+  description: "Run every campus placement drive from one platform: recruiter mapping, bulk student onboarding, proctored assessments, AI interviews and a personal learning centre for every student.",
   keywords: [
-    "competitive programming",
-    "algorithms",
-    "data structures",
-    "coding contest",
-    "CodeChef",
-    "LeetCode",
-    "Codeforces",
-    "developer tools",
-    "interview preparation"
+    "campus placements",
+    "placement management system",
+    "talent pool",
+    "proctored assessments",
+    "AI interviews",
+    "placement preparation",
+    "coding practice",
+    "TPO software",
+    "job portal for students",
   ],
-  authors: [{ name: "CodeGen Box Team" }],
+  authors: [{ name: "AptRun Team" }],
   openGraph: {
-    title: "CodeGen Box — Master Competitive Programming",
-    description: "Solve challenging problems, compete in contests, track your progress, and sharpen developer skills.",
+    title: "AptRun — The Placement Sandbox for Colleges",
+    description: "The placement sandbox for colleges: campus drives, student learning centres and a hiring-partner network.",
     type: "website",
     locale: "en_US",
-    siteName: "CodeGen Box",
+    siteName: "AptRun",
   },
   twitter: {
     card: "summary_large_image",
-    title: "CodeGen Box — Master Competitive Programming",
-    description: "Solve challenging problems, compete in contests, and track your progress.",
-    creator: "@codegenbox",
+    title: "AptRun — The Placement Sandbox for Colleges",
+    description: "The placement sandbox for colleges and their students.",
   },
 };
 

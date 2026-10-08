@@ -144,7 +144,7 @@ export default function PartnerCollegesPage() {
     <DashboardShell
       role="admin_company"
       title="Partner Colleges"
-      subtitle={`Every college on CodeGen Box — pick one to propose one of ${companyName}'s job openings to their campus.`}
+      subtitle={`Every college on AptRun — pick one to propose one of ${companyName}'s job openings to their campus.`}
     >
       <HpToast message={toastMessage} />
 
@@ -265,7 +265,7 @@ export default function PartnerCollegesPage() {
               icon={GraduationCap}
               tone="teal"
               title="No partner colleges yet"
-              description="Colleges show up here as soon as they join CodeGen Box — check back soon to propose your openings to their campus."
+              description="Colleges show up here as soon as they join AptRun — check back soon to propose your openings to their campus."
             />
           ) : filtered.length === 0 ? (
             <HpEmptyState

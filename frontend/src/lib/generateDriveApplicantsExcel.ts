@@ -7,7 +7,7 @@ export async function generateDriveApplicantsExcel(
   collegeName: string
 ) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Applicants");

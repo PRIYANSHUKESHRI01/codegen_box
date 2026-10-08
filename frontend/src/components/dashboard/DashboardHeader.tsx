@@ -371,7 +371,7 @@ export function DashboardHeader({
           {/*
             A breadcrumb that actually tracks where you are.
 
-            This used to read "CodeGen Box / <role context> / <portal name>" —
+            This used to read "AptRun / <role context> / <portal name>" —
             three crumbs, none of which changed as you navigated, because the
             last one was the role's portal name rather than the page. Every
             screen in a role rendered an identical header. The product name

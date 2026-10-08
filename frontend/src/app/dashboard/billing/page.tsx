@@ -62,7 +62,7 @@ export default function BillingPage() {
   }
 
   return (
-    <DashboardShell role="user" title="Your Plan" subtitle="Manage your CodeGen Box subscription">
+    <DashboardShell role="user" title="Your Plan" subtitle="Manage your AptRun subscription">
       <AnimatePresence>
         {toastMessage && (
           <motion.div

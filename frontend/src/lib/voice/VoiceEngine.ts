@@ -32,8 +32,12 @@ export interface VoiceEngine {
    * specific message rather than silently falling back.
    */
   startListening(callbacks?: VoiceListenCallbacks): Promise<void>;
-  /** Stops capture and resolves with whatever was captured. `audioBlob` is null if MediaRecorder isn't supported or capture never started. */
-  stopListening(): Promise<{ transcript: string; audioBlob: Blob | null }>;
+  /**
+   * Stops capture and resolves with whatever was captured. `audioBlob` is null if MediaRecorder isn't supported or capture never started.
+   * `voicedMs` is how long actual speech was detected by the level meter, or null when it was never measured (no `onAudioLevel`
+   * callback, or no AudioContext) — lets a caller refuse to submit a recording of a muted mic without ever blocking on "unknown".
+   */
+  stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null }>;
   /** Stops any in-flight speech/listening without resolving a result — used on navigation away mid-question. */
   cancel(): void;
 }

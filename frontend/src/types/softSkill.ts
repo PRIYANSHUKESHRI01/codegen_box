@@ -83,6 +83,8 @@ export interface SoftSkillResult {
   passed: boolean;
   category_breakdown: Partial<Record<SoftSkillCategory, { correct: number; total: number }>>;
   completed_at: string;
+  /** null when the attempt was taken without proctoring (older attempts, or proctoring switched off). `terminated` = the strike limit ended it. */
+  proctoring?: { violation_count: number; terminated: boolean } | null;
   results: SoftSkillResultItem[];
 }
 

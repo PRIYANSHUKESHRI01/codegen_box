@@ -5,7 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ListeningAttempt;
 use App\Models\SpeakingAttempt;
+use App\Models\VocabularyAnswer;
 use App\Models\VocabularyAttempt;
+use App\Models\VocabularyWord;
+use App\Models\VocabularyWordProgress;
+use App\Services\ListeningProgressService;
+use App\Support\ActivityStreak;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -20,7 +25,7 @@ use Illuminate\Support\Collection;
  */
 class LearningCentreController extends Controller
 {
-    public function overview(Request $request)
+    public function overview(Request $request, ListeningProgressService $listeningProgress)
     {
         $userId = $request->user()->id;
 
@@ -34,62 +39,41 @@ class LearningCentreController extends Controller
         $activityDates = collect()
             ->concat((clone $speaking)->pluck('created_at'))
             ->concat((clone $listening)->pluck('created_at'))
+            // Every answered question counts as activity; finished quizzes from before per-question answers existed still count too.
             ->concat((clone $vocabulary)->pluck('submitted_at'))
+            ->concat(VocabularyAnswer::where('user_id', $userId)->pluck('created_at'))
             ->filter()
             ->map(fn ($d) => Carbon::parse($d)->toDateString())
             ->unique()
             ->sortDesc()
             ->values();
 
-        $wordsMasteredThisWeek = (clone $vocabulary)
-            ->where('submitted_at', '>=', now()->startOfWeek())
-            ->get()
-            ->sum(function (VocabularyAttempt $attempt) {
-                $questions = $attempt->questions ?? [];
-                $answers = $attempt->answers ?? [];
+        // Words the student has actually learned (spaced-repetition box 4+), not just answers they got right.
+        $mastered = VocabularyWordProgress::where('user_id', $userId)->whereNotNull('mastered_at');
+        $wordsMasteredTotal = (clone $mastered)->count();
+        $wordsMasteredThisWeek = (clone $mastered)->where('mastered_at', '>=', now()->startOfWeek())->count();
+        $vocabularyDue = VocabularyWordProgress::where('user_id', $userId)->whereDate('due_on', '<=', today())->count();
 
-                return collect($answers)->filter(
-                    fn ($selected, $i) => (int) $selected === (int) ($questions[$i]['correct_index'] ?? -1)
-                )->count();
-            });
+        $listeningCounts = $listeningProgress->counts($userId);
 
         return response()->json([
             'total_sessions' => $totalSessions,
             'best_speaking_score' => $bestSpeakingScore !== null ? (int) $bestSpeakingScore : null,
             'day_streak' => $this->computeStreak($activityDates),
             'words_mastered_this_week' => $wordsMasteredThisWeek,
+            // Real numbers for the hub's Vocabulary Sprint card.
+            'words_mastered_total' => $wordsMasteredTotal,
+            'vocabulary_words_total' => VocabularyWord::library()->count(),
+            'vocabulary_due' => $vocabularyDue,
+            // Real numbers for the hub's Listening Lab card (library lessons only).
+            'listening_lessons_total' => $listeningCounts['total'],
+            'listening_lessons_passed' => $listeningCounts['passed'],
         ]);
     }
 
-    /**
-     * Current streak only counts if the most recent activity day is today
-     * or yesterday — otherwise it's broken, not "paused". Same convention
-     * as StudentStatsService::streak() for DSA practice, computed
-     * independently here since it spans three different tables.
-     */
+    /** See ActivityStreak — spans three different tables here, so it takes already-collected dates. */
     private function computeStreak(Collection $sortedDescDateStrings): int
     {
-        if ($sortedDescDateStrings->isEmpty()) {
-            return 0;
-        }
-
-        $mostRecent = $sortedDescDateStrings->first();
-        if ($mostRecent !== now()->toDateString() && $mostRecent !== now()->subDay()->toDateString()) {
-            return 0;
-        }
-
-        $streak = 1;
-        $cursor = Carbon::parse($mostRecent);
-
-        foreach ($sortedDescDateStrings->slice(1) as $dateString) {
-            $expected = $cursor->copy()->subDay()->toDateString();
-            if ($dateString !== $expected) {
-                break;
-            }
-            $streak++;
-            $cursor = Carbon::parse($dateString);
-        }
-
-        return $streak;
+        return ActivityStreak::current($sortedDescDateStrings);
     }
 }

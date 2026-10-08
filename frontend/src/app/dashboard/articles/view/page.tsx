@@ -84,7 +84,7 @@ function ArticleReaderPageContent() {
   }, [status, load]);
 
   useEffect(() => {
-    if (article) document.title = `${article.title} — Articles — CodeGen Box`;
+    if (article) document.title = `${article.title} — Articles — AptRun`;
   }, [article]);
 
   const markRead = useCallback(() => {

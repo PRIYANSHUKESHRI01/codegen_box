@@ -8,7 +8,7 @@
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
                                 Hi {{ $user->name }},
                                 {{ $company->name }} has invited you to a voice interview for <strong style="color:#111827;">{{ $roleTitle }}</strong>
-                                on CodeGen Box. Sign in to review the interview details and take it whenever you're ready.
+                                on AptRun. Sign in to review the interview details and take it whenever you're ready.
                             </p>
                         </td>
                     </tr>

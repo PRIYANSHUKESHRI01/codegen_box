@@ -15,6 +15,14 @@ interface UseInterviewProctoringOptions {
   basePath: string;
   /** Only starts once true (the interview session has actually been fetched/started). */
   enabled: boolean;
+  /**
+   * What the attempt is called in the camera/fullscreen error messages
+   * ("...required for a proctored ${activityLabel}"). Defaults to "interview"
+   * so AI-interview callers are unchanged; the Soft Skills test passes "test"
+   * — the mechanics (no code to auto-submit, sequential "completed" phase)
+   * fit any non-coding attempt, which is why that flow reuses this hook.
+   */
+  activityLabel?: string;
 }
 
 interface UseInterviewProctoringResult {
@@ -63,7 +71,7 @@ function buildDeviceInfo(): DeviceInfo {
  * events fast and stays in sync with whatever the server says the real
  * violation count is.
  */
-export function useInterviewProctoring({ basePath, enabled }: UseInterviewProctoringOptions): UseInterviewProctoringResult {
+export function useInterviewProctoring({ basePath, enabled, activityLabel = "interview" }: UseInterviewProctoringOptions): UseInterviewProctoringResult {
   const [phase, setPhase] = useState<ProctoringPhase>("idle");
   const [session, setSession] = useState<ProctoringSessionState | null>(null);
   const [lastViolation, setLastViolation] = useState<{ type: ViolationType; count: number; max: number } | null>(null);
@@ -135,12 +143,12 @@ export function useInterviewProctoring({ basePath, enabled }: UseInterviewProcto
 
   const checkCapabilities = useCallback((): boolean => {
     if (!navigator.mediaDevices?.getUserMedia || !document.documentElement.requestFullscreen) {
-      setConsentError("Your browser doesn't support the camera/fullscreen features required for a proctored interview. Please use a recent version of Chrome, Firefox, or Edge on desktop.");
+      setConsentError(`Your browser doesn't support the camera/fullscreen features required for a proctored ${activityLabel}. Please use a recent version of Chrome, Firefox, or Edge on desktop.`);
       setPhase("blocked");
       return false;
     }
     return true;
-  }, []);
+  }, [activityLabel]);
 
   const enableDevicePreview = useCallback(async () => {
     setConsentError(null);
@@ -150,7 +158,7 @@ export function useInterviewProctoring({ basePath, enabled }: UseInterviewProcto
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
     } catch {
-      setConsentError("Camera and microphone access is required to take a proctored interview. Please allow access in your browser and try again.");
+      setConsentError(`Camera and microphone access is required to take a proctored ${activityLabel}. Please allow access in your browser and try again.`);
       setPhase("blocked");
       return;
     }
@@ -162,7 +170,7 @@ export function useInterviewProctoring({ basePath, enabled }: UseInterviewProcto
       previewVideoRef.current.play().catch(() => {});
     }
     setDevicePreviewReady(true);
-  }, [checkCapabilities]);
+  }, [checkCapabilities, activityLabel]);
 
   const grantConsentAndStart = useCallback(async () => {
     setConsentError(null);
@@ -174,7 +182,7 @@ export function useInterviewProctoring({ basePath, enabled }: UseInterviewProcto
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       } catch {
-        setConsentError("Camera and microphone access is required to take a proctored interview. Please allow access in your browser and try again.");
+        setConsentError(`Camera and microphone access is required to take a proctored ${activityLabel}. Please allow access in your browser and try again.`);
         setPhase("blocked");
         return;
       }
@@ -225,7 +233,7 @@ export function useInterviewProctoring({ basePath, enabled }: UseInterviewProcto
     }
 
     setPhase("active");
-  }, [basePath, teardownMedia, checkCapabilities]);
+  }, [basePath, teardownMedia, checkCapabilities, activityLabel]);
 
   const resumeFullscreen = useCallback(() => {
     document.documentElement

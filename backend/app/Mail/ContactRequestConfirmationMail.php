@@ -18,7 +18,7 @@ class ContactRequestConfirmationMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject('We got your message — CodeGen Box')
+        return $this->subject('We got your message — AptRun')
             ->view('emails.contact-request-confirmation');
     }
 }

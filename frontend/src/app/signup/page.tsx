@@ -382,7 +382,7 @@ export default function SignupPage() {
                       </AnimatePresence>
                     </button>
                     <span className="text-text-secondary text-sm font-medium leading-snug">
-                      I agree to the CodeGen Box{" "}
+                      I agree to the AptRun{" "}
                       <Link href="/#" className="text-accent-primary hover:underline">
                         Terms of Service
                       </Link>

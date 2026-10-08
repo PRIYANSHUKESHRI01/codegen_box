@@ -98,7 +98,7 @@ class DatabaseSeeder extends Seeder
                 'website_url' => 'https://nimbuslabs.example.com',
                 'industry' => 'Cloud Infrastructure',
                 'overview' => 'Nimbus Labs builds developer tooling for cloud-native teams, hiring directly through '
-                    .'CodeGen Box for its engineering roles.',
+                    .'AptRun for its engineering roles.',
                 'account_type' => Company::ACCOUNT_TYPE_HIRING_TENANT,
             ]
         );
@@ -155,6 +155,7 @@ class DatabaseSeeder extends Seeder
         $this->call(DsaHundredProblemSeederV7::class);
         $this->call(DsaHundredProblemSeederV8::class);
         $this->call(DsaHundredProblemSeederV9::class);
+        $this->call(DsaHundredProblemSeederV10::class);
         $this->call(CompanyTagSeeder::class);
         // InterviewQuestionBankSeeder before CampusRosterSeeder: both
         // CompanyHiringSeeder and InterviewSeeder below attach real
@@ -171,6 +172,8 @@ class DatabaseSeeder extends Seeder
         // Articles/interviews, no ordering dependency on anything above.
         $this->call(SpeakingPromptSeeder::class);
         $this->call(ListeningLessonSeeder::class);
+        // Vocabulary Sprint's word library — the spaced-repetition decks.
+        $this->call(VocabularyWordSeeder::class);
         // Soft Skills — the question bank, then the default published
         // general assessment built from it (requires priya@mellow.ai,
         // already seeded above).

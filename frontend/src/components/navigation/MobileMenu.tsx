@@ -61,7 +61,7 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
           <div className="flex items-center justify-between pb-6 border-b border-border-subtle">
             <div className="flex items-center gap-2">
               <LogoBadge className="w-8 h-8" />
-              <Wordmark className="font-bold text-lg tracking-tight text-primary" />
+              <Wordmark className="text-lg" />
             </div>
             <button
               type="button"

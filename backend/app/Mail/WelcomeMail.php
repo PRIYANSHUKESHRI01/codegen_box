@@ -22,7 +22,7 @@ class WelcomeMail extends Mailable
 
     public function build(): self
     {
-        return $this->subject('Welcome to CodeGen Box')
+        return $this->subject('Welcome to AptRun')
             ->view('emails.welcome');
     }
 }

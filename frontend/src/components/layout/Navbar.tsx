@@ -76,19 +76,17 @@ export function Navbar() {
         {/* Top subtle gradient hairline */}
         <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-75" />
         <Container size="xl">
-          <div className="flex items-center justify-between h-16 sm:h-18">
-            {/* Brand Logo */}
+          <div className="flex items-center justify-between h-16">
+            {/* Brand lockup: mark + wordmark only. The "Placement Sandbox"
+                descriptor lives in the hero eyebrow right below, so repeating
+                it here only made the logo heavier. */}
             <Link
               href="/"
-              className="flex items-center gap-2.5 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control"
+              aria-label="AptRun home"
+              className="flex items-center gap-2 shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control"
             >
-              <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.4)]" />
-              <div className="flex flex-col">
-                <Wordmark className="font-bold text-lg tracking-tight text-primary leading-none" />
-                <span className="text-3xs font-mono text-text-muted tracking-wider uppercase whitespace-nowrap">
-                  Placements &bull; Practice
-                </span>
-              </div>
+              <LogoBadge className="w-8 h-8 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(0,78,239,0.45)]" />
+              <Wordmark className="text-lg" />
             </Link>
 
             {/* Desktop Navigation */}
@@ -149,7 +147,7 @@ export function Navbar() {
                   return (
                     <a
                       key={problem.slug}
-                      href="#problems"
+                      href="/#problems"
                       onClick={() => setSearchOpen(false)}
                       className="flex items-center justify-between p-3 rounded-control hover:bg-elevated transition-colors group"
                     >

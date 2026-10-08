@@ -50,7 +50,7 @@ export function generateReportPdf(input: ReportPdfInput) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
   doc.setTextColor(17, 24, 39);
-  doc.text("CodeGen Box — Performance Report", margin, y);
+  doc.text("AptRun — Performance Report", margin, y);
 
   y += 22;
   doc.setFont("helvetica", "normal");
@@ -217,7 +217,7 @@ export function generateReportPdf(input: ReportPdfInput) {
     doc.setFontSize(8);
     doc.setTextColor(...MUTED);
     doc.text(
-      `CodeGen Box · Generated ${new Date().toLocaleString("en-IN")} · Page ${i} of ${pageCount}`,
+      `AptRun · Generated ${new Date().toLocaleString("en-IN")} · Page ${i} of ${pageCount}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 20,
       { align: "center" }
@@ -225,5 +225,5 @@ export function generateReportPdf(input: ReportPdfInput) {
   }
 
   const fileSafeName = input.studentName.toLowerCase().replace(/\s+/g, "-");
-  doc.save(`codegen-box-performance-report-${fileSafeName}.pdf`);
+  doc.save(`aptrun-performance-report-${fileSafeName}.pdf`);
 }

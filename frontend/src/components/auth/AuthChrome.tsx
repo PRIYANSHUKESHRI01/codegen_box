@@ -33,15 +33,10 @@ export function AuthChrome({ altLabel, altHref, children }: AuthChromeProps) {
     <div className="min-h-screen bg-background text-primary flex flex-col justify-between selection:bg-accent-primary/20 selection:text-accent-primary relative overflow-hidden">
       <AuthBackground />
 
-      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control">
-          <LogoBadge className="w-9 h-9 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(79,70,229,0.4)]" />
-          <div className="flex flex-col">
-            <Wordmark className="font-bold text-lg tracking-tight text-primary leading-none" />
-            <span className="text-3xs font-mono text-text-muted tracking-wider uppercase">
-              Placements &bull; Practice
-            </span>
-          </div>
+      <header className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
+        <Link href="/" aria-label="AptRun home" className="flex items-center gap-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary rounded-control">
+          <LogoBadge className="w-8 h-8 transition-all duration-200 group-hover:scale-105 group-hover:drop-shadow-[0_0_10px_rgba(0,78,239,0.45)]" />
+          <Wordmark className="text-lg" />
         </Link>
 
         <div className="flex items-center gap-3">

@@ -32,6 +32,12 @@ function mapRecognitionError(code: string): VoiceListenError {
   return "unknown";
 }
 
+/** Normalized level above which a frame counts as someone speaking. Deliberately low (room hiss is ~0.02-0.04): a quiet speaker must still register, because the server rejects silence anyway. */
+const VOICED_LEVEL = 0.05;
+
+/** How long stopListening() waits for the browser to deliver its last, still-pending speech result before giving up on it. */
+const RECOGNITION_DRAIN_MS = 1500;
+
 /** RMS of a time-domain byte buffer (128 = silence), normalized to roughly 0-1 for typical speech levels. */
 function computeRmsLevel(data: Uint8Array): number {
   let sumSquares = 0;
@@ -64,7 +70,24 @@ export class BrowserVoiceEngine implements VoiceEngine {
   private recognition: SpeechRecognitionLike | null = null;
   private chunks: Blob[] = [];
   private finalTranscript = "";
+  /** Words the recognizer has heard but not yet finalized — folded into the transcript if the browser never finalizes them. */
+  private interimChunk = "";
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+
+  // Chrome ends a continuous recognition session on its own after a stretch of
+  // silence (and sometimes just at a time limit). Unless stopListening() asked
+  // for the stop, onend restarts it so a thoughtful pause mid-answer doesn't
+  // silently cut the transcript off there.
+  private stopRequested = false;
+  private restartCount = 0;
+  private recognitionEnded: (() => void) | null = null;
+
+  // Real speech detected by the level meter, so callers can refuse to score a
+  // recording of a muted mic without needing the (optional) recognizer.
+  private voicedMs = 0;
+  private lastLevelTickAt = 0;
+  /** False until the meter has actually measured a frame — an unmeasured recording must not look like a silent one. */
+  private meterRan = false;
 
   // Audio level metering — the AudioContext/analyser/source are set up once
   // (lazily, off the same persistent `stream`) and reused for the whole
@@ -101,6 +124,13 @@ export class BrowserVoiceEngine implements VoiceEngine {
   async startListening(callbacks?: VoiceListenCallbacks): Promise<void> {
     this.chunks = [];
     this.finalTranscript = "";
+    this.interimChunk = "";
+    this.stopRequested = false;
+    this.restartCount = 0;
+    this.recognitionEnded = null;
+    this.voicedMs = 0;
+    this.lastLevelTickAt = 0;
+    this.meterRan = false;
 
     if (!this.stream) {
       try {
@@ -124,33 +154,64 @@ export class BrowserVoiceEngine implements VoiceEngine {
     this.startLevelMetering(callbacks?.onAudioLevel);
 
     const Ctor = getSpeechRecognitionCtor();
-    if (Ctor) {
-      const recognition = new Ctor();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-IN";
-      recognition.onresult = (event: SpeechRecognitionEventLike) => {
-        let interimChunk = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            this.finalTranscript += (this.finalTranscript ? " " : "") + result[0].transcript.trim();
-          } else {
-            interimChunk += result[0].transcript;
-          }
+    if (Ctor) this.startRecognition(Ctor, callbacks);
+  }
+
+  /** One recognizer session; onend re-enters here so the engine keeps listening until stopListening() says otherwise. */
+  private startRecognition(Ctor: new () => SpeechRecognitionLike, callbacks?: VoiceListenCallbacks): void {
+    const recognition = new Ctor();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN";
+
+    let fatal = false;
+
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
+      let interimChunk = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        if (result.isFinal) {
+          this.finalTranscript += (this.finalTranscript ? " " : "") + result[0].transcript.trim();
+        } else {
+          interimChunk += result[0].transcript;
         }
-        callbacks?.onInterimTranscript?.((this.finalTranscript + " " + interimChunk).trim());
-      };
-      recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
-        // A no-speech/network blip shouldn't kill the session — the
-        // candidate can still submit whatever final transcript was
-        // captured so far, or fall back to editing it by hand. Still
-        // reported so the UI can show a transient, non-blocking hint.
-        callbacks?.onError?.(mapRecognitionError(event.error));
-      };
-      recognition.start();
-      this.recognition = recognition;
-    }
+      }
+      this.interimChunk = interimChunk.trim();
+      callbacks?.onInterimTranscript?.((this.finalTranscript + " " + interimChunk).trim());
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
+      const kind = mapRecognitionError(event.error);
+      // Permission problems will not fix themselves on a restart.
+      if (kind === "permission_denied") fatal = true;
+      // A no-speech/network blip shouldn't kill the session — the
+      // candidate can still submit whatever final transcript was
+      // captured so far, or fall back to editing it by hand. Still
+      // reported so the UI can show a transient, non-blocking hint.
+      callbacks?.onError?.(kind);
+    };
+
+    recognition.onend = () => {
+      if (this.stopRequested || fatal || this.recognition !== recognition) {
+        this.recognitionEnded?.();
+        return;
+      }
+      // Ended on its own mid-answer (silence timeout) — pick up again, with a cap so a
+      // recognizer that dies instantly cannot spin forever.
+      if (this.restartCount >= 30) return;
+      this.restartCount += 1;
+      window.setTimeout(() => {
+        if (this.stopRequested || this.recognition !== recognition) return;
+        try {
+          recognition.start();
+        } catch {
+          // start() throws if the session is somehow already running — nothing to do.
+        }
+      }, 250);
+    };
+
+    recognition.start();
+    this.recognition = recognition;
   }
 
   /** Lazily sets up one AudioContext/analyser off the persistent stream, then runs a rAF loop calling `onLevel` until stopped. Silently no-ops if AudioContext isn't available or gets blocked — the meter is a nice-to-have, never load-bearing. */
@@ -178,9 +239,17 @@ export class BrowserVoiceEngine implements VoiceEngine {
 
     const tick = () => {
       analyser.getByteTimeDomainData(buffer);
-      onLevel(computeRmsLevel(buffer));
+      const level = computeRmsLevel(buffer);
+      onLevel(level);
+
+      const now = performance.now();
+      this.meterRan = true;
+      if (this.lastLevelTickAt && level > VOICED_LEVEL) this.voicedMs += now - this.lastLevelTickAt;
+      this.lastLevelTickAt = now;
+
       this.levelRafId = requestAnimationFrame(tick);
     };
+    this.lastLevelTickAt = 0;
     this.levelRafId = requestAnimationFrame(tick);
   }
 
@@ -191,28 +260,48 @@ export class BrowserVoiceEngine implements VoiceEngine {
     }
   }
 
-  async stopListening(): Promise<{ transcript: string; audioBlob: Blob | null }> {
+  async stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null }> {
     this.stopLevelMetering();
+    this.stopRequested = true;
 
-    if (this.recognition) {
-      this.recognition.stop();
-      this.recognition = null;
+    // SpeechRecognition.stop() does not return the last words — the browser
+    // delivers one more (final) result AFTER it, then fires onend. Reading the
+    // transcript straight away drops the end of the answer, so wait for onend
+    // (bounded: some browsers never fire it).
+    const recognition = this.recognition;
+    this.recognition = null;
+    let recognitionDrained: Promise<void> = Promise.resolve();
+    if (recognition) {
+      recognitionDrained = new Promise<void>((resolve) => {
+        this.recognitionEnded = resolve;
+        window.setTimeout(resolve, RECOGNITION_DRAIN_MS);
+      });
+      try {
+        recognition.stop();
+      } catch {
+        this.recognitionEnded?.();
+      }
     }
 
     let audioBlob: Blob | null = null;
-    if (this.recorder && this.recorder.state !== "inactive") {
-      audioBlob = await new Promise<Blob>((resolve) => {
-        const recorder = this.recorder!;
-        recorder.onstop = () => resolve(new Blob(this.chunks, { type: recorder.mimeType || "audio/webm" }));
-        recorder.stop();
-      });
-    }
+    const recorded = this.recorder && this.recorder.state !== "inactive"
+      ? new Promise<Blob>((resolve) => {
+          const recorder = this.recorder!;
+          recorder.onstop = () => resolve(new Blob(this.chunks, { type: recorder.mimeType || "audio/webm" }));
+          recorder.stop();
+        })
+      : null;
+
+    [audioBlob] = await Promise.all([recorded, recognitionDrained]);
     this.recorder = null;
+    this.recognitionEnded = null;
 
-    const transcript = this.finalTranscript.trim();
+    // Anything the recognizer heard but never finalized still counts.
+    const transcript = [this.finalTranscript, this.interimChunk].filter(Boolean).join(" ").trim();
     this.finalTranscript = "";
+    this.interimChunk = "";
 
-    return { transcript, audioBlob };
+    return { transcript, audioBlob, voicedMs: this.meterRan ? Math.round(this.voicedMs) : null };
   }
 
   cancel(): void {
@@ -220,10 +309,12 @@ export class BrowserVoiceEngine implements VoiceEngine {
     this.currentUtterance = null;
 
     this.stopLevelMetering();
+    this.stopRequested = true;
 
     if (this.recognition) {
       this.recognition.onresult = null;
       this.recognition.onerror = null;
+      this.recognition.onend = null;
       this.recognition.abort();
       this.recognition = null;
     }

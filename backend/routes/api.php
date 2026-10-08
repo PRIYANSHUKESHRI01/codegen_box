@@ -54,6 +54,7 @@ use App\Http\Controllers\Api\PhoneVerificationController;
 use App\Http\Controllers\Api\ProblemController;
 use App\Http\Controllers\Api\PublicController;
 use App\Http\Controllers\Api\SoftSkillController;
+use App\Http\Controllers\Api\SoftSkillProctoringController;
 use App\Http\Controllers\Api\SpeakingPracticeController;
 use App\Http\Controllers\Api\StudentDriveController;
 use App\Http\Controllers\Api\StudentImportController;
@@ -76,6 +77,7 @@ use App\Http\Controllers\Api\TpoSoftSkillController;
 use App\Http\Controllers\Api\TpoStudentController;
 use App\Http\Controllers\Api\TpoStudentReportController;
 use App\Http\Controllers\Api\VocabularyController;
+use App\Http\Controllers\Api\VocabularyProgressController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -824,6 +826,13 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/soft-skills/sessions/{softSkillSession}/submit', [SoftSkillController::class, 'submit']);
             Route::get('/soft-skills/sessions/{softSkillSession}', [SoftSkillController::class, 'viewSession']);
 
+            // Camera/mic proctoring for a Soft Skills attempt — same shape as
+            // the interview/contest proctoring routes above (start() is
+            // idempotent and resumes on refresh; reportViolation() is what the
+            // frontend's tab-switch/fullscreen/devtools detectors call).
+            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/start', [SoftSkillProctoringController::class, 'start']);
+            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/violations', [SoftSkillProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
+
             // The "Final Interview" 3-round pipeline — index() is where a
             // candidate discovers a track exists at all (standalone
             // /interviews above excludes track rounds); show() is the
@@ -849,16 +858,33 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/learning-centre/overview', [LearningCentreController::class, 'overview']);
 
             Route::get('/learning-centre/speaking/prompts', [SpeakingPracticeController::class, 'index']);
+            Route::post('/learning-centre/speaking/prompts/generate', [SpeakingPracticeController::class, 'generate'])
+                ->middleware('throttle:ai-generation');
             Route::get('/learning-centre/speaking/prompts/{speakingPrompt}', [SpeakingPracticeController::class, 'show']);
             Route::post('/learning-centre/speaking/prompts/{speakingPrompt}/attempts', [SpeakingPracticeController::class, 'submit'])
                 ->middleware('throttle:ai-generation');
 
             Route::get('/learning-centre/listening/lessons', [ListeningLabController::class, 'index']);
+            // Writing a lesson around the student's own topic is the one Listening Lab call that costs a Gemini request.
+            Route::post('/learning-centre/listening/lessons/generate', [ListeningLabController::class, 'generate'])
+                ->middleware('throttle:ai-generation');
             Route::get('/learning-centre/listening/lessons/{listeningLesson}', [ListeningLabController::class, 'show']);
             Route::post('/learning-centre/listening/lessons/{listeningLesson}/attempts', [ListeningLabController::class, 'submit']);
 
+            // Vocabulary Sprint: a curated word bank with spaced repetition. Sessions
+            // (daily / deck / weak words) are built from the bank with no Gemini call;
+            // only /generate (quick quiz on any topic) costs one. Answers are graded
+            // one question at a time — see VocabularyController's docblock.
+            Route::get('/learning-centre/vocabulary/overview', [VocabularyProgressController::class, 'overview']);
+            Route::get('/learning-centre/vocabulary/words', [VocabularyProgressController::class, 'words']);
+            Route::post('/learning-centre/vocabulary/sessions', [VocabularyController::class, 'start'])
+                ->middleware('throttle:60,1');
+            Route::get('/learning-centre/vocabulary/attempts/{vocabularyAttempt}', [VocabularyController::class, 'show']);
+            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/answer', [VocabularyController::class, 'answer'])
+                ->middleware('throttle:240,1');
             Route::post('/learning-centre/vocabulary/generate', [VocabularyController::class, 'generate'])
                 ->middleware('throttle:ai-generation');
+            // Original all-at-once grading, kept for a frontend deployed before the upgrade.
             Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/submit', [VocabularyController::class, 'submit']);
 
             // Proctoring — contest problem-solving only, never practice (see

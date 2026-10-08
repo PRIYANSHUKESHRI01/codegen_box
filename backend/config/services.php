@@ -46,6 +46,8 @@ return [
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
         'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        // Second, informational "worth a second listen" call per speaking attempt; turn off on a tight quota.
+        'speaking_pronunciation_notes' => env('GEMINI_SPEAKING_PRONUNCIATION_NOTES', true),
     ],
 
     /*

@@ -19,7 +19,7 @@ export interface ExportableStudent {
 
 export async function generateStudentsExcel(students: ExportableStudent[], collegeName: string) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
 
   const sheet = workbook.addWorksheet("Student Cohort");

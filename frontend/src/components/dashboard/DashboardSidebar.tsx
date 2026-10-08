@@ -822,7 +822,7 @@ export function DashboardSidebar({
         <Link
           href="/"
           className="sb-focus group flex min-w-0 items-center gap-2.5 outline-none"
-          aria-label="CodeGen Box home"
+          aria-label="AptRun home"
         >
           <LogoBadge className="h-9 w-9 shrink-0 transition-transform duration-200 group-hover:scale-[1.04]" />
 
@@ -836,12 +836,9 @@ export function DashboardSidebar({
                 className="flex min-w-0 flex-col whitespace-nowrap"
               >
                 <span className="flex items-center gap-1.5">
-                  {/* text-15's own paired line-height (20px, see
-                      tailwind.config.ts) — not leading-none. A 1.0 line-box
-                      combined with `truncate`'s overflow:hidden was clipping
-                      the descender off "Codegen"'s "g"; same fix applied to
-                      every other leading-none+truncate label below. */}
-                  <Wordmark className="truncate text-15 font-extrabold tracking-tight text-sidebar-strong" />
+                  {/* The rail is dark in both themes, so the wordmark always uses its
+                      white + teal variant. It is sized in em from the text-* class. */}
+                  <Wordmark surface="on-dark" className="text-lg" />
                   <span className="rounded bg-sidebar-accent-soft px-1.5 py-[3px] text-3xs font-extrabold uppercase leading-none tracking-[0.1em] text-sidebar-accent ring-1 ring-inset ring-[rgba(129,140,248,0.3)]">
                     Pro
                   </span>

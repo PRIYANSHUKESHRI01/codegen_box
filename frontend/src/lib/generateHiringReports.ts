@@ -10,7 +10,7 @@ import type { HiringReportData } from "@/types/hiring";
  */
 export async function generateHiringReportExcel(report: HiringReportData, companyName: string) {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "CodeGen Box";
+  workbook.creator = "AptRun";
   workbook.created = new Date();
 
   const summarySheet = workbook.addWorksheet("Hiring Summary");

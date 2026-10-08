@@ -4,10 +4,14 @@ import { useRouter } from "next/navigation";
 import { Container } from "@/components/layout/Container";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DifficultyBadge } from "./DifficultyBadge";
-import { Card } from "@/components/ui/Card";
+import { SpotlightCard } from "@/components/ui/SpotlightCard";
+import { TONES, Tone } from "@/components/ui/tones";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { usePublicSampleProblems, usePublicStats } from "@/lib/usePublicPlatformData";
 import { ArrowRight } from "lucide-react";
+
+const DIFFICULTY_TONE: Record<string, Tone> = { easy: "emerald", medium: "amber", hard: "rose" };
 
 function titleCase(difficulty: string): string {
   return difficulty.charAt(0).toUpperCase() + difficulty.slice(1);
@@ -29,10 +33,10 @@ export function ProblemExplorer() {
     <section id="problems" className="py-20 sm:py-28">
       <Container size="xl">
         <SectionHeading
-          badge="Problem Explorer"
-          title="Battle-Tested"
-          highlight="Algorithmic Problems"
-          description="A real sample from the catalog — dynamic programming, graphs, trees, and everything in between, judged against real, hidden test cases."
+          badge="Practice arena"
+          title="Sharpen the skills"
+          highlight="employers test for"
+          description="A real sample from the catalog, judged against hidden test cases in C++, Java, Python and JavaScript."
         />
 
         {loading ? (
@@ -43,40 +47,53 @@ export function ProblemExplorer() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {problems.map((problem) => (
-              <Card
-                key={problem.slug}
-                variant="interactive"
-                onClick={() => router.push("/signup")}
-                className="card-shine p-5 sm:p-6 flex flex-col justify-between group transition-all duration-300 border-border-subtle hover:border-accent-primary/40 hover:shadow-card"
-              >
-                <div>
-                  <div className="mb-3">
-                    <DifficultyBadge difficulty={titleCase(problem.difficulty)} size="sm" />
+            {problems.map((problem, i) => {
+              const tone = TONES[DIFFICULTY_TONE[problem.difficulty] ?? "indigo"];
+              return (
+                <SpotlightCard
+                  key={problem.slug}
+                  onClick={() => router.push("/signup")}
+                  className={cn(
+                    "group relative p-5 sm:p-6 flex flex-col justify-between rounded-card bg-surface border border-border-subtle shadow-sm overflow-hidden cursor-pointer hover:-translate-y-1.5 hover:border-border-strong transition-all duration-300",
+                    tone.shadow
+                  )}
+                >
+                  {/* Difficulty-coloured wash and edge */}
+                  <div aria-hidden="true" className={cn("absolute inset-x-0 top-0 h-24 bg-gradient-to-b to-transparent pointer-events-none", tone.wash)} />
+                  <span aria-hidden="true" className={cn("absolute left-0 top-5 bottom-5 w-[3px] rounded-r-full", tone.dot)} />
+
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <DifficultyBadge difficulty={titleCase(problem.difficulty)} size="sm" />
+                      <span className="font-mono text-2xs font-bold text-text-muted">#{String(i + 1).padStart(2, "0")}</span>
+                    </div>
+
+                    <h3 className="text-base sm:text-lg font-bold text-primary group-hover:text-accent-primary transition-colors line-clamp-1 mb-3">
+                      {problem.title}
+                    </h3>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {problem.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="text-2xs font-mono font-medium px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-text-secondary group-hover:border-border-strong transition-colors"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
                   </div>
 
-                  <h3 className="text-base sm:text-lg font-bold text-primary group-hover:text-accent-primary transition-colors line-clamp-1 mb-2.5">
-                    {problem.title}
-                  </h3>
-
-                  <div className="flex flex-wrap gap-1.5">
-                    {problem.tags.map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-2xs font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted group-hover:border-border-strong transition-colors"
-                      >
-                        {tag}
-                      </span>
-                    ))}
+                  <div className="relative pt-4 mt-5 border-t border-border-subtle flex items-center justify-between">
+                    <span className="text-2xs font-semibold text-text-secondary">Judged on hidden test cases</span>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-bold text-text-secondary group-hover:text-white group-hover:bg-accent-primary group-hover:border-accent-primary group-hover:shadow-glow px-3 py-1.5 rounded-full border border-border-strong bg-surface transition-all duration-300">
+                      Solve
+                      <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
+                    </span>
                   </div>
-                </div>
-
-                <div className="pt-4 mt-4 border-t border-border-subtle flex items-center justify-end text-xs text-text-secondary group-hover:text-accent-primary group-hover:translate-x-1 transition-all font-sans font-semibold">
-                  <span>Solve</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                </div>
-              </Card>
-            ))}
+                </SpotlightCard>
+              );
+            })}
           </div>
         )}
 

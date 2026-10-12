@@ -24,8 +24,8 @@ describe("centralized dummy data integrity", () => {
   });
 
   it("validates supported languages match the real judge config exactly", () => {
-    expect(LANGUAGES_DATA.length).toBe(4);
-    expect(LANGUAGES_DATA.map((l) => l.id).sort()).toEqual(["cpp", "java", "javascript", "python"]);
+    expect(LANGUAGES_DATA.length).toBe(19);
+    expect(LANGUAGES_DATA.map((l) => l.id).sort()).toEqual(["c", "cpp", "csharp", "dart", "elixir", "erlang", "go", "java", "javascript", "kotlin", "php", "python", "python2", "racket", "ruby", "rust", "scala", "swift", "typescript"]);
     LANGUAGES_DATA.forEach((lang) => {
       expect(lang.id).toBeDefined();
       expect(lang.defaultSnippet.length).toBeGreaterThan(20);

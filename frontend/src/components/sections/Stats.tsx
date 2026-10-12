@@ -87,7 +87,7 @@ export function Stats() {
           value: stats.languages_total,
           suffix: "",
           label: "Languages Supported",
-          sublabel: "C++, Java, Python and JavaScript, all real judge execution",
+          sublabel: "C++, Java, Python, JavaScript, TypeScript, C#, Go, Rust, Kotlin, Swift and 9 more, all real judge execution",
           icon: Terminal,
           colorScheme: "emerald",
         },

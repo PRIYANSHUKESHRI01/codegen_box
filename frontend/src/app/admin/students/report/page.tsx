@@ -75,6 +75,7 @@ import { buildActivityWeeks } from "@/lib/activityGrid";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn, withMinDelay } from "@/lib/utils";
+import { languageLabel } from "@/lib/judgeLanguages";
 import { DRIVE_APPLICATION_STAGES, DRIVE_APPLICATION_STAGE_LABELS, DRIVE_APPLICATION_TERMINAL_STAGES, type DriveApplicationStage } from "@/types/placement";
 import type {
   StudentReport,
@@ -1517,7 +1518,7 @@ function ContestSubmissionsPanel({
                     <p className="truncate text-xs font-bold text-primary">{s.problem_title}</p>
                     <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs text-text-muted">
                       <span className={cn("font-bold capitalize", v ? HP_TONES[v.tone].text : "text-text-secondary")}>{verdictLabel(s.status)}</span>
-                      <span className="font-mono">{s.language}</span>
+                      <span className="font-mono">{languageLabel(s.language)}</span>
                       {s.points_awarded !== null && <span className="tabular">{s.points_awarded} pts</span>}
                       <time dateTime={s.submitted_at} className="tabular">
                         {fmtDateTime(s.submitted_at)}
@@ -1866,7 +1867,7 @@ function PremiumSubmissionHistory({ submissions, onOpenCode }: { submissions: Su
                           {SOURCE_LABEL[s.source]}
                         </HpPill>
                         <span className="rounded-md bg-elevated px-1.5 py-px font-mono font-semibold text-text-secondary ring-1 ring-inset ring-border-subtle">
-                          {s.language}
+                          {languageLabel(s.language)}
                         </span>
                         {s.contest_title && <span className="min-w-0 max-w-[16rem] truncate">via {s.contest_title}</span>}
                         {s.points_awarded !== null && <span className="tabular font-semibold">{s.points_awarded} pts</span>}

@@ -73,6 +73,7 @@ const SOLUTIONS = {
   javascript: (u) => `function twoSum(nums, target) {\n  const seen = new Map();\n  for (let i = 0; i < nums.length; i++) {\n    const j = seen.get(target - nums[i]);\n    if (j !== undefined) return [j, i];\n    seen.set(nums[i], i);\n  }\n  return [];\n}\n// ${u}\n`,
   java: (u) => `class Solution {\n    public int[] twoSum(int[] nums, int target) {\n        java.util.Map<Integer, Integer> m = new java.util.HashMap<>();\n        for (int i = 0; i < nums.length; i++) {\n            Integer j = m.get(target - nums[i]);\n            if (j != null) return new int[]{j, i};\n            m.put(nums[i], i);\n        }\n        return new int[]{};\n    }\n}\n// ${u}\n`,
   cpp: (u) => `class Solution {\npublic:\n    vector<int> twoSum(vector<int>& nums, int target) {\n        unordered_map<int, int> m;\n        for (int i = 0; i < (int)nums.size(); i++) {\n            auto it = m.find(target - nums[i]);\n            if (it != m.end()) return {it->second, i};\n            m[nums[i]] = i;\n        }\n        return {};\n    }\n};\n// ${u}\n`,
+  php: (u) => `<?php\nclass Solution {\n    public function twoSum($nums, $target) {\n        $seen = [];\n        foreach ($nums as $i => $n) {\n            if (isset($seen[$target - $n])) return [$seen[$target - $n], $i];\n            $seen[$n] = $i;\n        }\n        return [];\n    }\n}\n// ${u}\n`,
 };
 
 const pickLang = () => {

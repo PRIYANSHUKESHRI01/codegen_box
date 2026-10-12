@@ -1,0 +1,67 @@
+# Local development gateway: plain http on :8081, any Host. Browsers resolve
+# *.localhost to 127.0.0.1 by themselves, so  http://ws-<id>.localhost:8081  just
+# works with no DNS or hosts-file edit. No TLS, no certificates, no firewall —
+# for a developer machine only.
+#
+# Environment: APP_ORIGINS  (default below) — who may embed the editor.
+
+{
+	auto_https off
+	admin off
+}
+
+:8081 {
+	@preview header_regexp pv Host ^p(\d{4,5})--(ws-[a-z0-9]{24})\.
+	handle @preview {
+		reverse_proxy {re.pv.2}:{re.pv.1} {
+			# DEV ONLY, same reason as the editor below: the preview is an iframe on a different SITE
+			# than the dashboard here, so a student app's session cookie (Laravel/Django send
+			# SameSite=Lax; Express/Flask send no SameSite at all, which browsers treat as Lax) would be
+			# dropped and every login would fail. Strip whatever SameSite it has and re-issue it as a
+			# partitioned third-party cookie. Production is same-site (app.example.com and
+			# p3000--ws-<id>.ws.example.com) and needs none of this.
+			header_down Set-Cookie "(?i);\s*samesite=[^;]*" ""
+			header_down Set-Cookie "$" "; SameSite=None; Secure; Partitioned"
+		}
+	}
+
+	@ide header_regexp ide Host ^(ws-[a-z0-9]{24})\.
+	handle @ide {
+		header Content-Security-Policy "frame-ancestors 'self' {$APP_ORIGINS:http://localhost:3000 http://127.0.0.1:3000}"
+		reverse_proxy {re.ide.1}:13370 {
+			# DEV ONLY. VS Code keeps its access token in a SameSite=Lax cookie. Locally the
+			# dashboard (localhost:3000) and the editor (ws-<id>.localhost:8081) are different
+			# SITES, so a Lax/Strict cookie is never sent back from inside the iframe and the editor
+			# 403s on its first redirect. Re-issue it as a partitioned third-party cookie.
+			# In production the app and the workspaces share a registrable domain, so the
+			# stock Lax cookie works and this rewrite is deliberately NOT in ./Caddyfile.
+			header_down Set-Cookie "(?i)samesite=(lax|strict)" "SameSite=None; Secure; Partitioned"
+		}
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+
+	# Friendly pages instead of a blank frame when nothing is answering.
+	handle_errors {
+		@previewDown header_regexp pv Host ^p(\d{4,5})--ws-
+		handle @previewDown {
+			header Content-Type "text/html; charset=utf-8"
+			respond <<HTML
+				<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nothing is listening yet</title>
+				<style>body{font:15px/1.6 system-ui,sans-serif;background:#0f1117;color:#e6e8ee;margin:0;display:grid;place-items:center;min-height:100vh}main{max-width:34rem;padding:2rem}h1{font-size:1.15rem;margin:0 0 .6rem}code{background:#1c2030;padding:.1rem .35rem;border-radius:4px}p{margin:.5rem 0;color:#aeb4c4}</style></head>
+				<body><main><h1>Nothing is listening on port {re.pv.1} yet</h1><p>Start your app in the VS Code terminal, and make it listen on <code>0.0.0.0</code> rather than <code>localhost</code>.</p><p>For example: <code>npm run dev -- --host</code>, <code>php artisan serve --host=0.0.0.0 --port=8000</code> or <code>python manage.py runserver 0.0.0.0:8000</code>.</p><p>Then reload this preview.</p></main></body></html>
+				HTML 502
+		}
+		@ideDown header_regexp ide Host ^ws-
+		handle @ideDown {
+			header Content-Type "text/html; charset=utf-8"
+			respond <<HTML
+				<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workspace not running</title>
+				<style>body{font:15px/1.6 system-ui,sans-serif;background:#0f1117;color:#e6e8ee;margin:0;display:grid;place-items:center;min-height:100vh}main{max-width:34rem;padding:2rem}h1{font-size:1.15rem;margin:0 0 .6rem}code{background:#1c2030;padding:.1rem .35rem;border-radius:4px}p{margin:.5rem 0;color:#aeb4c4}</style></head>
+				<body><main><h1>This workspace is not running</h1><p>Open it again from your Project Lab page — your files are safe.</p></main></body></html>
+				HTML 502
+		}
+	}
+}

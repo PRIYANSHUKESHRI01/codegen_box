@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 /** Per-problem, per-language local draft — genuinely client-only (no
  * submission backend exists yet), so this never claims to sync anywhere. */
 function draftKey(slug: string, language: string) {
-  return `codeforge:draft:${slug}:${language}`;
+  return `aptrun:draft:${slug}:${language}`;
 }
 
 export default function ProblemSolvePage() {

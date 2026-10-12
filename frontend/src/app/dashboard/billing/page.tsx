@@ -6,6 +6,7 @@ import { Check } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { PricingPlans } from "@/components/pricing/PricingPlans";
+import { ProjectLabPricing } from "@/components/pricing/ProjectLabPricing";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
 import { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
@@ -80,7 +81,10 @@ export default function BillingPage() {
       {coverageLoading ? (
         <div className="p-10 flex items-center justify-center text-xs text-text-muted">Loading your plan...</div>
       ) : (
-        <PricingPlans audience="individual" billingCycle="monthly" coverage={coverage} onSubscribed={handleSubscribed} />
+        <>
+          <PricingPlans audience="individual" billingCycle="monthly" coverage={coverage} onSubscribed={handleSubscribed} />
+          <ProjectLabPricing onPurchased={() => triggerToast("Project Lab is active — find it in the sidebar.")} />
+        </>
       )}
     </DashboardShell>
   );

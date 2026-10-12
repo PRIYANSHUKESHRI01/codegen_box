@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Code2, FileCode2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { languageLabel } from "@/lib/judgeLanguages";
 import type { ContestType, SubmissionHistoryRow } from "@/types/studentReport";
 
 const VERDICT_TONE: Record<string, string> = {
@@ -120,7 +121,7 @@ export function SubmissionHistoryList({ submissions, onOpenCode, maxHeightClassN
                   <p className="truncate text-xs font-bold text-primary">{s.problem_title}</p>
                   <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-3xs">
                     <span className={cn("font-bold", VERDICT_TONE[s.status] ?? "text-text-muted")}>{VERDICT_LABEL[s.status] ?? s.status}</span>
-                    <span className="text-text-muted">{s.language}</span>
+                    <span className="text-text-muted">{languageLabel(s.language)}</span>
                     <span className={cn("rounded-full border px-1.5 py-0 text-3xs font-bold uppercase tracking-wide", SOURCE_TONE[s.source])}>
                       {SOURCE_LABEL[s.source]}
                     </span>

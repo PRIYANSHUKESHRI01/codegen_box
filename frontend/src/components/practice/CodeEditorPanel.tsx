@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import type { OnMount } from "@monaco-editor/react";
+import { monacoLanguageFor } from "@/lib/judgeLanguages";
+import { LanguagePicker } from "./LanguagePicker";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
 
@@ -76,20 +78,6 @@ function attachDragAutoScroll(editorInstance: Parameters<OnMount>[0]) {
   });
 }
 
-const LANGUAGE_LABELS: Record<string, string> = {
-  javascript: "JavaScript",
-  python: "Python",
-  java: "Java",
-  cpp: "C++",
-};
-
-const MONACO_LANGUAGE: Record<string, string> = {
-  javascript: "javascript",
-  python: "python",
-  java: "java",
-  cpp: "cpp",
-};
-
 interface CodeEditorPanelProps {
   language: string;
   availableLanguages: string[];
@@ -116,17 +104,7 @@ export function CodeEditorPanel({
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e]">
       <div className="flex items-center justify-between gap-2 px-3 h-11 border-b border-black/30 bg-surface shrink-0">
-        <select
-          value={language}
-          onChange={(e) => onLanguageChange(e.target.value)}
-          className="px-2.5 py-1 rounded-control bg-elevated border border-border-subtle text-xs font-semibold text-primary outline-none focus:border-accent-primary"
-        >
-          {availableLanguages.map((lang) => (
-            <option key={lang} value={lang}>
-              {LANGUAGE_LABELS[lang] ?? lang}
-            </option>
-          ))}
-        </select>
+        <LanguagePicker value={language} options={availableLanguages} onChange={onLanguageChange} />
 
         <div className="flex items-center gap-1">
           <span className="text-2xs text-text-muted font-mono w-8 text-center select-none">{fontSize}px</span>
@@ -166,7 +144,7 @@ export function CodeEditorPanel({
 
       <div className="flex-1 min-h-0">
         <MonacoEditor
-          language={MONACO_LANGUAGE[language] ?? "plaintext"}
+          language={monacoLanguageFor(language)}
           value={code}
           onChange={(value) => onCodeChange(value ?? "")}
           onMount={attachDragAutoScroll}
@@ -179,6 +157,11 @@ export function CodeEditorPanel({
             scrollBeyondLastLine: false,
             smoothScrolling: true,
             tabSize: language === "javascript" ? 2 : 4,
+            // gofmt's style (and the Go starter code) is tabs; every other language here is spaces.
+            insertSpaces: language !== "go",
+            // Without this Monaco guesses the indentation from whatever code is loaded (the previous
+            // language's starter, or a pasted snippet) and ignores the two options above.
+            detectIndentation: false,
             padding: { top: 14 },
             renderLineHighlight: "gutter",
             fontLigatures: true,

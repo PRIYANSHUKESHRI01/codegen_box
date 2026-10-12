@@ -1,0 +1,44 @@
+# Production gateway for the workspace host. Run on the workspace host only, never
+# on the web server.
+#
+#   1. host-bootstrap.sh has created the `aptrun-workspaces` network with a fixed subnet
+#      and applied host-firewall.sh.
+#   2. cp .env.example .env   and fill it in.
+#   3. docker compose up -d --build
+#
+# The workspaces themselves are NOT in this file: Laravel starts and stops them,
+# one container per student, on the same network.
+name: aptrun-gateway
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      WORKSPACE_DOMAIN: ${WORKSPACE_DOMAIN:?set WORKSPACE_DOMAIN, e.g. ws.example.com}
+      APP_ORIGINS: ${APP_ORIGINS:?set APP_ORIGINS, e.g. https://app.example.com}
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      workspaces:
+        # Fixed so host-firewall.sh can let the gateway — and only the gateway —
+        # talk to the workspaces.
+        ipv4_address: ${GATEWAY_IP:-172.30.0.2}
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  workspaces:
+    name: aptrun-workspaces
+    external: true

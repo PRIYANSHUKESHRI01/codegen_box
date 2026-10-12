@@ -36,12 +36,16 @@ import {
   Inbox,
   Sparkles,
   Brain,
+  FlaskConical,
+  Lock,
+  Rocket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
+import { SUBSCRIPTION_CHANGED_EVENT } from "@/lib/projectLab";
 import { useMyStats } from "@/lib/useMyStats";
 import type { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
 import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
@@ -83,6 +87,14 @@ interface NavItem {
   icon: any;
   badge?: string;
   badgeTone?: BadgeTone;
+  /**
+   * The destination is part of a plan add-on the signed-in student doesn't have.
+   * The item stays in the rail (so they can find it and see what it is) but wears
+   * a lock instead of a badge; following it lands on that section's unlock page.
+   */
+  locked?: boolean;
+  /** Highlight this item on its sub-pages too (/dashboard/projects/view, …), not only on its exact path. */
+  matchPrefix?: boolean;
 }
 
 interface NavSection {
@@ -175,17 +187,32 @@ export function DashboardSidebar({
   // "only Mellow staff can change it" rule as Settings' Billing tab). No
   // other role has a plan concept at all, so this never fetches for them.
   const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
+  // null = not known yet (or not applicable): the Project Lab item then shows no lock,
+  // so an entitled student never sees a lock flash while the request is in flight.
+  const [projectLabEnabled, setProjectLabEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     if (currentRole !== "user" && currentRole !== "admin_tpo") return;
     let cancelled = false;
-    api
-      .get<MySubscriptionResponse>("/me/subscription")
-      .then((res) => {
-        if (!cancelled) setCoverage(res.coverage);
-      })
-      .catch(() => {});
+
+    const fetchPlan = () =>
+      api
+        .get<MySubscriptionResponse>("/me/subscription")
+        .then((res) => {
+          if (cancelled) return;
+          setCoverage(res.coverage);
+          setProjectLabEnabled(res.project_lab ? res.project_lab.enabled : null);
+        })
+        .catch(() => {});
+
+    fetchPlan();
+
+    // A purchase made on this same page (the unlock panel, Your Plan) should
+    // lift the lock immediately rather than on the next navigation.
+    window.addEventListener(SUBSCRIPTION_CHANGED_EVENT, fetchPlan);
+
     return () => {
       cancelled = true;
+      window.removeEventListener(SUBSCRIPTION_CHANGED_EVENT, fetchPlan);
     };
   }, [currentRole]);
 
@@ -234,13 +261,18 @@ export function DashboardSidebar({
   };
 
   // Determine if a specific navigation item is active
-  const isItemActive = (href: string) => {
+  const isItemActive = (href: string, matchPrefix = false) => {
     const [pathAndQuery, itemHashPart] = href.split("#");
     const [itemPath, itemQueryPart] = pathAndQuery.split("?");
     const itemHash = itemHashPart ? `#${itemHashPart}` : "";
     const itemQuery = itemQueryPart ? `?${itemQueryPart}` : "";
 
-    // 1. Pathname check
+    // 1. Pathname check — an item that owns a whole section (matchPrefix) is also
+    // "you are here" on that section's sub-pages, not only on its landing page.
+    if (matchPrefix) {
+      if (pathname !== itemPath && !pathname.startsWith(`${itemPath}/`)) return false;
+      return true;
+    }
     if (pathname !== itemPath) return false;
 
     // 2. Query parameter check (e.g. view=mellow vs view=tpo)
@@ -316,6 +348,22 @@ export function DashboardSidebar({
             label: "Soft Skills",
             href: "/admin/soft-skills",
             icon: Brain,
+            badge: "New",
+            badgeTone: "new",
+          },
+          {
+            label: "Project Lab",
+            href: "/admin/projects",
+            icon: FlaskConical,
+            matchPrefix: true,
+            badge: "New",
+            badgeTone: "new",
+          },
+          {
+            label: "Hackathons",
+            href: "/admin/hackathons",
+            icon: Rocket,
+            matchPrefix: true,
             badge: "New",
             badgeTone: "new",
           },
@@ -505,6 +553,14 @@ export function DashboardSidebar({
               badgeTone: "new",
             },
             {
+              label: "Hackathons",
+              href: "/admin/company/hackathons",
+              icon: Rocket,
+              matchPrefix: true,
+              badge: "New",
+              badgeTone: "new",
+            },
+            {
               label: "Talent Pool",
               href: "/admin/company/talent-pool",
               icon: Award,
@@ -574,6 +630,15 @@ export function DashboardSidebar({
             icon: Sparkles,
             badge: "AI",
             badgeTone: "new",
+          },
+          // Visible to every student. Without the Project Lab add-on it wears a
+          // lock and its page is the unlock/upgrade screen — see ProjectLabPage.
+          {
+            label: "Project Lab",
+            href: "/dashboard/projects",
+            icon: FlaskConical,
+            matchPrefix: true,
+            ...(projectLabEnabled === false ? { locked: true } : { badge: "New", badgeTone: "new" as const }),
           },
         ],
       },
@@ -955,7 +1020,7 @@ export function DashboardSidebar({
             <ul className="space-y-1">
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const active = isItemActive(item.href);
+                const active = isItemActive(item.href, item.matchPrefix);
                 const tone = badgeToneClass[item.badgeTone ?? "count"];
 
                 return (
@@ -978,7 +1043,7 @@ export function DashboardSidebar({
                           ? "bg-sidebar-active text-sidebar-strong"
                           : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-strong"
                       )}
-                      title={isExpanded ? undefined : item.label}
+                      title={isExpanded ? undefined : item.locked ? `${item.label} — requires Project Lab` : item.label}
                     >
                       {/* Selection rule: one 3px bar flush to the rail's inner
                           edge. The cheapest unambiguous "you are here" there
@@ -999,6 +1064,11 @@ export function DashboardSidebar({
                         )}
                         strokeWidth={active ? 2.3 : 1.9}
                       />
+
+                      {/* In the icon-only rail there is no row for a lock chip to sit in, so it rides the icon's corner. */}
+                      {!isExpanded && item.locked && (
+                        <Lock aria-hidden className="absolute bottom-1.5 right-2 h-3 w-3 rounded-sm bg-sidebar p-px text-sidebar-dim" />
+                      )}
 
                       <AnimatePresence initial={false}>
                         {isExpanded && (
@@ -1051,6 +1121,17 @@ export function DashboardSidebar({
                                   <span className="h-1.5 w-1.5 rounded-full bg-amber-300 motion-safe:animate-pulse-subtle" />
                                 )}
                                 {item.badge}
+                              </span>
+                            )}
+
+                            {item.locked && (
+                              <span
+                                className="flex shrink-0 items-center gap-1 rounded-full bg-sidebar-chip px-2 py-[3px] text-3xs font-bold leading-none text-sidebar-chip-text"
+                                title="Requires Project Lab"
+                              >
+                                <Lock aria-hidden className="h-3 w-3" />
+                                <span>Pro</span>
+                                <span className="sr-only">— requires Project Lab</span>
                               </span>
                             )}
                           </motion.span>

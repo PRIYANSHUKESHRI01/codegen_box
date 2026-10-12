@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!entrypoint.sh
+!lab-db
+!lab-db.cnf
+!workspace-settings.json
+!machine-settings.json
+!extensions.txt
+!guard/aptrun-guard.js

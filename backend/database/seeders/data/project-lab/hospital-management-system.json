@@ -1,0 +1,143 @@
+{
+    "slug": "hospital-management-system",
+    "title": "Hospital Management System",
+    "category": "Healthcare",
+    "summary": "Build the outpatient system a growing hospital needs: patients book real time slots with doctors, the front desk checks them in, doctors record consultations and prescriptions, and billing rolls up into a daily revenue dashboard. Four roles, strict access rules, and a booking engine that can never double-book.",
+    "difficulty": "intermediate",
+    "estimated_hours": 45,
+    "tech_stack": ["Laravel", "PHP 8.3", "SQLite", "Blade", "Tailwind CSS", "PHPUnit"],
+    "outcomes": [
+        "Design a relational schema whose constraints protect data integrity, not just the happy path",
+        "Build a slot-booking engine that stays correct when two people book at the same moment",
+        "Enforce role-based access with policies so no user can read or change another user's data",
+        "Handle money correctly: integer paise, server-side totals, part payments and an honest history",
+        "Write feature tests for the rules that matter and ship a README another developer can follow",
+        "Read a real statement of work: scope, priorities, business rules and acceptance criteria"
+    ],
+    "icon": "Stethoscope",
+    "status": "published",
+    "is_free_sample": false,
+    "authorship_mode": "strict",
+    "display_order": 10,
+    "milestones": [
+        {
+            "title": "Project setup and foundation",
+            "description": "Create the Laravel project in your workspace, get it running in Preview, put it under git and build the layout every other page will reuse. Do this first and carefully: a clean start saves hours later.",
+            "estimated_hours": 3,
+            "acceptance_criteria": [
+                "The Laravel app lives in its own folder under your workspace and opens in Preview (port 8000) without errors",
+                "A git repository exists with a first commit, and .gitignore excludes .env, vendor and node_modules",
+                "APP_TIMEZONE is Asia/Kolkata, APP_DEBUG is false in .env.example, and .env.example lists every setting the app needs",
+                "One shared layout (header, role navigation, footer, flash messages) is used by every page",
+                "Tailwind CSS compiles with npm run build and the styling is visible in Preview",
+                "Links and redirects work from the Preview address (trusted proxies are configured)"
+            ]
+        },
+        {
+            "title": "Accounts, roles and access control",
+            "description": "Build sign-up, sign-in and the four roles, and make access control a habit from the start. Every later feature depends on knowing who the user is and what they may touch. Seed the demo accounts now so you can sign in as each role while you build.",
+            "estimated_hours": 5,
+            "acceptance_criteria": [
+                "A visitor can register as a patient and is signed in; a duplicate email or weak password gives a clear message (AUTH-1)",
+                "All four roles can sign in; a wrong email and a wrong password show the same generic message (AUTH-2)",
+                "Each role sees only its own navigation, and opening another role's URL directly returns 403 (AUTH-3)",
+                "An admin can create, edit and deactivate doctor and receptionist accounts; a deactivated user cannot sign in (AUTH-4)",
+                "Passwords are hashed, and five wrong attempts in a minute are throttled with a visible message (AUTH-6)",
+                "migrate:fresh --seed creates the five demo accounts listed under Deliverables, all using Password@123"
+            ]
+        },
+        {
+            "title": "Departments, doctors and availability",
+            "description": "Model the people patients will book: departments, doctor profiles and the weekly blocks of time they are available. Getting availability right here makes the booking engine in the next milestone straightforward.",
+            "estimated_hours": 5,
+            "acceptance_criteria": [
+                "An admin can create, edit and delete departments; deleting one that has doctors is refused with a message (DOC-1)",
+                "A doctor profile stores department, specialization, qualification, fee in rupees and a slot length of 10, 15, 20 or 30 minutes (DOC-2)",
+                "Weekly availability allows several blocks per weekday; overlapping blocks and blocks that end before they start are rejected (DOC-3)",
+                "An admin or the doctor can block a date; a date that already has confirmed appointments cannot be blocked (DOC-4)",
+                "A signed-in patient can browse active doctors, filter by department and search by name (DOC-5)"
+            ]
+        },
+        {
+            "title": "Appointment booking",
+            "description": "The core of the system. Turn availability into bookable slots, book them safely, and enforce the cancellation rules. The rule that matters most is that a doctor can never have two active appointments at the same start time, even under concurrent requests. Follow the worked examples in the business rules exactly.",
+            "estimated_hours": 8,
+            "acceptance_criteria": [
+                "Slots for a doctor and date match the worked example in section 6.1, including the 60-minute lead time, blocked dates and the end-inside-the-block rule (APT-1, APT-2)",
+                "A booked slot disappears from the list, and the database rejects a second active appointment for the same doctor and start time (APT-3)",
+                "When two requests race for one slot, exactly one appointment exists and the other user sees a friendly message, not an error page (APT-3)",
+                "A cancelled appointment frees its slot so it can be booked again (APT-5)",
+                "A patient can cancel until 2 hours before the start; after that the button is gone and the server refuses the request (APT-5)",
+                "A receptionist can book, cancel and reschedule for any patient (APT-6)",
+                "The appointment stores the doctor's fee at booking time; changing the fee later does not change it (APT-8)",
+                "A patient cannot hold two overlapping active appointments with any doctor (APT-7)"
+            ]
+        },
+        {
+            "title": "Front desk and patient records",
+            "description": "Give the receptionist the tools to run the desk: register walk-ins, find patients quickly, check them in and keep the daily queue. This milestone also adds the patient page that other roles will reuse.",
+            "estimated_hours": 5,
+            "acceptance_criteria": [
+                "A receptionist can register a walk-in patient without an e-mail; the patient gets a unique UHID such as UHID-000042 (PAT-1)",
+                "Search finds patients by name, phone or UHID, with pagination (PAT-2)",
+                "The patient page shows demographics and visit history to allowed roles only (PAT-3)",
+                "Check-in sets the status to checked_in and issues the next token for that doctor and day; tokens are never reused (PAT-4)",
+                "No-show is possible only after the start time has passed, and every status change follows the lifecycle table (PAT-5)",
+                "Registering a patient whose phone and date of birth already exist shows a duplicate warning with a link (PAT-6)"
+            ]
+        },
+        {
+            "title": "Consultations and prescriptions",
+            "description": "The doctor's side of the visit. Record what happened, prescribe, complete the consultation and print the prescription. This is also where the privacy rules are tested hardest: clinical data must reach only the treating doctor and the patient.",
+            "estimated_hours": 6,
+            "acceptance_criteria": [
+                "A doctor's queue shows only their own patients for today, in token order (CON-1)",
+                "A doctor can record complaint, vitals, diagnosis, notes and a follow-up date on a checked-in appointment (CON-2)",
+                "Prescription lines can be added, edited and removed until the consultation is completed (CON-3)",
+                "Completing sets the appointment to completed and makes the consultation read-only; a second attempt changes nothing (CON-4)",
+                "The prescription page fits one A4 sheet in the browser's print preview and shows hospital, doctor, patient, diagnosis and medicines (CON-5)",
+                "A doctor cannot open a patient they never treated, a patient sees only their own consultations, and admin and receptionist are refused clinical data (CON-6)",
+                "Known allergies appear prominently at the top of the consultation screen (CON-7)"
+            ]
+        },
+        {
+            "title": "Billing and payments",
+            "description": "Turn a finished consultation into a correct bill and track the money. Treat every amount as an integer number of paise and compute totals on the server only. The worked example in section 6.4 is the exact case the reviewer will repeat.",
+            "estimated_hours": 6,
+            "acceptance_criteria": [
+                "Completing a consultation creates exactly one invoice with a consultation line at the fee captured at booking; completing twice never creates a second invoice (BIL-1)",
+                "A receptionist can add and remove line items and apply a flat or percentage discount with a reason; the worked example in section 6.4 totals Rs 1,170.00 (BIL-2)",
+                "All amounts are stored as integer paise, with no float columns or floating-point arithmetic, and totals never come from the browser (BIL-3)",
+                "Payments can be recorded in parts, an overpayment is refused, and the status moves unpaid, partial, paid on its own (BIL-4)",
+                "Invoice numbers are unique and follow INV-YYYY-NNNNNN (BIL-5)",
+                "The printable invoice shows items, discount, total, payments received and balance due (BIL-6)",
+                "A patient sees only their own invoices, read only, and a doctor cannot open invoices (BIL-7)"
+            ]
+        },
+        {
+            "title": "Dashboards, reports and audit trail",
+            "description": "Give management the numbers and give the hospital accountability. Revenue must come from payments actually received, so the dashboard and the invoices can never disagree.",
+            "estimated_hours": 3,
+            "acceptance_criteria": [
+                "The admin dashboard shows today's appointments by status, new patients this month, revenue today and this month, and the top 5 doctors (RPT-1)",
+                "Revenue is counted from payments received, not invoices issued, and excludes voided invoices (RPT-1)",
+                "The receptionist dashboard lists today's appointments with a status filter and a one-click check-in (RPT-2)",
+                "The revenue report filters by date range, totals by day and payment method, and exports a CSV (RPT-3)",
+                "Sensitive actions are written to the audit log; admin can browse and filter it and nobody can edit it (AUD-1, AUD-2)"
+            ]
+        },
+        {
+            "title": "Quality, tests and delivery",
+            "description": "Finish like a professional. Add the automated tests, remove the slow queries, write the README so a stranger can run your project, tidy the git history and rehearse the reviewer's walkthrough from the Evaluation section before you submit.",
+            "estimated_hours": 4,
+            "acceptance_criteria": [
+                "php artisan test passes with at least 12 feature tests covering slot generation, double-booking, the cancellation rule, role authorization (three or more cases), invoice arithmetic and overpayment",
+                "List pages eager-load their relations: no N+1 queries on the appointments, patients and invoices lists (RPT-4)",
+                "A new reader can follow the README alone (composer install, .env, key, migrate:fresh --seed, serve) and sign in with the documented accounts",
+                "The README includes setup, demo accounts, a database diagram and a Decisions section",
+                "The git history has at least 10 meaningful commits, and no .env or secret appears in the code or history",
+                "Every item in the reviewer's walkthrough works end to end"
+            ]
+        }
+    ]
+}

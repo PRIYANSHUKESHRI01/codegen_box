@@ -80,7 +80,7 @@ export const viewport: Viewport = {
 const themeInitScript = `
   (function() {
     try {
-      var saved = localStorage.getItem('codepulse-theme');
+      var saved = localStorage.getItem('aptrun-theme');
       var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       var isDark = saved === 'dark' || (saved === 'system' && prefersDark);
       if (isDark) {

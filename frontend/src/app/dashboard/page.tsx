@@ -26,6 +26,7 @@ import {
   Swords,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { HackArenaBanner } from "@/components/arena/HackArenaBanner";
 import { StatTile } from "@/components/dashboard/student/StatTile";
 import { RatingChart } from "@/components/dashboard/student/RatingChart";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
@@ -375,6 +376,12 @@ export default function UserDashboardPage() {
           </div>
         </section>
       )}
+
+      {/* ------------------------------------------------------------ */}
+      {/* Hack Arena doorway — the Arena is its own full-screen world, */}
+      {/* so it is entered from here rather than from the sidebar.     */}
+      {/* ------------------------------------------------------------ */}
+      <HackArenaBanner />
 
       {/* ------------------------------------------------------------ */}
       {/* 2. KPI strip — every value real                              */}

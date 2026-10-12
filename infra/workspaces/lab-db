@@ -1,0 +1,96 @@
+#!/bin/bash
+# lab-db — start the database a project needs, inside the workspace, as the student.
+#
+#   lab-db start mysql|postgres|redis
+#   lab-db stop  mysql|postgres|redis
+#   lab-db status
+#
+# Data lives under ~/.lab/db and so survives workspace restarts. Servers listen on
+# 127.0.0.1 only and are NOT started automatically; a stopped workspace stops them.
+set -uo pipefail
+
+ROOT="$HOME/.lab/db"
+mkdir -p "$ROOT"
+
+die() { echo "lab-db: $*" >&2; exit 1; }
+
+pg_bin() {
+    local d
+    d="$(ls -d /usr/lib/postgresql/*/bin 2>/dev/null | tail -1)"
+    [ -n "$d" ] || die "PostgreSQL is not installed in this image (lite flavour)."
+    echo "$d"
+}
+
+is_up() { # name
+    case "$1" in
+        mysql)    mysqladmin --socket="$ROOT/mysql.sock" -uroot ping >/dev/null 2>&1 ;;
+        postgres) "$(pg_bin)/pg_isready" -q -h 127.0.0.1 -p 5432 ;;
+        redis)    redis-cli -p 6379 ping >/dev/null 2>&1 ;;
+    esac
+}
+
+wait_up() { # name
+    for _ in $(seq 1 40); do is_up "$1" && return 0; sleep 0.5; done
+    return 1
+}
+
+start_mysql() {
+    command -v mariadbd >/dev/null || die "MariaDB is not installed in this image (lite flavour)."
+    is_up mysql && { echo "mysql already running"; return; }
+    if [ ! -d "$ROOT/mysql/mysql" ]; then
+        echo "Initialising MariaDB (first run)…"
+        mariadb-install-db --datadir="$ROOT/mysql" --auth-root-authentication-method=normal --skip-test-db >"$ROOT/mysql-init.log" 2>&1 \
+            || die "initialisation failed — see $ROOT/mysql-init.log"
+    fi
+    nohup mariadbd --datadir="$ROOT/mysql" --socket="$ROOT/mysql.sock" --pid-file="$ROOT/mysql.pid" \
+        --bind-address=127.0.0.1 --port=3306 >"$ROOT/mysql.log" 2>&1 &
+    wait_up mysql || die "MariaDB did not start — see $ROOT/mysql.log"
+    echo "MariaDB is running on 127.0.0.1:3306 (user: root, no password)"
+}
+
+start_postgres() {
+    local bin; bin="$(pg_bin)"
+    is_up postgres && { echo "postgres already running"; return; }
+    if [ ! -f "$ROOT/pg/PG_VERSION" ]; then
+        echo "Initialising PostgreSQL (first run)…"
+        "$bin/initdb" -D "$ROOT/pg" -U postgres --auth=trust >"$ROOT/pg-init.log" 2>&1 || die "initialisation failed — see $ROOT/pg-init.log"
+    fi
+    "$bin/pg_ctl" -D "$ROOT/pg" -l "$ROOT/pg.log" -o "-p 5432 -k $ROOT -c listen_addresses=127.0.0.1" start >/dev/null \
+        || die "PostgreSQL did not start — see $ROOT/pg.log"
+    wait_up postgres || die "PostgreSQL did not start — see $ROOT/pg.log"
+    echo "PostgreSQL is running on 127.0.0.1:5432 (user: postgres, no password)"
+}
+
+start_redis() {
+    command -v redis-server >/dev/null || die "Redis is not installed in this image (lite flavour)."
+    is_up redis && { echo "redis already running"; return; }
+    mkdir -p "$ROOT/redis"
+    redis-server --dir "$ROOT/redis" --port 6379 --bind 127.0.0.1 --daemonize yes --pidfile "$ROOT/redis.pid" --logfile "$ROOT/redis.log" >/dev/null
+    wait_up redis || die "Redis did not start — see $ROOT/redis.log"
+    echo "Redis is running on 127.0.0.1:6379"
+}
+
+stop_one() {
+    case "$1" in
+        mysql)    mysqladmin --socket="$ROOT/mysql.sock" -uroot shutdown 2>/dev/null && echo "mysql stopped" || echo "mysql was not running" ;;
+        postgres) "$(pg_bin)/pg_ctl" -D "$ROOT/pg" stop -m fast >/dev/null 2>&1 && echo "postgres stopped" || echo "postgres was not running" ;;
+        redis)    redis-cli -p 6379 shutdown nosave 2>/dev/null; echo "redis stopped" ;;
+        *)        die "unknown database '$1' (mysql, postgres, redis)" ;;
+    esac
+}
+
+case "${1:-}" in
+    start)
+        case "${2:-}" in
+            mysql|mariadb) start_mysql ;;
+            postgres|postgresql|pg) start_postgres ;;
+            redis) start_redis ;;
+            *) die "usage: lab-db start mysql|postgres|redis" ;;
+        esac ;;
+    stop) stop_one "${2:-}" ;;
+    status)
+        for db in mysql postgres redis; do
+            if is_up "$db" 2>/dev/null; then echo "$db: running"; else echo "$db: stopped"; fi
+        done ;;
+    *) die "usage: lab-db start|stop <mysql|postgres|redis>  |  lab-db status" ;;
+esac

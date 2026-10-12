@@ -22,7 +22,7 @@ import { ProctoringOverlay } from "@/components/proctoring/ProctoringOverlay";
 import { ProctoringLockedScreen } from "@/components/proctoring/ProctoringLockedScreen";
 
 function draftKey(contestSlug: string, contestProblemId: string, language: string) {
-  return `codeforge:contest-draft:${contestSlug}:${contestProblemId}:${language}`;
+  return `aptrun:contest-draft:${contestSlug}:${contestProblemId}:${language}`;
 }
 
 export default function ContestProblemSolvePage() {

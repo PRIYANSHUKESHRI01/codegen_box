@@ -26,7 +26,7 @@ test.describe("AptRun Landing Page E2E", () => {
     await lightBtn.click();
     await expect(page.locator("html")).toHaveClass(/light/);
 
-    const savedTheme = await page.evaluate(() => localStorage.getItem("codepulse-theme"));
+    const savedTheme = await page.evaluate(() => localStorage.getItem("aptrun-theme"));
     expect(savedTheme).toBe("light");
 
     const darkBtn = page.getByRole("radio", { name: /Dark theme/i }).first();

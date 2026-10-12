@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { RecentSubmission, TopicMastery, VerdictStat, LanguageUsage } from "@/types/studentStats";
 import { pdfSafe } from "@/lib/pdfTextSafe";
+import { languageLabel } from "@/lib/judgeLanguages";
 
 interface DriveEligibilityRow {
   company: string;
@@ -122,7 +123,7 @@ export function generateReportPdf(input: ReportPdfInput) {
     startY: y,
     margin: { left: pageWidth / 2 + 10, right: margin },
     head: [["Language", "Submissions"]],
-    body: input.languageUsage.map((l) => [l.language, String(l.count)]),
+    body: input.languageUsage.map((l) => [languageLabel(l.language), String(l.count)]),
     headStyles: { fillColor: ACCENT, fontSize: 8 },
     bodyStyles: { fontSize: 8 },
     theme: "grid",
@@ -171,7 +172,7 @@ export function generateReportPdf(input: ReportPdfInput) {
     body: input.recentSubmissions.slice(0, 15).map((s) => [
       s.problem_title,
       s.difficulty,
-      s.language,
+      languageLabel(s.language),
       STATUS_LABEL[s.status] ?? s.status,
       new Date(s.submitted_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
     ]),

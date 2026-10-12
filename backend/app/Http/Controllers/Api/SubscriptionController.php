@@ -9,6 +9,8 @@ use App\Models\Plan;
 use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\ProjectLab\ProjectLabAccess;
+use App\Services\PurchaseQuoteService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 
@@ -36,19 +38,41 @@ class SubscriptionController extends Controller
             return response()->json(['scope' => 'internal', 'coverage' => null]);
         }
 
-        return response()->json([
-            'scope' => 'individual',
-            'coverage' => $this->formatCoverage($user->subscriptionCoverage()),
-            'entitlements' => $this->entitlementsWithUsage($user),
+        return response()->json($this->individualPayload($user));
+    }
+
+    /**
+     * What a cart would cost this student right now — plan, add-ons, or both —
+     * so the pricing page can show a live total. Read-only; the same
+     * PurchaseQuoteService prices the real checkout below.
+     */
+    public function quote(Request $request, PurchaseQuoteService $quotes)
+    {
+        $user = $request->user();
+
+        abort_unless($user->role === User::ROLE_USER, 403, 'Only individual student accounts can purchase plans.');
+
+        $validated = $request->validate([
+            'plan_code' => ['nullable', 'string'],
+            'addons' => ['nullable', 'array', 'max:5'],
+            'addons.*' => ['string'],
         ]);
+
+        return response()->json(['quote' => $quotes->quote($user, $validated['plan_code'] ?? null, $validated['addons'] ?? [])]);
     }
 
     /**
      * The self-serve "checkout" stand-in — instantly activates, no payment
      * gateway wired up yet. Restricted to student accounts; a TPO's college
      * plan is assigned by Mellow staff (see AdminController::assignCollegeSubscription).
+     *
+     * A cart is a base plan, add-ons (Project Lab), or both. The amount is
+     * ALWAYS recomputed here by PurchaseQuoteService — the client only says
+     * what it wants and (optionally) the total it was shown, so a price that
+     * changed between page load and click is refused with the new quote
+     * instead of silently charging something the student didn't agree to.
      */
-    public function subscribe(Request $request, SubscriptionService $service)
+    public function subscribe(Request $request, SubscriptionService $service, PurchaseQuoteService $quotes)
     {
         $user = $request->user();
 
@@ -57,22 +81,43 @@ class SubscriptionController extends Controller
         }
 
         $validated = $request->validate([
-            'plan_code' => ['required', 'string', 'exists:plans,code'],
+            'plan_code' => ['nullable', 'string'],
+            'addons' => ['nullable', 'array', 'max:5'],
+            'addons.*' => ['string'],
+            'expected_total' => ['nullable', 'integer', 'min:0'],
         ]);
 
-        $plan = Plan::where('code', $validated['plan_code'])->first();
+        $quote = $quotes->quote($user, $validated['plan_code'] ?? null, $validated['addons'] ?? []);
 
-        if ($plan->audience !== Plan::AUDIENCE_INDIVIDUAL || ! $plan->is_active) {
-            return response()->json(['message' => 'That plan is not available for self-serve signup.'], 422);
+        if (isset($validated['expected_total']) && (int) $validated['expected_total'] !== $quote['total']) {
+            return response()->json([
+                'message' => 'The price changed since you opened this page. Please review the new total.',
+                'code' => 'price_changed',
+                'quote' => $quote,
+            ], 409);
         }
 
-        $service->subscribeIndividual($user, $plan);
+        $service->purchase($user, $quote);
 
-        return response()->json([
+        return response()->json($this->individualPayload($user->fresh()) + ['purchase' => $quote]);
+    }
+
+    /** @return array<string, mixed> the student-scope body shared by GET and POST /me/subscription */
+    private function individualPayload(User $user): array
+    {
+        return [
             'scope' => 'individual',
             'coverage' => $this->formatCoverage($user->subscriptionCoverage()),
             'entitlements' => $this->entitlementsWithUsage($user),
-        ]);
+            'addons' => $user->activeAddonSubscriptions()->map(fn (Subscription $s) => [
+                'code' => $s->plan->code,
+                'name' => $s->plan->name,
+                'days_remaining' => $s->daysRemaining(),
+                'current_period_end' => $s->current_period_end,
+                'price_paid' => $s->meta['price_paid'] ?? null,
+            ])->values(),
+            'project_lab' => app(ProjectLabAccess::class)->summary($user),
+        ];
     }
 
     /**

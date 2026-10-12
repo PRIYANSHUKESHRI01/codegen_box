@@ -51,7 +51,7 @@ export interface BatchStudent {
   rollNumber: string;
   branch: "CSE" | "IT" | "ECE" | "EE" | "MECH";
   cgpa: number;
-  codeForgeRating: number;
+  aptRunRating: number;
   ratingTier: string;
   solvedProblems: number;
   readinessScore: number; // 0 - 100
@@ -166,13 +166,13 @@ export const CAMPUS_DRIVES: CampusDrive[] = [
 ];
 
 export const BATCH_STUDENTS: BatchStudent[] = [
-  { id: "std-01", name: "Alex Chen", rollNumber: "2022CSE014", branch: "CSE", cgpa: 9.32, codeForgeRating: 1945, ratingTier: "Candidate Master", solvedProblems: 680, readinessScore: 94, placementStatus: "Shortlisted", companyPlaced: "Google India (Shortlist)" },
-  { id: "std-02", name: "Sneha Reddy", rollNumber: "2022CSE088", branch: "CSE", cgpa: 9.14, codeForgeRating: 1880, ratingTier: "Expert", solvedProblems: 540, readinessScore: 91, placementStatus: "Placed", companyPlaced: "Microsoft (₹32 LPA)" },
-  { id: "std-03", name: "Kartik Mehta", rollNumber: "2022IT045", branch: "IT", cgpa: 8.84, codeForgeRating: 1760, ratingTier: "Expert", solvedProblems: 410, readinessScore: 84, placementStatus: "In Assessment" },
-  { id: "std-04", name: "Tanvi Saxena", rollNumber: "2022ECE021", branch: "ECE", cgpa: 8.92, codeForgeRating: 1640, ratingTier: "Specialist", solvedProblems: 320, readinessScore: 78, placementStatus: "In Assessment" },
-  { id: "std-05", name: "Rahul Deshmukh", rollNumber: "2022CSE105", branch: "CSE", cgpa: 7.62, codeForgeRating: 1410, ratingTier: "Apprentice", solvedProblems: 190, readinessScore: 56, placementStatus: "Needs Training" },
-  { id: "std-06", name: "Ananya Iyer", rollNumber: "2022IT012", branch: "IT", cgpa: 9.45, codeForgeRating: 1910, ratingTier: "Candidate Master", solvedProblems: 620, readinessScore: 93, placementStatus: "Placed", companyPlaced: "Adobe Systems (₹29 LPA)" },
-  { id: "std-07", name: "Vikram Malhotra", rollNumber: "2022EE034", branch: "EE", cgpa: 7.20, codeForgeRating: 1320, ratingTier: "Apprentice", solvedProblems: 140, readinessScore: 48, placementStatus: "Needs Training" },
+  { id: "std-01", name: "Alex Chen", rollNumber: "2022CSE014", branch: "CSE", cgpa: 9.32, aptRunRating: 1945, ratingTier: "Candidate Master", solvedProblems: 680, readinessScore: 94, placementStatus: "Shortlisted", companyPlaced: "Google India (Shortlist)" },
+  { id: "std-02", name: "Sneha Reddy", rollNumber: "2022CSE088", branch: "CSE", cgpa: 9.14, aptRunRating: 1880, ratingTier: "Expert", solvedProblems: 540, readinessScore: 91, placementStatus: "Placed", companyPlaced: "Microsoft (₹32 LPA)" },
+  { id: "std-03", name: "Kartik Mehta", rollNumber: "2022IT045", branch: "IT", cgpa: 8.84, aptRunRating: 1760, ratingTier: "Expert", solvedProblems: 410, readinessScore: 84, placementStatus: "In Assessment" },
+  { id: "std-04", name: "Tanvi Saxena", rollNumber: "2022ECE021", branch: "ECE", cgpa: 8.92, aptRunRating: 1640, ratingTier: "Specialist", solvedProblems: 320, readinessScore: 78, placementStatus: "In Assessment" },
+  { id: "std-05", name: "Rahul Deshmukh", rollNumber: "2022CSE105", branch: "CSE", cgpa: 7.62, aptRunRating: 1410, ratingTier: "Apprentice", solvedProblems: 190, readinessScore: 56, placementStatus: "Needs Training" },
+  { id: "std-06", name: "Ananya Iyer", rollNumber: "2022IT012", branch: "IT", cgpa: 9.45, aptRunRating: 1910, ratingTier: "Candidate Master", solvedProblems: 620, readinessScore: 93, placementStatus: "Placed", companyPlaced: "Adobe Systems (₹29 LPA)" },
+  { id: "std-07", name: "Vikram Malhotra", rollNumber: "2022EE034", branch: "EE", cgpa: 7.20, aptRunRating: 1320, ratingTier: "Apprentice", solvedProblems: 140, readinessScore: 48, placementStatus: "Needs Training" },
 ];
 
 export const DEPARTMENT_READINESS: DepartmentReadiness[] = [

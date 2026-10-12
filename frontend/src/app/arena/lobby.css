@@ -1,0 +1,407 @@
+/*
+ * Hack Arena 2.0 — the lobby layer.
+ *
+ * arena.css owns the design language (tokens, surfaces, type scale, hover kit); this file only holds what the
+ * lobby screens need on top of it and that Tailwind utilities cannot express: the ticket masks, the card
+ * hover choreography, the sticky filter bar, the snap rail and a few keyframes. Everything is prefixed `lb-`.
+ *
+ * Motion rules, same as the rest of the arena: transform + opacity only, and a reduced-motion block at the
+ * bottom that switches every loop and every lift off.
+ */
+
+.arena-root {
+  /* Height of the sticky top bar. Anything that sticks "under the top bar" should offset by this. */
+  --ar-topbar: 60px;
+  --lb-gold: 251 191 36;
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+
+.lb-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: var(--ar-topbar);
+  background: rgba(7, 9, 19, 0.7);
+  -webkit-backdrop-filter: blur(18px) saturate(1.5);
+  backdrop-filter: blur(18px) saturate(1.5);
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.lb-topbar[data-scrolled="true"] {
+  background: rgba(7, 9, 19, 0.86);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 12px 32px -20px rgba(0, 0, 0, 0.9);
+}
+
+.lb-bottombar {
+  position: fixed;
+  inset: auto 0 0 0;
+  z-index: 40;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(9, 11, 23, 0.88);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -18px 40px -24px rgba(0, 0, 0, 0.9);
+}
+
+/* ── The card ────────────────────────────────────────────────────────────── */
+/*
+ * Not `.ar-card`: that one clips its own overflow, which also clips the animated sweep border and the
+ * prize pill that straddles the cover edge. Here the card is overflow-visible and only the cover clips.
+ */
+
+.lb-card {
+  position: relative;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.018)), #0b0d1b;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 22px 44px -28px rgba(0, 0, 0, 0.9);
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease, box-shadow 0.4s ease;
+}
+
+/* The spotlight sits behind the content, so the stretched link and the text stay on top of it. */
+.lb-card.ar-spot::before { z-index: -1; }
+
+.lb-card:hover,
+.lb-card:focus-within {
+  transform: translateY(-5px);
+  border-color: rgb(var(--ar-a) / 0.5);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 36px 64px -28px rgb(var(--ar-a) / 0.55),
+    0 0 0 1px rgb(var(--ar-a) / 0.14);
+}
+
+.lb-card:active { transform: translateY(-2px) scale(0.985); transition-duration: 0.12s; }
+
+.lb-card:has(.lb-card-link:focus-visible) {
+  outline: 2px solid rgb(var(--ar-b));
+  outline-offset: 4px;
+}
+
+.lb-cover-img { transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+.lb-card:hover .lb-cover-img { transform: scale(1.06); }
+
+/* A slow wash of light across the cover on hover — the "something is alive here" tell. */
+.lb-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transform: translateX(-120%) skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.14), transparent);
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.lb-card:hover .lb-cover::before { transform: translateX(120%) skewX(-18deg); }
+
+.lb-card:hover .ar-btn-primary {
+  transform: none;
+  filter: brightness(1.1);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 16px 34px -10px rgb(var(--ar-a) / 1);
+}
+
+.lb-card:hover .ar-btn-ghost {
+  background: rgb(var(--ar-a) / 0.16);
+  border-color: rgb(var(--ar-a) / 0.55);
+}
+
+/* Badges that sit on cover art get a dark base so they stay legible on any picture. */
+.lb-on-cover {
+  -webkit-backdrop-filter: blur(10px) saturate(1.3);
+  backdrop-filter: blur(10px) saturate(1.3);
+  box-shadow: 0 6px 18px -8px rgba(0, 0, 0, 0.7);
+}
+
+.lb-on-cover.ar-phase[data-tone="live"] { background: linear-gradient(rgb(var(--ar-live) / 0.3), rgb(var(--ar-live) / 0.3)), rgba(8, 10, 20, 0.72); }
+.lb-on-cover.ar-phase[data-tone="open"] { background: linear-gradient(rgb(var(--ar-open) / 0.24), rgb(var(--ar-open) / 0.24)), rgba(8, 10, 20, 0.72); }
+.lb-on-cover.ar-phase[data-tone="soon"] { background: linear-gradient(rgb(var(--ar-soon) / 0.22), rgb(var(--ar-soon) / 0.22)), rgba(8, 10, 20, 0.72); }
+.lb-on-cover.ar-phase[data-tone="judging"] { background: linear-gradient(rgb(var(--ar-judging) / 0.28), rgb(var(--ar-judging) / 0.28)), rgba(8, 10, 20, 0.72); }
+.lb-on-cover.ar-phase[data-tone="done"],
+.lb-on-cover.ar-phase[data-tone="muted"] { background: rgba(8, 10, 20, 0.72); }
+
+/* The prize pill: glass with a gold tint, the one warm thing on the card. */
+.lb-prize {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 13px 0 5px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  color: #ffeaa6;
+  background: linear-gradient(rgba(251, 191, 36, 0.2), rgba(251, 191, 36, 0.1)), rgba(9, 11, 22, 0.88);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 10px 24px -10px rgba(251, 191, 36, 0.6), 0 6px 14px -6px rgba(0, 0, 0, 0.8);
+}
+
+.lb-prize-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  color: #5b3200;
+}
+
+/* ── Tickets ─────────────────────────────────────────────────────────────── */
+/*
+ * A mask cuts the notches, and a mask also clips box-shadow — so the shadow lives on a wrapper
+ * (`.lb-ticket-wrap`) as a drop-shadow filter, which follows the notched alpha.
+ */
+
+.lb-ticket-wrap {
+  filter: drop-shadow(0 26px 34px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 28px rgb(var(--ar-a) / 0.22));
+}
+
+.lb-ticket {
+  background: linear-gradient(180deg, rgba(26, 28, 56, 0.86), rgba(11, 13, 28, 0.92));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  backdrop-filter: blur(18px) saturate(1.3);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset;
+}
+
+/*
+ * A ticket that stays vertical at every width (the featured hero's countdown card). `--tb` is the fixed height
+ * of the stub below the tear line; the notches sit exactly on its top edge, wherever the content above ends.
+ */
+.lb-ticket.lb-ticket-v {
+  --notch: 12px;
+  --tb: 188px;
+  --cut: calc(100% - var(--tb));
+}
+
+.lb-gold-text {
+  background: linear-gradient(135deg, #fff6c9 0%, #fcd34d 38%, #f59e0b 72%, #d97706 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 18px rgba(251, 191, 36, 0.28));
+}
+
+/* A ticket that is vertical on phones and tears sideways on desktop (the "continue" panel). */
+.lb-ticket-resp {
+  --notch: 13px;
+  --cut: calc(100% - 156px);
+  position: relative;
+  -webkit-mask:
+    radial-gradient(circle var(--notch) at 0 var(--cut), #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% var(--cut), #0000 97%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--notch) at 0 var(--cut), #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% var(--cut), #0000 97%, #000) right / 51% 100% no-repeat;
+}
+
+@media (min-width: 1024px) {
+  .lb-ticket-resp {
+    --cutx: calc(100% - 340px);
+    -webkit-mask:
+      radial-gradient(circle var(--notch) at var(--cutx) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle var(--notch) at var(--cutx) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+    mask:
+      radial-gradient(circle var(--notch) at var(--cutx) 0, #0000 97%, #000) top / 100% 51% no-repeat,
+      radial-gradient(circle var(--notch) at var(--cutx) 100%, #0000 97%, #000) bottom / 100% 51% no-repeat;
+  }
+}
+
+.lb-colon { animation: lb-blink 1s steps(1, end) infinite; }
+
+@keyframes lb-blink {
+  0%, 55% { opacity: 0.85; }
+  56%, 100% { opacity: 0.2; }
+}
+
+/* ── Hero cover motion ───────────────────────────────────────────────────── */
+
+.lb-kenburns { animation: lb-kenburns 34s ease-in-out infinite alternate; transform-origin: 68% 42%; will-change: transform; }
+
+@keyframes lb-kenburns {
+  from { transform: scale(1.02) translate3d(0, 0, 0); }
+  to { transform: scale(1.13) translate3d(-1.6%, -1.2%, 0); }
+}
+
+/* ── Sticky filter bar ───────────────────────────────────────────────────── */
+/*
+ * Phones and tablets: the status tabs alone stick under the top bar (a two-row sticky block would eat a
+ * fifth of the screen), and search + selects sit below them and scroll away. From lg up the whole bar is
+ * one glass strip that sticks. `display: contents` lets the tabs stick within the section on small screens.
+ * DOM order is tabs, then search/selects, so keyboard order matches reading order at every size.
+ */
+
+.lb-filterbar { display: contents; }
+
+.lb-filter-extra { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+
+.lb-filter-tabs {
+  position: sticky;
+  top: var(--ar-topbar);
+  z-index: 30;
+  margin: 0 -16px 8px;
+  padding: 8px 16px;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  border-bottom: 1px solid transparent;
+}
+
+.lb-filterbar[data-stuck="true"] .lb-filter-tabs {
+  background: rgba(8, 10, 21, 0.86);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 14px 28px -22px rgba(0, 0, 0, 0.9);
+}
+
+@media (min-width: 640px) {
+  .lb-filter-tabs { margin-inline: -24px; padding-inline: 24px; }
+}
+
+@media (min-width: 1024px) {
+  .lb-filterbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: sticky;
+    top: calc(var(--ar-topbar) + 12px);
+    z-index: 30;
+    margin-bottom: 14px;
+    padding: 8px;
+    border-radius: 22px;
+    background: rgba(12, 14, 29, 0.62);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    -webkit-backdrop-filter: blur(18px) saturate(1.3);
+    backdrop-filter: blur(18px) saturate(1.3);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 40px -28px rgba(0, 0, 0, 0.85);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+  }
+
+  .lb-filterbar[data-stuck="true"] {
+    background: rgba(11, 13, 27, 0.9);
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 28px 50px -24px rgba(0, 0, 0, 0.95);
+  }
+
+  .lb-filter-tabs,
+  .lb-filterbar[data-stuck="true"] .lb-filter-tabs {
+    position: static;
+    flex: 0 1 auto;
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: 0;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .lb-filter-extra { flex: 1 1 auto; flex-wrap: nowrap; margin: 0; justify-content: flex-end; min-width: 0; }
+}
+
+/* ── Rail ────────────────────────────────────────────────────────────────── */
+
+.lb-rail {
+  --fl: 0px;
+  --fr: 0px;
+  display: flex;
+  gap: 20px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 6px;
+  scrollbar-width: none;
+  /* Room above/below/beside the cards so the hover lift and the glow are not clipped by the scroller. */
+  padding: 26px 6px 30px;
+  margin: -26px -6px -30px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 var(--fl), #000 calc(100% - var(--fr)), transparent 100%);
+}
+
+.lb-rail::-webkit-scrollbar { display: none; }
+.lb-rail > * { flex: 0 0 auto; scroll-snap-align: start; }
+.lb-rail[data-l="true"] { --fl: 40px; }
+.lb-rail[data-r="true"] { --fr: 40px; }
+
+/* ── Skeleton that matches the card ──────────────────────────────────────── */
+
+.lb-skel-card {
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.016)), #0b0d1b;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+
+.lb-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 1px solid rgb(var(--ar-a) / 0.55);
+  animation: lb-ring 3.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  opacity: 0;
+}
+
+@keyframes lb-ring {
+  0% { transform: scale(0.55); opacity: 0.7; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+/* ── Dashboard doorway ───────────────────────────────────────────────────── */
+
+.lb-banner {
+  --ar-a: 124 92 255;
+  --ar-b: 34 211 238;
+  isolation: isolate;
+}
+
+.lb-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: inherit;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(420px circle at var(--mx, 70%) var(--my, 0%), rgba(167, 139, 250, 0.28), transparent 62%);
+}
+
+.lb-banner:hover::before,
+.lb-banner:focus-visible::before { opacity: 1; }
+
+/* ── Reduced motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .lb-kenburns,
+  .lb-colon,
+  .lb-ring { animation: none; }
+
+  .lb-colon { opacity: 0.85; }
+  .lb-ring { opacity: 0.35; }
+
+  .lb-card,
+  .lb-cover-img,
+  .lb-cover::before,
+  .lb-topbar,
+  .lb-banner::before { transition: none; }
+
+  .lb-card:hover,
+  .lb-card:focus-within,
+  .lb-card:active { transform: none; }
+
+  .lb-card:hover .lb-cover-img { transform: none; }
+  .lb-card:hover .lb-cover::before { transform: translateX(-120%) skewX(-18deg); }
+}
+
+/* The card's focus ring is drawn on the whole card (above); the title link inside it must not draw a second one. */
+.arena-root .lb-card .lb-card-link:focus-visible { outline: none; }

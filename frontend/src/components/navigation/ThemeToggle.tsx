@@ -24,7 +24,7 @@ export function ThemeToggle({ className, showLabels = false, compact = false }: 
 
   useEffect(() => {
     setMounted(true);
-    const saved = localStorage.getItem("codepulse-theme") as ThemeMode | null;
+    const saved = localStorage.getItem("aptrun-theme") as ThemeMode | null;
     if (saved && ["light", "dark", "system"].includes(saved)) {
       setTheme(saved);
       applyTheme(saved);
@@ -35,7 +35,7 @@ export function ThemeToggle({ className, showLabels = false, compact = false }: 
 
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
-      const currentSaved = localStorage.getItem("codepulse-theme");
+      const currentSaved = localStorage.getItem("aptrun-theme");
       if (currentSaved === "system") {
         applyTheme("system");
       }
@@ -63,7 +63,7 @@ export function ThemeToggle({ className, showLabels = false, compact = false }: 
 
   const handleSelect = (nextTheme: ThemeMode) => {
     setTheme(nextTheme);
-    localStorage.setItem("codepulse-theme", nextTheme);
+    localStorage.setItem("aptrun-theme", nextTheme);
     applyTheme(nextTheme);
   };
 

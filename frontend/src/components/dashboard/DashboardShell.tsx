@@ -44,6 +44,20 @@ interface DashboardShellProps {
    * proctoring overlay.
    */
   hideChrome?: boolean;
+  /**
+   * Pins the shell to the window height (no page scroll), WITH the sidebar and
+   * header still showing — for a page whose content is a self-scrolling
+   * workspace around an embedded iframe (the Project Lab IDE).
+   *
+   * Without it the content decides the page height: a tall side panel stretched
+   * the editor iframe to far more than the window (1377px in a 770px window),
+   * pushing the status bar and terminal below the fold. And a mouse wheel over an
+   * iframe never reaches the page, so that overflow could not be scrolled to
+   * with the pointer over the editor. Opt-in rather than automatic for fullBleed
+   * pages, because the centred consent/locked screens on other routes rely on
+   * page scroll as a safety net (see the note on hideChrome above).
+   */
+  fitViewport?: boolean;
 }
 
 export function DashboardShell({
@@ -57,6 +71,7 @@ export function DashboardShell({
   fullBleed = false,
   defaultSidebarCollapsed = false,
   hideChrome = false,
+  fitViewport = false,
 }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultSidebarCollapsed);
@@ -84,7 +99,12 @@ export function DashboardShell({
     // taller than a short viewport.
     <div
       data-portal={portal ?? undefined}
-      className={cn("bg-background text-primary flex", isHiring && "hp-portal", hideChrome ? "h-screen overflow-hidden" : "min-h-screen")}
+      className={cn(
+        "bg-background text-primary flex",
+        isHiring && "hp-portal",
+        // dvh tracks the visible height as mobile browser bars come and go (every current browser supports it).
+        hideChrome ? "h-screen overflow-hidden" : fitViewport ? "h-dvh overflow-hidden" : "min-h-screen"
+      )}
     >
       {/* Production Sidebar — Suspense-wrapped because it reads
           useSearchParams() (for ?tab=/?status=-based active-link
@@ -110,7 +130,7 @@ export function DashboardShell({
         className={cn(
           "flex-1 flex flex-col min-w-0 transition-[padding] duration-300",
           isHiring && "hp-canvas",
-          hideChrome && "min-h-0",
+          (hideChrome || fitViewport) && "min-h-0",
           // rail / rail-collapsed are the SAME tokens the panel itself is
           // sized from (RAIL_WIDTH / RAIL_COLLAPSED_WIDTH in
           // DashboardSidebar). These were hard-coded as pl-64 (256px) against

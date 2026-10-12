@@ -36,7 +36,7 @@ export function ProblemExplorer() {
           badge="Practice arena"
           title="Sharpen the skills"
           highlight="employers test for"
-          description="A real sample from the catalog, judged against hidden test cases in C++, Java, Python and JavaScript."
+          description="A real sample from the catalog, judged against hidden test cases in 19 languages, from C and Rust to Python and Elixir."
         />
 
         {loading ? (

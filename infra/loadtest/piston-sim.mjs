@@ -48,8 +48,8 @@ if (args.tokens && fs.existsSync(args.tokens)) {
   if (seed.problem?.expected_lines?.length) expected = seed.problem.expected_lines;
 }
 
-const WALL_MS = { python: 110, javascript: 120, java: 1000, "c++": 1800 };
-const CPU_MS = { python: 40, javascript: 60, java: 950, "c++": 1750 };
+const WALL_MS = { python: 110, javascript: 120, java: 1000, "c++": 1800, php: 110 };
+const CPU_MS = { python: 40, javascript: 60, java: 950, "c++": 1750, php: 40 };
 const jitter = (ms) => ms * (0.8 + Math.random() * 0.4);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -74,7 +74,7 @@ http
     if (Date.now() < downUntil) return send(res, 503, { message: "node down (simulated)" });
 
     if (url.pathname === "/api/v2/runtimes") {
-      return send(res, 200, [{ language: "python", version: "3.10.0" }, { language: "javascript", version: "18.15.0" }, { language: "java", version: "15.0.2" }, { language: "c++", version: "10.2.0" }]);
+      return send(res, 200, [{ language: "python", version: "3.10.0" }, { language: "javascript", version: "18.15.0" }, { language: "java", version: "15.0.2" }, { language: "c++", version: "10.2.0" }, { language: "php", version: "8.2.3" }]);
     }
 
     if (url.pathname === "/api/v2/execute" && req.method === "POST") {

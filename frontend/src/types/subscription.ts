@@ -2,6 +2,8 @@
 // POST /api/admin/colleges/{college}/subscription (see backend
 // SubscriptionController::formatCoverage).
 
+import type { ProjectLabSummary } from "./projectLab";
+
 export type SubscriptionScope = "individual" | "institution" | "internal";
 export type CoverageSource = "individual" | "institution" | "none";
 
@@ -35,8 +37,21 @@ export interface Entitlements {
   drive_access: boolean;
 }
 
+/** An active add-on (e.g. Project Lab) the student holds alongside their plan. */
+export interface AddonSubscription {
+  code: string;
+  name: string;
+  days_remaining: number | null;
+  current_period_end: string | null;
+  /** What was actually charged for it (a bundled add-on is discounted). */
+  price_paid: number | null;
+}
+
 export interface MySubscriptionResponse {
   scope: SubscriptionScope;
   coverage: SubscriptionCoverage | null;
   entitlements?: Entitlements;
+  /** Individual scope only. */
+  addons?: AddonSubscription[];
+  project_lab?: ProjectLabSummary;
 }

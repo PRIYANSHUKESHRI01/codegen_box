@@ -111,7 +111,8 @@ export function MarkdownRenderer({ content, className }: MarkdownRendererProps) 
           thead: ({ children }) => <thead className="bg-elevated">{children}</thead>,
           tr: ({ children }) => <tr className="border-b border-border-subtle last:border-0">{children}</tr>,
           th: ({ children }) => <th className="px-3 py-2 text-left font-bold text-primary">{children}</th>,
-          td: ({ children }) => <td className="px-3 py-2 text-text-secondary">{children}</td>,
+          // A short code span in the first column (a requirement id like APT-10) must not wrap at its hyphen.
+          td: ({ children }) => <td className="px-3 py-2 text-text-secondary [&:first-child_code]:whitespace-nowrap">{children}</td>,
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
             if (!match) {

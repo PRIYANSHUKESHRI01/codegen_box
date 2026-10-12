@@ -88,6 +88,12 @@ class User extends Authenticatable
     /** Author Mellow-curated (general) Soft Skills tests and manage the shared question bank — see App\Models\SoftSkillAssessment. */
     public const PERM_SOFT_SKILLS = 'soft_skills';
 
+    /** Author Project Lab topics and SOWs, and review student project submissions — see App\Models\ProjectTopic. */
+    public const PERM_PROJECT_LAB = 'project_lab';
+
+    /** Host and judge hackathons in the Hack Arena — see App\Models\Hackathon. */
+    public const PERM_HACKATHONS = 'hackathons';
+
     public const PERMISSIONS_INTERNAL = [
         self::PERM_COLLEGES,
         self::PERM_PLATFORM_USERS,
@@ -99,6 +105,8 @@ class User extends Authenticatable
         self::PERM_ARTICLES,
         self::PERM_TALENT_POOL,
         self::PERM_SOFT_SKILLS,
+        self::PERM_PROJECT_LAB,
+        self::PERM_HACKATHONS,
     ];
 
     public const PERM_LEADS = 'leads';
@@ -626,6 +634,74 @@ class User extends Authenticatable
             'max_learning_centre_ai_attempts_per_day' => $plan?->max_learning_centre_ai_attempts_per_day,
             'drive_access' => $plan?->drive_access ?? true,
         ];
+    }
+
+    /**
+     * Where this student's Project Lab access comes from, resolved in one
+     * place so every gate (API, sidebar, workspace start, reaper) reads the
+     * same answer. Precedence:
+     *   1. their own in-date Project Lab add-on — carries its own hour and
+     *      active-project limits, and its period is what "hours used" is
+     *      counted against;
+     *   2. the plan that governs them (their college's, else their own base
+     *      plan) when that plan sets project_lab_access — a college can later
+     *      be granted Lab without every student buying it. Hours then count
+     *      per calendar month. No plan sets the flag today.
+     *
+     * @return array{access: bool, source: 'addon'|'plan'|'institution'|'none', plan: ?Plan, subscription: ?Subscription, period_started_at: ?\Illuminate\Support\Carbon, period_ends_at: ?\Illuminate\Support\Carbon, days_remaining: ?int, max_workspace_hours_per_month: ?int, max_active_projects: ?int}
+     */
+    public function projectLabCoverage(): array
+    {
+        $none = [
+            'access' => false,
+            'source' => 'none',
+            'plan' => null,
+            'subscription' => null,
+            'period_started_at' => null,
+            'period_ends_at' => null,
+            'days_remaining' => null,
+            'max_workspace_hours_per_month' => null,
+            'max_active_projects' => null,
+        ];
+
+        $addon = $this->activeAddonSubscriptions()->first(fn (Subscription $s) => $s->plan?->project_lab_access);
+
+        if ($addon !== null) {
+            return [
+                'access' => true,
+                'source' => 'addon',
+                'plan' => $addon->plan,
+                'subscription' => $addon,
+                'period_started_at' => $addon->started_at,
+                'period_ends_at' => $addon->current_period_end,
+                'days_remaining' => $addon->daysRemaining(),
+                'max_workspace_hours_per_month' => $addon->plan->max_workspace_hours_per_month,
+                'max_active_projects' => $addon->plan->max_active_projects,
+            ];
+        }
+
+        $effective = $this->effectiveSubscription();
+
+        if ($effective !== null && $effective->isActive() && $effective->plan?->project_lab_access) {
+            return [
+                'access' => true,
+                'source' => $effective->subscriber_type === self::class ? 'plan' : 'institution',
+                'plan' => $effective->plan,
+                'subscription' => $effective,
+                'period_started_at' => now()->startOfMonth(),
+                'period_ends_at' => $effective->current_period_end,
+                'days_remaining' => $effective->daysRemaining(),
+                'max_workspace_hours_per_month' => $effective->plan->max_workspace_hours_per_month,
+                'max_active_projects' => $effective->plan->max_active_projects,
+            ];
+        }
+
+        return $none;
+    }
+
+    public function hasProjectLabAccess(): bool
+    {
+        return $this->projectLabCoverage()['access'];
     }
 
     /** The tier label the TPO cohort UI filters/displays by — see ReadinessScoreService::tierFor() for the actual bands. */

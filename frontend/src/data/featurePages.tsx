@@ -385,10 +385,10 @@ export const FEATURE_PAGES: FeaturePageData[] = [
     title: "The Practice Arena",
     tagline: "A real coding judge with instant verdicts, topic tracks and a record of how you are improving.",
     overview:
-      "Practice only counts if it reflects the real thing. The arena compiles and runs your code against hidden test cases in C++, Java, Python or JavaScript, so a green verdict means your solution works, and your history shows how far you have come.",
+      "Practice only counts if it reflects the real thing. The arena compiles and runs your code against hidden test cases in 19 languages, from C and Rust to Python, TypeScript and Elixir, so a green verdict means your solution works, and your history shows how far you have come.",
     icon: Code2,
     tone: "cyan",
-    highlights: ["C++, Java, Python and JavaScript", "Judged on hidden test cases", "Topic tracks across Easy, Medium and Hard"],
+    highlights: ["19 languages, from C and Rust to Elixir", "Judged on hidden test cases", "Topic tracks across Easy, Medium and Hard"],
     capabilities: [
       {
         icon: Code2,

@@ -1,0 +1,9 @@
+{
+  "chat.disableAIFeatures": true,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "workbench.startupEditor": "none",
+  "workbench.tips.enabled": false,
+  "extensions.autoUpdate": false,
+  "extensions.autoCheckUpdates": false,
+  "extensions.ignoreRecommendations": true
+}

@@ -49,6 +49,14 @@ class PistonPool
             throw new JudgeUnavailableException('No Piston nodes are configured (PISTON_NODES / PISTON_BASE_URL).');
         }
 
+        // The HTTP budget must cover everything this one request may legitimately take: the compile and run
+        // limits it asks Piston for, plus a margin. A language with a long compile (Kotlin, Scala: a JVM
+        // compiler) would otherwise be cut off by the global default while still within its own limits.
+        $httpTimeout = max(
+            (int) config('piston.http_timeout_seconds', 30),
+            (int) ceil((($payload['compile_timeout'] ?? 0) + ($payload['run_timeout'] ?? 0)) / 1000) + 3,
+        );
+
         $tried = [];
         $lastError = 'unknown error';
 
@@ -68,7 +76,7 @@ class PistonPool
 
                 try {
                     $response = Http::connectTimeout((int) config('piston.connect_timeout_seconds', 3))
-                        ->timeout((int) config('piston.http_timeout_seconds', 30))
+                        ->timeout($httpTimeout)
                         ->acceptJson()
                         ->asJson()
                         ->post($node['url'].'/api/v2/execute', $payload);

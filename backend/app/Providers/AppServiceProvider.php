@@ -5,6 +5,11 @@ namespace App\Providers;
 use App\Models\User;
 use App\Services\LeadAssignmentService;
 use App\Services\SubscriptionService;
+use App\Services\Workspaces\DockerCliRuntime;
+use App\Services\Workspaces\FakeWorkspaceRuntime;
+use App\Services\Workspaces\ProcessRunner;
+use App\Services\Workspaces\SymfonyProcessRunner;
+use App\Services\Workspaces\WorkspaceRuntime;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -18,7 +23,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Project Lab workspaces: the docker-CLI runtime in production, an in-memory
+        // fake when WORKSPACE_RUNTIME=fake (UI development without Docker). Tests
+        // swap in their own with $this->app->instance(WorkspaceRuntime::class, …).
+        $this->app->bind(ProcessRunner::class, SymfonyProcessRunner::class);
+
+        $this->app->singleton(WorkspaceRuntime::class, function ($app) {
+            return config('workspaces.runtime') === 'fake'
+                ? new FakeWorkspaceRuntime
+                : new DockerCliRuntime($app->make(ProcessRunner::class), (string) config('workspaces.docker_binary', 'docker'));
+        });
     }
 
     /**
@@ -136,6 +150,38 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('phone-verify', function (Request $request) {
             return Limit::perMinute(10)->by('phone-verify:'.$request->user()?->id);
         });
+
+        // Project Lab. One NAMED limiter per route family, keyed per user — never
+        // `throttle:N,1`: Laravel keys an unnamed numeric throttle by the user alone,
+        // so differently-limited routes would all share a single counter and, say,
+        // polling the workspace while it boots would spend the Start button's
+        // allowance of 10 a minute (found by the real-Docker end-to-end run).
+        foreach ([
+            'lab-topic-start' => 20,
+            'lab-sow' => 20,
+            'lab-milestone' => 60,
+            'lab-workspace-start' => 10,
+            'lab-workspace-poll' => 120,
+            'lab-workspace-heartbeat' => 30,
+            'lab-integrity' => 30,
+            'lab-workspace-stop' => 20,
+            'lab-submit' => 5,
+            'lab-purchase' => 20,
+        ] as $name => $perMinute) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by($name.':'.($request->user()?->id ?? $request->ip())));
+        }
+
+        // Hack Arena. Named, per user (never per IP: a campus lab shares one address), and one
+        // per route family so they do not spend each other's allowance. Registering and team
+        // changes are rare, deliberate actions; saving a project is the busiest, and a person
+        // writing up their work and pressing Save now and then is nowhere near its ceiling.
+        foreach ([
+            'arena-action' => 30,
+            'arena-submit' => 30,
+            'arena-host' => 120,
+        ] as $name => $perMinute) {
+            RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by($name.':'.($request->user()?->id ?? $request->ip())));
+        }
 
         // Every student account — however it's created (self-registration,
         // admin storeUser, bulk CSV import, seeders) — starts on the free

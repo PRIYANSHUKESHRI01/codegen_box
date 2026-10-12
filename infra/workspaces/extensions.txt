@@ -1,0 +1,27 @@
+# The CURATED extension set (Open VSX; Microsoft's marketplace is not available to VS Code forks).
+# This is the complete list: the image bakes these into a read-only folder and removes the Marketplace, so a
+# student cannot install anything else. That is deliberate: an AI-autocomplete extension would write their code
+# for them (see docs/project-lab.md, "Authorship"). Add a line here to make something available to everyone.
+# One per line; add "full" after the id to install it only in the full flavour. A line that cannot be
+# installed is skipped with a warning at build time.
+
+# Language support and quality
+bmewburn.vscode-intelephense-client
+onecentlin.laravel-blade
+dbaeumer.vscode-eslint
+esbenp.prettier-vscode
+bradlc.vscode-tailwindcss
+Vue.volar
+EditorConfig.EditorConfig
+mikestead.dotenv
+humao.rest-client
+ms-python.python
+redhat.java full
+vscjava.vscode-java-debug full
+vscjava.vscode-maven full
+
+# Look and feel (so a locked set still feels like the student's own editor)
+zhuangtongfa.Material-theme
+dracula-theme.theme-dracula
+GitHub.github-vscode-theme
+PKief.material-icon-theme

@@ -180,6 +180,10 @@ class DatabaseSeeder extends Seeder
         $this->call(SoftSkillQuestionSeeder::class);
         $this->call(SoftSkillAssessmentSeeder::class);
         $this->call(FeatureFlagSeeder::class);
+        // Project Lab's project catalogue (SOW + milestones), read from files.
+        $this->call(ProjectLabContentSeeder::class);
+        // Hack Arena demo: five hackathons in five different states, with a student cohort.
+        $this->call(HackathonSeeder::class);
 
         $this->subscribeSeededDemoData();
     }

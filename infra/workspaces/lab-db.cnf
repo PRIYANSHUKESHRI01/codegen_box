@@ -1,0 +1,8 @@
+# Databases a student starts with `lab-db` keep their socket and data under
+# /home/workspace/.lab/db (the persistent volume). The client section lets a
+# bare `mysql -uroot` find that socket.
+[client]
+socket=/home/workspace/.lab/db/mysql.sock
+
+[mysqld]
+socket=/home/workspace/.lab/db/mysql.sock

@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -85,6 +86,75 @@ class SubscriptionService
         }
 
         return $subscription;
+    }
+
+    /**
+     * Self-serve checkout for one cart: a base plan, add-ons, or both,
+     * priced by PurchaseQuoteService (pass its result in — never a price from
+     * the request). Each line becomes its own subscription row, so each
+     * add-on has its own period and can be renewed or lapse independently;
+     * `meta` records what was actually charged per line plus a shared
+     * `purchase_ref`, which is the reconciliation key until a payment
+     * gateway supplies its own order id.
+     *
+     * The buyer row is locked for the duration so a double-click or two
+     * tabs cannot create two overlapping checkouts for the same student.
+     * Still the instant "checkout" stand-in — no money moves yet.
+     *
+     * @param  array{lines: list<array{code: string, kind: string, list_price: int, discount: int, price: int}>, total: int}  $quote
+     * @return list<Subscription>
+     */
+    public function purchase(User $user, array $quote): array
+    {
+        $reference = (string) Str::uuid();
+
+        $subscriptions = DB::transaction(function () use ($user, $quote, $reference) {
+            User::whereKey($user->id)->lockForUpdate()->first();
+
+            $created = [];
+
+            foreach ($quote['lines'] as $line) {
+                $plan = Plan::where('code', $line['code'])->firstOrFail();
+
+                $created[] = $this->activate($user, $plan, null, [
+                    'purchase_ref' => $reference,
+                    'list_price' => $line['list_price'],
+                    'discount' => $line['discount'],
+                    'price_paid' => $line['price'],
+                    'quote_total' => $quote['total'],
+                ]);
+
+                ActivityLog::record(
+                    $user,
+                    $plan->isAddon() ? 'Purchased an add-on' : 'Subscribed to a plan',
+                    $plan->isAddon() ? 'Add-on' : 'Plan',
+                    $plan->name,
+                    ['plan_code' => $plan->code, 'price_paid' => $line['price'], 'discount' => $line['discount'], 'purchase_ref' => $reference]
+                );
+            }
+
+            return $created;
+        });
+
+        // A lead that pays for anything — a plan or Project Lab alone — is
+        // the lead-to-customer conversion moment (see subscribeIndividual).
+        if ($quote['total'] > 0 && $user->isMellowDirectLead()) {
+            $wasAlreadyConverted = $user->lead_status === User::LEAD_STATUS_CONVERTED;
+
+            $this->leadAssignment->convertLead($user);
+
+            if (! $wasAlreadyConverted) {
+                ActivityLog::record(
+                    $user,
+                    'Converted from lead to paying customer',
+                    'User',
+                    $user->name,
+                    ['purchase_ref' => $reference, 'total' => $quote['total']]
+                );
+            }
+        }
+
+        return $subscriptions;
     }
 
     /**
@@ -192,6 +262,9 @@ class SubscriptionService
                     'max_practice_problems_per_day' => $currentPlan->max_practice_problems_per_day,
                     'max_mock_interviews_per_day' => $currentPlan->max_mock_interviews_per_day,
                     'max_learning_centre_ai_attempts_per_day' => $currentPlan->max_learning_centre_ai_attempts_per_day,
+                    'project_lab_access' => $currentPlan->project_lab_access,
+                    'max_workspace_hours_per_month' => $currentPlan->max_workspace_hours_per_month,
+                    'max_active_projects' => $currentPlan->max_active_projects,
                 ]
             );
 
@@ -246,12 +319,40 @@ class SubscriptionService
      * default) keeps the existing behavior exactly: period end derived from
      * the plan, not flagged as a trial.
      */
-    private function activate(Model $subscriber, Plan $plan, ?int $trialDays = null): Subscription
+    private function activate(Model $subscriber, Plan $plan, ?int $trialDays = null, array $meta = []): Subscription
     {
-        return DB::transaction(function () use ($subscriber, $plan, $trialDays) {
-            $subscriber->subscriptions()
+        return DB::transaction(function () use ($subscriber, $plan, $trialDays, $meta) {
+            // Supersede only what this activation actually replaces: a plan
+            // change replaces the current BASE plan (and must never cancel a
+            // Project Lab add-on the student also paid for); renewing an
+            // add-on replaces only that same add-on.
+            $previous = $subscriber->subscriptions()
                 ->where('status', Subscription::STATUS_ACTIVE)
-                ->update(['status' => Subscription::STATUS_CANCELED, 'canceled_at' => now()]);
+                ->whereHas('plan', fn ($q) => $plan->isAddon()
+                    ? $q->where('id', $plan->id)
+                    : $q->where('kind', Plan::KIND_BASE))
+                ->get();
+
+            if ($previous->isNotEmpty()) {
+                $subscriber->subscriptions()
+                    ->whereKey($previous->modelKeys())
+                    ->update(['status' => Subscription::STATUS_CANCELED, 'canceled_at' => now()]);
+            }
+
+            // Renewing an add-on early must not forfeit days already paid
+            // for: the new period stacks on the old end. (A base plan keeps
+            // its long-standing behaviour — a fresh period from today.)
+            $periodStart = now();
+            if ($plan->isAddon() && $trialDays === null) {
+                $stillPaidUntil = $previous
+                    ->map(fn (Subscription $s) => $s->current_period_end)
+                    ->filter(fn ($end) => $end !== null && $end->isFuture())
+                    ->max();
+
+                if ($stillPaidUntil !== null) {
+                    $periodStart = $stillPaidUntil;
+                }
+            }
 
             return $subscriber->subscriptions()->create([
                 'plan_id' => $plan->id,
@@ -259,8 +360,9 @@ class SubscriptionService
                 'started_at' => now(),
                 'current_period_end' => $trialDays !== null
                     ? now()->addDays($trialDays)
-                    : ($plan->duration_days !== null ? now()->addDays($plan->duration_days) : null),
+                    : ($plan->duration_days !== null ? $periodStart->copy()->addDays($plan->duration_days) : null),
                 'is_trial' => $trialDays !== null,
+                'meta' => $meta ?: null,
             ]);
         });
     }

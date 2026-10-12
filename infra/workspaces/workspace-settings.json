@@ -1,0 +1,38 @@
+{
+  "editor.fontSize": 14,
+  "editor.minimap.enabled": false,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": false,
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/vendor/**": true,
+    "**/.git/objects/**": true,
+    "**/.venv/**": true
+  },
+  "files.exclude": {
+    ".cache": true,
+    ".npm": true,
+    ".npm-global": true,
+    ".composer": true,
+    ".local": true,
+    ".lab": true,
+    ".openvscode-server": true,
+    ".bash_logout": true,
+    ".bashrc": true,
+    ".profile": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/vendor": true,
+    "**/.venv": true
+  },
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true,
+  "git.openRepositoryInParentFolders": "never",
+  "[php]": { "editor.tabSize": 4 },
+  "[python]": { "editor.tabSize": 4 },
+  "[java]": { "editor.tabSize": 4 }
+}

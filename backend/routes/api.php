@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AdminArticleTopicController;
 use App\Http\Controllers\Api\AdminCompanyController;
 use App\Http\Controllers\Api\AdminContestController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminHackathonController;
 use App\Http\Controllers\Api\AdminStudentReportController;
 use App\Http\Controllers\Api\AdminInterviewController;
 use App\Http\Controllers\Api\AdminInterviewQuestionBankController;
@@ -24,6 +25,7 @@ use App\Http\Controllers\Api\CompanyCandidateController;
 use App\Http\Controllers\Api\CompanyCollegeController;
 use App\Http\Controllers\Api\CompanyContestController;
 use App\Http\Controllers\Api\CompanyDriveController;
+use App\Http\Controllers\Api\CompanyHackathonController;
 use App\Http\Controllers\Api\CompanyInterviewController;
 use App\Http\Controllers\Api\CompanyInterviewRoleTemplateController;
 use App\Http\Controllers\Api\CompanyInterviewTrackController;
@@ -35,6 +37,7 @@ use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\CoordinatorProctoringController;
 use App\Http\Controllers\Api\CoordinatorStudentController;
 use App\Http\Controllers\Api\CoordinatorStudentReportController;
+use App\Http\Controllers\Api\HackathonArenaController;
 use App\Http\Controllers\Api\InterviewController;
 use App\Http\Controllers\Api\InterviewProctoringController;
 use App\Http\Controllers\Api\InterviewQuestionBankController;
@@ -52,6 +55,9 @@ use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PhoneVerificationController;
 use App\Http\Controllers\Api\ProblemController;
+use App\Http\Controllers\Api\AdminProjectLabController;
+use App\Http\Controllers\Api\ProjectLabController;
+use App\Http\Controllers\Api\ProjectWorkspaceController;
 use App\Http\Controllers\Api\PublicController;
 use App\Http\Controllers\Api\SoftSkillController;
 use App\Http\Controllers\Api\SoftSkillProctoringController;
@@ -139,7 +145,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // college, or "internal" for staff) — subscribe() further restricts
     // itself to role:user, so no route-level role middleware is needed here.
     Route::get('/me/subscription', [SubscriptionController::class, 'mine']);
-    Route::post('/me/subscription', [SubscriptionController::class, 'subscribe']);
+    // Live price of a cart (plan and/or Project Lab) — the same service prices the POST below.
+    Route::get('/me/purchase-quote', [SubscriptionController::class, 'quote']);
+    Route::post('/me/subscription', [SubscriptionController::class, 'subscribe'])->middleware('throttle:lab-purchase');
 
     // Mellow-internal-staff-only: manage partner colleges and their TPO
     // accounts. A logged-in admin_tpo user gets a 403 from every route in
@@ -308,6 +316,51 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/interview-tracks/{interviewTrack}', [AdminInterviewTrackController::class, 'update']);
                 Route::delete('/interview-tracks/{interviewTrack}', [AdminInterviewTrackController::class, 'destroy']);
                 Route::post('/interview-tracks/{interviewTrack}/colleges', [AdminInterviewTrackController::class, 'updateColleges']);
+            });
+
+            Route::middleware('permission:'.User::PERM_PROJECT_LAB)->group(function () {
+                // Project Lab authoring (topics, hand-written SOWs, milestones)
+                // and the submission review queue — see AdminProjectLabController.
+                Route::get('/project-lab/topics', [AdminProjectLabController::class, 'topics']);
+                Route::post('/project-lab/topics', [AdminProjectLabController::class, 'storeTopic']);
+                Route::get('/project-lab/topics/{projectTopic}', [AdminProjectLabController::class, 'showTopic']);
+                Route::put('/project-lab/topics/{projectTopic}', [AdminProjectLabController::class, 'updateTopic']);
+                Route::delete('/project-lab/topics/{projectTopic}', [AdminProjectLabController::class, 'destroyTopic']);
+
+                Route::get('/project-lab/submissions', [AdminProjectLabController::class, 'submissions']);
+                Route::get('/project-lab/submissions/{submission}', [AdminProjectLabController::class, 'showSubmission']);
+                Route::get('/project-lab/submissions/{submission}/snapshot', [AdminProjectLabController::class, 'downloadSnapshot']);
+                Route::post('/project-lab/submissions/{submission}/review', [AdminProjectLabController::class, 'review']);
+            });
+
+            Route::middleware('permission:'.User::PERM_HACKATHONS)->group(function () {
+                // Hack Arena hosting: Mellow Ops hosts the platform's own hackathons and
+                // moderates partners'. See AdminHackathonController and the ManagesHackathons
+                // concern it shares with the hiring-partner controller. A college TPO has no
+                // route into any of this.
+                Route::middleware('throttle:arena-host')->group(function () {
+                    Route::get('/hackathons', [AdminHackathonController::class, 'index']);
+                    Route::post('/hackathons', [AdminHackathonController::class, 'store']);
+                    // Declared before {hackathon} so "colleges" is not mistaken for an id.
+                    Route::get('/hackathons/colleges', [AdminHackathonController::class, 'colleges']);
+                    Route::get('/hackathons/{hackathon}', [AdminHackathonController::class, 'show']);
+                    Route::put('/hackathons/{hackathon}', [AdminHackathonController::class, 'update']);
+                    Route::delete('/hackathons/{hackathon}', [AdminHackathonController::class, 'destroy']);
+                    Route::post('/hackathons/{hackathon}/cover', [AdminHackathonController::class, 'uploadCover']);
+                    Route::delete('/hackathons/{hackathon}/cover', [AdminHackathonController::class, 'deleteCover']);
+                    Route::post('/hackathons/{hackathon}/publish', [AdminHackathonController::class, 'publish']);
+                    Route::post('/hackathons/{hackathon}/unpublish', [AdminHackathonController::class, 'unpublish']);
+                    Route::post('/hackathons/{hackathon}/cancel', [AdminHackathonController::class, 'cancel']);
+                    Route::get('/hackathons/{hackathon}/registrations', [AdminHackathonController::class, 'registrations']);
+                    Route::get('/hackathons/{hackathon}/registrations/export', [AdminHackathonController::class, 'exportRegistrations']);
+                    Route::get('/hackathons/{hackathon}/submissions', [AdminHackathonController::class, 'submissions']);
+                    Route::post('/hackathons/{hackathon}/submissions/{submission}/score', [AdminHackathonController::class, 'scoreSubmission']);
+                    Route::post('/hackathons/{hackathon}/submissions/{submission}/disqualify', [AdminHackathonController::class, 'disqualify']);
+                    Route::post('/hackathons/{hackathon}/submissions/{submission}/reinstate', [AdminHackathonController::class, 'reinstate']);
+                    Route::post('/hackathons/{hackathon}/publish-results', [AdminHackathonController::class, 'publishResults']);
+                    Route::post('/hackathons/{hackathon}/announcements', [AdminHackathonController::class, 'storeAnnouncement']);
+                    Route::delete('/hackathons/{hackathon}/announcements/{announcement}', [AdminHackathonController::class, 'destroyAnnouncement']);
+                });
             });
 
             Route::middleware('permission:'.User::PERM_SOFT_SKILLS)->group(function () {
@@ -695,6 +748,31 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
             Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
                 ->middleware('throttle:ai-generation');
+
+            // A company hosting its own hackathon, strictly its own (see CompanyHackathonController).
+            Route::middleware('throttle:arena-host')->group(function () {
+                Route::get('/hackathons', [CompanyHackathonController::class, 'index']);
+                Route::post('/hackathons', [CompanyHackathonController::class, 'store']);
+                // Declared before {hackathon} so "colleges" is not mistaken for an id.
+                Route::get('/hackathons/colleges', [CompanyHackathonController::class, 'colleges']);
+                Route::get('/hackathons/{hackathon}', [CompanyHackathonController::class, 'show']);
+                Route::put('/hackathons/{hackathon}', [CompanyHackathonController::class, 'update']);
+                Route::delete('/hackathons/{hackathon}', [CompanyHackathonController::class, 'destroy']);
+                Route::post('/hackathons/{hackathon}/cover', [CompanyHackathonController::class, 'uploadCover']);
+                Route::delete('/hackathons/{hackathon}/cover', [CompanyHackathonController::class, 'deleteCover']);
+                Route::post('/hackathons/{hackathon}/publish', [CompanyHackathonController::class, 'publish']);
+                Route::post('/hackathons/{hackathon}/unpublish', [CompanyHackathonController::class, 'unpublish']);
+                Route::post('/hackathons/{hackathon}/cancel', [CompanyHackathonController::class, 'cancel']);
+                Route::get('/hackathons/{hackathon}/registrations', [CompanyHackathonController::class, 'registrations']);
+                Route::get('/hackathons/{hackathon}/registrations/export', [CompanyHackathonController::class, 'exportRegistrations']);
+                Route::get('/hackathons/{hackathon}/submissions', [CompanyHackathonController::class, 'submissions']);
+                Route::post('/hackathons/{hackathon}/submissions/{submission}/score', [CompanyHackathonController::class, 'scoreSubmission']);
+                Route::post('/hackathons/{hackathon}/submissions/{submission}/disqualify', [CompanyHackathonController::class, 'disqualify']);
+                Route::post('/hackathons/{hackathon}/submissions/{submission}/reinstate', [CompanyHackathonController::class, 'reinstate']);
+                Route::post('/hackathons/{hackathon}/publish-results', [CompanyHackathonController::class, 'publishResults']);
+                Route::post('/hackathons/{hackathon}/announcements', [CompanyHackathonController::class, 'storeAnnouncement']);
+                Route::delete('/hackathons/{hackathon}/announcements/{announcement}', [CompanyHackathonController::class, 'destroyAnnouncement']);
+            });
         });
 
     // Section-Coordinator-only: a TPO-provisioned account scoped to exactly
@@ -724,6 +802,33 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/proctoring', [CoordinatorProctoringController::class, 'index']);
             Route::get('/proctoring/{proctoringSession}', [CoordinatorProctoringController::class, 'show']);
             Route::post('/proctoring/{proctoringSession}/reinstate', [CoordinatorProctoringController::class, 'reinstate']);
+        });
+
+    // Hack Arena: the students' hackathon world (see HackathonArenaController). Reads are
+    // open to students and, as a read-only preview, to the hosting roles; a college TPO and
+    // every other role get a 403. Writes are student-only, each with its own per-user limiter.
+    Route::middleware('role:'.User::ROLE_USER.','.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_COMPANY.','.User::ROLE_SUPERADMIN)
+        ->prefix('arena')
+        ->group(function () {
+            Route::get('/home', [HackathonArenaController::class, 'home']);
+            Route::get('/hackathons', [HackathonArenaController::class, 'index']);
+            Route::get('/hackathons/{hackathon:slug}', [HackathonArenaController::class, 'show']);
+            Route::get('/hackathons/{hackathon:slug}/gallery', [HackathonArenaController::class, 'gallery']);
+            Route::get('/hackathons/{hackathon:slug}/results', [HackathonArenaController::class, 'results']);
+        });
+
+    Route::middleware('role:'.User::ROLE_USER)
+        ->prefix('arena')
+        ->group(function () {
+            Route::get('/mine', [HackathonArenaController::class, 'mine']);
+
+            Route::middleware('throttle:arena-action')->group(function () {
+                Route::post('/hackathons/{hackathon:slug}/register', [HackathonArenaController::class, 'register']);
+                Route::post('/hackathons/{hackathon:slug}/withdraw', [HackathonArenaController::class, 'withdraw']);
+                Route::post('/hackathons/{hackathon:slug}/team/members/{user}/remove', [HackathonArenaController::class, 'removeMember']);
+            });
+
+            Route::put('/hackathons/{hackathon:slug}/submission', [HackathonArenaController::class, 'saveSubmission'])->middleware('throttle:arena-submit');
         });
 
     // Read-only problem catalog (title/difficulty/tags — never the hidden
@@ -886,6 +991,30 @@ Route::middleware('auth:sanctum')->group(function () {
                 ->middleware('throttle:ai-generation');
             // Original all-at-once grading, kept for a frontend deployed before the upgrade.
             Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/submit', [VocabularyController::class, 'submit']);
+
+            // Project Lab — SOW-guided, full-stack projects built in a browser
+            // VS Code workspace. Browsing the catalog is open to every student;
+            // the SOW body, PDF, milestone detail and workspace need the Project
+            // Lab add-on (402 `project_lab_required` otherwise) — see
+            // ProjectLabController's docblock. Throttles are per user.
+            Route::get('/project-lab/topics', [ProjectLabController::class, 'index']);
+            Route::get('/project-lab/topics/{projectTopic:slug}', [ProjectLabController::class, 'show']);
+            Route::post('/project-lab/topics/{projectTopic:slug}/start', [ProjectLabController::class, 'start'])->middleware('throttle:lab-topic-start');
+            Route::get('/project-lab/topics/{projectTopic:slug}/sow.pdf', [ProjectLabController::class, 'downloadSow'])->middleware('throttle:lab-sow');
+            Route::get('/project-lab/projects', [ProjectLabController::class, 'mine']);
+            Route::get('/project-lab/enrollments/{enrollment}', [ProjectLabController::class, 'showEnrollment']);
+            Route::post('/project-lab/enrollments/{enrollment}/milestones/{milestone}/toggle', [ProjectLabController::class, 'toggleMilestone'])->middleware('throttle:lab-milestone');
+            Route::post('/project-lab/enrollments/{enrollment}/abandon', [ProjectLabController::class, 'abandon']);
+
+            // The workspace (browser VS Code). show() is the boot poll; heartbeat()
+            // runs every minute while the workspace page is open and is the idle
+            // detector and the hours meter — see WorkspaceManager.
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/start', [ProjectWorkspaceController::class, 'start'])->middleware('throttle:lab-workspace-start');
+            Route::get('/project-lab/enrollments/{enrollment}/workspace', [ProjectWorkspaceController::class, 'show'])->middleware('throttle:lab-workspace-poll');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/heartbeat', [ProjectWorkspaceController::class, 'heartbeat'])->middleware('throttle:lab-workspace-heartbeat');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/integrity', [ProjectWorkspaceController::class, 'integrity'])->middleware('throttle:lab-integrity');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/stop', [ProjectWorkspaceController::class, 'stop'])->middleware('throttle:lab-workspace-stop');
+            Route::post('/project-lab/enrollments/{enrollment}/submit', [ProjectWorkspaceController::class, 'submit'])->middleware('throttle:lab-submit');
 
             // Proctoring — contest problem-solving only, never practice (see
             // ContestProctoringController's docblock). start() is idempotent

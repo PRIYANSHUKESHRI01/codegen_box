@@ -42,18 +42,15 @@ class CodeExecutionService
         }
 
         $prelude = config("piston.preludes.{$language}", '');
-        $fullSource = $prelude.$this->assembleSource($language, $studentCode, $harness);
 
         $data = $this->pool->execute([
             'language' => $lang['piston_language'],
             'version' => $lang['version'],
-            'run_timeout' => (int) config('piston.run_timeout_ms', 7000),
-            'compile_timeout' => (int) config('piston.compile_timeout_ms', 15000),
+            'run_timeout' => (int) ($lang['run_timeout_ms'] ?? config('piston.run_timeout_ms', 7000)),
+            'compile_timeout' => (int) ($lang['compile_timeout_ms'] ?? config('piston.compile_timeout_ms', 15000)),
             'run_cpu_time' => (int) ($lang['run_cpu_time_ms'] ?? config('piston.run_cpu_time_ms', 3000)),
-            'compile_cpu_time' => (int) config('piston.compile_cpu_time_ms', 10000),
-            'files' => [
-                ['name' => $lang['filename'], 'content' => $fullSource],
-            ],
+            'compile_cpu_time' => (int) ($lang['compile_cpu_time_ms'] ?? config('piston.compile_cpu_time_ms', 10000)),
+            'files' => $this->assembleFiles($language, $lang, $prelude, $studentCode, $harness),
         ]);
 
         $compile = $data['compile'] ?? null;
@@ -67,12 +64,26 @@ class CodeExecutionService
 
         $compileMessage = trim($compile['stderr'] ?? '') ?: trim($compile['output'] ?? '');
 
+        // PHP has no compile step, so its bootstrap reports a syntax error by exiting with this
+        // dedicated code (config/piston.php) — the equivalent of Java/C++ failing to compile.
+        $syntaxErrorExit = $lang['syntax_error_exit_code'] ?? null;
+        $syntaxError = $syntaxErrorExit !== null && ($run['code'] ?? null) === $syntaxErrorExit;
+
+        // Go has no separate compile step either (`go run` does both), so a build failure is only
+        // recognisable by what it prints. A panic's stderr starts with "panic:", never like this.
+        $buildErrorPattern = $lang['compile_error_pattern'] ?? null;
+        $buildError = $buildErrorPattern !== null
+            && ($run['code'] ?? 0) !== 0
+            && preg_match($buildErrorPattern, ltrim($run['stderr'] ?? '')) === 1;
+
         return [
             'stdout' => $run['stdout'] ?? '',
             'stderr' => $run['stderr'] ?? '',
-            'compileError' => $compileFailed
-                ? ($compileMessage ?: ($compileKilled ? 'Compilation was stopped: '.($compile['message'] ?? 'resource limit exceeded').'.' : 'Compilation failed.'))
-                : null,
+            'compileError' => match (true) {
+                $compileFailed => $compileMessage ?: ($compileKilled ? 'Compilation was stopped: '.($compile['message'] ?? 'resource limit exceeded').'.' : 'Compilation failed.'),
+                $syntaxError, $buildError => trim($run['stderr'] ?? '') ?: 'Syntax error.',
+                default => null,
+            },
             'signal' => $run['signal'] ?? null,
             'exitCode' => array_key_exists('code', $run) ? $run['code'] : null,
             'cpuTimeMs' => $run['cpu_time'] ?? null,
@@ -99,6 +110,56 @@ class CodeExecutionService
             return $harness."\n\n".$studentCode;
         }
 
+        if ($language === 'rust' && preg_match('/\bstruct\s+Solution\b/', $studentCode) !== 1) {
+            // LeetCode's Rust editor hides `struct Solution;` and shows only the `impl`; solutions
+            // pasted from there (or the impl a student kept after deleting the struct) still build.
+            $studentCode .= "\nstruct Solution;";
+        }
+
+        // A Racket file is only a module if it opens with `#lang`; the starter code shows it, and a
+        // student who deletes it (or pastes LeetCode's, which hides it) still runs.
+        if ($language === 'racket' && preg_match('/\A\s*#lang\s/', $studentCode) !== 1) {
+            $studentCode = "#lang racket\n".$studentCode;
+        }
+
         return $studentCode."\n\n".$harness;
+    }
+
+    /**
+     * The files Piston writes, entry file first. Most languages are one file: the student's code and
+     * the harness together. PHP and Go keep the student's code in a file of its own (the entry file's
+     * prelude + harness is the other) — see the 'languages' note in config/piston.php for why.
+     *
+     * @param  array<string, mixed>  $lang  config("piston.languages.{$language}")
+     * @return list<array{name: string, content: string}>
+     */
+    private function assembleFiles(string $language, array $lang, string $prelude, string $studentCode, string $harness): array
+    {
+        if (! isset($lang['solution_filename'])) {
+            return [['name' => $lang['filename'], 'content' => $prelude.$this->assembleSource($language, $studentCode, $harness)]];
+        }
+
+        return [
+            ['name' => $lang['filename'], 'content' => $prelude.$harness],
+            ['name' => $lang['solution_filename'], 'content' => $this->solutionFileSource($language, $studentCode)],
+        ];
+    }
+
+    /**
+     * What goes in the student's own file. These languages need a header the student may or may not
+     * have kept from the starter code — PHP's `<?php` (a PHP file is only code between tags), Go's
+     * `package main` — so accept both; Erlang's module header is never in the starter at all, so it is
+     * always added. A missing header goes on the *same line* as the first line of the student's code,
+     * so a syntax error's line number is the one the editor shows.
+     */
+    private function solutionFileSource(string $language, string $studentCode): string
+    {
+        return match ($language) {
+            'php' => preg_match('/^\s*<\?php(\s|$)/i', $studentCode) === 1 ? $studentCode : '<?php '.$studentCode,
+            'go' => preg_match('/^\s*(?:(?:\/\/[^\n]*|\/\*.*?\*\/)\s*)*package\s+\w+/s', $studentCode) === 1 ? $studentCode : 'package main; '.$studentCode,
+            // A student's Erlang is just functions (as in LeetCode); the harness loads it as the `solution` module.
+            'erlang' => '-module(solution). -compile([export_all, nowarn_export_all]). '.$studentCode,
+            default => $studentCode,
+        };
     }
 }

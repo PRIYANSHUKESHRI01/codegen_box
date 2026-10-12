@@ -149,7 +149,7 @@ class AdminProblemController extends Controller
             'test_cases.*.is_sample' => ['nullable', 'boolean'],
             'test_cases.*.explanation' => ['nullable', 'string'],
             'reference_solution' => ['required', 'array'],
-            'reference_solution.language' => ['required', Rule::in(['javascript', 'python', 'java', 'cpp'])],
+            'reference_solution.language' => ['required', Rule::in(JudgeService::SUPPORTED_LANGUAGES)],
             'reference_solution.code' => ['required', 'string'],
         ]);
 

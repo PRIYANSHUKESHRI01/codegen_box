@@ -8,6 +8,21 @@ import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javasc
 import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
 import java from "react-syntax-highlighter/dist/esm/languages/prism/java";
 import cpp from "react-syntax-highlighter/dist/esm/languages/prism/cpp";
+import php from "react-syntax-highlighter/dist/esm/languages/prism/php";
+import c from "react-syntax-highlighter/dist/esm/languages/prism/c";
+import csharp from "react-syntax-highlighter/dist/esm/languages/prism/csharp";
+import go from "react-syntax-highlighter/dist/esm/languages/prism/go";
+import kotlin from "react-syntax-highlighter/dist/esm/languages/prism/kotlin";
+import rust from "react-syntax-highlighter/dist/esm/languages/prism/rust";
+import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript";
+import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
+import ruby from "react-syntax-highlighter/dist/esm/languages/prism/ruby";
+import dart from "react-syntax-highlighter/dist/esm/languages/prism/dart";
+import scala from "react-syntax-highlighter/dist/esm/languages/prism/scala";
+import elixir from "react-syntax-highlighter/dist/esm/languages/prism/elixir";
+import erlang from "react-syntax-highlighter/dist/esm/languages/prism/erlang";
+import racket from "react-syntax-highlighter/dist/esm/languages/prism/racket";
+import { languageLabel, prismLanguageFor } from "@/lib/judgeLanguages";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 
@@ -18,6 +33,20 @@ SyntaxHighlighter.registerLanguage("javascript", javascript);
 SyntaxHighlighter.registerLanguage("python", python);
 SyntaxHighlighter.registerLanguage("java", java);
 SyntaxHighlighter.registerLanguage("cpp", cpp);
+SyntaxHighlighter.registerLanguage("php", php);
+SyntaxHighlighter.registerLanguage("c", c);
+SyntaxHighlighter.registerLanguage("csharp", csharp);
+SyntaxHighlighter.registerLanguage("go", go);
+SyntaxHighlighter.registerLanguage("kotlin", kotlin);
+SyntaxHighlighter.registerLanguage("rust", rust);
+SyntaxHighlighter.registerLanguage("typescript", typescript);
+SyntaxHighlighter.registerLanguage("swift", swift);
+SyntaxHighlighter.registerLanguage("ruby", ruby);
+SyntaxHighlighter.registerLanguage("dart", dart);
+SyntaxHighlighter.registerLanguage("scala", scala);
+SyntaxHighlighter.registerLanguage("elixir", elixir);
+SyntaxHighlighter.registerLanguage("erlang", erlang);
+SyntaxHighlighter.registerLanguage("racket", racket);
 
 const VERDICT_TONE: Record<string, string> = {
   accepted: "bg-status-success/15 text-status-success border-status-success/25",
@@ -105,7 +134,7 @@ export function CodeViewModal({ data, onClose }: CodeViewModalProps) {
           {VERDICT_LABEL[data.status] ?? data.status}
         </span>
         <span className="rounded-full border border-border-subtle bg-elevated px-2 py-0.5 text-3xs font-bold uppercase text-text-secondary">
-          {data.language}
+          {languageLabel(data.language)}
         </span>
         {data.runtimeMs != null && <span className="font-mono text-3xs text-text-muted">{data.runtimeMs}ms</span>}
         {data.memoryKb != null && <span className="font-mono text-3xs text-text-muted">{data.memoryKb}KB</span>}
@@ -134,7 +163,7 @@ export function CodeViewModal({ data, onClose }: CodeViewModalProps) {
             {copied ? "Copied" : "Copy"}
           </button>
           <SyntaxHighlighter
-            language={data.language}
+            language={prismLanguageFor(data.language)}
             style={vscDarkPlus}
             customStyle={{
               margin: 0,

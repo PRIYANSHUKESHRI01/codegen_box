@@ -1,0 +1,596 @@
+/*
+ * Hack Arena — visual system.
+ *
+ * The Arena is deliberately its own world rather than another dashboard page:
+ * a dark, immersive "night arena" that looks the same in the app's light and
+ * dark themes (like a game lobby, or the Project Lab IDE). Everything below is
+ * scoped to `.arena-root`, so none of it can leak into the rest of the app.
+ *
+ * Colour comes from two RGB triples, --ar-a → --ar-b. The root sets the brand
+ * pair (violet → cyan); a hackathon's card or page overrides them from its own
+ * accent (see accentVars() in lib/hackathon.ts), so one event's cover, glow,
+ * buttons and chips all stay in key. Text tokens clear 4.5:1 on the base.
+ */
+
+.arena-root {
+  --ar-a: 124 92 255;
+  --ar-b: 34 211 238;
+
+  --ar-bg: #06070d;
+  --ar-bg-raised: #0b0d18;
+  --ar-text: #f3f4fb;
+  --ar-text-2: #c5cadd; /* 11.6:1 on the base */
+  --ar-text-3: #9aa1bb; /* 7.4:1 */
+  --ar-border: rgba(255, 255, 255, 0.09);
+  --ar-border-strong: rgba(255, 255, 255, 0.17);
+  --ar-glass: linear-gradient(180deg, rgba(255, 255, 255, 0.062), rgba(255, 255, 255, 0.026));
+  --ar-live: 255 77 109;
+  --ar-open: 52 211 153;
+  --ar-soon: 251 191 36;
+  --ar-judging: 167 139 250;
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  background: var(--ar-bg);
+  color: var(--ar-text);
+  color-scheme: dark;
+}
+
+.arena-root ::selection {
+  background: rgb(var(--ar-a) / 0.45);
+  color: #fff;
+}
+
+/* ── Backdrop ────────────────────────────────────────────────────────────── */
+
+.ar-aurora {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 12% -8%, rgb(var(--ar-a) / 0.26), transparent 70%),
+    radial-gradient(50% 45% at 92% 2%, rgb(var(--ar-b) / 0.16), transparent 70%),
+    radial-gradient(55% 40% at 50% 112%, rgb(236 72 153 / 0.13), transparent 70%),
+    var(--ar-bg);
+}
+
+.ar-aurora::before {
+  /* A fine dot grid that fades out toward the bottom — texture without noise. */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1.2px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 72%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 72%);
+}
+
+.ar-aurora::after {
+  /* A slow-drifting highlight so the backdrop feels alive, not wallpapered. */
+  content: "";
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  left: 8%;
+  top: 6%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgb(var(--ar-a) / 0.16), transparent 66%);
+  filter: blur(40px);
+  animation: ar-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes ar-drift {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(22vw, 10vh, 0) scale(1.18); }
+}
+
+/* ── Surfaces ────────────────────────────────────────────────────────────── */
+
+.ar-glass {
+  background: var(--ar-glass);
+  border: 1px solid var(--ar-border);
+  border-radius: 20px;
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 18px 40px -24px rgba(0, 0, 0, 0.7);
+}
+
+.ar-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ar-glass);
+  border: 1px solid var(--ar-border);
+  border-radius: 22px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 20px 44px -26px rgba(0, 0, 0, 0.75);
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s, box-shadow 0.35s;
+}
+
+.ar-card:hover,
+.ar-card:focus-within {
+  transform: translateY(-4px);
+  border-color: rgb(var(--ar-a) / 0.55);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 28px 56px -24px rgb(var(--ar-a) / 0.55), 0 0 0 1px rgb(var(--ar-a) / 0.15);
+}
+
+.ar-hairline {
+  /* A gradient border for the one hero element on a screen. */
+  position: relative;
+}
+
+.ar-hairline::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgb(var(--ar-a) / 0.75), rgba(255, 255, 255, 0.06) 40%, rgb(var(--ar-b) / 0.6));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Type ────────────────────────────────────────────────────────────────── */
+
+.ar-eyebrow {
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ar-text-3);
+}
+
+.ar-grad-text {
+  background: linear-gradient(95deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ar-display {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1.04;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+
+.ar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.18s, box-shadow 0.25s, background 0.25s, border-color 0.25s, opacity 0.2s;
+}
+
+.ar-btn:disabled,
+.ar-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.ar-btn:active { transform: scale(0.97); }
+
+.ar-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 12px 28px -10px rgb(var(--ar-a) / 0.85);
+}
+
+.ar-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.4) inset, 0 16px 34px -10px rgb(var(--ar-a) / 1);
+}
+
+.ar-btn-ghost {
+  color: var(--ar-text);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--ar-border-strong);
+}
+
+.ar-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.ar-btn-danger {
+  color: #fecdd3;
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+}
+
+.ar-btn-danger:hover { background: rgba(244, 63, 94, 0.24); }
+
+.ar-btn-sm { height: 36px; padding: 0 14px; font-size: 13px; border-radius: 11px; }
+
+.ar-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--ar-text);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--ar-border-strong);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.ar-input::placeholder { color: var(--ar-text-3); }
+
+.ar-input:hover { border-color: rgba(255, 255, 255, 0.3); }
+
+.ar-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgb(var(--ar-a) / 0.9);
+  box-shadow: 0 0 0 3px rgb(var(--ar-a) / 0.25);
+}
+
+.ar-input[aria-invalid="true"] { border-color: rgb(var(--ar-live) / 0.8); }
+
+select.ar-input { appearance: none; padding-right: 36px; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239aa1bb' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>"); background-repeat: no-repeat; background-position: right 12px center; }
+
+.ar-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ar-text-2);
+}
+
+.ar-hint { margin-top: 6px; font-size: 12px; color: var(--ar-text-3); }
+
+.ar-error { margin-top: 6px; font-size: 12px; font-weight: 600; color: #fda4af; }
+
+/* Keyboard focus: always visible, tinted by the page's accent. */
+.arena-root a:focus-visible,
+.arena-root button:focus-visible,
+.arena-root [role="tab"]:focus-visible,
+.arena-root summary:focus-visible {
+  outline: 2px solid rgb(var(--ar-b));
+  outline-offset: 3px;
+  border-radius: 12px;
+}
+
+/* ── Chips & tabs ────────────────────────────────────────────────────────── */
+
+.ar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ar-text-2);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--ar-border);
+  white-space: nowrap;
+}
+
+.ar-chip-accent {
+  color: #fff;
+  background: rgb(var(--ar-a) / 0.22);
+  border-color: rgb(var(--ar-a) / 0.5);
+}
+
+.ar-phase { font-weight: 800; letter-spacing: 0.02em; }
+.ar-phase[data-tone="live"] { color: #ffd1da; background: rgb(var(--ar-live) / 0.2); border-color: rgb(var(--ar-live) / 0.55); }
+.ar-phase[data-tone="open"] { color: #b6f5dc; background: rgb(var(--ar-open) / 0.17); border-color: rgb(var(--ar-open) / 0.5); }
+.ar-phase[data-tone="soon"] { color: #fde9a8; background: rgb(var(--ar-soon) / 0.15); border-color: rgb(var(--ar-soon) / 0.45); }
+.ar-phase[data-tone="judging"] { color: #e0d6ff; background: rgb(var(--ar-judging) / 0.2); border-color: rgb(var(--ar-judging) / 0.5); }
+.ar-phase[data-tone="done"] { color: #d6dbea; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); }
+.ar-phase[data-tone="muted"] { color: var(--ar-text-3); }
+
+.ar-dot { position: relative; display: inline-flex; width: 8px; height: 8px; }
+.ar-dot::before,
+.ar-dot::after { content: ""; position: absolute; inset: 0; border-radius: 9999px; background: currentColor; }
+.ar-dot::before { animation: ar-ping 1.7s cubic-bezier(0, 0, 0.2, 1) infinite; opacity: 0.7; }
+
+@keyframes ar-ping { 75%, 100% { transform: scale(2.6); opacity: 0; } }
+
+.ar-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ar-text-3);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.ar-tab:hover { color: var(--ar-text); }
+
+.ar-tab[aria-selected="true"] { color: #fff; }
+
+.ar-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 3px;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(90deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  box-shadow: 0 0 14px rgb(var(--ar-a) / 0.9);
+}
+
+/* ── Cover art ───────────────────────────────────────────────────────────── */
+
+.ar-cover-scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to top, rgba(6, 7, 13, 0.95) 0%, rgba(6, 7, 13, 0.35) 45%, rgba(6, 7, 13, 0) 100%),
+    linear-gradient(120deg, rgb(var(--ar-a) / 0.18), transparent 55%);
+}
+
+/* ── Markdown ────────────────────────────────────────────────────────────── */
+
+.ar-prose { font-size: 15px; line-height: 1.75; color: var(--ar-text-2); }
+.ar-prose > :first-child { margin-top: 0; }
+.ar-prose > :last-child { margin-bottom: 0; }
+.ar-prose h1, .ar-prose h2, .ar-prose h3 { color: var(--ar-text); font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; }
+.ar-prose h1 { font-size: 24px; margin: 1.6em 0 0.6em; }
+.ar-prose h2 { font-size: 20px; margin: 1.7em 0 0.55em; }
+.ar-prose h3 { font-size: 16px; margin: 1.4em 0 0.4em; }
+.ar-prose p { margin: 0.85em 0; }
+.ar-prose strong { color: var(--ar-text); font-weight: 700; }
+.ar-prose a { color: rgb(var(--ar-b)); text-decoration: underline; text-underline-offset: 3px; }
+.ar-prose a:hover { color: #fff; }
+.ar-prose ul, .ar-prose ol { margin: 0.85em 0; padding-left: 1.4em; }
+.ar-prose ul { list-style: none; padding-left: 0; }
+.ar-prose ul > li { position: relative; padding-left: 1.5em; margin: 0.45em 0; }
+.ar-prose ul > li::before { content: ""; position: absolute; left: 0.2em; top: 0.72em; width: 7px; height: 7px; border-radius: 9999px; background: linear-gradient(135deg, rgb(var(--ar-a)), rgb(var(--ar-b))); }
+.ar-prose ol > li { margin: 0.45em 0; padding-left: 0.3em; }
+.ar-prose ol > li::marker { color: rgb(var(--ar-b)); font-weight: 700; }
+.ar-prose code { padding: 2px 6px; border-radius: 6px; font-size: 0.88em; background: rgba(255, 255, 255, 0.09); color: #fff; }
+.ar-prose pre { margin: 1em 0; padding: 14px 16px; overflow-x: auto; border-radius: 12px; background: rgba(0, 0, 0, 0.4); border: 1px solid var(--ar-border); }
+.ar-prose pre code { padding: 0; background: none; }
+.ar-prose blockquote { margin: 1em 0; padding: 4px 0 4px 16px; border-left: 3px solid rgb(var(--ar-a)); color: var(--ar-text-2); }
+.ar-prose hr { margin: 1.6em 0; border: 0; border-top: 1px solid var(--ar-border); }
+.ar-prose table { width: 100%; margin: 1em 0; border-collapse: collapse; font-size: 14px; }
+.ar-prose th, .ar-prose td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--ar-border); }
+.ar-prose th { color: var(--ar-text); font-weight: 700; }
+
+/* ── Utilities ───────────────────────────────────────────────────────────── */
+
+.ar-scroll-x {
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ar-scroll-x::-webkit-scrollbar { display: none; }
+
+.ar-skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ar-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: ar-shimmer 1.6s infinite;
+}
+
+@keyframes ar-shimmer { to { transform: translateX(100%); } }
+
+.ar-divider { height: 1px; background: var(--ar-border); }
+
+/* A thin, quiet scrollbar for the few places that scroll inside the arena. */
+.arena-root * { scrollbar-color: rgba(255, 255, 255, 0.18) transparent; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-aurora::after,
+  .ar-dot::before,
+  .ar-skeleton::after { animation: none; }
+
+  .ar-card,
+  .ar-btn { transition: none; }
+
+  .ar-card:hover,
+  .ar-card:focus-within { transform: none; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * Arena 2.0 foundation — shared by every screen. Components compose these;
+ * they do not re-invent them. (Added after the first pass; the classes above
+ * keep working.)
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Type scale ──────────────────────────────────────────────────────────────
+ * Heavy weights are for numerals and the one hero title per screen. Everything
+ * else is 600–700 — a greeting is not a headline.
+ *
+ *   .ar-hero-title   hero / poster title only             30 → 46 px, 800
+ *   .ar-h1           page title                           22 → 28 px, 700
+ *   .ar-h2           section title                        18 → 20 px, 700
+ *   .ar-h3           card title                           16 → 17 px, 650
+ *   .ar-body         running text                         14 / 1.65
+ *   .ar-meta         secondary facts                      12.5 px, muted
+ *   .ar-num          tabular figures, tight tracking
+ */
+.ar-hero-title { font-size: clamp(30px, 4.2vw, 46px); line-height: 1.05; font-weight: 800; letter-spacing: -0.035em; text-wrap: balance; }
+.ar-h1 { font-size: clamp(22px, 2.4vw, 28px); line-height: 1.2; font-weight: 700; letter-spacing: -0.022em; }
+.ar-h2 { font-size: clamp(18px, 1.8vw, 20px); line-height: 1.3; font-weight: 700; letter-spacing: -0.016em; }
+.ar-h3 { font-size: 16.5px; line-height: 1.32; font-weight: 650; letter-spacing: -0.012em; }
+.ar-body { font-size: 14px; line-height: 1.65; color: var(--ar-text-2); }
+.ar-meta { font-size: 12.5px; line-height: 1.4; font-weight: 500; color: var(--ar-text-3); }
+.ar-num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+
+/* ── Surfaces: three elevations ──────────────────────────────────────────────
+ *   base    the page                     (var(--ar-bg))
+ *   raised  a card sitting on the page   (.ar-raised)
+ *   float   something above a card       (.ar-float — popovers, sticky bars, dialogs)
+ */
+.ar-raised {
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.022));
+  border: 1px solid rgba(255, 255, 255, 0.085);
+  border-radius: 20px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 24px 48px -28px rgba(0, 0, 0, 0.8);
+}
+
+.ar-float {
+  background: rgba(13, 16, 32, 0.82);
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 30px 70px -30px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+
+/* ── Cursor spotlight (pair with useSpotlight() in motion.tsx) ───────────── */
+.ar-spot { position: relative; isolation: isolate; }
+
+.ar-spot::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--ar-a) / 0.2), transparent 62%);
+}
+
+.ar-spot:hover::before,
+.ar-spot:focus-within::before { opacity: 1; }
+
+/* ── Animated gradient border on hover ───────────────────────────────────── */
+@property --ar-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+
+.ar-sweep { position: relative; }
+
+.ar-sweep::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  border-radius: inherit;
+  padding: 1.5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  background: conic-gradient(from var(--ar-angle), transparent 0 55%, rgb(var(--ar-b)) 78%, rgb(var(--ar-a)) 92%, transparent 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: ar-spin 3.4s linear infinite;
+}
+
+.ar-sweep:hover::after,
+.ar-sweep:focus-within::after { opacity: 1; }
+
+@keyframes ar-spin { to { --ar-angle: 360deg; } }
+
+/* ── Ticket shape: a card with a notch on each side where it tears ──────── */
+.ar-ticket {
+  --cut: 64%;
+  --notch: 12px;
+  position: relative;
+  -webkit-mask:
+    radial-gradient(circle var(--notch) at 0 var(--cut), #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% var(--cut), #0000 97%, #000) right / 51% 100% no-repeat;
+  mask:
+    radial-gradient(circle var(--notch) at 0 var(--cut), #0000 97%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% var(--cut), #0000 97%, #000) right / 51% 100% no-repeat;
+}
+
+.ar-perforation {
+  height: 0;
+  border-top: 2px dashed rgba(255, 255, 255, 0.16);
+}
+
+/* ── Metallic prize tones ────────────────────────────────────────────────── */
+.ar-metal-1 { background: linear-gradient(135deg, #fff1b8 0%, #fbbf24 38%, #d97706 72%, #92400e 100%); }
+.ar-metal-2 { background: linear-gradient(135deg, #f8fafc 0%, #cbd5e1 40%, #94a3b8 74%, #475569 100%); }
+.ar-metal-3 { background: linear-gradient(135deg, #fed7aa 0%, #fb923c 40%, #c2410c 74%, #7c2d12 100%); }
+
+.ar-shine { position: relative; overflow: hidden; }
+
+.ar-shine::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -60%;
+  width: 40%;
+  transform: skewX(-20deg);
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  animation: ar-shine 4.5s ease-in-out infinite;
+}
+
+@keyframes ar-shine { 0%, 55% { left: -60%; } 100% { left: 160%; } }
+
+/* ── Progress ────────────────────────────────────────────────────────────── */
+.ar-progress { height: 6px; overflow: hidden; border-radius: 9999px; background: rgba(255, 255, 255, 0.09); }
+
+.ar-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  box-shadow: 0 0 12px rgb(var(--ar-a) / 0.7);
+  transition: width 1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Urgency: closing within a day or two. Warm, never alarming. */
+.ar-urgent { color: #fde9a8; background: rgb(var(--ar-soon) / 0.14); border-color: rgb(var(--ar-soon) / 0.45); }
+
+/* ── Texture ─────────────────────────────────────────────────────────────── */
+/* Film grain: kills gradient banding and adds a little tactility. Decorative only. */
+.ar-grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Edge fade for horizontally scrolling rails. */
+.ar-fade-x {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 28px, #000 calc(100% - 28px), transparent 100%);
+}
+
+/* Snap rail (carousel). */
+.ar-rail { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-bottom: 4px; }
+.ar-rail::-webkit-scrollbar { display: none; }
+.ar-rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+/* Cards that animate a CTA arrow on hover. */
+.ar-arrow { transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1); }
+.group:hover .ar-arrow, .group:focus-within .ar-arrow { transform: translate(3px, -3px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ar-sweep::after,
+  .ar-shine::after { animation: none; }
+  .ar-progress > span { transition: none; }
+}

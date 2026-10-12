@@ -19,6 +19,17 @@ Schedule::command('report:weekly-readiness')->weekly();
 // Daily: flip any subscription past its current_period_end to expired.
 Schedule::command('subscriptions:expire')->daily();
 
+// Every minute: stop Project Lab workspaces that are idle, lapsed or out of
+// hours (see ReapWorkspaces). Needs the every-minute `schedule:run` cron above —
+// the daily-only schedule this file had until now would not be enough.
+Schedule::command('workspaces:reap')->everyMinute()->withoutOverlapping(5);
+
+// Daily: delete authorship reports (refused pastes, typing flags) past their retention. The summary a reviewer
+// read is frozen on the submission itself, so this only trims raw event rows.
+Schedule::call(function () {
+    \App\Models\ProjectWorkspaceIntegrityEvent::where('occurred_at', '<', now()->subDays((int) config('authorship.retention_days', 180)))->delete();
+})->name('authorship:prune')->daily();
+
 // Every 5 minutes: score/rate any contest whose end_at has passed. Kept
 // frequent (not hourly) since a contest's rating results are the whole
 // point of entering it — students should see them soon after it ends, not

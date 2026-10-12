@@ -24,7 +24,10 @@ use RuntimeException;
  */
 class JudgeService
 {
-    public const SUPPORTED_LANGUAGES = ['javascript', 'python', 'java', 'cpp'];
+    public const SUPPORTED_LANGUAGES = [
+        'javascript', 'python', 'java', 'cpp', 'c', 'csharp', 'go', 'kotlin', 'rust', 'php',
+        'typescript', 'swift', 'ruby', 'dart', 'scala', 'elixir', 'erlang', 'racket', 'python2',
+    ];
 
     public function __construct(
         private readonly CodeExecutionService $executor,

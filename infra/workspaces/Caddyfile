@@ -1,0 +1,65 @@
+# Production gateway for Project Lab workspaces.
+#
+# Every workspace is reached at a hostname under one wildcard domain:
+#
+#   ws-<24 chars>.ws.example.com            the editor (VS Code)        → container:13370
+#   p<port>--ws-<24 chars>.ws.example.com   the student's running app   → container:<port>
+#
+# The container is found by its Docker DNS name on the shared network, so adding
+# a workspace needs no gateway reconfiguration at all. Access control is the
+# unguessable 24-character id in the hostname PLUS the editor's own connection
+# token, which only the API hands out, and only to the entitled owner — so no
+# request ever has to travel back to the Laravel app.
+#
+# Environment (see docker-compose.yml):
+#   WORKSPACE_DOMAIN       ws.example.com
+#   APP_ORIGINS            https://app.example.com   (who may embed the editor; space-separated)
+#   CLOUDFLARE_API_TOKEN   DNS-01 token for the wildcard certificate
+
+{
+	# One wildcard certificate via DNS-01. Per-hostname certificates would hit Let's
+	# Encrypt's weekly limits as soon as a few hundred workspaces had existed.
+	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+}
+
+*.{$WORKSPACE_DOMAIN} {
+	# The student's own app. Not framed-restricted: it is theirs, and previews
+	# are embedded in a sandboxed iframe by the dashboard.
+	@preview header_regexp pv Host ^p(\d{4,5})--(ws-[a-z0-9]{24})\.
+	handle @preview {
+		reverse_proxy {re.pv.2}:{re.pv.1}
+	}
+
+	# The editor. Only the dashboard may put it in a frame (clickjacking defence); 'self' is needed because VS Code itself frames its own pages (webviews, the extension host).
+	@ide header_regexp ide Host ^(ws-[a-z0-9]{24})\.
+	handle @ide {
+		header Content-Security-Policy "frame-ancestors 'self' {$APP_ORIGINS}"
+		reverse_proxy {re.ide.1}:13370
+	}
+
+	handle {
+		respond "Not found" 404
+	}
+
+	# Friendly pages instead of a blank frame when nothing is answering.
+	handle_errors {
+		@previewDown header_regexp pv Host ^p(\d{4,5})--ws-
+		handle @previewDown {
+			header Content-Type "text/html; charset=utf-8"
+			respond <<HTML
+				<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nothing is listening yet</title>
+				<style>body{font:15px/1.6 system-ui,sans-serif;background:#0f1117;color:#e6e8ee;margin:0;display:grid;place-items:center;min-height:100vh}main{max-width:34rem;padding:2rem}h1{font-size:1.15rem;margin:0 0 .6rem}code{background:#1c2030;padding:.1rem .35rem;border-radius:4px}p{margin:.5rem 0;color:#aeb4c4}</style></head>
+				<body><main><h1>Nothing is listening on port {re.pv.1} yet</h1><p>Start your app in the VS Code terminal, and make it listen on <code>0.0.0.0</code> rather than <code>localhost</code>.</p><p>For example: <code>npm run dev -- --host</code>, <code>php artisan serve --host=0.0.0.0 --port=8000</code> or <code>python manage.py runserver 0.0.0.0:8000</code>.</p><p>Then reload this preview.</p></main></body></html>
+				HTML 502
+		}
+		@ideDown header_regexp ide Host ^ws-
+		handle @ideDown {
+			header Content-Type "text/html; charset=utf-8"
+			respond <<HTML
+				<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workspace not running</title>
+				<style>body{font:15px/1.6 system-ui,sans-serif;background:#0f1117;color:#e6e8ee;margin:0;display:grid;place-items:center;min-height:100vh}main{max-width:34rem;padding:2rem}h1{font-size:1.15rem;margin:0 0 .6rem}code{background:#1c2030;padding:.1rem .35rem;border-radius:4px}p{margin:.5rem 0;color:#aeb4c4}</style></head>
+				<body><main><h1>This workspace is not running</h1><p>Open it again from your Project Lab page — your files are safe.</p></main></body></html>
+				HTML 502
+		}
+	}
+}

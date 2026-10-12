@@ -1,0 +1,695 @@
+/*
+ * Hack Arena — hackathon detail page.
+ *
+ * Everything here composes the shared Arena 2.0 tokens in arena.css (--ar-a/--ar-b accent pair,
+ * .ar-raised / .ar-float surfaces, .ar-ticket, .ar-metal-N, …); it only adds the handful of
+ * shapes that belong to this one screen. All classes are `dt-` prefixed and live under
+ * `.arena-root`, so nothing leaks.
+ *
+ * Layout vars (set by HackathonDetailView):
+ *   --dt-top    height of the sticky top bar above the page (measured, so it follows the shell)
+ *   --dt-mini   height of the sticky mini-bar (title + CTA) that appears once the hero is gone
+ */
+
+.arena-root {
+  --dt-top: 60px;
+  --dt-mini: 54px;
+  --dt-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dt-gold: #fbbf24;
+}
+
+/* ── Hover lift shared by cards ──────────────────────────────────────────── */
+
+.arena-root .dt-lift {
+  transition: transform 0.35s var(--dt-ease), border-color 0.25s, box-shadow 0.35s, background-color 0.25s;
+}
+
+.arena-root .dt-lift:hover,
+.arena-root .dt-lift:focus-within {
+  transform: translateY(-3px);
+  border-color: rgb(var(--ar-a) / 0.45);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 28px 54px -28px rgb(var(--ar-a) / 0.55);
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-hero {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 44px 90px -50px rgb(var(--ar-a) / 0.7), 0 22px 40px -28px rgba(0, 0, 0, 0.9);
+}
+
+.arena-root .dt-cover {
+  animation: dt-settle 1.8s var(--dt-ease) both;
+  will-change: transform;
+}
+
+@keyframes dt-settle {
+  from { transform: scale(1.09); }
+  to { transform: scale(1); }
+}
+
+.arena-root .dt-scrim {
+  background:
+    linear-gradient(to top, rgba(6, 7, 13, 0.97) 4%, rgba(6, 7, 13, 0.72) 38%, rgba(6, 7, 13, 0.22) 100%),
+    linear-gradient(100deg, rgba(6, 7, 13, 0.7) 0%, rgba(6, 7, 13, 0) 62%),
+    radial-gradient(70% 90% at 100% 0%, rgb(var(--ar-b) / 0.16), transparent 70%);
+}
+
+.arena-root .dt-glass-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px 0 9px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ar-text-2);
+  background: rgba(8, 10, 20, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+}
+
+.arena-root .dt-glass-pill:hover { color: #fff; background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.28); }
+.arena-root .dt-glass-pill svg { transition: transform 0.25s var(--dt-ease); }
+.arena-root .dt-glass-pill:hover svg { transform: translateX(-3px); }
+
+/* The four facts under the title. */
+.arena-root .dt-fact {
+  position: relative;
+  min-width: 0;
+  padding: 10px 13px 11px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.095), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(16px) saturate(1.3);
+  backdrop-filter: blur(16px) saturate(1.3);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset, 0 16px 32px -20px rgba(0, 0, 0, 0.9);
+  transition: transform 0.3s var(--dt-ease), border-color 0.25s, background 0.25s;
+}
+
+.arena-root .dt-fact:hover {
+  transform: translateY(-2px);
+  border-color: rgb(var(--ar-a) / 0.55);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+}
+
+.arena-root .dt-fact-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ar-text-3);
+}
+
+.arena-root .dt-fact-value {
+  margin-top: 7px;
+  font-size: clamp(18px, 1.9vw, 22px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.arena-root .dt-fact-sub {
+  margin-top: 5px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--ar-text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Gold text for the prize — metallic, used only where money is the point. */
+.arena-root .dt-gold-text {
+  background: linear-gradient(180deg, #fff3c4 0%, #fbbf24 52%, #f59e0b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Sticky mini-bar & tab bar ───────────────────────────────────────────── */
+
+.arena-root .dt-minibar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--dt-top);
+  z-index: 30;
+  height: var(--dt-mini);
+  border-width: 0 0 1px;
+  border-radius: 0;
+}
+
+.arena-root .dt-minibar::after {
+  /* A hairline of the event's accent along the bottom edge. */
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(var(--ar-a) / 0.7), rgb(var(--ar-b) / 0.7), transparent);
+}
+
+.arena-root .dt-tabbar {
+  position: sticky;
+  top: calc(var(--dt-top) + var(--dt-mini));
+  z-index: 20;
+  margin-bottom: 24px;
+  transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.arena-root .dt-tabbar[data-stuck="true"] {
+  background: rgba(8, 10, 20, 0.82);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+  box-shadow: 0 18px 30px -24px rgba(0, 0, 0, 0.9);
+}
+
+.arena-root .dt-tabbar [role="tablist"] { border-bottom-color: rgba(255, 255, 255, 0.1); }
+
+/* When the tabs scroll sideways, fade whichever edge has more behind it (data-fade is set from scroll position). */
+.arena-root .dt-tabbar[data-fade="right"] [role="tablist"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent);
+}
+
+.arena-root .dt-tabbar[data-fade="left"] [role="tablist"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px);
+  mask-image: linear-gradient(90deg, transparent, #000 36px);
+}
+
+.arena-root .dt-tabbar[data-fade="both"] [role="tablist"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent);
+}
+
+
+.arena-root .dt-aside {
+  top: calc(var(--dt-top) + var(--dt-mini) + 16px);
+}
+
+/* ── Ticket (action card) ────────────────────────────────────────────────── */
+
+.arena-root .dt-ticket-wrap {
+  filter: drop-shadow(0 26px 30px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 26px rgb(var(--ar-a) / 0.16));
+}
+
+.arena-root .dt-ticket {
+  --notch: 11px;
+  overflow: hidden;
+  border-radius: 24px;
+  background: #0a0c18;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.arena-root .dt-ticket-top {
+  position: relative;
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgb(var(--ar-a) / 0.34), transparent 62%),
+    radial-gradient(90% 80% at 100% 0%, rgb(var(--ar-b) / 0.2), transparent 66%),
+    linear-gradient(180deg, #151a36, #0e1226);
+}
+
+.arena-root .dt-ticket-top::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 40%);
+}
+
+.arena-root .dt-ticket .ar-perforation {
+  margin: 0 22px;
+  border-top-color: rgba(255, 255, 255, 0.2);
+}
+
+.arena-root .dt-ticket-stub {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)), #0a0c18;
+}
+
+/* The primary call to action: gradient fill, a sheen that sweeps across on hover. */
+.arena-root .dt-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.arena-root .dt-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: translateX(-120%) skewX(-18deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+  transition: transform 0.7s var(--dt-ease);
+}
+
+.arena-root .dt-cta:hover::after { transform: translateX(120%) skewX(-18deg); }
+.arena-root .dt-cta .dt-cta-arrow { transition: transform 0.25s var(--dt-ease); }
+.arena-root .dt-cta:hover .dt-cta-arrow { transform: translateX(3px); }
+
+.arena-root .dt-util {
+  display: inline-flex;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ar-text-2);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.18s;
+}
+
+.arena-root .dt-util:hover { color: #fff; background: rgba(255, 255, 255, 0.09); border-color: rgba(255, 255, 255, 0.24); }
+.arena-root .dt-util:active { transform: scale(0.97); }
+.arena-root .dt-util[data-done="true"] { color: #b6f5dc; border-color: rgb(var(--ar-open) / 0.5); background: rgb(var(--ar-open) / 0.12); }
+
+/* ── Prizes ──────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-prize-hero {
+  background:
+    radial-gradient(70% 120% at 100% 0%, rgba(251, 191, 36, 0.2), transparent 62%),
+    radial-gradient(60% 100% at 0% 100%, rgb(var(--ar-a) / 0.2), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+}
+
+.arena-root .dt-tile {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.022));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 24px 48px -30px rgba(0, 0, 0, 0.85);
+}
+
+.arena-root .dt-tile::before {
+  /* The metal edge across the top. */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--tile-metal, rgba(255, 255, 255, 0.2));
+  clip-path: inset(0 round 22px 22px 0 0);
+}
+
+.arena-root .dt-tile::after {
+  /* Warm glow rising from the edge. */
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 120px;
+  pointer-events: none;
+  background: linear-gradient(180deg, var(--tile-glow, transparent), transparent);
+  clip-path: inset(0 round 22px 22px 0 0);
+}
+
+.arena-root .dt-tile[data-place="1"] { --tile-metal: linear-gradient(90deg, #fff1b8, #fbbf24, #d97706); --tile-glow: rgba(251, 191, 36, 0.16); border-color: rgba(251, 191, 36, 0.32); }
+.arena-root .dt-tile[data-place="2"] { --tile-metal: linear-gradient(90deg, #f8fafc, #cbd5e1, #94a3b8); --tile-glow: rgba(203, 213, 225, 0.1); }
+.arena-root .dt-tile[data-place="3"] { --tile-metal: linear-gradient(90deg, #fed7aa, #fb923c, #c2410c); --tile-glow: rgba(251, 146, 60, 0.11); }
+
+.arena-root .dt-medallion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  color: #1c1204;
+  font-weight: 800;
+  font-size: 18px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 -3px 6px rgba(0, 0, 0, 0.25) inset, 0 10px 20px -8px rgba(0, 0, 0, 0.7);
+}
+
+.arena-root .dt-medallion.ar-metal-1 { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 -3px 6px rgba(120, 53, 15, 0.45) inset, 0 10px 26px -6px rgba(251, 191, 36, 0.65); }
+
+.arena-root .dt-metal-text-1 { background: linear-gradient(180deg, #fff3c4, #fbbf24 55%, #f59e0b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.arena-root .dt-metal-text-2 { background: linear-gradient(180deg, #ffffff, #cbd5e1 55%, #94a3b8); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.arena-root .dt-metal-text-3 { background: linear-gradient(180deg, #ffe4cc, #fb923c 55%, #ea580c); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.arena-root .dt-tick {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  border-radius: 9999px;
+  color: rgb(var(--ar-b));
+  background: rgb(var(--ar-b) / 0.14);
+  box-shadow: 0 0 0 1px rgb(var(--ar-b) / 0.3) inset;
+}
+
+/* Criteria bars: the fill is a full-width element scaled from the left (transform only). */
+.arena-root .dt-bar { position: relative; height: 8px; overflow: hidden; border-radius: 9999px; background: rgba(255, 255, 255, 0.08); }
+.arena-root .dt-bar > span { position: absolute; inset: 0; transform-origin: left center; border-radius: inherit; background: var(--tone, linear-gradient(90deg, rgb(var(--ar-a)), rgb(var(--ar-b)))); box-shadow: 0 0 14px color-mix(in srgb, var(--tone, rgb(var(--ar-a))) 55%, transparent); }
+.arena-root .dt-bar[data-thin="true"] { height: 4px; }
+.arena-root .dt-bar[data-metal="1"] > span { background: linear-gradient(90deg, #d97706, #fbbf24, #fff1b8); box-shadow: 0 0 14px rgba(251, 191, 36, 0.5); }
+.arena-root .dt-bar[data-metal="2"] > span { background: linear-gradient(90deg, #94a3b8, #cbd5e1, #f8fafc); box-shadow: 0 0 12px rgba(203, 213, 225, 0.35); }
+.arena-root .dt-bar[data-metal="3"] > span { background: linear-gradient(90deg, #c2410c, #fb923c, #fed7aa); box-shadow: 0 0 12px rgba(251, 146, 60, 0.4); }
+
+/* ── Schedule ────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-tl { --dtw: 0px; --dtg: 0px; }
+
+@media (min-width: 640px) {
+  .arena-root .dt-tl { --dtw: 88px; --dtg: 16px; }
+}
+
+.arena-root .dt-tl-line {
+  position: absolute;
+  left: calc(var(--dtw) + var(--dtg) + 15px);
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.arena-root .dt-tl-fill {
+  position: absolute;
+  left: calc(var(--dtw) + var(--dtg) + 15px);
+  width: 2px;
+  border-radius: 2px;
+  transform-origin: top center;
+  background: linear-gradient(180deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  box-shadow: 0 0 12px rgb(var(--ar-a) / 0.7);
+}
+
+.arena-root .dt-node {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 5px #0b0d19;
+}
+
+.arena-root .dt-node[data-state="done"] { color: #fff; background: linear-gradient(135deg, rgb(var(--ar-a)), rgb(var(--ar-b))); }
+.arena-root .dt-node[data-state="next"] { color: rgb(var(--ar-b)); background: #10142b; border: 2px solid rgb(var(--ar-b)); }
+.arena-root .dt-node[data-state="upcoming"] { color: rgba(255, 255, 255, 0.35); background: #10142b; border: 2px solid rgba(255, 255, 255, 0.16); }
+
+.arena-root .dt-node[data-state="next"]::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid rgb(var(--ar-b));
+  animation: dt-pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes dt-pulse {
+  0% { transform: scale(1); opacity: 0.8; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+
+.arena-root .dt-event[data-state="next"] {
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgb(var(--ar-a) / 0.16), rgb(var(--ar-b) / 0.07));
+  border: 1px solid rgb(var(--ar-a) / 0.4);
+  box-shadow: 0 18px 36px -26px rgb(var(--ar-a) / 0.7);
+}
+
+/* ── FAQ accordion ───────────────────────────────────────────────────────── */
+
+.arena-root .dt-acc-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition: grid-template-rows 0.38s var(--dt-ease), visibility 0s linear 0.38s;
+}
+
+.arena-root .dt-acc[data-open="true"] .dt-acc-body {
+  grid-template-rows: 1fr;
+  visibility: visible;
+  transition: grid-template-rows 0.38s var(--dt-ease), visibility 0s;
+}
+
+.arena-root .dt-acc-body > div { min-height: 0; overflow: hidden; }
+
+.arena-root .dt-acc[data-open="true"] {
+  border-color: rgb(var(--ar-a) / 0.4);
+  background: linear-gradient(135deg, rgb(var(--ar-a) / 0.1), rgba(255, 255, 255, 0.025));
+}
+
+.arena-root .dt-acc-chevron { transition: transform 0.3s var(--dt-ease), background 0.2s, color 0.2s; }
+.arena-root .dt-acc[data-open="true"] .dt-acc-chevron { transform: rotate(180deg); color: #fff; background: rgb(var(--ar-a) / 0.4); }
+
+/* ── Prose (host-written Markdown) — calmer than the shared default ──────── */
+
+.arena-root .dt-prose .ar-prose { font-size: 15px; line-height: 1.78; }
+.arena-root .dt-prose .ar-prose h1,
+.arena-root .dt-prose .ar-prose h2,
+.arena-root .dt-prose .ar-prose h3 { font-weight: 700; letter-spacing: -0.018em; }
+.arena-root .dt-prose .ar-prose h1 { font-size: 22px; }
+.arena-root .dt-prose .ar-prose h2 { font-size: 19px; margin: 1.9em 0 0.5em; padding-top: 1.3em; border-top: 1px solid var(--ar-border); }
+.arena-root .dt-prose .ar-prose > h2:first-child,
+.arena-root .dt-prose .ar-prose > h1:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.arena-root .dt-prose .ar-prose h3 { font-size: 16px; color: var(--ar-text); }
+.arena-root .dt-prose .ar-prose > h2:first-child + p,
+.arena-root .dt-prose .ar-prose > h1:first-child + p { font-size: 16.5px; line-height: 1.7; color: var(--ar-text); }
+.arena-root .dt-prose .ar-prose strong { font-weight: 650; }
+.arena-root .dt-prose .ar-prose ul > li { margin: 0.6em 0; }
+.arena-root .dt-prose .ar-prose blockquote { border-radius: 0 12px 12px 0; padding: 10px 16px; background: rgb(var(--ar-a) / 0.08); }
+
+/* ── Podium ──────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 28px;
+  background:
+    radial-gradient(55% 70% at 50% 0%, rgba(251, 191, 36, 0.2), transparent 70%),
+    radial-gradient(40% 50% at 12% 100%, rgb(var(--ar-a) / 0.16), transparent 70%),
+    radial-gradient(40% 50% at 88% 100%, rgb(var(--ar-b) / 0.14), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 40px 70px -40px rgba(0, 0, 0, 0.9);
+}
+
+.arena-root .dt-stage::before {
+  /* A soft spotlight cone falling on the winner. */
+  content: "";
+  position: absolute;
+  top: -10%;
+  left: 50%;
+  z-index: -1;
+  width: 62%;
+  height: 120%;
+  transform: translateX(-50%);
+  background: conic-gradient(from 180deg at 50% 0%, transparent 156deg, rgba(251, 191, 36, 0.11) 172deg, rgba(255, 244, 200, 0.16) 180deg, rgba(251, 191, 36, 0.11) 188deg, transparent 204deg);
+  pointer-events: none;
+}
+
+.arena-root .dt-step {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+  overflow: hidden;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.06) 70%, rgba(255, 255, 255, 0.03));
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-bottom: 0;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset;
+}
+
+.arena-root .dt-step::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: var(--tile-metal);
+}
+
+.arena-root .dt-step[data-place="1"] { --tile-metal: linear-gradient(90deg, #fff1b8, #fbbf24, #d97706); background: linear-gradient(180deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.06) 75%, rgba(251, 191, 36, 0.02)); border-color: rgba(251, 191, 36, 0.35); }
+.arena-root .dt-step[data-place="2"] { --tile-metal: linear-gradient(90deg, #f8fafc, #cbd5e1, #94a3b8); }
+.arena-root .dt-step[data-place="3"] { --tile-metal: linear-gradient(90deg, #fed7aa, #fb923c, #c2410c); }
+
+.arena-root .dt-step-num {
+  font-size: 54px;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.arena-root .dt-floor {
+  height: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.1), transparent);
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.arena-root .dt-mine {
+  background: linear-gradient(90deg, rgb(var(--ar-a) / 0.2), rgb(var(--ar-b) / 0.06));
+  border-color: rgb(var(--ar-a) / 0.55);
+}
+
+/* ── Gallery / project card ──────────────────────────────────────────────── */
+
+.arena-root .dt-proj-band {
+  height: 64px;
+  margin: -1px -1px 0;
+  background:
+    radial-gradient(90% 140% at 0% 0%, rgb(var(--ar-a) / 0.38), transparent 70%),
+    radial-gradient(80% 140% at 100% 0%, rgb(var(--ar-b) / 0.28), transparent 70%),
+    rgba(255, 255, 255, 0.03);
+}
+
+.arena-root .dt-iconbtn {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  color: var(--ar-text-2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  transition: color 0.2s, background 0.2s, border-color 0.2s, transform 0.2s var(--dt-ease);
+}
+
+.arena-root .dt-iconbtn:hover { color: #fff; background: rgb(var(--ar-a) / 0.3); border-color: rgb(var(--ar-a) / 0.7); transform: translateY(-2px); }
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-savebar {
+  position: sticky;
+  bottom: calc(var(--ar-bottom-nav, 0px) + 12px);
+  z-index: 15;
+}
+
+.arena-root .dt-group + .dt-group { margin-top: 32px; padding-top: 28px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+
+.arena-root .dt-step-badge {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, rgb(var(--ar-a) / 0.75), rgb(var(--ar-b) / 0.55));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset;
+}
+
+.arena-root .dt-code {
+  background:
+    linear-gradient(#0d1124, #0d1124) padding-box,
+    linear-gradient(135deg, rgb(var(--ar-a) / 0.7), rgba(255, 255, 255, 0.08) 45%, rgb(var(--ar-b) / 0.6)) border-box;
+  border: 1px solid transparent;
+}
+
+.arena-root .dt-slot-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.24);
+  color: var(--ar-text-3);
+}
+
+/* ── Dialogs ─────────────────────────────────────────────────────────────── */
+
+.arena-root .dt-dialog {
+  background:
+    radial-gradient(90% 60% at 0% 0%, rgb(var(--ar-a) / 0.22), transparent 62%),
+    radial-gradient(70% 60% at 100% 0%, rgb(var(--ar-b) / 0.12), transparent 66%),
+    linear-gradient(180deg, #121630, #0c0f21 40%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 50px 100px -30px rgba(0, 0, 0, 0.95), 0 0 80px -30px rgb(var(--ar-a) / 0.5);
+}
+
+.arena-root .dt-option {
+  position: relative;
+  display: flex;
+  cursor: pointer;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+  transition: border-color 0.2s, background 0.2s, transform 0.2s var(--dt-ease), box-shadow 0.25s;
+}
+
+.arena-root .dt-option:hover { border-color: rgba(255, 255, 255, 0.28); background: rgba(255, 255, 255, 0.06); transform: translateY(-1px); }
+
+.arena-root .dt-option[data-selected="true"] {
+  border-color: rgb(var(--ar-a) / 0.9);
+  background: linear-gradient(135deg, rgb(var(--ar-a) / 0.22), rgb(var(--ar-b) / 0.08));
+  box-shadow: 0 0 0 1px rgb(var(--ar-a) / 0.35), 0 16px 32px -20px rgb(var(--ar-a) / 0.8);
+}
+
+.arena-root .dt-option:has(input:focus-visible) { outline: 2px solid rgb(var(--ar-b)); outline-offset: 2px; }
+
+.arena-root .dt-radio {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  margin-top: 2px;
+  border-radius: 9999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  color: transparent;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.25s var(--dt-ease);
+}
+
+.arena-root .dt-option[data-selected="true"] .dt-radio {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, rgb(var(--ar-a)), rgb(var(--ar-b)));
+  transform: scale(1.08);
+}
+
+/* Floating, in-place nudges. */
+@keyframes dt-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.arena-root .dt-floaty { animation: dt-float 5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arena-root .dt-cover,
+  .arena-root .dt-floaty,
+  .arena-root .dt-node[data-state="next"]::before { animation: none; }
+
+  .arena-root .dt-lift,
+  .arena-root .dt-fact,
+  .arena-root .dt-option,
+  .arena-root .dt-iconbtn,
+  .arena-root .dt-cta::after,
+  .arena-root .dt-acc-body { transition: none; }
+
+  .arena-root .dt-lift:hover,
+  .arena-root .dt-lift:focus-within,
+  .arena-root .dt-fact:hover,
+  .arena-root .dt-option:hover,
+  .arena-root .dt-iconbtn:hover { transform: none; }
+}

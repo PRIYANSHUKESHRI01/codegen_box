@@ -37,6 +37,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useMyStats } from "@/lib/useMyStats";
 import { api, ApiError } from "@/lib/api";
 import { RatingHistoryPoint } from "@/types/studentStats";
+import { languageLabel } from "@/lib/judgeLanguages";
 import type { SubmissionHistoryRow, StudentReportInterview } from "@/types/studentReport";
 import type { SoftSkillHistoryEntry } from "@/types/softSkill";
 
@@ -341,7 +342,7 @@ export default function PerformanceReportPage() {
                 return (
                   <div key={lang.language} className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-primary font-mono">{lang.language}</span>
+                      <span className="font-semibold text-primary font-mono">{languageLabel(lang.language)}</span>
                       <span className="text-text-muted font-mono">
                         {lang.count} submissions · {share}%
                       </span>

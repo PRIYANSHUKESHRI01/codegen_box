@@ -1,0 +1,4 @@
+# These files run inside Linux containers / on Linux hosts. A CRLF checkout on
+# Windows would turn `#!/bin/bash` into `#!/bin/bash\r` and break them.
+* text=auto eol=lf
+*.ps1 text eol=crlf

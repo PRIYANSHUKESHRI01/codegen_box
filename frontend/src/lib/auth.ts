@@ -83,8 +83,8 @@ export function userHasPermission(user: AuthUser | null, key: string): boolean {
   return (user.permissions ?? []).includes(key);
 }
 
-const TOKEN_KEY = "codeforge_token";
-const USER_KEY = "codeforge_user";
+const TOKEN_KEY = "aptrun_token";
+const USER_KEY = "aptrun_user";
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

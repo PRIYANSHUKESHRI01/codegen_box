@@ -31,6 +31,14 @@ class PlanSeeder extends Seeder
             ['code' => 'coder', 'name' => 'Coder', 'audience' => Plan::AUDIENCE_INDIVIDUAL, 'monthly_price' => 0, 'annual_price' => 0, 'duration_days' => null, 'sort_order' => 1, 'max_practice_problems_per_day' => 1, 'max_mock_interviews_per_day' => 1, 'drive_access' => false],
             ['code' => 'expert', 'name' => 'Expert', 'audience' => Plan::AUDIENCE_INDIVIDUAL, 'monthly_price' => 399, 'annual_price' => 3999, 'duration_days' => 30, 'sort_order' => 2, 'max_practice_problems_per_day' => null, 'max_mock_interviews_per_day' => 3, 'drive_access' => true],
             ['code' => 'grandmaster', 'name' => 'Grandmaster', 'audience' => Plan::AUDIENCE_INDIVIDUAL, 'monthly_price' => 799, 'annual_price' => 7999, 'duration_days' => 30, 'sort_order' => 3, 'max_practice_problems_per_day' => null, 'max_mock_interviews_per_day' => 10, 'drive_access' => true],
+            // Project Lab: an ADD-ON (kind=addon), bought alone or next to any
+            // base plan — see PurchaseQuoteService for the bundle price (the
+            // list price below drops by config billing.addon_bundle_discount_percent
+            // for a PAID base-plan holder). 80 workspace-hours per 30-day
+            // period is about 2.6 h/day: enough for one real project a month,
+            // and the cap that keeps the self-hosted workspace fleet's cost
+            // per student bounded. Tune here; nothing else hard-codes it.
+            ['code' => Plan::CODE_PROJECT_LAB, 'name' => 'Project Lab', 'audience' => Plan::AUDIENCE_INDIVIDUAL, 'kind' => Plan::KIND_ADDON, 'monthly_price' => 499, 'annual_price' => 4999, 'duration_days' => 30, 'sort_order' => 10, 'project_lab_access' => true, 'max_workspace_hours_per_month' => 80, 'max_active_projects' => 3],
             // max_students mirrors the seat counts already advertised on the
             // pricing page (frontend/src/data/pricing.ts's institution plan
             // feature bullets) — null = unlimited, same as Academic

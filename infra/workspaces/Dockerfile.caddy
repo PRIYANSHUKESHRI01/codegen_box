@@ -1,0 +1,8 @@
+# Caddy with the Cloudflare DNS module, needed for the wildcard certificate (DNS-01).
+# If your DNS is elsewhere, swap `caddy-dns/cloudflare` for that provider's module
+# (https://github.com/caddy-dns) and the `acme_dns` line in the Caddyfile.
+FROM caddy:2-builder AS builder
+RUN xcaddy build --with github.com/caddy-dns/cloudflare
+
+FROM caddy:2
+COPY --from=builder /usr/bin/caddy /usr/bin/caddy

@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { PricingHero } from "@/components/pricing/PricingHero";
 import { PricingPlans } from "@/components/pricing/PricingPlans";
+import { ProjectLabPricing } from "@/components/pricing/ProjectLabPricing";
 import { PricingAudience } from "@/data/pricing";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
@@ -84,6 +85,9 @@ export function PricingPageClient() {
       <main className="relative flex flex-col items-center pb-16 sm:pb-24">
         <PricingHero audience={audience} onAudienceChange={setAudience} />
         <PricingPlans audience={audience} billingCycle="monthly" coverage={coverage} onSubscribed={handleSubscribed} />
+        {audience === "individual" && (
+          <ProjectLabPricing onPurchased={() => triggerToast("Project Lab is active — find it in the sidebar.")} />
+        )}
       </main>
     </div>
   );

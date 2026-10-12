@@ -81,6 +81,31 @@ export const INDIVIDUAL_PLANS: PricingPlan[] = [
   },
 ];
 
+/**
+ * Project Lab, the paid add-on sold next to (or without) a student plan. The
+ * figures below are marketing copy for signed-out visitors only — kept in sync
+ * by hand with PlanSeeder's `project-lab` row and config/billing.php's bundle
+ * discount, exactly like the plans above. A signed-in student is always shown
+ * the server's own quote instead (see PurchasePanel).
+ */
+export const PROJECT_LAB_ADDON = {
+  id: "project-lab",
+  name: "Project Lab",
+  tagline: "Build real, full-stack projects from a proper SOW — in a VS Code that lives in your browser.",
+  monthlyPrice: 499,
+  /** Price when bought next to a paid plan (Expert / Grandmaster). */
+  bundledMonthlyPrice: 349,
+  workspaceHours: 80,
+  activeProjects: 3,
+  features: [
+    "A Statement of Work for every project — read online or download as a PDF",
+    "A full VS Code in your browser: terminal, git, Node, PHP/Laravel, Python & Java",
+    "MySQL, PostgreSQL, Redis and SQLite ready to start; live preview of your app",
+    "80 workspace hours and 3 projects at a time, every month",
+    "Submit your code and get it reviewed against each milestone's acceptance criteria",
+  ],
+} as const;
+
 export const INSTITUTION_PLANS: PricingPlan[] = [
   {
     id: "standard",

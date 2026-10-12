@@ -433,6 +433,18 @@ class SuperAdminController extends Controller
             ->with('plan')
             ->get();
 
+        // Add-on rows (Project Lab) sit in the same table as plans. They are
+        // revenue, but not additional "subscribers" — one student on Expert +
+        // Project Lab is one paying student with two lines — so they are kept
+        // out of `count` and reported separately.
+        $baseSubs = $individualSubs->reject(fn (Subscription $s) => $s->plan?->isAddon());
+        $addonSubs = $individualSubs->filter(fn (Subscription $s) => $s->plan?->isAddon());
+
+        // What the student was actually charged for the line (a bundled add-on
+        // is discounted), falling back to list price for rows from before
+        // purchases recorded it.
+        $linePrice = fn (Subscription $s): int => (int) ($s->meta['price_paid'] ?? $s->plan?->monthly_price ?? 0);
+
         $institutionalPriced = $institutionalSubs->filter(fn (Subscription $s) => $s->plan?->annual_price !== null);
 
         return response()->json([
@@ -445,8 +457,10 @@ class SuperAdminController extends Controller
             // figure — not fabricated, but explicitly list-price, not
             // collected cash (no payment gateway exists yet).
             'individual_recurring' => [
-                'count' => $individualSubs->count(),
-                'monthly_total' => $individualSubs->sum(fn (Subscription $s) => $s->plan?->monthly_price ?? 0),
+                'count' => $baseSubs->count(),
+                'monthly_total' => $individualSubs->sum($linePrice),
+                'addon_count' => $addonSubs->count(),
+                'addon_monthly_total' => $addonSubs->sum($linePrice),
             ],
             // Institutional subs bill annually. Academic Enterprise has no
             // fixed annual_price on file (custom/enterprise sales) — those

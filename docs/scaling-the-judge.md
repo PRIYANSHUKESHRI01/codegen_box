@@ -100,8 +100,81 @@ trivial `Main`), on the 4-core / 8-thread test laptop:
 | C++ compiles finished per second (all jobs) | ~0.8 | 0.82 | **1.19** | 1.03 |
 | Java run, CPU per job (tuned launcher) | 0.7–1.0 s | 2.0 s | 2.5 s | 2.6 s |
 
-Python and JavaScript are ~0.1–0.15 s and barely move. Two things to take from
-this: per-job cost rises steeply once jobs outnumber physical cores, and
+Python and JavaScript are ~0.1–0.15 s and barely move. PHP (added after these
+runs, so it is not in the 1,000-student test) is in the same class: ~10–40 ms of
+run CPU per harness run, and all 1,010 catalog problems judged with PHP solutions
+took 58 s sequentially on the two laptop nodes (~57 ms each, end to end). PHP's
+`memory_limit` is raised to 448M in its bootstrap (`config/piston.php`) so it gets
+nearly the node's 512 MiB cap instead of PHP's stock 128M. C (same gcc package as
+C++) is cheaper still: median run CPU 6 ms, p95 20 ms, and the same 1,010 problems
+took 353 s sequentially.
+
+The other thirteen languages (Go, Kotlin, Rust, C#, TypeScript, Swift, Ruby, Dart,
+Scala, Elixir, Erlang, Racket and Python 2) were measured the same way on the same
+two laptop nodes, one submission at a time, with a different method: for each of 191
+catalog problems (one per distinct signature, plus the special-string and
+100,000-value cases) the generated starter code gets a body that returns the
+expected answers, and it is judged through the real `JudgeService`. Run CPU per
+problem, in ms (the compile step is billed separately):
+
+| language | median | p95 | notes |
+|---|---|---|---|
+| Rust | 5 | 12 | native |
+| C | 6 | 14 | native (p95 20 over all 1,010 problems, above) |
+| Python 2 | 18 | 70 | |
+| C# (mono) | 34 | 115 | |
+| TypeScript | 72 | 325 | `tsc` compile first, then node |
+| Ruby | 89 | 292 | |
+| Dart | 399 | 634 | VM start-up |
+| Scala | 454 | 699 | compile 6–10 CPU-s |
+| Racket | 461 | 1,101 | |
+| Go | 495 | 1,336 | `go run`: the build is billed to the run |
+| Erlang | 759 | 1,549 | |
+| Elixir | 816 | 1,557 | |
+| Swift | 852 | 1,460 | |
+| Kotlin | 79 | 204 | pre-built jar; its compile is ≈ 9 CPU-s warm, ≈ 18 cold |
+| Java | 1,509 | 2,432 | for scale: source-launcher mode, so `javac` is billed to the run |
+
+What is worth knowing before sizing a contest around them:
+
+- **The JVM compilers are the expensive ones.** `kotlinc` and `scalac` are JVM
+  programs and burned 2–3× their wall time in CPU until tuned (`infra/judge/patch-runtimes.sh`:
+  serial GC, C1 only, class-data sharing, small heap). That is why the node's compile
+  ceilings are 30 s wall / 30 s CPU (`docker-compose.yml`) and the app asks for 25 s
+  for those two (`config/piston.php`). Budget roughly one core for ~10 s per Kotlin
+  or Scala submission (almost all of it the compile), against ~1–1.5 s for Java,
+  whose `javac` runs in-process on every run. The run column above is therefore not
+  comparable across languages: Kotlin, Scala, Go and the native ones compile first
+  (billed separately, except Go's), Java does both in one step.
+- **Cold file cache counts as CPU.** Each node carries 11.4 GB of runtimes. On a
+  host with little RAM the page cache is cold, and cold reads are *kernel CPU time
+  inside Piston's limit*: a Racket hello world measured 4.5 s cold and 1.2 s warm. On
+  the 8 GB test laptop the same submission can swing 2–3× between runs, and a sweep
+  run next to a build or a test suite produced false "time limit" verdicts (always
+  re-run a failure on a quiet machine before believing it). Give a judge node enough
+  RAM to keep its runtimes cached.
+- **Large inputs go in as text.** 18 catalog problems have cases of up to 100,000
+  values. As source-code literals they hit the JVM's 64 KB-per-method limit
+  (Java, Kotlin, Scala), Swift's type checker, Dart's file-size limit, and slow
+  parses in Go/Rust/Elixir/Erlang/Racket/Python 2. Above 200 values an integer array
+  is emitted as text and parsed at run time (`LiteralEmitter::chunkedIntegers`). Erlang
+  still needs its 10 s wall ceiling for those problems.
+- **Two languages cannot catch every crash.** Swift's `fatalError`/array-bounds traps
+  and C's segfaults kill the whole process, so a crash in one test case is reported
+  for the submission as a runtime error rather than just that case.
+- **Crashing programs can fill the Windows host's C: drive on Docker Desktop.**
+  WSL2's kernel writes a core dump of every crashed sandbox process to
+  `%TEMP%\wsl-crashes` — 200–600 MB each, for anything with a big memory image — and
+  neither `ulimit` nor isolate's `--core=0` stops it, because the kernel ignores that
+  limit when `core_pattern` is a pipe (WSL2's is). A crash-heavy sweep on a laptop
+  with a small C: drive filled it to 0 bytes and wedged Docker Desktop. A plain Linux
+  host whose `core_pattern` is the kernel default (a file) honours isolate's limit and
+  writes nothing; hosts that pipe cores to `systemd-coredump` or `apport` behave like
+  WSL2 and need the same housekeeping. On Windows, clear that folder after crash-heavy
+  testing.
+
+Measure on the target hardware before sizing a contest around any of this. Two
+things to take from the Java/C++ runs above: per-job cost rises steeply once jobs outnumber physical cores, and
 **throughput stops rising at the physical-core count** (6 at once is *slower* in
 total than 4). Java is the canary — in the full 1,000-student run at 4 slots its
 CPU time averaged **4.3 s and peaked at 5.7 s against an 8 s limit**, about 6×

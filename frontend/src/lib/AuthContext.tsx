@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { AuthUser, clearSession, getStoredUser, getToken, saveSession } from "./auth";
 
 export type AuthStatus = "loading" | "ready" | "signed_out";
@@ -69,10 +69,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       saveSession(token, freshUser);
       setUser(freshUser);
       setStatus("ready");
-    } catch {
-      clearSession();
-      setUser(null);
-      setStatus("signed_out");
+    } catch (err) {
+      // Only the server rejecting the credential ends the session (401 expired/invalid, 403 blocked). A slow or
+      // briefly unreachable API — a timeout, a 5xx, a dropped connection — must not log someone out of a session
+      // that is perfectly good: they keep the cached one and the next check settles it. With nothing cached to
+      // fall back on there is no session to keep, so that case signs out as before.
+      const rejected = err instanceof ApiError && (err.status === 401 || err.status === 403);
+
+      if (rejected || !getStoredUser()) {
+        clearSession();
+        setUser(null);
+        setStatus("signed_out");
+      }
     }
   }, []);
 

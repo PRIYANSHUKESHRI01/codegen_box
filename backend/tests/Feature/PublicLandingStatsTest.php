@@ -61,7 +61,7 @@ class PublicLandingStatsTest extends TestCase
             'problems_hard' => 1,
             'topics_total' => 3, // Array, Hash Table, Graph
             'test_cases_total' => 3,
-            'languages_total' => 4, // config/piston.php: cpp, java, python, javascript
+            'languages_total' => 19, // every key of config/piston.php 'languages' (Python 2 counts separately from Python 3)
         ]);
     }
 

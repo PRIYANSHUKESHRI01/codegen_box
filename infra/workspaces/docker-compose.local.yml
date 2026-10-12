@@ -1,0 +1,25 @@
+# Local development gateway (plain http on :8081). See Caddyfile.local.
+#
+#   docker network create aptrun-workspaces      # once (build-image.ps1 / .sh does it)
+#   docker compose -f docker-compose.local.yml up -d
+#
+# then point the backend at it:  WORKSPACE_DOMAIN=localhost:8081  WORKSPACE_SCHEME=http
+name: aptrun-gateway-local
+
+services:
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      APP_ORIGINS: ${APP_ORIGINS:-http://localhost:3000 http://127.0.0.1:3000}
+    volumes:
+      - ./Caddyfile.local:/etc/caddy/Caddyfile:ro
+    networks:
+      - workspaces
+
+networks:
+  workspaces:
+    name: aptrun-workspaces
+    external: true

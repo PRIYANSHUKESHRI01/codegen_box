@@ -17,6 +17,7 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Services\SectionCoordinatorService;
 use App\Services\SubscriptionService;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -133,6 +134,12 @@ class AdminController extends Controller
             // accidental unbounded "demo" (e.g. a typo'd day count).
             'is_demo' => ['nullable', 'boolean'],
             'demo_days' => [Rule::requiredIf($request->boolean('is_demo')), 'nullable', 'integer', 'min:1', 'max:90'],
+        ], [
+            // The default "The tpo email has already been taken." never said what to do.
+            // Emails are unique across EVERY role, so a student/staff account (or a
+            // previous test onboarding) using this address blocks it too.
+            'tpo_email.unique' => 'That email already belongs to an existing AptRun account (a student, staff member or another TPO). Use a different email for this TPO.',
+            'short_code.unique' => 'That short code is already used by another college. Pick a different one, or leave it blank to generate one.',
         ]);
 
         $trialDays = $request->boolean('is_demo') ? (int) $validated['demo_days'] : null;
@@ -191,12 +198,17 @@ class AdminController extends Controller
             ]
         );
 
-        SendAccountCredentialsEmail::dispatch($tpo->id, $temporaryPassword);
+        // Sent right here, not queued: the college has to get its login even
+        // on a server with no queue worker running. The response says whether
+        // it went out so the admin knows to hand the password over themselves
+        // when it didn't (it is returned below either way).
+        $emailed = SingleMail::now(new SendAccountCredentialsEmail($tpo->id, $temporaryPassword));
 
         return response()->json([
             'college' => $college,
             'tpo' => $tpo,
             'temporary_password' => $temporaryPassword,
+            'credentials_email_sent' => $emailed,
         ], 201);
     }
 
@@ -482,11 +494,12 @@ class AdminController extends Controller
 
         ActivityLog::record($request->user(), 'Created a student account', 'User', $user->name, ['email' => $user->email]);
 
-        SendAccountCredentialsEmail::dispatch($user->id, $temporaryPassword);
+        $emailed = SingleMail::now(new SendAccountCredentialsEmail($user->id, $temporaryPassword));
 
         return response()->json([
             'user' => $user->load('college:id,name'),
             'temporary_password' => $temporaryPassword,
+            'credentials_email_sent' => $emailed,
         ], 201);
     }
 

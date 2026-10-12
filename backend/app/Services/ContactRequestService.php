@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\ContactRequest;
 use App\Models\ContactRequestNote;
 use App\Models\User;
+use App\Support\SingleMail;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -37,10 +38,10 @@ class ContactRequestService
         $this->assignment->assignContactRequest($contactRequest);
 
         if ($contactRequest->assigned_marketing_id !== null) {
-            SendContactRequestNotification::dispatch($contactRequest->id);
+            SingleMail::afterResponse(new SendContactRequestNotification($contactRequest->id));
         }
 
-        SendContactRequestConfirmation::dispatch($contactRequest->id);
+        SingleMail::afterResponse(new SendContactRequestConfirmation($contactRequest->id));
 
         return $contactRequest;
     }

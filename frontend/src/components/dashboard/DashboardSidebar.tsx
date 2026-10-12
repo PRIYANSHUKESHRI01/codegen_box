@@ -621,8 +621,6 @@ export function DashboardSidebar({
             label: "Performance Report",
             href: "/dashboard/reports",
             icon: LineChart,
-            badge: "New",
-            badgeTone: "new",
           },
           {
             label: "Learning Centre",
@@ -651,20 +649,8 @@ export function DashboardSidebar({
             icon: Briefcase,
           },
           { label: "Contests", href: "/dashboard/contests", icon: Swords },
-          {
-            label: "AI Interviews",
-            href: "/dashboard/interviews",
-            icon: Mic,
-            badge: "New",
-            badgeTone: "new",
-          },
-          {
-            label: "Soft Skills",
-            href: "/dashboard/soft-skills",
-            icon: Brain,
-            badge: "New",
-            badgeTone: "new",
-          },
+          { label: "AI Interviews", href: "/dashboard/interviews", icon: Mic },
+          { label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain },
           {
             label: "Talent Pool",
             href: "/dashboard/talent-pool",
@@ -901,9 +887,8 @@ export function DashboardSidebar({
                 className="flex min-w-0 flex-col whitespace-nowrap"
               >
                 <span className="flex items-center gap-1.5">
-                  {/* The rail is dark in both themes, so the wordmark always uses its
-                      white + teal variant. It is sized in em from the text-* class. */}
-                  <Wordmark surface="on-dark" className="text-lg" />
+                  {/* Sized in em from the text-* class. */}
+                  <Wordmark className="text-lg" />
                   <span className="rounded bg-sidebar-accent-soft px-1.5 py-[3px] text-3xs font-extrabold uppercase leading-none tracking-[0.1em] text-sidebar-accent ring-1 ring-inset ring-[rgba(129,140,248,0.3)]">
                     Pro
                   </span>

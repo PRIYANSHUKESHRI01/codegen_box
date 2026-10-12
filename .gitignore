@@ -9,3 +9,15 @@ Thumbs.db
 # Dev server output
 *.log
 *.out
+
+# Deploy packages and crash dumps — a package zip can contain a copy of
+# backend/.env, so it must never be committable (see infra/deploy/).
+*.zip
+*.stackdump
+/dist/
+
+# Environment files hold real secrets (database / SMTP / superadmin passwords, API keys).
+# Never commit them. Only the *.example templates are tracked.
+/.env
+/.env.*
+!/.env.example

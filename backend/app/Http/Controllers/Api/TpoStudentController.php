@@ -7,6 +7,7 @@ use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\User;
 use App\Services\StudentBulkNotificationService;
 use App\Services\StudentCohortService;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -125,7 +126,7 @@ class TpoStudentController extends Controller
             'parent_phone' => $validated['parent_phone'] ?? null,
         ]);
 
-        SendAccountCredentialsEmail::dispatch($student->id, $plainPassword);
+        SingleMail::afterResponse(new SendAccountCredentialsEmail($student->id, $plainPassword));
 
         // Refresh so DB-applied column defaults (e.g. is_blocked) are
         // reflected in the response instead of the in-memory nulls Eloquent

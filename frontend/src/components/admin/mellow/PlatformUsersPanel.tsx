@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, Plus, Users2, X, Filter, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { credentialsEmailNote } from "@/lib/credentialsEmail";
 
 interface ApiUser {
   id: number;
@@ -111,7 +112,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
     if (!newName || !newEmail || !newHandle) return;
 
     try {
-      const res = await api.post<{ user: ApiUser; temporary_password: string }>("/admin/users", {
+      const res = await api.post<{ user: ApiUser; temporary_password: string; credentials_email_sent?: boolean }>("/admin/users", {
         name: newName,
         email: newEmail,
         handle: newHandle,
@@ -124,7 +125,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
       setNewEmail("");
       setNewHandle("");
       setNewCollegeId("");
-      triggerToast(`Account for "${res.user.name}" created! Temporary password: ${res.temporary_password}`);
+      triggerToast(`Account for "${res.user.name}" created! Temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.user.email)}`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to create user account.");
     }

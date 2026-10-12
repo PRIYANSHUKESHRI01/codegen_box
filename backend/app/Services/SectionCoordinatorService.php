@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Support\SingleMail;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -102,7 +103,7 @@ class SectionCoordinatorService
             ['section' => $coordinator->section]
         );
 
-        SendAccountCredentialsEmail::dispatch($coordinator->id, $plainPassword);
+        SingleMail::afterResponse(new SendAccountCredentialsEmail($coordinator->id, $plainPassword));
 
         return $coordinator->refresh();
     }

@@ -11,6 +11,7 @@ use App\Models\CompanyRecommendedProblem;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\SubscriptionService;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -77,7 +78,7 @@ class AdminCompanyController extends Controller
             ['admin_email' => $admin->email]
         );
 
-        SendAccountCredentialsEmail::dispatch($admin->id, $temporaryPassword);
+        SingleMail::afterResponse(new SendAccountCredentialsEmail($admin->id, $temporaryPassword));
 
         return response()->json(['company' => $company->fresh('admins'), 'admin' => $admin], 201);
     }
@@ -126,7 +127,7 @@ class AdminCompanyController extends Controller
                 ['admin_email' => $admin->email]
             );
 
-            SendAccountCredentialsEmail::dispatch($admin->id, $temporaryPassword);
+            SingleMail::afterResponse(new SendAccountCredentialsEmail($admin->id, $temporaryPassword));
         }
 
         return response()->json(['company' => $company->fresh('admins')]);

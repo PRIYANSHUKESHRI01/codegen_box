@@ -45,7 +45,11 @@ return [
             'port' => env('MAIL_PORT', 2525),
             'username' => env('MAIL_USERNAME'),
             'password' => env('MAIL_PASSWORD'),
-            'timeout' => null,
+            // Seconds of silence before giving up on the mail server. Single
+            // emails are now sent inside the request that triggered them
+            // (App\Support\SingleMail), so a hung SMTP host must not be able to
+            // hold a request open for PHP's 60-second socket default.
+            'timeout' => env('MAIL_TIMEOUT', 15),
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 

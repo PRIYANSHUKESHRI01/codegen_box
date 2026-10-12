@@ -197,4 +197,44 @@ class AdminCollegeSubscriptionTest extends TestCase
         $this->putJson("/api/admin/colleges/{$college->id}/seats", ['max_students' => 10])
             ->assertForbidden();
     }
+
+    public function test_onboarding_with_an_email_that_already_has_an_account_says_so_and_creates_nothing(): void
+    {
+        $this->standardPlan();
+        // Emails are unique across every role — here a student already owns the address.
+        User::factory()->create(['email' => 'taken@example.com', 'role' => User::ROLE_USER]);
+
+        Sanctum::actingAs($this->superadmin());
+        $response = $this->postJson('/api/admin/colleges', [
+            'name' => 'Tulas University',
+            'tier' => 'Standard',
+            'tpo_name' => 'Dr. Arun Kumar',
+            'tpo_email' => 'taken@example.com',
+            'is_demo' => true,
+            'demo_days' => 7,
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('tpo_email');
+        $this->assertStringContainsString('already belongs to an existing AptRun account', $response->json('errors.tpo_email.0'));
+        $this->assertDatabaseMissing('colleges', ['name' => 'Tulas University']);
+        $this->assertSame(1, User::where('email', 'taken@example.com')->count());
+    }
+
+    public function test_onboarding_with_a_short_code_another_college_uses_says_so(): void
+    {
+        $this->standardPlan();
+        College::create(['name' => 'Existing College', 'short_code' => 'TU', 'tier' => 'Standard']);
+
+        Sanctum::actingAs($this->superadmin());
+        $response = $this->postJson('/api/admin/colleges', [
+            'name' => 'Tulas University',
+            'short_code' => 'TU',
+            'tier' => 'Standard',
+            'tpo_name' => 'Dr. Arun Kumar',
+            'tpo_email' => 'fresh.tpo@example.com',
+        ]);
+
+        $response->assertStatus(422)->assertJsonValidationErrors('short_code');
+        $this->assertStringContainsString('already used by another college', $response->json('errors.short_code.0'));
+    }
 }

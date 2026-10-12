@@ -13,10 +13,14 @@ use App\Models\FeatureFlag;
 use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\CollegePurgeService;
 use App\Services\Judge\JudgeStatusService;
 use App\Services\LeadAssignmentService;
 use App\Services\StudentStatsService;
+use App\Support\SingleMail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -305,11 +309,12 @@ class SuperAdminController extends Controller
             }
         }
 
-        SendAccountCredentialsEmail::dispatch($user->id, $temporaryPassword);
+        $emailed = SingleMail::now(new SendAccountCredentialsEmail($user->id, $temporaryPassword));
 
         return response()->json([
             'user' => $user->load('college:id,name'),
             'temporary_password' => $temporaryPassword,
+            'credentials_email_sent' => $emailed,
         ], 201);
     }
 
@@ -354,6 +359,143 @@ class SuperAdminController extends Controller
         );
 
         return response()->json(['user' => $user->fresh(['college:id,name'])]);
+    }
+
+    /**
+     * Give an account a brand-new temporary password and show it to the
+     * superadmin — the only way to "see" a login, because passwords are stored
+     * as one-way hashes and a user replaces their temporary one at first login,
+     * so the current password simply does not exist anywhere to be read back.
+     *
+     * The old password stops working immediately and every session the account
+     * has open is signed out; the user must choose their own password at next
+     * login. Superadmin accounts are excluded on purpose: they never get a
+     * self-service reset (see PasswordResetService::requestOtp()), so letting
+     * one superadmin mint and read another's password would hand out a
+     * takeover of the platform's top role. The caller must re-enter their own
+     * password — a stolen session token alone must not be enough to take over
+     * every account on the platform.
+     */
+    public function resetPassword(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+            'send_email' => ['sometimes', 'boolean'],
+        ]);
+
+        $this->confirmSuperadminPassword($request, $validated['password']);
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            return response()->json([
+                'message' => 'Superadmin passwords cannot be reset or viewed here. A superadmin changes their own from Settings.',
+            ], 422);
+        }
+
+        $temporaryPassword = Str::password(16);
+
+        DB::transaction(function () use ($user, $temporaryPassword) {
+            $user->forceFill([
+                'password' => Hash::make($temporaryPassword),
+                'must_change_password' => true,
+                // The credentials-email job refuses to send twice to one account; this is a new password, so it must be allowed to.
+                'credentials_email_sent_at' => null,
+            ])->save();
+
+            // Sign the account out everywhere: the old password may be the very reason it is being reset.
+            $user->tokens()->delete();
+        });
+
+        $emailed = $request->boolean('send_email')
+            ? SingleMail::now(new SendAccountCredentialsEmail($user->id, $temporaryPassword))
+            : null;
+
+        // Never the password itself — the audit trail is readable by other staff.
+        ActivityLog::record(
+            $request->user(),
+            'Reset an account password and viewed the temporary password',
+            'User',
+            $user->name,
+            ['role' => $user->role, 'emailed_to_user' => $emailed]
+        );
+
+        return response()->json([
+            'user' => $user->fresh(['college:id,name']),
+            'temporary_password' => $temporaryPassword,
+            // null = the superadmin chose not to email it; true/false = it was attempted.
+            'credentials_email_sent' => $emailed,
+        ]);
+    }
+
+    /**
+     * What permanently deleting a university would remove — shown in the
+     * confirmation dialog before anything is touched.
+     */
+    public function collegeDeletionPreview(College $college, CollegePurgeService $purge)
+    {
+        return response()->json([
+            'college' => $college->only(['id', 'name', 'short_code']),
+            'impact' => $purge->preview($college),
+        ]);
+    }
+
+    /**
+     * Permanently delete a university, its TPO/coordinator/student accounts and
+     * everything it owns. Irreversible, so it takes THREE deliberate things: the
+     * superadmin role (this route group), their own password, and the
+     * university's exact name typed out. See CollegePurgeService for exactly
+     * what goes and what stays. All-or-nothing: on any database refusal nothing
+     * has been deleted.
+     */
+    public function destroyCollege(Request $request, College $college, CollegePurgeService $purge)
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string'],
+            'confirm_name' => ['required', 'string'],
+        ]);
+
+        $this->confirmSuperadminPassword($request, $validated['password']);
+
+        if (! hash_equals($college->name, trim($validated['confirm_name']))) {
+            throw ValidationException::withMessages([
+                'confirm_name' => ['The name you typed does not match this university. Type it exactly, including capitals.'],
+            ]);
+        }
+
+        // A large campus is a long delete (every student's data cascades). Don't let a closed tab or the
+        // default time limit stop it half-way — it is one transaction, so it would roll back, but only after wasting the work.
+        ignore_user_abort(true);
+        @set_time_limit(0);
+
+        $name = $college->name;
+
+        try {
+            $removed = $purge->purge($college);
+        } catch (QueryException $e) {
+            report($e);
+
+            return response()->json([
+                'message' => 'The university could not be deleted because some of its records are still in use elsewhere. Nothing was deleted.',
+            ], 409);
+        }
+
+        ActivityLog::record($request->user(), 'Permanently deleted a partner university', 'College', $name, $removed);
+
+        return response()->json(['deleted' => true, 'removed' => $removed]);
+    }
+
+    /**
+     * Re-check the signed-in superadmin's own password before an action that
+     * can take over accounts or destroy data. Answers 422, never 401: the
+     * frontend treats a 401 as "session expired" and would log them out for a
+     * typo.
+     */
+    private function confirmSuperadminPassword(Request $request, string $password): void
+    {
+        if (! Hash::check($password, $request->user()->password)) {
+            throw ValidationException::withMessages([
+                'password' => ['That is not your password. Enter the password you sign in with.'],
+            ]);
+        }
     }
 
     /**

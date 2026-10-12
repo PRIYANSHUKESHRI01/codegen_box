@@ -187,7 +187,9 @@ function AdminPageContent() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary"
+            // z-[100]: must sit above the panels' modal overlays (z-50) or a failed
+            // action's message is drawn underneath the dark backdrop and never seen.
+            className="fixed top-20 right-6 z-[100] px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary"
           >
             <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping" />
             <span>{toastMessage}</span>

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Users2, Search, Plus, Ban, CheckCircle2, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { credentialsEmailNote } from "@/lib/credentialsEmail";
 import { Modal } from "@/components/ui/Modal";
 import { ROLE_LABEL, ROLE_BADGE_CLASS, formatDateTime, type ApiPage, type ApiPlatformUser, type ApiCollege } from "./types";
 import { permissionCatalogForRole, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS, type Permission } from "@/types/permissions";
@@ -106,7 +107,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
     const resolvedRole = newRole === "admin_internal" ? (newStaffTeam === "marketing" ? "admin_marketing" : "admin_internal") : newRole;
 
     try {
-      const res = await api.post<{ user: ApiPlatformUser; temporary_password: string }>("/superadmin/users", {
+      const res = await api.post<{ user: ApiPlatformUser; temporary_password: string; credentials_email_sent?: boolean }>("/superadmin/users", {
         name: newName,
         email: newEmail,
         role: resolvedRole,
@@ -125,7 +126,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
       setNewRole("admin_internal");
       setNewStaffTeam("ops");
       setNewPermissions([...permissionCatalogForRole("admin_internal")]);
-      triggerToast(`Created ${ROLE_LABEL[res.user.role]} account for ${res.user.name}. Temporary password: ${res.temporary_password}`);
+      triggerToast(`Created ${ROLE_LABEL[res.user.role]} account for ${res.user.name}. Temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.user.email)}`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to create account.");
     }

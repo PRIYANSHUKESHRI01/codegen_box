@@ -10,6 +10,7 @@ use App\Models\ProctoringViolation;
 use App\Models\User;
 use App\Services\Judge\JudgeQueue;
 use App\Services\Judge\JudgeRequest;
+use App\Support\SingleMail;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -153,7 +154,7 @@ class ProctoringService
             );
         }
 
-        SendProctoringViolationReport::dispatch($session->id);
+        SingleMail::afterResponse(new SendProctoringViolationReport($session->id));
     }
 
     /** A TPO/Section Coordinator overriding a false positive — see TpoProctoringController/CoordinatorProctoringController::reinstate(). */

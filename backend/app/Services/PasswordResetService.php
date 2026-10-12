@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\SendPasswordResetOtpEmail;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
+use App\Support\SingleMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -59,7 +60,7 @@ class PasswordResetService
             'expires_at' => now()->addMinutes(self::OTP_LIFETIME_MINUTES),
         ]);
 
-        SendPasswordResetOtpEmail::dispatch($user->id, $code);
+        SingleMail::afterResponse(new SendPasswordResetOtpEmail($user->id, $code));
     }
 
     /** @return string the raw reset token to hand back to the caller — never stored in plaintext */

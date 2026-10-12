@@ -15,9 +15,12 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * One queued job per account — the fan-out unit for a bulk import of
- * (potentially) thousands of welcome emails, but also the single-account
- * unit used by every other account-creation path (self-registration aside,
- * which has no password to deliver and uses SendWelcomeEmail instead).
+ * (potentially) thousands of welcome emails. Creating a SINGLE account (an
+ * admin onboarding a TPO, a TPO adding one student…) does not queue it: those
+ * paths run handle() straight away via App\Support\SingleMail so the email
+ * goes out even where no queue worker is running; the queue is only the
+ * retry fallback when that direct send fails. (Self-registration has no
+ * password to deliver and uses SendWelcomeEmail instead.)
  * Deliberately NOT one big job that loops over every account and sends
  * serially: a single job doing that would (a) tie up one worker for the
  * entire run with no parallelism, (b) have to restart the *whole* batch

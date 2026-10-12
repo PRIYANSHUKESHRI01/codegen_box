@@ -10,6 +10,7 @@ use App\Models\DriveApplication;
 use App\Models\PlacementDrive;
 use App\Services\CandidateImportService;
 use App\Services\DrivePipelineService;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
@@ -66,9 +67,9 @@ class CompanyCandidateController extends Controller
         );
 
         if ($result['created']) {
-            SendAccountCredentialsEmail::dispatch($candidate->id, $result['plainPassword']);
+            SingleMail::afterResponse(new SendAccountCredentialsEmail($candidate->id, $result['plainPassword']));
         } else {
-            SendCandidateInviteEmail::dispatch($candidate->id, $placementDrive->company_id, $placementDrive->role_title);
+            SingleMail::afterResponse(new SendCandidateInviteEmail($candidate->id, $placementDrive->company_id, $placementDrive->role_title));
         }
 
         $application->load('user:id,name,email,roll_number,branch,parent_phone,phone');

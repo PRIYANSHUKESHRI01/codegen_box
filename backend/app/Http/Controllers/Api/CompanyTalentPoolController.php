@@ -10,6 +10,7 @@ use App\Jobs\SendTalentPoolOutreachEmail;
 use App\Models\TalentPoolCandidate;
 use App\Models\TalentPoolInquiry;
 use App\Models\TalentPoolMessage;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -150,7 +151,7 @@ class CompanyTalentPoolController extends Controller
         $inquiry = $this->firstOrCreateInquiry($candidate, $companyId, $request->user()->id);
 
         if ($inquiry->wasRecentlyCreated) {
-            SendTalentPoolInterestEmail::dispatch($candidate->user_id, $companyId, $inquiry->id);
+            SingleMail::afterResponse(new SendTalentPoolInterestEmail($candidate->user_id, $companyId, $inquiry->id));
         }
 
         return response()->json(['inquiry' => $inquiry], $inquiry->wasRecentlyCreated ? 201 : 200);
@@ -181,7 +182,7 @@ class CompanyTalentPoolController extends Controller
             'responded_at' => null,
         ]);
 
-        SendTalentPoolInterviewInviteEmail::dispatch($candidate->user_id, $companyId, $inquiry->id);
+        SingleMail::afterResponse(new SendTalentPoolInterviewInviteEmail($candidate->user_id, $companyId, $inquiry->id));
 
         return response()->json(['inquiry' => $inquiry->fresh()]);
     }
@@ -222,7 +223,7 @@ class CompanyTalentPoolController extends Controller
             'hired_at' => now(),
         ]);
 
-        SendTalentPoolHireOfferEmail::dispatch($candidate->user_id, $companyId, $inquiry->id);
+        SingleMail::afterResponse(new SendTalentPoolHireOfferEmail($candidate->user_id, $companyId, $inquiry->id));
 
         return response()->json(['inquiry' => $inquiry->fresh(), 'candidate' => $candidate->fresh()]);
     }
@@ -244,7 +245,7 @@ class CompanyTalentPoolController extends Controller
             'message' => $validated['message'],
         ]);
 
-        SendTalentPoolOutreachEmail::dispatch($candidate->user_id, $companyId, $message->id);
+        SingleMail::afterResponse(new SendTalentPoolOutreachEmail($candidate->user_id, $companyId, $message->id));
 
         return response()->json(['message_sent' => $message], 201);
     }

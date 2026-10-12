@@ -151,6 +151,15 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('phone-verify:'.$request->user()?->id);
         });
 
+        // Superadmin actions that re-ask for the caller's own password (reset-and-reveal
+        // an account's password, permanently delete a university). Per USER: a wrong
+        // password is a guess at the superadmin's password, and a stolen session token
+        // must not be able to try thousands of them. A real superadmin does these a
+        // handful of times a day.
+        RateLimiter::for('superadmin-sensitive', function (Request $request) {
+            return Limit::perMinute(10)->by('superadmin-sensitive:'.$request->user()?->id);
+        });
+
         // Project Lab. One NAMED limiter per route family, keyed per user — never
         // `throttle:N,1`: Laravel keys an unnamed numeric throttle by the user alone,
         // so differently-limited routes would all share a single counter and, say,

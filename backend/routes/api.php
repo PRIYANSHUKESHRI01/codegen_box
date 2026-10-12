@@ -458,6 +458,12 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/users/{user}/detail', [SuperAdminController::class, 'showUser']);
             Route::post('/users/{user}/toggle-block', [SuperAdminController::class, 'toggleBlock']);
             Route::post('/users/{user}/permissions', [SuperAdminController::class, 'updatePermissions']);
+            // Both re-check the caller's own password, so they share a tight per-user limiter (see AppServiceProvider).
+            Route::post('/users/{user}/reset-password', [SuperAdminController::class, 'resetPassword'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::get('/colleges/{college}/deletion-preview', [SuperAdminController::class, 'collegeDeletionPreview']);
+            Route::delete('/colleges/{college}', [SuperAdminController::class, 'destroyCollege'])
+                ->middleware('throttle:superadmin-sensitive');
             Route::get('/marketing-performance', [SuperAdminController::class, 'marketingPerformance']);
             Route::get('/audit-logs', [SuperAdminController::class, 'auditLogs']);
             Route::get('/judge-nodes', [SuperAdminController::class, 'judgeNodes']);

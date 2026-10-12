@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendTalentPoolInterviewResponseEmail;
 use App\Models\TalentPoolCandidate;
 use App\Models\TalentPoolInquiry;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -83,7 +84,7 @@ class StudentTalentPoolController extends Controller
             'responded_at' => now(),
         ]);
 
-        SendTalentPoolInterviewResponseEmail::dispatch($inquiry->id, $validated['decision']);
+        SingleMail::afterResponse(new SendTalentPoolInterviewResponseEmail($inquiry->id, $validated['decision']));
 
         return response()->json(['inquiry' => $inquiry->fresh()]);
     }

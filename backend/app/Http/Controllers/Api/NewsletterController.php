@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendNewsletterWelcomeEmail;
 use App\Models\NewsletterSubscriber;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 
 /** The public footer's newsletter signup — its own tiny surface, see the create_newsletter_subscribers_table migration's docblock for why. */
@@ -28,10 +29,10 @@ class NewsletterController extends Controller
                 'email' => $email,
                 'subscribed_at' => now(),
             ]);
-            SendNewsletterWelcomeEmail::dispatch($subscriber->id);
+            SingleMail::afterResponse(new SendNewsletterWelcomeEmail($subscriber->id));
         } elseif ($subscriber->unsubscribed_at !== null) {
             $subscriber->forceFill(['subscribed_at' => now(), 'unsubscribed_at' => null])->save();
-            SendNewsletterWelcomeEmail::dispatch($subscriber->id);
+            SingleMail::afterResponse(new SendNewsletterWelcomeEmail($subscriber->id));
         }
 
         return response()->json([

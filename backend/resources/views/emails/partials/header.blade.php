@@ -34,6 +34,6 @@
                     <tr>
                         <td style="padding:28px 32px 0 32px;">
                             {{-- Hosted from the frontend's public/brand folder. Where images are blocked (or FRONTEND_URL is not publicly reachable, e.g. local dev) the alt text renders in the brand navy. --}}
-                            <img src="{{ rtrim(config('app.frontend_url'), '/') }}/brand/aptrun-logo-email.png" alt="AptRun" width="150" height="39" style="display:block; border:0; outline:none; text-decoration:none; font-size:22px; font-weight:800; color:#06235E;">
+                            <img src="{{ rtrim(config('app.frontend_url'), '/') }}/brand/aptrun-logo-email.png" alt="AptRun" width="158" height="37" style="display:block; border:0; outline:none; text-decoration:none; font-size:22px; font-weight:800; color:#06235E;">
                         </td>
                     </tr>

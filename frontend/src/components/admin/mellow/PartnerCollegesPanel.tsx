@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Search, Plus, Building2, X, UserCog } from "lucide-react";
+import { Search, Plus, Building2, X, UserCog, Trash2 } from "lucide-react";
 import { BulkImportStudentsPanel } from "@/components/dashboard/tpo/BulkImportStudentsPanel";
 import { CollegeCoordinatorsModal } from "@/components/admin/mellow/CollegeCoordinatorsModal";
+import { DeleteCollegeModal } from "@/components/admin/superadmin/DeleteCollegeModal";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { credentialsEmailNote } from "@/lib/credentialsEmail";
 
 type CollegeTier = "Academic Enterprise" | "Pro Campus" | "Standard" | "Custom";
 
@@ -80,7 +82,17 @@ const PLAN_CODE_BY_TIER: Record<"Academic Enterprise" | "Pro Campus" | "Standard
  * dashboard already uses. Every row here comes from GET /admin/colleges;
  * nothing fabricated.
  */
-export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+interface PartnerCollegesPanelProps {
+  triggerToast: (msg: string) => void;
+  /**
+   * Show "Delete" on each university. Only the superadmin page passes this: the panel is shared with
+   * the Mellow Ops page, where staff must never be offered a permanent delete. The server enforces the
+   * same rule (the delete route is superadmin-only) — hiding the button is just not offering what would 403.
+   */
+  canDeleteColleges?: boolean;
+}
+
+export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }: PartnerCollegesPanelProps) {
   const [colleges, setColleges] = useState<College[]>([]);
   const [collegesLoading, setCollegesLoading] = useState(true);
   const [collegeSearch, setCollegeSearch] = useState("");
@@ -96,6 +108,12 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
   const [newCollegeAnnualPrice, setNewCollegeAnnualPrice] = useState("");
   const [isDemo, setIsDemo] = useState(false);
   const [demoDays, setDemoDays] = useState("14");
+  // The server's reason for refusing an onboarding (e.g. "that email already has
+  // an account"), shown INSIDE the modal. A toast can't do this job: the modal's
+  // full-screen overlay is drawn over it, so the admin never saw why nothing happened.
+  const [onboarding, setOnboarding] = useState(false);
+  const [deleteCollegeTarget, setDeleteCollegeTarget] = useState<{ id: number; name: string } | null>(null);
+  const [onboardError, setOnboardError] = useState<string | null>(null);
   const [planModalCollege, setPlanModalCollege] = useState<{ id: number; name: string; tier: CollegeTier } | null>(null);
   const [selectedPlanTier, setSelectedPlanTier] = useState<CollegeTier>("Standard");
   const [planMaxStudents, setPlanMaxStudents] = useState("");
@@ -127,8 +145,11 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
     if (newCollegeTier === "Custom" && !newCollegeMaxStudents) return;
     if (isDemo && !demoDays) return;
 
+    setOnboarding(true);
+    setOnboardError(null);
+
     try {
-      const res = await api.post<{ college: ApiCollege; tpo: { id: number; name: string; email: string }; temporary_password: string }>(
+      const res = await api.post<{ college: ApiCollege; tpo: { id: number; name: string; email: string }; temporary_password: string; credentials_email_sent?: boolean }>(
         "/admin/colleges",
         {
           name: newCollegeName,
@@ -162,12 +183,19 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
       setDemoDays("14");
       triggerToast(
         isDemo
-          ? `"${res.college.name}" onboarded as a ${demoDays}-day demo! TPO temporary password: ${res.temporary_password}`
-          : `Partner University "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}`
+          ? `"${res.college.name}" onboarded as a ${demoDays}-day demo! TPO temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.tpo.email)}`
+          : `Partner University "${res.college.name}" onboarded! TPO temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.tpo.email)}`
       );
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to onboard university.");
+      setOnboardError(err instanceof ApiError ? err.message : "Failed to onboard university. Check your connection and try again.");
+    } finally {
+      setOnboarding(false);
     }
+  };
+
+  const closeOnboardModal = () => {
+    setShowAddCollegeModal(false);
+    setOnboardError(null);
   };
 
   const handleAdjustSeats = async (e: React.FormEvent) => {
@@ -426,6 +454,15 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                       {col.tpoBlocked ? "Unblock TPO" : "Block TPO"}
                     </button>
                   )}
+                  {canDeleteColleges && (
+                    <button
+                      onClick={() => setDeleteCollegeTarget({ id: Number(col.id), name: col.name })}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-status-danger/30 bg-status-danger/10 hover:bg-status-danger/20 text-status-danger text-xs font-bold transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -441,7 +478,7 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 <Building2 className="w-5 h-5 text-accent-primary" />
                 <h3 className="font-bold text-primary text-base">Onboard Partner University & TPO</h3>
               </div>
-              <button onClick={() => setShowAddCollegeModal(false)} className="text-text-muted hover:text-primary p-1">
+              <button onClick={closeOnboardModal} className="text-text-muted hover:text-primary p-1">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -575,12 +612,22 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
                 Mellow internal portals or other universities.
               </div>
 
+              {onboardError && (
+                <div role="alert" className="p-3 rounded-control border border-status-danger/30 bg-status-danger/10 text-status-danger font-semibold">
+                  {onboardError}
+                </div>
+              )}
+
               <div className="pt-3 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddCollegeModal(false)} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
+                <button type="button" onClick={closeOnboardModal} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors shadow-subtle hover:shadow-glow">
-                  Provision TPO & Partner University
+                <button
+                  type="submit"
+                  disabled={onboarding}
+                  className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors shadow-subtle hover:shadow-glow disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {onboarding ? "Provisioning…" : "Provision TPO & Partner University"}
                 </button>
               </div>
             </form>
@@ -734,6 +781,18 @@ export function PartnerCollegesPanel({ triggerToast }: { triggerToast: (msg: str
         onClose={() => setCoordinatorsModalCollege(null)}
         triggerToast={triggerToast}
       />
+
+      {canDeleteColleges && deleteCollegeTarget && (
+        <DeleteCollegeModal
+          college={deleteCollegeTarget}
+          onClose={() => setDeleteCollegeTarget(null)}
+          onDeleted={(name) => {
+            setDeleteCollegeTarget(null);
+            loadColleges();
+            triggerToast(`"${name}" and everything that belonged to it was permanently deleted.`);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -24,6 +24,10 @@ export interface ApiPlatformUser {
   readiness_tier?: "Placement Ready" | "In Progress" | "Needs Training";
   /** Granular section access — only ever non-null for admin_internal/admin_marketing rows. See User::hasPermission on the backend. */
   permissions: string[] | null;
+  /** True while the account still has the temporary password it was issued (it must pick its own at next login). */
+  must_change_password?: boolean;
+  /** When the login-credentials email was last sent, or null if it never was (or the last attempt failed). */
+  credentials_email_sent_at?: string | null;
 }
 
 /** Laravel's default paginate() envelope — only the fields actually used. */

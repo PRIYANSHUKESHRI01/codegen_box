@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendWelcomeEmail;
 use App\Models\User;
+use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -39,7 +40,7 @@ class AuthController extends Controller
             'role' => User::ROLE_USER,
         ]);
 
-        SendWelcomeEmail::dispatch($user->id);
+        SingleMail::afterResponse(new SendWelcomeEmail($user->id));
 
         $token = $user->createToken('auth')->plainTextToken;
 

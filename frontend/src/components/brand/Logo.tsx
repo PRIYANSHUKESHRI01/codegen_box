@@ -5,30 +5,24 @@ import { cn } from "@/lib/utils";
  * AptRun brand assets (public/brand/). Every logo surface in the app reads
  * from here so the mark and wordmark can never drift between places.
  *
- *  - aptrun-mark.png              the rounded blue tile with the teal "t" and rising arrow
- *  - aptrun-wordmark-on-light.png navy + teal wordmark, for light backgrounds
- *  - aptrun-wordmark-on-dark.png  white + teal wordmark, for dark backgrounds
+ *  - aptrun-monogram.png  the blue "#" grid with the yellow roof/arrow chevron
+ *  - aptrun-wordmark.png  the blue + yellow "aptRun" wordmark
  *
- * The wordmark in the source artwork is navy, which disappears on a dark
- * page, so a recoloured white-and-teal twin ships alongside it and the
- * component swaps between them with the theme. The "PLACEMENT SANDBOX"
- * tagline that is part of the full lockup is live text next to the wordmark
- * in the UI (it would be unreadably small as an image at header size).
+ * Both are transparent PNGs cut from the master artwork in the repo root
+ * ("aptRun Monogram.png" / "aptRun Logo.png"). The blue and yellow hold their
+ * contrast on light and dark surfaces alike, so there is a single file for
+ * each and no theme swapping. The artwork is only 288px / 404px wide: if you
+ * ever need it larger than that, re-export it from the master, don't stretch it.
  */
-const MARK = { src: "/brand/aptrun-mark.png", width: 176, height: 173 };
-const WORDMARK = {
-  onLight: "/brand/aptrun-wordmark-on-light.png",
-  onDark: "/brand/aptrun-wordmark-on-dark.png",
-  width: 380,
-  height: 90,
-};
+const MARK = { src: "/brand/aptrun-monogram.png", width: 288, height: 288 };
+const WORDMARK = { src: "/brand/aptrun-wordmark.png", width: 404, height: 132 };
 
 interface LogoMarkProps {
   /** Tailwind size classes for the icon, e.g. "w-9 h-9". The artwork is contained inside that box. */
   className?: string;
 }
 
-/** The AptRun icon: a rounded blue tile carrying a teal "t" with a rising arrow. Reads on light and dark backgrounds unchanged. */
+/** The AptRun icon: the blue "#" grid with the yellow chevron. Reads on light and dark backgrounds unchanged. */
 export function LogoMark({ className }: LogoMarkProps) {
   return (
     <img
@@ -59,40 +53,21 @@ interface WordmarkProps {
    * font-size you give it (e.g. "text-lg") exactly like the old text lockup.
    */
   className?: string;
-  /**
-   * "auto" follows the page theme. "on-dark" always uses the white wordmark
-   * (the dashboard rail is dark in both themes); "on-light" always the navy one.
-   */
-  surface?: "auto" | "on-dark" | "on-light";
 }
 
-/** The "AptRun" wordmark, navy + teal on light surfaces and white + teal on dark ones. */
-export function Wordmark({ className, surface = "auto" }: WordmarkProps) {
-  const img = "block h-[1.3em] w-auto select-none";
+/** The "aptRun" wordmark. Same artwork on light and dark surfaces. */
+export function Wordmark({ className }: WordmarkProps) {
   return (
     <span role="img" aria-label="AptRun" className={cn("inline-flex items-center", className)}>
-      {surface !== "on-dark" && (
-        <img
-          src={WORDMARK.onLight}
-          width={WORDMARK.width}
-          height={WORDMARK.height}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          className={cn(img, surface === "auto" && "dark:hidden")}
-        />
-      )}
-      {surface !== "on-light" && (
-        <img
-          src={WORDMARK.onDark}
-          width={WORDMARK.width}
-          height={WORDMARK.height}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          className={cn(img, surface === "auto" && "hidden dark:block")}
-        />
-      )}
+      <img
+        src={WORDMARK.src}
+        width={WORDMARK.width}
+        height={WORDMARK.height}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="block h-[1.75em] w-auto select-none"
+      />
     </span>
   );
 }

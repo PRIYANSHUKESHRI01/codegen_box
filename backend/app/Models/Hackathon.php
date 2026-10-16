@@ -202,6 +202,19 @@ class Hackathon extends Model
     }
 
     /**
+     * The one definition of "this hackathon may raise a student's readiness
+     * score": a published hackathon the platform hosts — never one a hiring
+     * partner hosts (`host_type = company`). ReadinessScoreService reads
+     * hackathons only through this scope.
+     */
+    public function scopeCountsTowardReadiness(Builder $query): Builder
+    {
+        return $query
+            ->where('hackathons.host_type', self::HOST_PLATFORM)
+            ->where('hackathons.status', self::STATUS_PUBLISHED);
+    }
+
+    /**
      * Narrow to what `$user` may see by audience. A student sees hackathons open to everyone plus those
      * mapped to their own college (a student with no college sees only the former). Anyone else — a host
      * previewing — is not narrowed here; their access is decided by isManagedBy().

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight, BookMarked, Loader2, Wrench } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { AiQuizForm } from "@/components/vocabulary/AiQuizForm";
 import { DeckCard } from "@/components/vocabulary/DeckCard";
 import { TodayPanel } from "@/components/vocabulary/TodayPanel";
@@ -59,6 +60,8 @@ export default function VocabularySprintPage() {
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
           Learning Centre
         </Link>
+
+        <FreeTrialBanner feature="vocabulary" />
 
         {loading ? (
           <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-16 text-xs font-semibold text-text-secondary">

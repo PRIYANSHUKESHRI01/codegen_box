@@ -1,18 +1,17 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { CalendarClock, Check, FlaskConical, FolderGit2, Search, Timer } from "lucide-react";
+import { CalendarClock, FlaskConical, FolderGit2, Search, Timer } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { StatTile } from "@/components/dashboard/student/StatTile";
 import { ProjectCard } from "@/components/dashboard/projectLab/ProjectCard";
-import { PurchasePanel } from "@/components/dashboard/projectLab/PurchasePanel";
+import { UpgradePanel } from "@/components/billing/UpgradePanel";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { api } from "@/lib/api";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { errorMessage, formatHours } from "@/lib/projectLab";
 import { cn } from "@/lib/utils";
-import type { CatalogResponse, Difficulty, ProjectLabSummary } from "@/types/projectLab";
+import type { CatalogResponse, Difficulty } from "@/types/projectLab";
 
 const DIFFICULTIES: { value: "all" | Difficulty; label: string }[] = [
   { value: "all", label: "All levels" },
@@ -24,7 +23,7 @@ const DIFFICULTIES: { value: "all" | Difficulty; label: string }[] = [
 /**
  * Project Lab home: the catalog of SOW-guided projects.
  *
- * Open to every student. Without the add-on the page is a preview — the catalog
+ * Open to every student. Without Expert the page is a preview — the catalog
  * (what each project is, its stack and effort) plus the upgrade panel, because
  * the SOW, the PDF and the workspace are what Project Lab is. With it, the same
  * catalog becomes the place you pick a project to build, and the stats strip
@@ -38,7 +37,6 @@ export default function ProjectLabPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("all");
   const [difficulty, setDifficulty] = useState<"all" | Difficulty>("all");
-  const [toast, setToast] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -52,16 +50,6 @@ export default function ProjectLabPage() {
   useEffect(() => {
     if (status === "ready") load();
   }, [status, load]);
-
-  const handlePurchased = useCallback(
-    (summary: ProjectLabSummary) => {
-      setData((prev) => (prev ? { ...prev, project_lab: summary } : prev));
-      setToast("Project Lab is unlocked. Pick a project to start building.");
-      setTimeout(() => setToast(null), 5000);
-      load(); // the catalog is the same, but enrollments / free-sample flags are now relevant
-    },
-    [load]
-  );
 
   const projects = data?.topics ?? [];
   const summary = data?.project_lab;
@@ -91,21 +79,6 @@ export default function ProjectLabPage() {
       title="Project Lab"
       subtitle="Build real projects from a proper Statement of Work, in a full VS Code environment, and submit your code for review."
     >
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            role="status"
-            className="fixed right-6 top-20 z-50 flex max-w-sm items-center gap-3 rounded-panel border border-accent-primary/40 bg-surface px-4 py-3 text-xs font-semibold text-primary shadow-card"
-          >
-            <Check className="h-4 w-4 shrink-0 text-status-success" />
-            <span>{toast}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {error && (
         <div role="alert" className="rounded-panel border border-status-danger/30 bg-status-danger/10 p-4 text-sm text-status-danger">
           {error}
@@ -120,7 +93,7 @@ export default function ProjectLabPage() {
         </div>
       )}
 
-      {summary && !unlocked && <PurchasePanel summary={summary} onPurchased={handlePurchased} />}
+      {summary && !unlocked && <UpgradePanel feature="project_lab" initialPlan={summary.upgrade} />}
 
       {summary && unlocked && (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
@@ -143,7 +116,13 @@ export default function ProjectLabPage() {
             label="Project Lab access"
             value={summary.days_remaining === null ? "Active" : `${summary.days_remaining}`}
             suffix={summary.days_remaining === null ? undefined : summary.days_remaining === 1 ? "day left" : "days left"}
-            hint={summary.source === "institution" ? "Included with your college" : "Renew from Your Plan"}
+            hint={
+              summary.source === "institution"
+                ? "Included with your college"
+                : summary.source === "plan"
+                  ? `Included with your ${summary.plan?.name ?? "plan"} plan`
+                  : "From your Project Lab add-on"
+            }
             icon={CalendarClock}
             tone={summary.days_remaining !== null && summary.days_remaining <= 5 ? "warning" : "success"}
           />

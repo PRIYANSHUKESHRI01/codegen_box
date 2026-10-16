@@ -13,6 +13,7 @@ export default function AdminSoftSkillsPage() {
       title="Soft Skills"
       subtitle="Platform-wide aptitude, reasoning, English and workplace-judgment tests — the third pillar alongside Contests and AI Interviews."
       emptyMessage='No Soft Skills tests yet — click "New Soft Skills Test" to create one.'
+      libraryAdmin
     />
   );
 }

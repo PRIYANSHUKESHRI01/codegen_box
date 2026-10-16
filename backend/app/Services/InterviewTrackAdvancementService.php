@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Interview;
 use App\Models\InterviewSession;
 use App\Models\User;
+use App\Services\Vault\VaultRefreshService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -12,7 +13,7 @@ use Illuminate\Support\Facades\DB;
  * AdminInterviewController/TpoInterviewController/CompanyInterviewController's
  * finalizeSession() once a reviewer has scored every response in a
  * completed session, so every caller stays in lockstep, same "one source of
- * truth" convention TalentPoolQualificationService/ContestFinalizeService
+ * truth" convention ContestFinalizeService/VaultService
  * already establish for scoring decisions.
  *
  * Composite scoring is a category-weighted average, not a raw mean: each
@@ -93,6 +94,9 @@ class InterviewTrackAdvancementService
             }
         });
 
+        // The score just landed — the single biggest part of the student's readiness, so re-score now.
+        app(VaultRefreshService::class)->refreshQuietly([$session->user_id]);
+
         return [
             'finalized' => true,
             'composite_score_percent' => $percent,
@@ -145,6 +149,8 @@ class InterviewTrackAdvancementService
             'reviewed_at' => $reviewer ? now() : $session->reviewed_at,
             'reviewed_by' => $reviewer?->id,
         ]);
+
+        app(VaultRefreshService::class)->refreshQuietly([$session->user_id]);
 
         return ['finalized' => true, 'composite_score_percent' => $percent];
     }

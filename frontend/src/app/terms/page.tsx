@@ -46,10 +46,10 @@ const SECTIONS: LegalSection[] = [
     ],
   },
   {
-    id: "talent-pool",
-    title: "Talent pool and recruiters",
+    id: "vault",
+    title: "The Vault and recruiters",
     body: [
-      "A student's talent-pool profile becomes visible to hiring partners only after the student agrees, and the student can hide it again at any time. Hiring partners may use candidate information only for the hiring purposes it was shared for.",
+      "A student's Vault profile becomes visible to hiring partners, and is shared with employers on Mellow Vault, only after the student agrees, and the student can hide it again at any time. Being eligible for the Vault depends on the student's readiness score, which reflects their activity on AptRun; it is not a promise of a job, an interview or any other outcome. Hiring partners may use candidate information only for the hiring purposes it was shared for.",
     ],
   },
   {

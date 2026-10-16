@@ -21,7 +21,7 @@ class ContactRequestController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
-            'audience' => ['required', Rule::in([ContactRequest::AUDIENCE_INSTITUTION, ContactRequest::AUDIENCE_COMPANY])],
+            'audience' => ['required', Rule::in([ContactRequest::AUDIENCE_INSTITUTION, ContactRequest::AUDIENCE_COMPANY, ContactRequest::AUDIENCE_ACADEMY])],
             'organization_name' => ['required', 'string', 'max:255'],
             'message' => ['nullable', 'string', 'max:2000'],
         ]);

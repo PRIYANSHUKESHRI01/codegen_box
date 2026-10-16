@@ -64,7 +64,7 @@ class CollegePermanentDeletionTest extends TestCase
 
         $plan = Plan::create([
             'code' => 'standard', 'name' => 'Standard', 'audience' => Plan::AUDIENCE_INSTITUTION,
-            'monthly_price' => null, 'annual_price' => 149000, 'duration_days' => 365,
+            'list_price' => null, 'annual_price' => 149000, 'duration_days' => 365,
             'is_active' => true, 'sort_order' => 1, 'drive_access' => true, 'max_students' => 500,
         ]);
 
@@ -339,5 +339,48 @@ class CollegePermanentDeletionTest extends TestCase
 
         $this->assertDatabaseHas('colleges', ['id' => $w['college']->id]);
         $this->assertSame(0, ActivityLog::where('action', 'Permanently deleted a partner university')->count());
+    }
+
+    /** A QueryException the way MySQL builds it: the driver code in errorInfo[1] and its message text. */
+    private function mysqlRefusal(int $driverCode, string $message): QueryException
+    {
+        $pdo = new \PDOException($message);
+        $pdo->errorInfo = ['23000', $driverCode, $message];
+
+        return new QueryException('mysql', 'delete from colleges', [], $pdo);
+    }
+
+    public function test_a_foreign_key_refusal_names_the_table_that_got_in_the_way(): void
+    {
+        $w = $this->world();
+        Sanctum::actingAs($this->superadmin());
+
+        $this->mock(CollegePurgeService::class, function ($mock) {
+            $mock->shouldReceive('purge')->once()->andThrow($this->mysqlRefusal(
+                1451,
+                'SQLSTATE[23000]: Integrity constraint violation: 1451 Cannot delete or update a parent row: a foreign key constraint fails '
+                .'(`aptrun`.`hackathon_teams`, CONSTRAINT `hackathon_teams_college_id_foreign` FOREIGN KEY (`college_id`) REFERENCES `colleges` (`id`))'
+            ));
+        });
+
+        $this->deleteCollege($w['college'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'hackathon_teams') && str_contains($m, 'Nothing was deleted'));
+
+        $this->assertDatabaseHas('colleges', ['id' => $w['college']->id]);
+    }
+
+    public function test_a_busy_database_is_reported_as_try_again_not_as_records_in_use(): void
+    {
+        $w = $this->world();
+        Sanctum::actingAs($this->superadmin());
+
+        $this->mock(CollegePurgeService::class, function ($mock) {
+            $mock->shouldReceive('purge')->once()->andThrow($this->mysqlRefusal(1213, 'SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock; try restarting transaction'));
+        });
+
+        $this->deleteCollege($w['college'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', fn (string $m) => str_contains($m, 'busy') && str_contains($m, 'Nothing was deleted') && ! str_contains($m, 'still depend'));
     }
 }

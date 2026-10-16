@@ -101,6 +101,11 @@ class PasswordResetService
         // exact same "prove it's you, then pick your own password"
         // requirement as the dedicated first-login flow, so a temp-password
         // account that goes through Forgot Password instead is equally unlocked.
+        // Somebody ELSE added this account (college roster, bulk import, TPO, Mellow staff) and its owner is setting their
+        // own password for the first time: this is the moment it becomes theirs, so it gets a welcome instead of a
+        // "password changed" notice. (A superadmin never reaches here — requestOtp() refuses them — and is not created this way.)
+        $firstActivation = $user->must_change_password && $user->role !== User::ROLE_SUPERADMIN;
+
         $user->forceFill(['password' => Hash::make($newPassword), 'must_change_password' => false])->save();
 
         $otp->forceFill(['consumed_at' => now()])->save();
@@ -109,5 +114,11 @@ class PasswordResetService
         // already hold — same tokens() relation AuthController::sessions()/
         // revokeSession() already use for the equivalent manual action.
         $user->tokens()->delete();
+
+        $mail = app(LifecycleMailService::class);
+
+        if (! ($firstActivation && $mail->welcomeActivated($user))) {
+            $mail->passwordChanged($user, 'reset');
+        }
     }
 }

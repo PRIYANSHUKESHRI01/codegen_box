@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Brain, Loader2, ListChecks, Plus, Trash2, Rocket, PenLine, Ban, Timer, Target, Users, SearchX, type LucideIcon } from "lucide-react";
+import { Brain, Loader2, ListChecks, Plus, Trash2, Rocket, PenLine, Ban, Timer, Target, Users, SearchX, Library, type LucideIcon } from "lucide-react";
 import {
   HpButton,
   HpCard,
@@ -21,7 +21,7 @@ import {
 import { ScIconButton, ScMetric, ScNotice, ScReveal } from "@/components/portal/screeningKit";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { CreateSoftSkillAssessmentModal } from "./CreateSoftSkillAssessmentModal";
+import { CreateSoftSkillAssessmentModal, type SoftSkillCreatedResult } from "./CreateSoftSkillAssessmentModal";
 import { ManageSoftSkillQuestionsModal } from "./ManageSoftSkillQuestionsModal";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -40,6 +40,39 @@ interface SoftSkillAdminConsoleProps {
   emptyMessage: string;
   /** "premium" is the hiring-portal look (kit cards, stats, filters, premium modals). Default leaves Ops/TPO markup exactly as before. */
   variant?: "default" | "premium";
+  /**
+   * Mellow Ops only: split the list into "Tests" (what people scheduled) and "Question sets" (AptRun's numbered library),
+   * and let staff list a test they wrote as a set, or take an unused one out again.
+   */
+  libraryAdmin?: boolean;
+}
+
+/** "/tpo/soft-skills" → "/tpo/soft-skill-question-sets": each role's own library endpoint, which is what scopes its "already used" markers. */
+export function questionSetsPathFor(basePath: string): string {
+  return basePath.replace(/\/soft-skills$/, "/soft-skill-question-sets");
+}
+
+/** "Built from Set 7 · Set 9" — which library sets a test was assembled from. */
+function BuiltFrom({ assessment }: { assessment: AdminSoftSkillAssessment }) {
+  const sets = assessment.applied_sets ?? [];
+  if (sets.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      <span className="text-3xs font-bold uppercase tracking-wide text-text-muted">Built from</span>
+      {sets.map((s) => (
+        <span key={s.id} title={s.set_title} className="rounded-full bg-accent-primary/10 px-1.5 py-px text-3xs font-bold text-accent-primary">
+          {s.set_number !== null ? `Set ${s.set_number}` : s.set_title}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Why a test's questions can no longer change, or null while it is still open. */
+function lockReason(assessment: AdminSoftSkillAssessment): string | null {
+  if (assessment.status === "cancelled") return "This test is cancelled — questions can no longer be added to it.";
+  if (assessment.sessions_count > 0) return "Candidates have already taken this test, so its questions can no longer change.";
+  return null;
 }
 
 const PREMIUM_STATUS: Record<AdminSoftSkillAssessment["status"], { label: string; tone: HpTone; icon?: LucideIcon; dot?: boolean; pulse?: boolean }> = {
@@ -68,6 +101,7 @@ export function SoftSkillAdminConsole({
   subtitle,
   emptyMessage,
   variant = "default",
+  libraryAdmin = false,
 }: SoftSkillAdminConsoleProps) {
   const { status } = useAuthGuard(allowedRoles);
   const [assessments, setAssessments] = useState<AdminSoftSkillAssessment[]>([]);
@@ -75,6 +109,8 @@ export function SoftSkillAdminConsole({
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<AdminSoftSkillAssessment | null>(null);
+  const [kind, setKind] = useState<"tests" | "sets">("tests");
+  const setsPath = questionSetsPathFor(basePath);
   // View-only list controls for the premium presentation (client-side filtering of the loaded list).
   const [filter, setFilter] = useState<PremiumFilter>("all");
   const [query, setQuery] = useState("");
@@ -87,14 +123,14 @@ export function SoftSkillAdminConsole({
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ assessments: AdminSoftSkillAssessment[] }>(basePath);
+      const res = await api.get<{ assessments: AdminSoftSkillAssessment[] }>(libraryAdmin ? `${basePath}?kind=${kind}` : basePath);
       setAssessments(res.assessments);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to load Soft Skills tests.");
     } finally {
       setLoading(false);
     }
-  }, [basePath]);
+  }, [basePath, libraryAdmin, kind]);
 
   useEffect(() => {
     if (status === "ready") load();
@@ -122,6 +158,34 @@ export function SoftSkillAdminConsole({
       triggerToast(err instanceof ApiError ? err.message : "Failed to delete.");
     }
   };
+
+  const handleLibraryToggle = async (assessment: AdminSoftSkillAssessment, listed: boolean) => {
+    try {
+      await api.post(`${basePath}/${assessment.slug}`, { is_question_set: listed });
+      triggerToast(listed ? `"${assessment.title}" is now in the question-set library.` : `"${assessment.title}" left the question-set library.`);
+      load();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Could not change the library listing.");
+    }
+  };
+
+  const handleCreated = (result: SoftSkillCreatedResult) => {
+    setShowCreate(false);
+    load();
+    triggerToast(
+      result.published
+        ? `"${result.title}" is published with ${result.setLabel}.`
+        : result.setLabel
+        ? `Draft created with ${result.setLabel} — publish it when you're ready.`
+        : "Draft created — now attach some questions."
+    );
+  };
+
+  const modalProps = (assessment: AdminSoftSkillAssessment) => ({
+    setsPath,
+    appliedSets: assessment.applied_sets ?? [],
+    lockedReason: lockReason(assessment),
+  });
 
   if (variant === "premium") {
     const publishedCount = assessments.filter((a) => a.status === "published").length;
@@ -256,6 +320,9 @@ export function SoftSkillAdminConsole({
                             {assessment.description && (
                               <p className="mt-3.5 line-clamp-2 text-13 leading-relaxed text-text-secondary">{assessment.description}</p>
                             )}
+                            <div className="mt-3">
+                              <BuiltFrom assessment={assessment} />
+                            </div>
 
                             <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                               <ScMetric icon={ListChecks} label="Questions" value={assessment.assessment_questions_count} tone="indigo" />
@@ -306,16 +373,7 @@ export function SoftSkillAdminConsole({
         </HpStagger>
 
         {showCreate && (
-          <CreateSoftSkillAssessmentModal
-            variant="premium"
-            basePath={basePath}
-            onClose={() => setShowCreate(false)}
-            onCreated={() => {
-              setShowCreate(false);
-              load();
-              triggerToast("Draft created — now attach some questions.");
-            }}
-          />
+          <CreateSoftSkillAssessmentModal variant="premium" basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
         )}
 
         {managing && (
@@ -325,6 +383,7 @@ export function SoftSkillAdminConsole({
             bankBasePath={bankBasePath}
             assessmentSlug={managing.slug}
             assessmentTitle={managing.title}
+            {...modalProps(managing)}
             onClose={() => {
               setManaging(null);
               load();
@@ -348,6 +407,38 @@ export function SoftSkillAdminConsole({
         <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
           {toastMessage}
         </div>
+      )}
+
+      {libraryAdmin && (
+        <div role="tablist" aria-label="What to list" className="mb-4 inline-flex items-center gap-1 rounded-control border border-border-subtle bg-elevated p-1">
+          {(
+            [
+              ["tests", "Tests", Brain],
+              ["sets", "Question sets", Library],
+            ] as const
+          ).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={kind === id}
+              type="button"
+              onClick={() => setKind(id)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-[6px] px-3 py-1.5 text-xs font-semibold transition-colors",
+                kind === id ? "bg-surface text-primary shadow-subtle" : "text-text-muted hover:text-primary"
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {libraryAdmin && kind === "sets" && (
+        <p className="mb-3 text-2xs text-text-muted">
+          AptRun&apos;s numbered question sets. Students attempt them directly, and TPOs, hiring partners and Mellow can build a test from one. Published sets are the ones offered.
+        </p>
       )}
 
       {loading ? (
@@ -386,6 +477,10 @@ export function SoftSkillAdminConsole({
                   </div>
                   <div className="text-2xs text-text-muted mt-0.5">
                     {assessment.assessment_questions_count} questions · {assessment.duration_minutes} min · pass at {assessment.pass_percentage}% · {assessment.sessions_count} taken
+                    {assessment.is_question_set && ` · used in ${assessment.usages_count ?? 0} test${(assessment.usages_count ?? 0) === 1 ? "" : "s"}`}
+                  </div>
+                  <div className="mt-1">
+                    <BuiltFrom assessment={assessment} />
                   </div>
                 </div>
               </div>
@@ -398,6 +493,27 @@ export function SoftSkillAdminConsole({
                   <ListChecks className="w-3.5 h-3.5" />
                   <span>Manage Questions</span>
                 </button>
+                {libraryAdmin &&
+                  assessment.assessment_type === "general" &&
+                  (assessment.is_question_set ? (
+                    <button
+                      onClick={() => handleLibraryToggle(assessment, false)}
+                      disabled={(assessment.usages_count ?? 0) > 0}
+                      title={(assessment.usages_count ?? 0) > 0 ? "Tests were built from this set, so it can't leave the library — cancel it instead" : "Take this set out of the library"}
+                      className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      Remove from library
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleLibraryToggle(assessment, true)}
+                      disabled={assessment.assessment_questions_count === 0}
+                      title={assessment.assessment_questions_count === 0 ? "Attach questions first" : "List this test as a numbered question set that TPOs, hiring partners and students can use"}
+                      className="px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
+                    >
+                      List as question set
+                    </button>
+                  ))}
                 {assessment.status === "draft" && (
                   <button
                     onClick={() => handlePublish(assessment)}
@@ -422,15 +538,7 @@ export function SoftSkillAdminConsole({
       )}
 
       {showCreate && (
-        <CreateSoftSkillAssessmentModal
-          basePath={basePath}
-          onClose={() => setShowCreate(false)}
-          onCreated={() => {
-            setShowCreate(false);
-            load();
-            triggerToast("Draft created — now attach some questions.");
-          }}
-        />
+        <CreateSoftSkillAssessmentModal basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
 
       {managing && (
@@ -439,6 +547,7 @@ export function SoftSkillAdminConsole({
           bankBasePath={bankBasePath}
           assessmentSlug={managing.slug}
           assessmentTitle={managing.title}
+          {...modalProps(managing)}
           onClose={() => {
             setManaging(null);
             load();

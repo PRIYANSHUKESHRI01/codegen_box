@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, CheckCircle2, Play, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Play, Send } from "lucide-react";
 import { DifficultyBadge } from "@/components/problems/DifficultyBadge";
 import { Button } from "@/components/ui/Button";
 import { ProblemDetail } from "@/types/problem";
@@ -12,21 +12,31 @@ interface ProblemHeaderBarProps {
   onRun: () => void;
   onSubmit: () => void;
   running?: boolean;
+  /** The back button has been pressed and the previous screen is on its way. */
+  backPending?: boolean;
+  /** Which button was pressed while `running`, so that one shows the spinner and the other just waits. */
+  activeAction?: "run" | "submit" | null;
   /** Overrides the back button's label — this bar is shared with the contest solve page, where "Back to Practice Arena" is simply wrong. */
   backLabel?: string;
 }
 
-export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = false, backLabel = "Back to Practice Arena" }: ProblemHeaderBarProps) {
+export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = false, activeAction = null, backPending = false, backLabel = "Back to Practice Arena" }: ProblemHeaderBarProps) {
+  // Callers that only say "running" keep the old behaviour: it is the Run button that spins.
+  const runBusy = running && activeAction !== "submit";
+  const submitBusy = running && activeAction === "submit";
+
   return (
     <div className="flex items-center justify-between gap-3 px-3 sm:px-4 h-14 border-b border-border-subtle bg-surface shrink-0">
       <div className="flex items-center gap-3 min-w-0">
         <button
           onClick={onBack}
-          className="p-1.5 -ml-1 rounded-control text-text-muted hover:text-primary hover:bg-surface-hover transition-colors shrink-0"
+          disabled={backPending}
+          aria-busy={backPending}
+          className="p-1.5 -ml-1 rounded-control text-text-muted hover:text-primary hover:bg-surface-hover transition-colors shrink-0 disabled:cursor-wait"
           aria-label={backLabel}
           title={backLabel}
         >
-          <ArrowLeft className="w-4 h-4" />
+          {backPending ? <Loader2 className="w-4 h-4 animate-spin text-accent-primary" aria-hidden /> : <ArrowLeft className="w-4 h-4" />}
         </button>
 
         <div className="h-6 w-px bg-border-subtle shrink-0 hidden sm:block" />
@@ -41,7 +51,7 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
               size="sm"
             />
             {problem.solved && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-3xs font-bold text-status-success">
+              <span className="chip-pop hidden sm:inline-flex items-center gap-1 text-3xs font-bold text-status-success">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Solved
               </span>
@@ -70,9 +80,11 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
           leftIcon={<Play className="w-3.5 h-3.5" />}
           onClick={onRun}
           disabled={running}
-          isLoading={running}
+          isLoading={runBusy}
+          title="Run against the sample cases (Ctrl/Cmd + Enter)"
+          className="transition-transform active:scale-[0.97]"
         >
-          Run
+          {runBusy ? "Running…" : "Run"}
         </Button>
         <Button
           variant="primary"
@@ -80,8 +92,11 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
           leftIcon={<Send className="w-3.5 h-3.5" />}
           onClick={onSubmit}
           disabled={running}
+          isLoading={submitBusy}
+          title="Submit to the judge — every test case, including hidden ones (Ctrl/Cmd + Shift + Enter)"
+          className="transition-transform active:scale-[0.97]"
         >
-          Submit
+          {submitBusy ? "Judging…" : "Submit"}
         </Button>
       </div>
     </div>

@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
 use App\Models\SoftSkillResponse;
 use App\Models\SoftSkillSession;
+use App\Models\User;
 use App\Services\SoftSkillGradingService;
+use App\Services\SoftSkillQuestionSetService;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\Rule;
 
 /**
  * Student-facing Soft Skills: browse published+visible assessments, take
@@ -22,28 +25,140 @@ use Illuminate\Support\Collection;
  */
 class SoftSkillController extends Controller
 {
-    public function index(Request $request)
+    /**
+     * GET /soft-skills
+     *
+     * With no query string: everything visible to the student in one list — the original shape, unchanged.
+     *
+     * With ?scope= (or any of page / per_page / q / status): the library view the dashboard uses.
+     *   scope=sets      the numbered AptRun question sets (paged in SQL — the library keeps growing)
+     *   scope=assigned  the tests somebody scheduled for this student: their college's mocks, hiring partners'
+     *                   screenings, anything Mellow wrote by hand. Few, and always the ones that matter most.
+     *   q               search ("12", "set 12", a word from the title)
+     *   status          all | not_attempted | in_progress | completed   — for THIS student
+     *   page, per_page  a number (max 100) or "all" (capped)
+     * The response always carries `counts`, so the header can say "45 sets · 12 completed" whichever view is open.
+     */
+    public function index(Request $request, SoftSkillQuestionSetService $sets)
     {
-        $assessments = SoftSkillAssessment::where('status', SoftSkillAssessment::STATUS_PUBLISHED)
-            ->with('owningCompany:id,name,logo')
-            ->get()
-            ->filter(fn (SoftSkillAssessment $a) => $a->isVisibleToUser($request->user()))
-            ->values();
+        $user = $request->user();
 
-        $completedByAssessment = SoftSkillSession::where('user_id', $request->user()->id)
-            ->whereIn('soft_skill_assessment_id', $assessments->pluck('id'))
-            ->where('status', SoftSkillSession::STATUS_COMPLETED)
-            ->get()
-            ->groupBy('soft_skill_assessment_id');
+        if (! $request->hasAny(['scope', 'page', 'per_page', 'q', 'status'])) {
+            $assessments = $this->assignedAndLibrary($user);
+
+            return response()->json(['assessments' => $this->summaries($assessments, $user, $sets)]);
+        }
+
+        $filters = $request->validate([
+            'scope' => ['nullable', Rule::in(['sets', 'assigned'])],
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', Rule::in(['all', 'not_attempted', 'in_progress', 'completed'])],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'regex:/^(all|\d{1,3})$/i'],
+        ]);
+
+        $scope = $filters['scope'] ?? 'sets';
+        $status = $filters['status'] ?? 'all';
+        $search = trim((string) ($filters['q'] ?? ''));
+        [$page, $perPage, $showAll] = $sets->paging($filters['page'] ?? 1, $filters['per_page'] ?? SoftSkillQuestionSetService::DEFAULT_PER_PAGE);
+
+        $library = SoftSkillAssessment::questionSets()->where('status', SoftSkillAssessment::STATUS_PUBLISHED);
+        $assigned = $this->assigned($user);
+
+        $counts = [
+            'sets' => (clone $library)->count(),
+            'sets_completed' => (clone $library)->whereHas('sessions', $this->sessionsOf($user, [SoftSkillSession::STATUS_COMPLETED]))->count(),
+            'sets_in_progress' => (clone $library)->whereHas('sessions', $this->sessionsOf($user, [SoftSkillSession::STATUS_IN_PROGRESS]))->count(),
+            'assigned' => $assigned->count(),
+        ];
+
+        if ($scope === 'sets') {
+            $query = (clone $library);
+
+            if ($search !== '') {
+                $sets->search($query, $search);
+            }
+
+            match ($status) {
+                'completed' => $query->whereHas('sessions', $this->sessionsOf($user, [SoftSkillSession::STATUS_COMPLETED])),
+                'in_progress' => $query->whereHas('sessions', $this->sessionsOf($user, [SoftSkillSession::STATUS_IN_PROGRESS])),
+                'not_attempted' => $query->whereDoesntHave('sessions', $this->sessionsOf($user, [SoftSkillSession::STATUS_COMPLETED, SoftSkillSession::STATUS_IN_PROGRESS])),
+                default => null,
+            };
+
+            $query->orderByRaw('question_set_number is null')->orderBy('question_set_number')->orderBy('id');
+
+            $meta = $sets->meta((clone $query)->count(), $page, $perPage, $showAll);
+            $rows = $query->forPage($meta['page'], $perPage)->get();
+        } else {
+            $rows = $assigned;
+
+            if ($search !== '') {
+                $rows = $rows->filter(fn (SoftSkillAssessment $a) => mb_stripos($a->title.' '.$a->description, $search) !== false);
+            }
+
+            if ($status !== 'all') {
+                $touched = SoftSkillSession::where('user_id', $user->id)
+                    ->whereIn('soft_skill_assessment_id', $rows->pluck('id'))
+                    ->get()
+                    ->groupBy('soft_skill_assessment_id');
+
+                $rows = $rows->filter(function (SoftSkillAssessment $a) use ($touched, $status) {
+                    $mine = $touched->get($a->id, collect());
+                    $done = $mine->contains('status', SoftSkillSession::STATUS_COMPLETED);
+                    $going = $mine->contains('status', SoftSkillSession::STATUS_IN_PROGRESS);
+
+                    return match ($status) {
+                        'completed' => $done,
+                        'in_progress' => $going,
+                        default => ! $done && ! $going,
+                    };
+                });
+            }
+
+            $rows = $rows->sortByDesc('created_at')->values();
+            $meta = $sets->meta($rows->count(), $page, $perPage, $showAll);
+            $rows = $rows->forPage($meta['page'], $perPage)->values();
+        }
 
         return response()->json([
-            'assessments' => $assessments->map(
-                fn (SoftSkillAssessment $a) => $this->assessmentSummary($a, $completedByAssessment->get($a->id, collect()))
-            ),
+            'assessments' => $this->summaries($rows, $user, $sets),
+            'meta' => $meta,
+            'counts' => $counts,
         ]);
     }
 
-    public function show(Request $request, SoftSkillAssessment $softSkillAssessment)
+    /** The published tests somebody scheduled for this student (everything visible except the AptRun library sets). */
+    private function assigned(User $user): Collection
+    {
+        return SoftSkillAssessment::notQuestionSets()
+            ->where('status', SoftSkillAssessment::STATUS_PUBLISHED)
+            ->with('owningCompany:id,name,logo')
+            ->get()
+            ->filter(fn (SoftSkillAssessment $a) => $a->isVisibleToUser($user))
+            ->values();
+    }
+
+    /** Everything visible, library included — the original, unpaged list. */
+    private function assignedAndLibrary(User $user): Collection
+    {
+        return SoftSkillAssessment::where('status', SoftSkillAssessment::STATUS_PUBLISHED)
+            ->with('owningCompany:id,name,logo')
+            ->orderByRaw('question_set_number is null')
+            ->orderBy('question_set_number')
+            ->orderBy('id')
+            ->get()
+            ->filter(fn (SoftSkillAssessment $a) => $a->isVisibleToUser($user))
+            ->values();
+    }
+
+    /** @param  list<string>  $statuses  a whereHas('sessions') constraint: this student's sessions in these states */
+    private function sessionsOf(User $user, array $statuses): \Closure
+    {
+        return fn ($q) => $q->where('user_id', $user->id)->whereIn('status', $statuses);
+    }
+
+    public function show(Request $request, SoftSkillAssessment $softSkillAssessment, SoftSkillQuestionSetService $sets)
     {
         abort_unless($softSkillAssessment->isPublished() && $softSkillAssessment->isVisibleToUser($request->user()), 404);
 
@@ -58,7 +173,7 @@ class SoftSkillController extends Controller
             ->first();
 
         return response()->json([
-            'assessment' => $this->assessmentSummary($softSkillAssessment, $completedSessions),
+            'assessment' => $this->summaries(collect([$softSkillAssessment]), $request->user(), $sets)[0],
             'in_progress_session_id' => $inProgressSession?->id,
             'completed_session_ids' => $completedSessions->pluck('id'),
             // Tells the client whether to put this test behind the camera /
@@ -186,32 +301,50 @@ class SoftSkillController extends Controller
         }
     }
 
-    private function assessmentSummary(SoftSkillAssessment $assessment, Collection $completedSessions): array
+    /**
+     * The card payload for each assessment, for THIS student — built from three grouped queries however many
+     * assessments are on the page (not two queries each).
+     *
+     * @param  Collection<int, SoftSkillAssessment>  $assessments
+     * @return list<array<string, mixed>>
+     */
+    private function summaries(Collection $assessments, User $user, SoftSkillQuestionSetService $sets): array
     {
-        $compositionByCategory = $assessment->assessmentQuestions()
-            ->join('soft_skill_questions', 'soft_skill_questions.id', '=', 'soft_skill_assessment_questions.soft_skill_question_id')
-            ->selectRaw('soft_skill_questions.category as category, count(*) as cnt')
-            ->groupBy('soft_skill_questions.category')
-            ->pluck('cnt', 'category');
+        $ids = $assessments->pluck('id')->all();
+        $composition = $sets->compositionFor($ids);
+        $mine = $ids === [] ? collect() : SoftSkillSession::where('user_id', $user->id)
+            ->whereIn('soft_skill_assessment_id', $ids)
+            ->whereIn('status', [SoftSkillSession::STATUS_COMPLETED, SoftSkillSession::STATUS_IN_PROGRESS])
+            ->get()
+            ->groupBy('soft_skill_assessment_id');
 
-        return [
-            'id' => $assessment->id,
-            'slug' => $assessment->slug,
-            'title' => $assessment->title,
-            'description' => $assessment->description,
-            'assessment_type' => $assessment->assessment_type,
-            'duration_minutes' => $assessment->duration_minutes,
-            'pass_percentage' => $assessment->pass_percentage,
-            'max_attempts' => $assessment->max_attempts,
-            'question_count' => (int) $compositionByCategory->sum(),
-            'category_composition' => $compositionByCategory,
-            'company' => $assessment->relationLoaded('owningCompany') && $assessment->owningCompany
-                ? ['id' => $assessment->owningCompany->id, 'name' => $assessment->owningCompany->name, 'logo' => $assessment->owningCompany->logo]
-                : null,
-            'attempts_taken' => $completedSessions->count(),
-            'best_score_percent' => $completedSessions->max('score_percent'),
-            'can_attempt' => $assessment->max_attempts === null || $completedSessions->count() < $assessment->max_attempts,
-        ];
+        return $assessments->map(function (SoftSkillAssessment $assessment) use ($composition, $mine) {
+            $sessions = $mine->get($assessment->id, collect());
+            $completed = $sessions->where('status', SoftSkillSession::STATUS_COMPLETED);
+            $byCategory = $composition[$assessment->id] ?? [];
+
+            return [
+                'id' => $assessment->id,
+                'slug' => $assessment->slug,
+                'title' => $assessment->title,
+                'description' => $assessment->description,
+                'assessment_type' => $assessment->assessment_type,
+                'is_question_set' => (bool) $assessment->is_question_set,
+                'set_number' => $assessment->question_set_number,
+                'duration_minutes' => $assessment->duration_minutes,
+                'pass_percentage' => $assessment->pass_percentage,
+                'max_attempts' => $assessment->max_attempts,
+                'question_count' => array_sum($byCategory),
+                'category_composition' => $byCategory === [] ? (object) [] : $byCategory,
+                'company' => $assessment->relationLoaded('owningCompany') && $assessment->owningCompany
+                    ? ['id' => $assessment->owningCompany->id, 'name' => $assessment->owningCompany->name, 'logo' => $assessment->owningCompany->logo]
+                    : null,
+                'attempts_taken' => $completed->count(),
+                'best_score_percent' => $completed->max('score_percent'),
+                'in_progress' => $sessions->contains('status', SoftSkillSession::STATUS_IN_PROGRESS),
+                'can_attempt' => $assessment->max_attempts === null || $completed->count() < $assessment->max_attempts,
+            ];
+        })->values()->all();
     }
 
     private function sessionPayload(SoftSkillSession $session): array

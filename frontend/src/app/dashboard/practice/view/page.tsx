@@ -2,20 +2,28 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { useSearchParams } from "next/navigation";
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
 import { GripVertical, GripHorizontal, Code2, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ProblemHeaderBar } from "@/components/practice/ProblemHeaderBar";
 import { ProblemDescriptionPanel } from "@/components/practice/ProblemDescriptionPanel";
 import { CodeEditorPanel } from "@/components/practice/CodeEditorPanel";
-import { ConsolePanel, ConsoleTab, LastAction, RunState } from "@/components/practice/ConsolePanel";
+import { ConsolePanel, ConsoleTab } from "@/components/practice/ConsolePanel";
+import { EditorBootPlaceholder } from "@/components/practice/EditorBootPlaceholder";
 import { Button } from "@/components/ui/Button";
-import { ProblemDetail, RunResponse } from "@/types/problem";
-import { executeJudged } from "@/lib/judge";
-import { api, ApiError } from "@/lib/api";
+import { ProblemDetail } from "@/types/problem";
+import { ApiError } from "@/lib/api";
+import { invalidateProblem, loadProblem } from "@/lib/problemPrefetch";
+import { useJudgedRun } from "@/lib/useJudgedRun";
+import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { pickInitialLanguage, recallLastLanguage, rememberLastLanguage } from "@/lib/studentPreferences";
 import { cn } from "@/lib/utils";
+
+/** When a run starts and the console is squeezed small, give it room so the verdict is in view. */
+const CONSOLE_MIN_WHILE_RUNNING = 40;
+const CONSOLE_COMFORTABLE = 46;
 
 /** Per-problem, per-language local draft — genuinely client-only (no
  * submission backend exists yet), so this never claims to sync anywhere. */
@@ -32,10 +40,11 @@ export default function ProblemSolvePage() {
 }
 
 function ProblemSolvePageContent() {
-  const { status } = useAuthGuard(["user"]);
+  const { status, user } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
-  const router = useRouter();
+  // Back must never leave the student staring at the old screen if the Practice Arena's data is slow to arrive.
+  const nav = useResilientNavigation();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not_found" | "error">("loading");
@@ -45,11 +54,7 @@ function ProblemSolvePageContent() {
   const [revealedHints, setRevealedHints] = useState(0);
   const [activeExample, setActiveExample] = useState(0);
   const [consoleTab, setConsoleTab] = useState<ConsoleTab>("testcase");
-  const [lastAction, setLastAction] = useState<LastAction>(null);
-  const [runState, setRunState] = useState<RunState>("idle");
-  const [runResult, setRunResult] = useState<RunResponse | null>(null);
-  const [queueNote, setQueueNote] = useState<string | null>(null);
-  const [runError, setRunError] = useState<string | null>(null);
+  const consolePanel = usePanelRef();
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
@@ -57,12 +62,14 @@ function ProblemSolvePageContent() {
     if (status !== "ready" || !slug) return;
     let cancelled = false;
 
-    api
-      .get<{ problem: ProblemDetail }>(`/problems/${slug}`)
+    // Usually already on its way: the Solve button starts this request the moment it is hovered or touched.
+    loadProblem(slug)
       .then((res) => {
         if (cancelled) return;
         setProblem(res.problem);
-        setLanguage(Object.keys(res.problem.starter_code ?? {})[0] ?? "javascript");
+        // Open in the language they last used, else the one they told us they code in (onboarding),
+        // else whatever this problem lists first.
+        setLanguage(pickInitialLanguage(Object.keys(res.problem.starter_code ?? {}), user, recallLastLanguage(user?.id)));
         setLoadState("ready");
       })
       .catch((err) => {
@@ -83,6 +90,11 @@ function ProblemSolvePageContent() {
     setCode(saved ?? problem.starter_code[language] ?? "");
   }, [problem, language]);
 
+  const handleLanguageChange = (next: string) => {
+    setLanguage(next);
+    rememberLastLanguage(user?.id, next);
+  };
+
   const handleCodeChange = (value: string) => {
     setCode(value);
     if (!problem) return;
@@ -98,46 +110,49 @@ function ProblemSolvePageContent() {
     setSavedAt(Date.now());
   };
 
-  const executeCode = async (action: "run" | "submit") => {
-    if (!problem || runState === "running") return;
-
-    setLastAction(action);
-    setConsoleTab("result");
-    setMobileView("code");
-    setRunState("running");
-    setRunError(null);
-    setQueueNote(null);
-
-    try {
-      // Run/Submit enqueue and return a token; executeJudged polls it and hands back the same result shape as before.
-      const result = await executeJudged<RunResponse>(`/problems/${problem.slug}/${action}`, { language, code }, (p) =>
-        setQueueNote(p.state === "queued" && (p.position ?? 0) > 1 ? `In queue — about #${p.position} in line` : null)
-      );
-      setRunResult(result);
-      setRunState("done");
-    } catch (err) {
-      setRunError(err instanceof ApiError ? err.message : "Couldn't reach the execution engine. Please try again.");
-      setRunState("error");
-    } finally {
-      setQueueNote(null);
-    }
+  /** Make sure the console is tall enough to show what is about to happen in it. */
+  const ensureConsoleVisible = () => {
+    const panel = consolePanel.current;
+    if (!panel) return;
+    if (panel.getSize().asPercentage < CONSOLE_MIN_WHILE_RUNNING) panel.resize(`${CONSOLE_COMFORTABLE}%`);
   };
 
-  const handleRun = () => executeCode("run");
-  const handleSubmit = () => executeCode("submit");
+  // Run / Submit: sending → queued → running → verdict, driven by the judge's real state (see useJudgedRun).
+  const judge = useJudgedRun({
+    endpoint: problem ? `/problems/${problem.slug}` : null,
+    language,
+    code,
+    onStart: () => {
+      setConsoleTab("result");
+      setMobileView("code");
+      ensureConsoleVisible();
+    },
+    onVerdict: (action, result) => {
+      if (action === "submit" && result.all_passed && problem) {
+        // The header's "Solved" appears at once instead of after the next visit.
+        setProblem((current) => (current && !current.solved ? { ...current, solved: true } : current));
+        invalidateProblem(problem.slug);
+      }
+    },
+  });
+  const { state: runState, lastAction, result: runResult, error: runError, progress, startedAt, resultKey, execute: executeCode } = judge;
 
-  // Ctrl/Cmd+Enter to run — the shortcut every major judge uses.
+  const handleRun = () => void executeCode("run");
+  const handleSubmit = () => void executeCode("submit");
+
+  // Ctrl/Cmd+Enter runs, Ctrl/Cmd+Shift+Enter submits — the shortcuts every major judge uses.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        handleRun();
+        if (e.shiftKey) handleSubmit();
+        else handleRun();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problem, language, code, runState]);
+  }, []);
 
   if (status !== "ready") {
     return (
@@ -154,7 +169,7 @@ function ProblemSolvePageContent() {
           <CenteredNotice
             heading="Problem not found"
             body={`"${slug}" doesn't match any problem in the catalog.`}
-            onBack={() => router.push("/dashboard/practice")}
+            onBack={() => nav.go("/dashboard/practice")}
           />
         )}
 
@@ -167,13 +182,15 @@ function ProblemSolvePageContent() {
         )}
 
         {loadState === "ready" && problem && (
-          <>
+          <div className="workspace-in flex flex-col flex-1 min-h-0">
             <ProblemHeaderBar
               problem={problem}
-              onBack={() => router.push("/dashboard/practice")}
+              onBack={() => nav.go("/dashboard/practice")}
+              backPending={nav.pending}
               onRun={handleRun}
               onSubmit={handleSubmit}
               running={runState === "running"}
+              activeAction={runState === "running" ? lastAction : null}
             />
 
             {/* Desktop / tablet-landscape: resizable split workspace */}
@@ -195,17 +212,19 @@ function ProblemSolvePageContent() {
                       <CodeEditorPanel
                         language={language}
                         availableLanguages={Object.keys(problem.starter_code)}
-                        onLanguageChange={setLanguage}
+                        onLanguageChange={handleLanguageChange}
                         code={code}
                         onCodeChange={handleCodeChange}
                         onReset={handleReset}
                         fontSize={fontSize}
                         onFontSizeChange={setFontSize}
                         savedAt={savedAt}
+                        onRun={handleRun}
+                        onSubmit={handleSubmit}
                       />
                     </Panel>
                     <ResizeHandle direction="vertical" />
-                    <Panel defaultSize="32" minSize="18">
+                    <Panel defaultSize="32" minSize="18" panelRef={consolePanel}>
                       <ConsolePanel
                         examples={problem.examples}
                         activeExample={activeExample}
@@ -216,7 +235,12 @@ function ProblemSolvePageContent() {
                         runState={runState}
                         runResult={runResult}
                         errorMessage={runError}
-                        statusNote={queueNote}
+                        progress={progress}
+                        startedAt={startedAt}
+                        resultKey={resultKey}
+                        caseCounts={problem.case_counts}
+                        onSubmit={handleSubmit}
+                        onRetry={() => lastAction && void executeCode(lastAction)}
                       />
                     </Panel>
                   </Group>
@@ -266,16 +290,18 @@ function ProblemSolvePageContent() {
                       <CodeEditorPanel
                         language={language}
                         availableLanguages={Object.keys(problem.starter_code)}
-                        onLanguageChange={setLanguage}
+                        onLanguageChange={handleLanguageChange}
                         code={code}
                         onCodeChange={handleCodeChange}
                         onReset={handleReset}
                         fontSize={fontSize}
                         onFontSizeChange={setFontSize}
                         savedAt={savedAt}
+                        onRun={handleRun}
+                        onSubmit={handleSubmit}
                       />
                     </div>
-                    <div className="h-52 border-t border-border-subtle shrink-0">
+                    <div className="h-64 border-t border-border-subtle shrink-0">
                       <ConsolePanel
                         examples={problem.examples}
                         activeExample={activeExample}
@@ -286,14 +312,19 @@ function ProblemSolvePageContent() {
                         runState={runState}
                         runResult={runResult}
                         errorMessage={runError}
-                        statusNote={queueNote}
+                        progress={progress}
+                        startedAt={startedAt}
+                        resultKey={resultKey}
+                        caseCounts={problem.case_counts}
+                        onSubmit={handleSubmit}
+                        onRetry={() => lastAction && void executeCode(lastAction)}
                       />
                     </div>
                   </div>
                 )}
               </div>
             </div>
-          </>
+          </div>
         )}
       </div>
     </DashboardShell>
@@ -339,7 +370,7 @@ function SolveScreenSkeleton() {
           <div className="h-24 w-full rounded bg-elevated mt-6" />
           <div className="h-24 w-full rounded bg-elevated" />
         </div>
-        <div className="flex-1 bg-[#1e1e1e]" />
+        <EditorBootPlaceholder label="Setting up your workspace…" className="flex-1" />
       </div>
     </div>
   );

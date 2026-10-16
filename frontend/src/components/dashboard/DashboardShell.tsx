@@ -3,6 +3,8 @@
 import { Suspense, useState } from "react";
 import { DashboardSidebar, DashboardRole } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { StudentOnboardingGate } from "@/components/onboarding/StudentOnboardingGate";
+import { PlanSyncWatcher } from "@/components/billing/PlanSyncWatcher";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -196,6 +198,14 @@ export function DashboardShell({
           {children}
         </main>
       </div>
+
+      {/* First-login onboarding for students. Never on the proctored exam
+          shell (hideChrome) — nothing may interrupt an attempt in progress. */}
+      {role === "user" && !hideChrome && <StudentOnboardingGate />}
+
+      {/* Keeps the plan on screen in step with the account's real plan, and says so when support
+          (or the calendar) changes it. Not on the exam shell, for the same reason as above. */}
+      {(role === "user" || role === "admin_tpo") && !hideChrome && <PlanSyncWatcher audience={role === "user" ? "student" : "college"} />}
     </div>
   );
 }

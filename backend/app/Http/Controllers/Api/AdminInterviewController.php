@@ -55,33 +55,24 @@ class AdminInterviewController extends Controller
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
-            'interview_type' => ['sometimes', Rule::in([Interview::INTERVIEW_TYPE_GENERAL, Interview::INTERVIEW_TYPE_COMPANY, Interview::INTERVIEW_TYPE_TALENT_POOL])],
+            // `talent_pool` is retired (see AdminContestController::store()); existing ones keep working as ordinary interviews.
+            'interview_type' => ['sometimes', Rule::in([Interview::INTERVIEW_TYPE_GENERAL, Interview::INTERVIEW_TYPE_COMPANY])],
             'placement_drive_id' => ['required_if:interview_type,company', 'integer', 'exists:placement_drives,id'],
             'college_ids' => ['sometimes', 'array'],
             'college_ids.*' => ['integer'],
             'is_mock' => ['sometimes', 'boolean'],
-            'audience_scope' => ['required_if:interview_type,talent_pool', Rule::in(Interview::AUDIENCE_SCOPES)],
         ]);
 
         $interviewType = $validated['interview_type'] ?? Interview::INTERVIEW_TYPE_GENERAL;
         $companyId = null;
         $placementDriveId = null;
         $collegeIds = [];
-        $audienceScope = null;
 
         if ($interviewType === Interview::INTERVIEW_TYPE_COMPANY) {
             $drive = PlacementDrive::findOrFail($validated['placement_drive_id']);
             $companyId = $drive->company_id;
             $placementDriveId = $drive->id;
             $collegeIds = $this->validatedLiveCollegeIds($placementDriveId, $validated['college_ids'] ?? []);
-        }
-
-        if ($interviewType === Interview::INTERVIEW_TYPE_TALENT_POOL) {
-            $audienceScope = $validated['audience_scope'];
-
-            if ($audienceScope === Interview::AUDIENCE_SCOPE_COLLEGE) {
-                $collegeIds = College::whereIn('id', $validated['college_ids'] ?? [])->pluck('id')->all();
-            }
         }
 
         $interview = Interview::create([
@@ -94,10 +85,9 @@ class AdminInterviewController extends Controller
             'company_id' => $companyId,
             'placement_drive_id' => $placementDriveId,
             'created_by' => $request->user()->id,
-            'audience_scope' => $audienceScope,
         ]);
 
-        if ($interviewType === Interview::INTERVIEW_TYPE_COMPANY || ($interviewType === Interview::INTERVIEW_TYPE_TALENT_POOL && $audienceScope === Interview::AUDIENCE_SCOPE_COLLEGE)) {
+        if ($interviewType === Interview::INTERVIEW_TYPE_COMPANY) {
             $interview->colleges()->sync($collegeIds);
         }
 
@@ -110,7 +100,7 @@ class AdminInterviewController extends Controller
         abort_unless(
             $interview->isCompanyInterview() || ($interview->isTalentPool() && $interview->audience_scope === Interview::AUDIENCE_SCOPE_COLLEGE),
             422,
-            'Only company interviews, and college-scoped Talent Pool interviews, have selectable college visibility.'
+            'Only company interviews, and the college-scoped interviews of the retired Talent Pool, have selectable college visibility.'
         );
 
         $validated = $request->validate([

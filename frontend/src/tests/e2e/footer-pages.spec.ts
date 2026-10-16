@@ -14,7 +14,7 @@ test.describe("Footer and public content pages", () => {
     { link: "Company Prep Packs", url: /\/features\/company-prep$/, heading: /Prep Packs/ },
     { link: "Practice Arena", url: /\/features\/practice-arena$/, heading: /Practice Arena/ },
     { link: "Hire From Campuses", url: /\/features\/campus-hiring$/, heading: /Hire From Campuses/ },
-    { link: "Talent Pool", url: /\/features\/talent-pool$/, heading: /Talent Pool/ },
+    { link: "The Vault", url: /\/features\/vault$/, heading: /The Vault/ },
     { link: "AI Interviews", url: /\/features\/ai-interviews$/, heading: /AI Interviews/ },
     { link: "About", url: /\/about$/, heading: /placement season/i },
     { link: "Contact", url: /\/contact$/, heading: /placement season/i },

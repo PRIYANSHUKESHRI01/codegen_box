@@ -84,7 +84,9 @@ class ProjectLabAccess
         $usedSeconds = $coverage['access'] ? $this->secondsUsed($user, $coverage) : 0;
         $used = round($usedSeconds / 3600, 1);
 
-        $addon = Plan::where('code', Plan::CODE_PROJECT_LAB)->where('is_active', true)->first();
+        // Project Lab is part of Expert now (it is no longer sold on its own), so the lock
+        // screen's one offer is that plan, at today's price.
+        $upgrade = Plan::where('code', Plan::CODE_EXPERT)->where('is_active', true)->first();
 
         return [
             'enabled' => $coverage['access'],
@@ -101,14 +103,11 @@ class ProjectLabAccess
                 'limit' => $coverage['max_active_projects'],
                 'active' => $this->activeProjectCount($user),
             ],
-            // What buying it costs this student right now (bundle discount included) — for the lock screen.
-            'offer' => $addon === null ? null : [
-                'code' => $addon->code,
-                'name' => $addon->name,
-                'monthly_price' => (int) $addon->monthly_price,
-                'duration_days' => $addon->duration_days,
-                'workspace_hours' => $addon->max_workspace_hours_per_month,
-                'active_projects' => $addon->max_active_projects,
+            // The plan that includes Project Lab, with its live price — for the lock screen. Null if
+            // that plan isn't on sale. `workspace_hours` / `active_projects` are what it includes.
+            'upgrade' => $upgrade === null ? null : $upgrade->pricing() + [
+                'workspace_hours' => $upgrade->max_workspace_hours_per_month,
+                'active_projects' => $upgrade->max_active_projects,
             ],
         ];
     }

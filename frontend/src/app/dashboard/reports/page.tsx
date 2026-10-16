@@ -30,7 +30,9 @@ import { VerdictDonut } from "@/components/dashboard/student/VerdictDonut";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
+import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { SubmissionHistoryList } from "@/components/dashboard/student/SubmissionHistoryList";
+import { LanguageFocusCard } from "@/components/dashboard/student/LanguageFocusCard";
 import { CodeViewModal, type CodeViewData } from "@/components/dashboard/CodeViewModal";
 import { cn, withMinDelay } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -269,7 +271,7 @@ export default function PerformanceReportPage() {
               <span>Placement Readiness</span>
             </h2>
             <p className="text-xs text-text-muted mt-0.5">
-              What&apos;s driving your score — and the fastest way to move it.
+              One score for everything you do on AptRun — what&apos;s driving it, and the fastest way to move it.
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -279,6 +281,8 @@ export default function PerformanceReportPage() {
         </div>
 
         <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} />
+
+        <VaultLine score={stats.readiness.score} vault={stats.readiness.vault} className="mt-5" />
       </section>
 
       {/* Rating trend */}
@@ -362,6 +366,9 @@ export default function PerformanceReportPage() {
           )}
         </section>
       </div>
+
+      {/* Language focus — per-language solved / acceptance and where to improve */}
+      <LanguageFocusCard enabled={status === "ready"} />
 
       {/* Topic mastery full */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { NullRecordingSink, type RecordingSink } from "./recordingSink";
+import { forgetEditorClipboard, installEditorClipboardGuard } from "./editorClipboardGuard";
 import type { DeviceInfo, ProctoringPhase, ProctoringSessionState, ViolationType } from "./types";
 
 const CHUNK_INTERVAL_MS = 20_000;
@@ -92,6 +93,8 @@ export function useProctoring({ basePath, enabled, getCurrentCode }: UseProctori
     streamRef.current = null;
     if (previewVideoRef.current) previewVideoRef.current.srcObject = null;
     sinkRef.current.onSessionEnd();
+    // Whatever they last copied out of the editor must not outlive this attempt (shared lab PCs).
+    forgetEditorClipboard();
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
@@ -256,10 +259,12 @@ export function useProctoring({ basePath, enabled, getCurrentCode }: UseProctori
       if (!document.fullscreenElement) reportViolation("fullscreen_exit");
     };
     const onBlur = () => reportViolation("window_blur", {});
-    const onPaste = (e: ClipboardEvent) => {
-      e.preventDefault();
-      reportViolation("paste_attempt");
-    };
+    // Only code copied out of the editor itself may be pasted; everything else is stopped before
+    // Monaco sees it and logged (not a strike). See editorClipboardGuard.ts for why a plain
+    // preventDefault() isn't enough.
+    const removeClipboardGuard = installEditorClipboardGuard(({ via, length }) => {
+      reportViolation("paste_attempt", { via, length });
+    });
     const onContextMenu = (e: MouseEvent) => {
       e.preventDefault();
       reportViolation("context_menu_blocked");
@@ -293,7 +298,6 @@ export function useProctoring({ basePath, enabled, getCurrentCode }: UseProctori
     document.addEventListener("visibilitychange", onVisibilityChange);
     document.addEventListener("fullscreenchange", onFullscreenChange);
     window.addEventListener("blur", onBlur);
-    document.addEventListener("paste", onPaste, true);
     document.addEventListener("contextmenu", onContextMenu, true);
     window.addEventListener("beforeunload", onBeforeUnload);
 
@@ -301,7 +305,7 @@ export function useProctoring({ basePath, enabled, getCurrentCode }: UseProctori
       document.removeEventListener("visibilitychange", onVisibilityChange);
       document.removeEventListener("fullscreenchange", onFullscreenChange);
       window.removeEventListener("blur", onBlur);
-      document.removeEventListener("paste", onPaste, true);
+      removeClipboardGuard();
       document.removeEventListener("contextmenu", onContextMenu, true);
       window.removeEventListener("beforeunload", onBeforeUnload);
       window.clearInterval(devtoolsInterval);

@@ -3,6 +3,8 @@
 // and App\Services\ProjectLab\ProjectLabPresenter). `code` values on a failed
 // request (ApiError.code) are listed in PROJECT_LAB_ERROR below.
 
+import type { PlanPricing } from "./pricing";
+
 export type Difficulty = "beginner" | "intermediate" | "advanced";
 export type TopicStatus = "draft" | "published" | "archived";
 export type EnrollmentStatus = "active" | "submitted" | "reviewed" | "abandoned";
@@ -31,16 +33,11 @@ export interface ProjectLabSummary {
   period_ends_at: string | null;
   hours: { limit: number | null; used: number; remaining: number | null };
   projects: { limit: number | null; active: number };
-  /** What buying it costs at list price; null when the add-on isn't sold. */
-  offer: {
-    code: string;
-    name: string;
-    monthly_price: number;
-    duration_days: number | null;
-    /** Workspace hours included per period, and projects in progress at once; null = unlimited. */
-    workspace_hours: number | null;
-    active_projects: number | null;
-  } | null;
+  /**
+   * The plan that includes Project Lab (Expert), with its live price — what the lock screen offers.
+   * null when that plan isn't on sale. `workspace_hours` / `active_projects` are what it includes; null = unlimited.
+   */
+  upgrade: (PlanPricing & { workspace_hours: number | null; active_projects: number | null }) | null;
 }
 
 export interface ProjectCardData {
@@ -180,6 +177,8 @@ export interface QuoteLine {
   kind: "base" | "addon";
   list_price: number;
   discount: number;
+  /** Percent the discount represents (the plan's own discount, or the add-on bundle discount). */
+  discount_percent: number;
   price: number;
   duration_days: number | null;
 }

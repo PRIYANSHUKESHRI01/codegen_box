@@ -907,10 +907,10 @@ function WorkspaceStateScreen({ enrollment, ws, summary, entitled, starting, onS
         </span>
         <h2 className="mt-4 text-base font-extrabold text-primary">Your Project Lab access has ended</h2>
         <p className="mt-1.5 text-xs leading-relaxed text-text-secondary">
-          Your files are safe and will be here when you renew. Your submissions and feedback stay visible in the Results tab.
+          Your files are safe and will be here when you upgrade to Expert. Your submissions and feedback stay visible in the Results tab.
         </p>
-        <Link href="/dashboard/projects" className="mt-5 inline-flex rounded-btn bg-accent-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-accent-primary-hover">
-          Renew Project Lab
+        <Link href="/dashboard/billing" className="mt-5 inline-flex rounded-btn bg-accent-primary px-5 py-2.5 text-sm font-bold text-white hover:bg-accent-primary-hover">
+          Upgrade to Expert
         </Link>
       </>
     );
@@ -983,7 +983,7 @@ function WorkspaceStateScreen({ enrollment, ws, summary, entitled, starting, onS
 
       {outOfHours ? (
         <p className="mt-4 rounded-control border border-amber-500/30 bg-amber-500/10 p-3 text-xs font-semibold text-amber-900 dark:text-amber-200">
-          You&apos;ve used all your workspace hours for this period. They reset when you renew Project Lab.
+          You&apos;ve used all your workspace hours for this period. They refresh when the next period starts.
         </p>
       ) : (
         <button

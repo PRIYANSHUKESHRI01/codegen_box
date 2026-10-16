@@ -50,6 +50,7 @@ import { STUDENT_PROFILE } from "@/data/mockDashboardData";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
 import { ProfileCompletionBar } from "@/components/settings/ProfileCompletionBar";
 import { SkillsTagInput } from "@/components/settings/SkillsTagInput";
+import { CodingPreferencesSection } from "@/components/settings/CodingPreferencesSection";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { Toggle } from "@/components/ui/Toggle";
 import { cn } from "@/lib/utils";
@@ -113,8 +114,8 @@ const inputClass =
  * Information card above (which still saves via PUT /me/profile) — this
  * saves via PUT /me/student-profile, mirroring how the backend keeps the
  * two write paths apart. What's actually shown to a hiring partner, and how
- * completion drives Talent Pool search ranking, lives in
- * CompanyTalentPoolController on the backend.
+ * completion helps break ties in the Vault search ranking, lives in
+ * CompanyVaultController on the backend.
  */
 function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (msg: string) => void }) {
   const { login } = useAuth();
@@ -208,7 +209,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
           Recruiter Profile
         </h3>
         <p className="text-xs text-text-muted mt-0.5">
-          What hiring partners see when they search the Talent Pool — the more complete, the higher you rank.
+          What hiring partners and employers see when they open your Vault profile — a fuller profile helps you stand out.
         </p>
       </div>
 
@@ -353,6 +354,14 @@ export default function SettingsPage() {
   const [tab, setTab] = useState<TabId>("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Deep links such as /settings?tab=preferences (the dashboard's "Steady pace" chip and the
+  // Language focus card point here). Read once on mount from the address bar instead of
+  // useSearchParams(), which would force a Suspense boundary around this whole page.
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    if (requested && TABS.some((t) => t.id === requested)) setTab(requested as TabId);
+  }, []);
+
   // Profile fields — seeded from the real session and persisted for real via
   // PUT /me/profile. College/roll number/branch/CGPA/backlogs are the
   // placement cell's source of truth (set through roster import) and are
@@ -382,7 +391,6 @@ export default function SettingsPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // Preferences
-  const [defaultLanguage, setDefaultLanguage] = useState("C++20");
   const [fontSize, setFontSize] = useState("14");
   const [timezone, setTimezone] = useState("Asia/Kolkata (IST)");
 
@@ -420,6 +428,7 @@ export default function SettingsPage() {
   const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
   const [coverageLoading, setCoverageLoading] = useState(true);
   const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
+  const [projectLabIncluded, setProjectLabIncluded] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (status !== "ready" || (user?.role !== "user" && user?.role !== "admin_tpo")) {
@@ -431,6 +440,7 @@ export default function SettingsPage() {
       .then((res) => {
         setCoverage(res.coverage);
         setEntitlements(res.entitlements);
+        setProjectLabIncluded(res.project_lab ? res.project_lab.enabled : null);
       })
       .catch(() => setCoverage(null))
       .finally(() => setCoverageLoading(false));
@@ -1174,25 +1184,62 @@ export default function SettingsPage() {
                 used={entitlements.mock_interviews_used_today}
                 max={entitlements.max_mock_interviews_per_day}
               />
-              {!entitlements.drive_access && (
-                <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
-                  <span className="text-2xs text-text-muted">Placement drives aren&apos;t included on your current plan.</span>
-                  <Link href="/dashboard/billing" className="text-3xs font-bold text-accent-primary hover:underline shrink-0">
-                    Upgrade →
-                  </Link>
+              {entitlements.feature_trial && (
+                <div className="p-3 rounded-control border border-border-subtle bg-elevated/60 space-y-1.5">
+                  <div className="text-2xs font-bold text-primary">
+                    Free trial — {entitlements.feature_trial.uses_per_feature === 1 ? "one try" : `${entitlements.feature_trial.uses_per_feature} tries`} of each AI feature
+                  </div>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-2xs text-text-muted">
+                    {(
+                      [
+                        ["mock_interview", "AI mock interview"],
+                        ["speaking", "Speaking Lab"],
+                        ["listening", "Listening Lab (AI lesson)"],
+                        ["vocabulary", "Vocabulary quiz (AI)"],
+                      ] as const
+                    ).map(([key, label]) => (
+                      <li key={key} className="flex items-center justify-between gap-2">
+                        <span>{label}</span>
+                        <span className="font-mono font-semibold text-text-secondary">
+                          {Math.min(entitlements.feature_trial!.used[key], entitlements.feature_trial!.uses_per_feature)} / {entitlements.feature_trial!.uses_per_feature} used
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
+
+              {/* What this plan does not include — each one is a reason to look at Expert. */}
+              {(
+                [
+                  [!entitlements.drive_access, "Placement drives"],
+                  [!entitlements.hackathon_access, "Hack Arena hackathons"],
+                  [projectLabIncluded === false, "Project Lab"],
+                  [!entitlements.vault_access, "The Vault (direct hiring through Mellow Vault)"],
+                ] as const
+              )
+                .filter(([missing]) => missing)
+                .map(([, label]) => (
+                  <div key={label} className="p-3 rounded-control border border-border-subtle bg-elevated/60 flex items-center justify-between gap-3">
+                    <span className="text-2xs text-text-muted">{label} isn&apos;t included on your current plan.</span>
+                    <Link href="/dashboard/billing" className="text-3xs font-bold text-accent-primary hover:underline shrink-0">
+                      Upgrade →
+                    </Link>
+                  </div>
+                ))}
             </div>
           )}
         </section>
       )}
 
       {/* ---------------- Preferences ---------------- */}
+      {tab === "preferences" && isStudent && <CodingPreferencesSection user={user} onToast={triggerToast} />}
+
       {tab === "preferences" && (
         <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-6">
           <div>
             <h3 className="text-sm font-bold text-primary">Workspace Preferences</h3>
-            <p className="text-xs text-text-muted mt-0.5">Defaults applied every time you open the code arena.</p>
+            <p className="text-xs text-text-muted mt-0.5">Editor and display options for this device.</p>
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-border-subtle">
@@ -1203,21 +1250,7 @@ export default function SettingsPage() {
             <ThemeToggle showLabels />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Field label="Default Language">
-              <select
-                value={defaultLanguage}
-                onChange={(e) => setDefaultLanguage(e.target.value)}
-                className={cn(inputClass, "px-3")}
-              >
-                {["C++20", "Python 3.12", "Java 21", "Go 1.22", "Rust 1.77", "JavaScript"].map((l) => (
-                  <option key={l} value={l}>
-                    {l}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Editor Font Size">
               <select value={fontSize} onChange={(e) => setFontSize(e.target.value)} className={cn(inputClass, "px-3")}>
                 {["12", "13", "14", "16", "18"].map((s) => (

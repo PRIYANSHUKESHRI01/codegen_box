@@ -6,7 +6,7 @@
                             </span>
                             <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">Thanks, {{ $contactRequest->name }} — we've got it</h1>
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
-                                We received your message about {{ $contactRequest->organization_name }} and someone from our team will reach out
+                                We received your message about {{ $contactRequest->audience === 'academy' ? 'Mellow Academy' : $contactRequest->organization_name }} and someone from our team will reach out
                                 to <strong style="color:#111827;">{{ $contactRequest->email }}</strong>{{ $contactRequest->phone ? ' or '.$contactRequest->phone : '' }}
                                 within one business day.
                             </p>

@@ -258,8 +258,10 @@ class HackathonArenaTest extends TestCase
     {
         $hackathon = $this->hackathon();
 
+        // A blocked account never reaches the registration code at all: the request is refused as
+        // soon as it is authenticated (EnsureAccountIsActive), before any feature can be asked.
         Sanctum::actingAs($this->student(['is_blocked' => true]));
-        $this->register($hackathon)->assertForbidden()->assertJsonPath('code', 'not_a_student');
+        $this->register($hackathon)->assertForbidden()->assertJsonPath('code', 'account_blocked');
     }
 
     // ───────────────────────────── teams ─────────────────────────────

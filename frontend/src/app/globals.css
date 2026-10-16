@@ -379,6 +379,73 @@ html.light .glass-panel {
   left: 150%;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+   Practice editor — opening a problem, running code, the verdict.
+   Pure CSS (no JS animation loop), and the global prefers-reduced-motion
+   rule above flattens every one of these to a single frame.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* A test-case chip lighting up in turn while the judge works: the sweep length scales with the
+   number of cases (--n) and each chip waits its turn (--i). */
+@keyframes judge-scan {
+  0%, 38%, 100% { opacity: 0.4; transform: scale(1); }
+  10% { opacity: 1; transform: scale(1.14); }
+}
+.judge-chip-scan {
+  animation: judge-scan calc(var(--n, 8) * 130ms + 900ms) ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 130ms);
+}
+
+/* The thin indeterminate bar along the top of a running panel / an opening row. */
+@keyframes judge-bar {
+  0% { transform: translateX(-110%); }
+  100% { transform: translateX(380%); }
+}
+.judge-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 30%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgb(var(--accent-primary-rgb)), transparent);
+  animation: judge-bar 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* A chip settling on its real verdict. */
+@keyframes chip-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.14); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.chip-pop { animation: chip-pop 0.28s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+/* The verdict banner arriving, and the glow that rings an Accepted. */
+@keyframes verdict-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.verdict-in { animation: verdict-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+@keyframes verdict-ring {
+  0% { box-shadow: 0 0 0 0 rgb(var(--status-success-rgb) / 0.4); }
+  100% { box-shadow: 0 0 0 16px rgb(var(--status-success-rgb) / 0); }
+}
+.verdict-ring { animation: verdict-ring 0.9s ease-out 0.25s 1 both; }
+
+/* The tick inside an Accepted drawing itself. */
+@keyframes draw-stroke {
+  to { stroke-dashoffset: 0; }
+}
+.draw-circle { stroke-dasharray: 63; stroke-dashoffset: 63; animation: draw-stroke 0.45s ease-out 0.05s forwards; }
+.draw-check { stroke-dasharray: 22; stroke-dashoffset: 22; animation: draw-stroke 0.3s ease-out 0.4s forwards; }
+
+/* A workspace settling into place once its data has arrived (skeleton → real content). */
+@keyframes workspace-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.workspace-in { animation: workspace-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
 /* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
 

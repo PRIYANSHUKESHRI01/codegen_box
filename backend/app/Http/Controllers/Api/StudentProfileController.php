@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\Vault\VaultService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,12 +14,12 @@ use Illuminate\Support\Facades\Storage;
  * AuthController::updateProfile(), which is shared by every role's Settings
  * page and stays untouched — these fields only ever make sense for a
  * student. Every write recomputes and persists User::computeProfileCompletion()
- * so CompanyTalentPoolController can rank on it directly in SQL.
+ * so CompanyVaultController can rank on it directly in SQL.
  *
  * The resume lives on the PRIVATE `local` disk (unlike the avatar's public
  * one — see AuthController::updateAvatar()) since it carries more personal
  * data than a photo; it's reachable only through downloadOwnResume() here
- * (self) or CompanyTalentPoolController's equivalent (a hiring partner with
+ * (self) or CompanyVaultController's equivalent (a hiring partner with
  * an actual relationship to the candidate), mirroring the same
  * private-disk-plus-ownership-check pattern already used for interview
  * answer recordings.
@@ -27,7 +28,7 @@ class StudentProfileController extends Controller
 {
     private const MAX_RESUME_KB = 5120;
 
-    public function update(Request $request)
+    public function update(Request $request, VaultService $vault)
     {
         $user = $request->user();
         abort_unless($user->isStudent(), 403);
@@ -51,11 +52,12 @@ class StudentProfileController extends Controller
 
         $user->forceFill($validated)->save();
         $user->forceFill(['profile_completion_percent' => $user->computeProfileCompletion()])->save();
+        $this->vaultProfileChanged($vault, $user);
 
         return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
     }
 
-    public function uploadResume(Request $request)
+    public function uploadResume(Request $request, VaultService $vault)
     {
         $user = $request->user();
         abort_unless($user->isStudent(), 403);
@@ -76,11 +78,12 @@ class StudentProfileController extends Controller
             'resume_uploaded_at' => now(),
         ])->save();
         $user->forceFill(['profile_completion_percent' => $user->computeProfileCompletion()])->save();
+        $this->vaultProfileChanged($vault, $user);
 
         return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
     }
 
-    public function deleteResume(Request $request)
+    public function deleteResume(Request $request, VaultService $vault)
     {
         $user = $request->user();
         abort_unless($user->isStudent(), 403);
@@ -93,9 +96,23 @@ class StudentProfileController extends Controller
                 'resume_uploaded_at' => null,
             ])->save();
             $user->forceFill(['profile_completion_percent' => $user->computeProfileCompletion()])->save();
+            $this->vaultProfileChanged($vault, $user);
         }
 
         return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+    }
+
+    /**
+     * Bio, links, skills and resume are exactly what Mellow Vault shows, so a student who is
+     * listed passes an edit on. Never lets a Vault problem fail the save the student just made.
+     */
+    private function vaultProfileChanged(VaultService $vault, \App\Models\User $user): void
+    {
+        try {
+            $vault->profileChanged($user);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /** Self-download — a candidate reviewing/confirming their own uploaded resume. */

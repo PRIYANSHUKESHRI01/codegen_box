@@ -32,6 +32,9 @@ export interface SoftSkillAssessmentSummary {
   title: string;
   description: string | null;
   assessment_type: SoftSkillAssessmentType;
+  /** true for a numbered AptRun library set ("Set 12"); false for a test somebody scheduled. */
+  is_question_set: boolean;
+  set_number: number | null;
   duration_minutes: number;
   pass_percentage: number;
   max_attempts: number | null;
@@ -40,7 +43,30 @@ export interface SoftSkillAssessmentSummary {
   company: { id: number; name: string; logo: string | null } | null;
   attempts_taken: number;
   best_score_percent: number | null;
+  /** The student has an unfinished attempt they can resume. */
+  in_progress: boolean;
   can_attempt: boolean;
+}
+
+/** Which of the student's attempts a list is narrowed to. */
+export type SoftSkillListStatus = "all" | "not_attempted" | "in_progress" | "completed";
+
+export interface ListMeta {
+  total: number;
+  page: number;
+  per_page: number;
+  last_page: number;
+  from: number;
+  to: number;
+  /** true when the user asked for "Show all". */
+  all: boolean;
+}
+
+/** GET /soft-skills?scope=… — one page of the student's library, plus the header counts for both lists. */
+export interface SoftSkillLibraryResponse {
+  assessments: SoftSkillAssessmentSummary[];
+  meta: ListMeta;
+  counts: { sets: number; sets_completed: number; sets_in_progress: number; assigned: number };
 }
 
 export interface SoftSkillSessionQuestion {
@@ -112,6 +138,55 @@ export interface AdminSoftSkillAssessment {
   max_attempts: number | null;
   sessions_count: number;
   assessment_questions_count: number;
+  /** Library sets this test was built from (see QuestionSetPicker). */
+  applied_sets?: AppliedQuestionSet[];
+  is_question_set?: boolean;
+  question_set_number?: number | null;
+  /** Only on library sets: how many tests have been built from it. */
+  usages_count?: number;
+}
+
+/** "This test was built from that set" — snapshot, so it stays readable after a set is retired. */
+export interface AppliedQuestionSet {
+  id: number;
+  question_set_id: number | null;
+  set_title: string;
+  set_number: number | null;
+  questions_added: number;
+  created_at: string;
+}
+
+export type SoftSkillSetUsageState = "unused" | "published" | "draft" | "cancelled";
+
+export interface QuestionSetUsage {
+  state: SoftSkillSetUsageState;
+  /** How many of THIS caller's tests were built from the set. */
+  count: number;
+  /** The five most recent. */
+  tests: { id: number; title: string; slug: string | null; status: SoftSkillAssessmentStatus | null; added_at: string | null }[];
+}
+
+/** One row of the scheduler's library picker. */
+export interface QuestionSetItem {
+  id: number;
+  slug: string;
+  title: string;
+  label: string;
+  set_number: number | null;
+  description: string | null;
+  duration_minutes: number;
+  pass_percentage: number;
+  question_count: number;
+  category_composition: Partial<Record<SoftSkillCategory, number>>;
+  usage: QuestionSetUsage;
+}
+
+export type QuestionSetUsageFilter = "all" | "unused" | "used";
+
+export interface QuestionSetCatalogue {
+  sets: QuestionSetItem[];
+  meta: ListMeta;
+  counts: { all: number; used: number; unused: number };
 }
 
 export interface AdminSoftSkillQuestion {

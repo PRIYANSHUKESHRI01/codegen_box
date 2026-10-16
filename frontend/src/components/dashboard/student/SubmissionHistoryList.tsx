@@ -40,7 +40,7 @@ export const SOURCE_LABEL: Record<"practice" | ContestType, string> = {
   general: "Mellow Contest",
   company: "Company Assessment",
   company_hiring: "Hiring Assessment",
-  talent_pool: "Talent Pool Test",
+  talent_pool: "Mellow Assessment",
 };
 
 export const SOURCE_TONE: Record<"practice" | ContestType, string> = {

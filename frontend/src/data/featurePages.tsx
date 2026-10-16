@@ -276,7 +276,7 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       title: "What is and isn't recorded",
       body: "During a proctored contest the camera and microphone record for the student's own attempt only. The video stays in their browser and is never uploaded or stored. Proctoring applies to contests, not to practice.",
     },
-    related: ["ai-interviews", "talent-pool", "practice-arena"],
+    related: ["ai-interviews", "vault", "practice-arena"],
   },
   {
     slug: "learning-centre",
@@ -526,34 +526,34 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       { title: "Reach the right campuses", body: "Propose it to partner colleges, or open it to every candidate." },
       { title: "Screen and hire", body: "Invite candidates to proctored assessments and AI interviews, then record the hire." },
     ],
-    related: ["talent-pool", "proctored-assessments", "ai-interviews"],
+    related: ["vault", "proctored-assessments", "ai-interviews"],
   },
   {
-    slug: "talent-pool",
+    slug: "vault",
     audience: "recruiters",
-    label: "Talent Pool",
-    title: "The Talent Pool",
-    tagline: "Students who score well opt in to be discovered, and recruiters reach them with consent.",
+    label: "The Vault",
+    title: "The Vault",
+    tagline: "Students whose readiness score says they are ready to be hired, and who agreed to be found.",
     overview:
-      "The talent pool connects strong performers with the companies hiring them. A student qualifies by scoring well in a contest, and only becomes visible to hiring partners after giving consent, so recruiters see verified scores and students stay in control of who can find them.",
+      "The Vault connects students who are ready with the companies hiring them. Every student has one readiness score, built only from what they have actually done on AptRun, and once it reaches the bar a student can choose to be listed. Recruiters see verified evidence behind every profile, and students stay in control of who can find them.",
     icon: Users2,
     tone: "rose",
-    highlights: ["Qualify by contest score", "Visible only with the student's consent", "Interview scheduling and hire tracking built in"],
+    highlights: ["One readiness score, built from real activity", "Visible only with the student's consent", "Interview scheduling and hire tracking built in"],
     capabilities: [
       {
-        icon: Trophy,
-        title: "Qualify on merit",
-        body: "Students enter the pool by scoring above the qualifying mark in a contest, and each entry shows the score and the contest it came from.",
+        icon: Gauge,
+        title: "Readiness you can trust",
+        body: "A single 0 to 100 score from mock interviews, practice, the Learning Centre, soft skills, contests and scheduled events. Anything a hiring partner posted never counts, and every profile shows what the score is made of.",
       },
       {
         icon: EyeOff,
         title: "Consent comes first",
-        body: "A student's profile is not visible until they agree. They can hide it again whenever they like.",
+        body: "A student's profile is not visible until they agree. They can hide it again whenever they like, and contact details are never handed over.",
       },
       {
         icon: Search,
-        title: "Search verified candidates",
-        body: "Hiring partners browse the visible pool and see scores that came from real assessments.",
+        title: "Search the ready",
+        body: "Hiring partners browse the live Vault ranked by readiness, and filter by college, branch or skill.",
       },
       {
         icon: Handshake,
@@ -568,17 +568,17 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       {
         icon: Award,
         title: "Record the hire",
-        body: "Mark the hire when it happens so the candidate and your reports stay accurate.",
+        body: "Mark the hire when it happens so the candidate is taken off every other recruiter's list and your reports stay accurate.",
       },
     ],
     steps: [
-      { title: "A student qualifies", body: "They score above the qualifying mark and are invited to join the pool." },
-      { title: "They give consent", body: "Only then does their profile become visible to hiring partners." },
+      { title: "A student gets ready", body: "Their readiness score reaches the Vault bar through real work on the platform." },
+      { title: "They give consent", body: "Only then does their profile become visible to hiring partners and to employers on Mellow Vault." },
       { title: "You reach out", body: "Express interest, schedule the interview and record the outcome." },
     ],
     note: {
       title: "Built around the student's choice",
-      body: "Visibility is the student's decision. Profiles are hidden until consent is given, a student can hide theirs at any time, and a student can decline an interest from a company.",
+      body: "Visibility is the student's decision. Profiles are hidden until consent is given, a student can hide theirs at any time, and a student can decline an interest from a company. Joining the Vault comes with the Expert plan, or with a college plan that covers the student.",
     },
     related: ["campus-hiring", "proctored-assessments", "ai-interviews"],
   },
@@ -596,6 +596,6 @@ export function featureHref(slug: string): string {
 export const FOOTER_FEATURE_GROUPS: { title: string; href: string; tone: Tone; icon: LucideIcon; slugs: string[] }[] = [
   { title: "For Colleges", href: "/colleges", tone: "indigo", icon: Building2, slugs: ["campus-drives", "student-onboarding", "placement-analytics", "proctored-assessments"] },
   { title: "For Students", href: "/students", tone: "cyan", icon: Brain, slugs: ["learning-centre", "company-prep", "practice-arena"] },
-  { title: "For Recruiters", href: "/recruiters", tone: "violet", icon: Handshake, slugs: ["campus-hiring", "talent-pool", "ai-interviews"] },
+  { title: "For Recruiters", href: "/recruiters", tone: "violet", icon: Handshake, slugs: ["campus-hiring", "vault", "ai-interviews"] },
 ];
 

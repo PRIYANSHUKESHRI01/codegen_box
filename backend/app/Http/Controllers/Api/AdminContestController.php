@@ -58,7 +58,9 @@ class AdminContestController extends Controller
             'start_at' => ['required', 'date'],
             'end_at' => ['required', 'date', 'after:start_at'],
             'is_rated' => ['boolean'],
-            'contest_type' => ['sometimes', Rule::in([Contest::CONTEST_TYPE_GENERAL, Contest::CONTEST_TYPE_COMPANY, Contest::CONTEST_TYPE_TALENT_POOL])],
+            // `talent_pool` is retired: nobody needs to pass a special test to get into the Vault any more
+            // (the readiness score does that). Existing talent_pool contests keep working as ordinary ones.
+            'contest_type' => ['sometimes', Rule::in([Contest::CONTEST_TYPE_GENERAL, Contest::CONTEST_TYPE_COMPANY])],
             'placement_drive_id' => ['required_if:contest_type,company', 'integer', 'exists:placement_drives,id'],
             // Which of the drive's currently-live colleges this specific
             // contest should target — a drive can be live at several
@@ -67,17 +69,12 @@ class AdminContestController extends Controller
             // visible to anyone yet", fixable later via updateColleges().
             'college_ids' => ['sometimes', 'array'],
             'college_ids.*' => ['integer'],
-            // talent_pool only — see Contest::AUDIENCE_SCOPES.
-            'audience_scope' => ['required_if:contest_type,talent_pool', Rule::in(Contest::AUDIENCE_SCOPES)],
-            'qualifying_score_percent' => ['sometimes', 'numeric', 'min:1', 'max:100'],
         ]);
 
         $contestType = $validated['contest_type'] ?? Contest::CONTEST_TYPE_GENERAL;
         $companyId = null;
         $placementDriveId = null;
         $collegeIds = [];
-        $audienceScope = null;
-        $qualifyingScorePercent = null;
 
         if ($contestType === Contest::CONTEST_TYPE_COMPANY) {
             $drive = PlacementDrive::findOrFail($validated['placement_drive_id']);
@@ -86,35 +83,21 @@ class AdminContestController extends Controller
             $collegeIds = $this->validatedLiveCollegeIds($placementDriveId, $validated['college_ids'] ?? []);
         }
 
-        if ($contestType === Contest::CONTEST_TYPE_TALENT_POOL) {
-            $audienceScope = $validated['audience_scope'];
-            $qualifyingScorePercent = $validated['qualifying_score_percent'] ?? 90.00;
-
-            // Any real, active college can be targeted directly — no drive
-            // mapping to intersect against (see the talent_pool arm of
-            // Contest::isVisibleToCollege()).
-            if ($audienceScope === Contest::AUDIENCE_SCOPE_COLLEGE) {
-                $collegeIds = College::whereIn('id', $validated['college_ids'] ?? [])->pluck('id')->all();
-            }
-        }
-
         $contest = Contest::create([
             'title' => $validated['title'],
             'slug' => Contest::uniqueSlug($validated['title']),
             'description' => $validated['description'] ?? null,
             'start_at' => $validated['start_at'],
             'end_at' => $validated['end_at'],
-            'is_rated' => $contestType === Contest::CONTEST_TYPE_TALENT_POOL ? false : ($validated['is_rated'] ?? true),
+            'is_rated' => $validated['is_rated'] ?? true,
             'status' => Contest::STATUS_DRAFT,
             'contest_type' => $contestType,
             'company_id' => $companyId,
             'placement_drive_id' => $placementDriveId,
             'created_by' => $request->user()->id,
-            'audience_scope' => $audienceScope,
-            'qualifying_score_percent' => $qualifyingScorePercent,
         ]);
 
-        if ($contestType === Contest::CONTEST_TYPE_COMPANY || ($contestType === Contest::CONTEST_TYPE_TALENT_POOL && $audienceScope === Contest::AUDIENCE_SCOPE_COLLEGE)) {
+        if ($contestType === Contest::CONTEST_TYPE_COMPANY) {
             $contest->colleges()->sync($collegeIds);
         }
 
@@ -136,7 +119,7 @@ class AdminContestController extends Controller
         abort_unless(
             $contest->isCompanyContest() || ($contest->isTalentPool() && $contest->audience_scope === Contest::AUDIENCE_SCOPE_COLLEGE),
             422,
-            'Only company contests, and college-scoped Talent Pool assessments, have selectable college visibility.'
+            'Only company contests, and the college-scoped assessments of the retired Talent Pool, have selectable college visibility.'
         );
 
         $validated = $request->validate([

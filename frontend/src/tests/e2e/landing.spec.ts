@@ -73,7 +73,7 @@ test.describe("AptRun Landing Page E2E", () => {
 
   test("should answer common questions in the FAQ", async ({ page }) => {
     const faq = page.locator("#faq");
-    await faq.getByText("Who can see a student's profile in the talent pool?").click();
+    await faq.getByText("Who can see a student's profile in the Vault?").click();
     await expect(faq.getByText(/only after the student gives consent/i)).toBeVisible();
   });
 

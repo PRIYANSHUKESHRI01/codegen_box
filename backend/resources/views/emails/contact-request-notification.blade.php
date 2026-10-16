@@ -2,7 +2,7 @@
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:#E0E7FF; color:#3730A3; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; padding:4px 10px; border-radius:999px; margin-bottom:12px;">
-                                {{ $contactRequest->audience === 'institution' ? 'College / TPO Inquiry' : 'Employer Inquiry' }}
+                                {{ $contactRequest->audienceLabel() }} Inquiry
                             </span>
                             <h1 style="font-size:18px; margin:12px 0 8px 0; color:#111827;">New inquiry assigned to you</h1>
                             <p style="font-size:14px; line-height:1.6; color:#4B5563; margin:0 0 20px 0;">
@@ -37,7 +37,7 @@
                                             </tr>
                                             <tr>
                                                 <td style="padding:6px 0; font-size:12px; color:#6B7280;">Type</td>
-                                                <td style="padding:6px 0; font-size:12px; color:#111827; font-weight:700;">{{ $contactRequest->audience === 'institution' ? 'College / TPO' : 'Employer' }}</td>
+                                                <td style="padding:6px 0; font-size:12px; color:#111827; font-weight:700;">{{ $contactRequest->audienceLabel() }}</td>
                                             </tr>
                                         </table>
                                         @if ($contactRequest->message)

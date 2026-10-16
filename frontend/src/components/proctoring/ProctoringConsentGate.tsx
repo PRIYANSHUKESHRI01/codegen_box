@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Camera, CheckCircle2, Maximize, Mic, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, ClipboardX, Maximize, Mic, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
 import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
@@ -91,6 +91,12 @@ export function ProctoringConsentGate({
             <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
             <span>{copy.strikes}</span>
           </li>
+          {copy.paste && (
+            <li className="flex items-start gap-2.5">
+              <ClipboardX className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+              <span>{copy.paste}</span>
+            </li>
+          )}
         </ul>
 
         {consentError && (

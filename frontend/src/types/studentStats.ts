@@ -25,6 +25,15 @@ export interface ReadinessComponent {
   score: number;
   weight_percent: number;
   contribution: number;
+  /** One line saying what the score is made of ("3 recent interviews · average 82%"). Absent on older API responses. */
+  detail?: string;
+}
+
+/** How far a readiness score is from the Vault line — see GET /api/me/vault for acting on it. */
+export interface ReadinessVault {
+  threshold: number;
+  qualifies: boolean;
+  points_needed: number;
 }
 
 export interface ReadinessStats {
@@ -33,6 +42,7 @@ export interface ReadinessStats {
   practice_score: number;
   components: ReadinessComponent[];
   next_steps: string[];
+  vault?: ReadinessVault;
 }
 
 export interface RatingStats {

@@ -8,6 +8,7 @@ use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
+use App\Services\PlanGate;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -295,7 +296,8 @@ class InterviewController extends Controller
     }
 
     /**
-     * The plan-tier practice gate for mock interviews — only counts a
+     * The plan-tier practice gate for mock interviews (a free plan's one-time
+     * try, then the daily limit) — only counts a
      * genuine practice attempt: `is_mock` interviews and tpo_mock-type
      * interviews, and NEVER a Final Interview track round (those are a
      * structured, server-gated hiring pipeline a candidate doesn't freely
@@ -312,6 +314,9 @@ class InterviewController extends Controller
         if (! $isPracticeType) {
             return;
         }
+
+        // The free plan's one-time try (a no-op for every plan without a trial cap).
+        app(PlanGate::class)->assertTrialAvailable($request->user(), PlanGate::TRIAL_MOCK_INTERVIEW);
 
         $limit = $request->user()->effectiveEntitlements()['max_mock_interviews_per_day'];
 

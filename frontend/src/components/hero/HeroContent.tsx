@@ -69,7 +69,7 @@ export function HeroContent() {
         </motion.h1>
 
         {/* Supporting copy — a single sentence. The detail (recruiters,
-            talent pool, reports) is carried by the sections below. */}
+            the Vault, reports) is carried by the sections below. */}
         <motion.p
           variants={item}
           className="text-base sm:text-lg text-text-secondary max-w-2xl leading-relaxed mb-8 font-medium text-balance"

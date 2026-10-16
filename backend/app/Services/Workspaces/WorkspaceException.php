@@ -27,12 +27,12 @@ class WorkspaceException extends RuntimeException
     /** Plan doesn't include Project Lab (or it lapsed): the upgrade prompt. */
     public static function projectLabRequired(): self
     {
-        return new self('Project Lab is not part of your plan yet. Add it to start building.', 'project_lab_required', 402);
+        return new self('Project Lab is part of the Expert plan. Upgrade to start building.', 'project_lab_required', 402);
     }
 
     public static function hoursExhausted(int $limit): self
     {
-        return new self("You've used all {$limit} workspace hours included in this period. They reset when you renew Project Lab.", 'workspace_hours_exhausted', 402);
+        return new self("You've used all {$limit} workspace hours included in this period. They refresh when the next period starts.", 'workspace_hours_exhausted', 402);
     }
 
     public static function activeProjectsFull(int $limit): self

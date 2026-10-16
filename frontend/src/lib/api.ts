@@ -1,6 +1,7 @@
 import { getToken } from "./auth";
+import { ACCOUNT_BLOCKED_CODE, announceSessionEnded } from "./sessionEvents";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api";
 
 export class ApiError extends Error {
   status: number;
@@ -16,12 +17,23 @@ export class ApiError extends Error {
   }
 }
 
-async function throwForFailedResponse(res: Response): Promise<never> {
+async function throwForFailedResponse(res: Response, hadToken = false): Promise<never> {
   const data = await res.json().catch(() => null);
   const firstError = data?.errors ? Object.values(data.errors)[0] : undefined;
   const message =
     data?.message ?? (Array.isArray(firstError) ? firstError[0] : "Something went wrong. Please try again.");
-  throw new ApiError(message, res.status, data?.errors, typeof data?.code === "string" ? data.code : undefined);
+  const code = typeof data?.code === "string" ? data.code : undefined;
+
+  // The server ended this session behind the page's back. Say so once, app-wide, instead of every
+  // screen failing separately: a superadmin blocked the account (403 account_blocked), or signed it
+  // out of every device / the token expired (401 on a request that carried a token).
+  if (hadToken && res.status === 403 && code === ACCOUNT_BLOCKED_CODE) {
+    announceSessionEnded({ reason: "blocked", message });
+  } else if (hadToken && res.status === 401) {
+    announceSessionEnded({ reason: "signed_out", message: "You were signed out. Please sign in again." });
+  }
+
+  throw new ApiError(message, res.status, data?.errors, code);
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -37,7 +49,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   });
 
-  if (!res.ok) return throwForFailedResponse(res);
+  if (!res.ok) return throwForFailedResponse(res, !!token);
 
   return (await res.json().catch(() => null)) as T;
 }
@@ -56,7 +68,7 @@ async function requestFormData<T>(path: string, formData: FormData): Promise<T> 
     body: formData,
   });
 
-  if (!res.ok) return throwForFailedResponse(res);
+  if (!res.ok) return throwForFailedResponse(res, !!token);
 
   return (await res.json().catch(() => null)) as T;
 }
@@ -71,7 +83,7 @@ async function requestBlob(path: string): Promise<Blob> {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
-  if (!res.ok) return throwForFailedResponse(res);
+  if (!res.ok) return throwForFailedResponse(res, !!token);
 
   return res.blob();
 }

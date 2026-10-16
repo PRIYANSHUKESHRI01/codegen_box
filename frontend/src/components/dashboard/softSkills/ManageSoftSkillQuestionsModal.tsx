@@ -8,10 +8,12 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { HP_TONES, HpButton, HpIconTile, HpPill, HpSkeleton, hpInput, hpLabel, type HpTone } from "@/components/portal/kit";
 import { ScIconButton, ScInlineEmpty, ScReveal, ScSkeletonList } from "@/components/portal/screeningKit";
+import { AddQuestionSetPanel } from "./AddQuestionSetPanel";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
   RECOMMENDED_COMPOSITION,
+  type AppliedQuestionSet,
   type AttachedAssessmentQuestion,
   type SoftSkillCategory,
   type SoftSkillDifficulty,
@@ -22,6 +24,12 @@ interface ManageSoftSkillQuestionsModalProps {
   bankBasePath: string;
   assessmentSlug: string;
   assessmentTitle: string;
+  /** The caller's own question-set library endpoint. */
+  setsPath: string;
+  /** Library sets this test was already built from. */
+  appliedSets?: AppliedQuestionSet[];
+  /** Why no further questions can be added (candidates already started / test cancelled); null when it is still open. */
+  lockedReason?: string | null;
   onClose: () => void;
   onToast: (msg: string) => void;
   /** "premium" is the hiring-portal look. Default leaves Ops/TPO markup exactly as before. */
@@ -45,10 +53,14 @@ export function ManageSoftSkillQuestionsModal({
   bankBasePath,
   assessmentSlug,
   assessmentTitle,
+  setsPath,
+  appliedSets: initialAppliedSets = [],
+  lockedReason = null,
   onClose,
   onToast,
   variant = "default",
 }: ManageSoftSkillQuestionsModalProps) {
+  const [appliedSets, setAppliedSets] = useState<AppliedQuestionSet[]>(initialAppliedSets);
   const [attached, setAttached] = useState<AttachedAssessmentQuestion[]>([]);
   const [bankCounts, setBankCounts] = useState<Partial<Record<SoftSkillCategory, number>>>({});
   const [loading, setLoading] = useState(true);
@@ -158,6 +170,20 @@ export function ManageSoftSkillQuestionsModal({
           </div>
         ) : (
           <>
+            {/* Ready-made question sets */}
+            <AddQuestionSetPanel
+              setsPath={setsPath}
+              basePath={basePath}
+              assessmentSlug={assessmentSlug}
+              appliedSets={appliedSets}
+              lockedReason={lockedReason}
+              onToast={onToast}
+              onAdded={(r) => {
+                setAppliedSets(r.appliedSets);
+                load();
+              }}
+            />
+
             {/* Auto-fill panel */}
             <section className="space-y-4 rounded-[20px] border border-border-subtle bg-elevated/30 p-4 sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -300,6 +326,20 @@ export function ManageSoftSkillQuestionsModal({
         </div>
       ) : (
         <>
+          {/* Ready-made question sets */}
+          <AddQuestionSetPanel
+            setsPath={setsPath}
+            basePath={basePath}
+            assessmentSlug={assessmentSlug}
+            appliedSets={appliedSets}
+            lockedReason={lockedReason}
+            onToast={onToast}
+            onAdded={(r) => {
+              setAppliedSets(r.appliedSets);
+              load();
+            }}
+          />
+
           {/* Auto-fill panel */}
           <section className="rounded-panel border border-border-subtle bg-elevated/40 p-4 space-y-3">
             <div className="flex items-center gap-2">

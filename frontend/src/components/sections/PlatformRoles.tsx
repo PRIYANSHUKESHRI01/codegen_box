@@ -80,7 +80,7 @@ const AUDIENCES: {
     points: [
       "Post openings and propose them to partner colleges",
       "Proctored coding assessments and AI-scored interviews",
-      "Search the consent-based talent pool and invite the best fits",
+      "Search the Vault of students who are ready and agreed to be found, and invite the best fits",
     ],
     cta: "Partner as a recruiter",
   },

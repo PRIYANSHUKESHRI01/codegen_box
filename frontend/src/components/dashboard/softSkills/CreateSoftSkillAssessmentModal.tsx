@@ -1,214 +1,217 @@
 "use client";
 
 import { useState } from "react";
-import { Brain, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Brain, Library, Plus, Rocket } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { HpButton, hpInput, hpLabel } from "@/components/portal/kit";
 import { ScNotice } from "@/components/portal/screeningKit";
+import type { QuestionSetItem } from "@/types/softSkill";
+import { QuestionSetPicker } from "./QuestionSetPicker";
+
+export interface SoftSkillCreatedResult {
+  title: string;
+  published: boolean;
+  /** "Set 12" when the test was built from a library set, otherwise null. */
+  setLabel: string | null;
+}
 
 interface CreateSoftSkillAssessmentModalProps {
   basePath: string;
+  /** The caller's own question-set library endpoint, e.g. "/tpo/soft-skill-question-sets". */
+  setsPath: string;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (result: SoftSkillCreatedResult) => void;
   /** "premium" is the hiring-portal look. Default leaves Ops/TPO markup exactly as before. */
   variant?: "default" | "premium";
 }
 
-/** Shared across Mellow Ops/TPO/Company — creates a draft assessment (title/timing/passing bar only). Questions are attached afterward via ManageSoftSkillQuestionsModal. */
-export function CreateSoftSkillAssessmentModal({ basePath, onClose, onCreated, variant = "default" }: CreateSoftSkillAssessmentModalProps) {
+/** One button for both looks, so the two variants share the same wiring. A real component (not defined inside the modal), so it keeps its identity — and its focus — across renders. */
+function Btn({
+  premium,
+  children,
+  onClick,
+  type = "button",
+  form,
+  kind = "primary",
+  disabled,
+  busy,
+  icon,
+  title,
+}: {
+  premium: boolean;
+  children: React.ReactNode;
+  onClick?: () => void;
+  type?: "button" | "submit";
+  form?: string;
+  kind?: "primary" | "secondary";
+  disabled?: boolean;
+  busy?: boolean;
+  icon?: React.ReactNode;
+  title?: string;
+}) {
+  return premium ? (
+    <HpButton type={type} form={form} variant={kind} onClick={onClick} disabled={disabled} isLoading={busy} leftIcon={icon} title={title}>
+      {children}
+    </HpButton>
+  ) : (
+    <button
+      type={type}
+      form={form}
+      onClick={onClick}
+      disabled={disabled || busy}
+      title={title}
+      className={cn(
+        "flex items-center gap-1.5 px-4 py-2 rounded-control font-bold transition-colors disabled:opacity-60",
+        kind === "primary" ? "bg-accent-primary hover:bg-accent-primary-hover text-white" : "border border-border-subtle text-text-muted hover:text-primary"
+      )}
+    >
+      {icon}
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Shared across Mellow Ops/TPO/Company — schedules a new Soft Skills test in two steps:
+ *   1. details (title, timing, passing bar);
+ *   2. the questions — pick one of AptRun's ready-made question sets (sets this organisation has already used
+ *      are marked, so the next test can start from a fresh one), then publish straight away or keep it as a draft.
+ * The set is optional: "create without a set" keeps the old route of attaching bank questions afterwards.
+ * The test, its questions and its published state are created by ONE request, so a refused set never leaves a
+ * half-built draft behind.
+ */
+export function CreateSoftSkillAssessmentModal({ basePath, setsPath, onClose, onCreated, variant = "default" }: CreateSoftSkillAssessmentModalProps) {
+  const premium = variant === "premium";
+  const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [passPercentage, setPassPercentage] = useState(60);
-  const [saving, setSaving] = useState(false);
+  const [chosen, setChosen] = useState<QuestionSetItem | null>(null);
+  const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
+  const detailsValid = title.trim().length > 0 && durationMinutes >= 5 && durationMinutes <= 240 && passPercentage >= 1 && passPercentage <= 100;
+
+  const create = async (publish: boolean) => {
+    setSaving(publish ? "publish" : "draft");
     setError(null);
     try {
       await api.post(basePath, {
-        title,
-        description: description || undefined,
+        title: title.trim(),
+        description: description.trim() || undefined,
         duration_minutes: durationMinutes,
         pass_percentage: passPercentage,
+        question_set_id: chosen?.id,
+        publish: chosen ? publish : undefined,
       });
-      onCreated();
+      onCreated({ title: title.trim(), published: publish && !!chosen, setLabel: chosen?.label ?? null });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create assessment.");
+      setError(err instanceof ApiError ? err.message : "Failed to create the test.");
     } finally {
-      setSaving(false);
+      setSaving(null);
     }
   };
 
-  if (variant === "premium") {
-    return (
-      <Modal
-        variant="premium"
-        onClose={onClose}
-        title="New Soft Skills Test"
-        subtitle="Aptitude, reasoning and English screening"
-        icon={Brain}
-        size="lg"
-        footer={
-          <>
-            <HpButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
-              Cancel
-            </HpButton>
-            <HpButton
-              type="submit"
-              form="create-soft-skill-form"
-              disabled={!title.trim()}
-              isLoading={saving}
-              leftIcon={<Plus className="h-4 w-4" />}
-            >
-              {saving ? "Creating…" : "Create Draft"}
-            </HpButton>
-          </>
-        }
-      >
-        <ScNotice tone="violet" className="mb-5">
-          Starts as a draft — attach questions from the shared bank (or generate new ones with AI) in the next step, then publish.
-        </ScNotice>
+  const goNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (detailsValid) {
+      setError(null);
+      setStep(2);
+    }
+  };
 
-        <form id="create-soft-skill-form" onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="css-title" className={hpLabel}>
-              Title *
-            </label>
-            <input
-              id="css-title"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Standard Placement Readiness Test"
-              className={hpInput}
-            />
-          </div>
-          <div>
-            <label htmlFor="css-desc" className={hpLabel}>
-              Description
-            </label>
-            <textarea id="css-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={cn(hpInput, "resize-y")} />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="css-duration" className={hpLabel}>
-                Duration (minutes)
-              </label>
-              <div className="relative">
-                <input
-                  id="css-duration"
-                  type="number"
-                  min={5}
-                  max={240}
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className={cn(hpInput, "tabular pr-12")}
-                />
-                <span aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-2xs font-semibold text-text-muted">
-                  min
-                </span>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="css-pass" className={hpLabel}>
-                Pass percentage
-              </label>
-              <div className="relative">
-                <input
-                  id="css-pass"
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={passPercentage}
-                  onChange={(e) => setPassPercentage(Number(e.target.value))}
-                  className={cn(hpInput, "tabular pr-9")}
-                />
-                <span aria-hidden className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-2xs font-semibold text-text-muted">
-                  %
-                </span>
-              </div>
-            </div>
-          </div>
+  const input = premium ? hpInput : "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary";
+  const label = premium ? hpLabel : "block font-semibold text-text-secondary mb-1";
 
-          {error && <ScNotice tone="rose">{error}</ScNotice>}
-        </form>
-      </Modal>
+  const footer =
+    step === 1 ? (
+      <>
+        <Btn premium={premium} kind="secondary" onClick={onClose}>
+          Cancel
+        </Btn>
+        <Btn premium={premium} kind="secondary" onClick={() => create(false)} disabled={!detailsValid || saving !== null} busy={saving === "draft"} icon={premium ? <Plus className="h-4 w-4" /> : undefined} title="Create an empty draft — add questions afterwards">
+          Create empty draft
+        </Btn>
+        <Btn premium={premium} type="submit" form="create-soft-skill-form" disabled={!detailsValid} icon={<ArrowRight className="h-4 w-4" />}>
+          Next: question set
+        </Btn>
+      </>
+    ) : (
+      <>
+        <Btn premium={premium} kind="secondary" onClick={() => setStep(1)} disabled={saving !== null} icon={<ArrowLeft className="h-4 w-4" />}>
+          Back
+        </Btn>
+        <Btn premium={premium} kind="secondary" onClick={() => create(false)} busy={saving === "draft"} disabled={saving !== null} title={chosen ? undefined : "Questions can be added afterwards from Manage Questions"}>
+          {chosen ? `Save as draft with ${chosen.label}` : "Create without a set"}
+        </Btn>
+        <Btn premium={premium} onClick={() => create(true)} busy={saving === "publish"} disabled={!chosen || saving !== null} icon={<Rocket className="h-4 w-4" />} title={chosen ? undefined : "Choose a question set to publish with"}>
+          {chosen ? `Add ${chosen.label} & publish` : "Publish"}
+        </Btn>
+      </>
     );
-  }
 
   return (
     <Modal
+      variant={premium ? "premium" : "default"}
       onClose={onClose}
       title="New Soft Skills Test"
-      icon={Brain}
-      size="lg"
-      footer={
-        <>
-          <button type="button" onClick={onClose} disabled={saving} className="px-4 py-2 rounded-control border border-border-subtle text-text-muted hover:text-primary transition-colors">
-            Cancel
-          </button>
-          <button type="submit" form="create-soft-skill-form" disabled={saving || !title.trim()} className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-bold transition-colors disabled:opacity-60">
-            {saving ? "Creating…" : "Create Draft"}
-          </button>
-        </>
-      }
+      subtitle={step === 1 ? "Step 1 of 2 · Details" : "Step 2 of 2 · Question set"}
+      icon={step === 1 ? Brain : Library}
+      size="3xl"
+      footer={footer}
     >
-      <p className="text-2xs text-text-muted mb-3">
-        Starts as a draft — attach questions from the shared bank (or generate new ones with AI) in the next step, then publish.
-      </p>
+      {step === 1 ? (
+        <>
+          {premium ? (
+            <ScNotice tone="violet" className="mb-5">
+              Next you&apos;ll pick one of AptRun&apos;s ready-made question sets and can publish straight away.
+            </ScNotice>
+          ) : (
+            <p className="mb-3 text-2xs text-text-muted">Next you&apos;ll pick one of AptRun&apos;s ready-made question sets and can publish straight away.</p>
+          )}
 
-      <form id="create-soft-skill-form" onSubmit={handleSubmit} className="space-y-3">
-        <div>
-          <label className="block font-semibold text-text-secondary mb-1">Title *</label>
-          <input
-            required
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Standard Placement Readiness Test"
-            className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-          />
+          <form id="create-soft-skill-form" onSubmit={goNext} className={cn(premium ? "space-y-4" : "space-y-3")}>
+            <div>
+              <label htmlFor="css-title" className={label}>
+                Title *
+              </label>
+              <input id="css-title" required autoFocus value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255} placeholder="e.g. Campus Drive — Round 1 Aptitude" className={input} />
+            </div>
+            <div>
+              <label htmlFor="css-desc" className={label}>
+                Description
+              </label>
+              <textarea id="css-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={cn(input, premium && "resize-y")} />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="css-duration" className={label}>
+                  Duration (minutes)
+                </label>
+                <input id="css-duration" type="number" min={5} max={240} value={durationMinutes} onChange={(e) => setDurationMinutes(Number(e.target.value))} className={cn(input, "tabular")} />
+              </div>
+              <div>
+                <label htmlFor="css-pass" className={label}>
+                  Pass percentage
+                </label>
+                <input id="css-pass" type="number" min={1} max={100} value={passPercentage} onChange={(e) => setPassPercentage(Number(e.target.value))} className={cn(input, "tabular")} />
+              </div>
+            </div>
+            {error && (premium ? <ScNotice tone="rose">{error}</ScNotice> : <p className="text-2xs text-status-danger">{error}</p>)}
+          </form>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-text-muted">
+            Choose the question set for <strong className="text-primary">{title.trim()}</strong>. Each set is a ready-made paper of 25 questions; ones you have already used are marked so you can start from a fresh one.
+          </p>
+          <QuestionSetPicker catalogueUrl={setsPath} selected={chosen} onSelect={setChosen} />
+          {error && (premium ? <ScNotice tone="rose">{error}</ScNotice> : <p role="alert" className="text-2xs text-status-danger">{error}</p>)}
         </div>
-        <div>
-          <label className="block font-semibold text-text-secondary mb-1">Description</label>
-          <textarea
-            rows={2}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">Duration (minutes)</label>
-            <input
-              type="number"
-              min={5}
-              max={240}
-              value={durationMinutes}
-              onChange={(e) => setDurationMinutes(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-            />
-          </div>
-          <div>
-            <label className="block font-semibold text-text-secondary mb-1">Pass percentage</label>
-            <input
-              type="number"
-              min={1}
-              max={100}
-              value={passPercentage}
-              onChange={(e) => setPassPercentage(Number(e.target.value))}
-              className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
-            />
-          </div>
-        </div>
-
-        {error && <p className="text-2xs text-status-danger">{error}</p>}
-      </form>
+      )}
     </Modal>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, Loader2, Lock, MinusCircle, Terminal, TriangleAlert, XCircle } from "lucide-react";
-import { ProblemExample, RunResponse, RunResultCase } from "@/types/problem";
+import { useState } from "react";
+import { Loader2, RefreshCw, Terminal, TriangleAlert } from "lucide-react";
+import { ProblemExample, RunResponse } from "@/types/problem";
 import { cn } from "@/lib/utils";
+import { JudgingView, type RunProgress } from "./JudgingView";
+import { VerdictView, describeVerdict } from "./VerdictView";
 
-/** Stagger between each case flipping from "running" to its real verdict — the LeetCode/GFG-style reveal. */
-const REVEAL_STAGGER_MS = 200;
+export type { RunProgress } from "./JudgingView";
 
 export type ConsoleTab = "testcase" | "result";
 export type LastAction = "run" | "submit" | null;
@@ -22,8 +23,18 @@ interface ConsolePanelProps {
   runState: RunState;
   runResult: RunResponse | null;
   errorMessage: string | null;
-  /** Live queue status while a run is in flight, e.g. "In queue — #12". */
-  statusNote?: string | null;
+  /** Where a run in flight is (sending / queued / running) and how many cases it will judge. */
+  progress?: RunProgress | null;
+  /** Date.now() when the run in flight was started — drives the live timer. */
+  startedAt?: number;
+  /** Changes with every finished run, so each verdict plays its reveal once (and tab-switching never replays it). */
+  resultKey?: number;
+  /** How many cases a Run and a Submit judge — drawn while the judge works, before the server says. */
+  caseCounts?: { samples: number; total: number } | null;
+  /** After a Run passes every sample case: submit it for real. */
+  onSubmit?: () => void;
+  /** After a failure to reach the judge: try the same action again. */
+  onRetry?: () => void;
 }
 
 export function ConsolePanel({
@@ -36,109 +47,105 @@ export function ConsolePanel({
   runState,
   runResult,
   errorMessage,
-  statusNote,
+  progress,
+  startedAt,
+  resultKey = 0,
+  caseCounts,
+  onSubmit,
+  onRetry,
 }: ConsolePanelProps) {
+  // A small, always-visible cue on the Result tab, so the outcome is clear even while looking at the Testcase tab —
+  // but only once the verdict has actually been revealed, never ahead of it.
+  const [settledKey, setSettledKey] = useState<number | null>(null);
+  const verdictTone = runState === "done" && runResult && settledKey === resultKey ? describeVerdict(runResult, lastAction).tone : null;
+
   return (
-    <div className="h-full flex flex-col bg-surface">
-      <div className="flex items-center gap-1 px-3 pt-2.5 border-b border-border-subtle shrink-0">
+    <div className="flex h-full flex-col bg-surface">
+      <div className="flex shrink-0 items-center gap-1 border-b border-border-subtle px-3 pt-2.5" role="tablist">
         <button
+          role="tab"
+          aria-selected={activeTab === "testcase"}
           onClick={() => onTabChange("testcase")}
           className={cn(
-            "px-3 py-1.5 rounded-t-control text-2xs font-bold transition-colors",
+            "rounded-t-control px-3 py-1.5 text-2xs font-bold transition-colors",
             activeTab === "testcase" ? "bg-elevated text-primary" : "text-text-muted hover:text-primary"
           )}
         >
           Testcase
         </button>
         <button
+          role="tab"
+          aria-selected={activeTab === "result"}
           onClick={() => onTabChange("result")}
           className={cn(
-            "px-3 py-1.5 rounded-t-control text-2xs font-bold transition-colors flex items-center gap-1.5",
+            "flex items-center gap-1.5 rounded-t-control px-3 py-1.5 text-2xs font-bold transition-colors",
             activeTab === "result" ? "bg-elevated text-primary" : "text-text-muted hover:text-primary"
           )}
         >
           Result
-          {runState === "running" && <Loader2 className="w-3 h-3 animate-spin" />}
+          {runState === "running" && <Loader2 className="h-3 w-3 animate-spin text-accent-primary" aria-label="Running" />}
+          {verdictTone && (
+            <span
+              data-testid="result-tab-dot"
+              aria-hidden
+              className={cn("h-1.5 w-1.5 rounded-full", verdictTone === "success" ? "bg-status-success" : verdictTone === "warning" ? "bg-status-warning" : "bg-status-danger")}
+            />
+          )}
+          {runState === "error" && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-status-danger" />}
         </button>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
-        {activeTab === "testcase" ? (
+      {/* Both panes stay mounted (just hidden): flipping to Testcase and back must not replay a verdict. */}
+      <div className="min-h-0 flex-1">
+        <div className={cn("h-full overflow-y-auto", activeTab !== "testcase" && "hidden")}>
           <div className="p-4">
-            <div className="flex items-center gap-1.5 mb-3 flex-wrap">
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
               {examples.map((_, idx) => (
                 <button
                   key={idx}
                   onClick={() => onSelectExample(idx)}
                   className={cn(
-                    "px-2.5 py-1 rounded-control text-2xs font-bold transition-colors border",
+                    "rounded-control border px-2.5 py-1 text-2xs font-bold transition-colors",
                     activeExample === idx
-                      ? "bg-accent-primary/10 text-accent-primary border-accent-primary/30"
-                      : "text-text-muted border-border-subtle hover:text-primary"
+                      ? "border-accent-primary/30 bg-accent-primary/10 text-accent-primary"
+                      : "border-border-subtle text-text-muted hover:text-primary"
                   )}
                 >
                   Case {idx + 1}
                 </button>
               ))}
             </div>
-            <div className="font-mono text-xs text-text-secondary space-y-2">
+            <div className="space-y-2 font-mono text-xs text-text-secondary">
               <div>
-                <div className="text-3xs uppercase tracking-wide text-text-muted mb-1">Input</div>
-                <div className="rounded-control bg-elevated/60 border border-border-subtle px-3 py-2">
-                  {examples[activeExample]?.input}
-                </div>
+                <div className="mb-1 text-3xs uppercase tracking-wide text-text-muted">Input</div>
+                <div className="rounded-control border border-border-subtle bg-elevated/60 px-3 py-2">{examples[activeExample]?.input}</div>
               </div>
               <div>
-                <div className="text-3xs uppercase tracking-wide text-text-muted mb-1">Expected Output</div>
-                <div className="rounded-control bg-elevated/60 border border-border-subtle px-3 py-2">
-                  {examples[activeExample]?.output}
-                </div>
+                <div className="mb-1 text-3xs uppercase tracking-wide text-text-muted">Expected Output</div>
+                <div className="rounded-control border border-border-subtle bg-elevated/60 px-3 py-2">{examples[activeExample]?.output}</div>
               </div>
             </div>
           </div>
-        ) : (
+        </div>
+
+        <div className={cn("h-full overflow-y-auto", activeTab !== "result" && "hidden")}>
           <ResultTab
             runState={runState}
             runResult={runResult}
             errorMessage={errorMessage}
             lastAction={lastAction}
-            statusNote={statusNote}
+            progress={progress ?? { phase: "sending" }}
+            startedAt={startedAt ?? 0}
+            resultKey={resultKey}
+            fallbackCases={lastAction === "submit" ? (caseCounts?.total ?? 0) : (caseCounts?.samples ?? examples.length)}
+            onSubmit={onSubmit}
+            onRetry={onRetry}
+            onSettled={() => setSettledKey(resultKey)}
           />
-        )}
+        </div>
       </div>
     </div>
   );
-}
-
-/**
- * How many of `results` have "finished running" in the animation, for the result
- * currently on screen. Reset synchronously (during render, not in an effect) the
- * instant a new `runResult` arrives, so an old reveal count can never flash against
- * a new result's rows before the timers below have a chance to restart it at 0.
- */
-function useRevealedCount(runState: RunState, runResult: RunResponse | null): number {
-  const [state, setState] = useState<{ result: RunResponse | null; count: number }>({ result: null, count: 0 });
-
-  if (runResult !== state.result) {
-    setState({ result: runResult, count: 0 });
-  }
-
-  useEffect(() => {
-    const results = runResult?.results;
-    if (runState !== "done" || !results || results.length === 0) return;
-
-    const timers = results.map((_, idx) =>
-      setTimeout(
-        () => setState((s) => (s.result === runResult ? { result: runResult, count: Math.max(s.count, idx + 1) } : s)),
-        (idx + 1) * REVEAL_STAGGER_MS
-      )
-    );
-
-    return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runResult, runState]);
-
-  return runResult === state.result ? state.count : 0;
 }
 
 function ResultTab({
@@ -146,21 +153,31 @@ function ResultTab({
   runResult,
   errorMessage,
   lastAction,
-  statusNote,
+  progress,
+  startedAt,
+  resultKey,
+  fallbackCases,
+  onSubmit,
+  onRetry,
+  onSettled,
 }: {
   runState: RunState;
   runResult: RunResponse | null;
   errorMessage: string | null;
   lastAction: LastAction;
-  statusNote?: string | null;
+  progress: RunProgress;
+  startedAt: number;
+  resultKey: number;
+  fallbackCases: number;
+  onSubmit?: () => void;
+  onRetry?: () => void;
+  onSettled: () => void;
 }) {
-  const revealedCount = useRevealedCount(runState, runResult);
-
   if (runState === "idle") {
     return (
-      <div className="p-4 h-full flex items-center justify-center text-center">
-        <div className="text-xs text-text-muted flex flex-col items-center gap-2">
-          <Terminal className="w-5 h-5 text-text-muted/60" />
+      <div className="flex h-full items-center justify-center p-4 text-center">
+        <div className="flex flex-col items-center gap-2 text-xs text-text-muted">
+          <Terminal className="h-5 w-5 text-text-muted/60" />
           <span>Run your code to see program output here.</span>
         </div>
       </div>
@@ -168,23 +185,24 @@ function ResultTab({
   }
 
   if (runState === "running") {
-    return (
-      <div className="p-4 h-full flex items-center justify-center text-center">
-        <div className="text-xs text-text-secondary flex flex-col items-center gap-2">
-          <Loader2 className="w-5 h-5 animate-spin text-accent-primary" />
-          <span>{lastAction === "submit" ? "Judging your submission..." : "Running your code..."}</span>
-          {statusNote && <span className="text-2xs text-text-muted">{statusNote}</span>}
-        </div>
-      </div>
-    );
+    return <JudgingView action={lastAction === "submit" ? "submit" : "run"} progress={progress} startedAt={startedAt} fallbackCases={fallbackCases} />;
   }
 
   if (runState === "error") {
     return (
-      <div className="p-4 h-full flex items-center justify-center text-center">
-        <div className="text-xs text-status-danger flex flex-col items-center gap-2 max-w-xs">
-          <TriangleAlert className="w-5 h-5" />
+      <div className="flex h-full items-center justify-center p-4 text-center">
+        <div role="alert" className="flex max-w-xs flex-col items-center gap-2.5 text-xs text-status-danger">
+          <TriangleAlert className="h-5 w-5" />
           <span>{errorMessage ?? "Something went wrong running your code."}</span>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-elevated px-3 py-1.5 text-2xs font-bold text-primary transition-colors hover:bg-surface-hover"
+            >
+              <RefreshCw className="h-3 w-3" aria-hidden /> Try again
+            </button>
+          )}
         </div>
       </div>
     );
@@ -192,151 +210,5 @@ function ResultTab({
 
   if (!runResult) return null;
 
-  if (runResult.compile_error) {
-    return (
-      <div className="p-4 space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-status-danger">
-          <XCircle className="w-4 h-4" />
-          Compilation Error
-        </div>
-        <pre className="text-2xs font-mono text-status-danger bg-status-danger/5 border border-status-danger/20 rounded-control p-3 overflow-x-auto whitespace-pre-wrap">
-          {runResult.compile_error}
-        </pre>
-      </div>
-    );
-  }
-
-  if (runResult.runtime_error) {
-    return (
-      <div className="p-4 space-y-3">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-status-danger">
-          <XCircle className="w-4 h-4" />
-          {runResult.status ?? "Runtime Error"}
-        </div>
-        <pre className="text-2xs font-mono text-status-danger bg-status-danger/5 border border-status-danger/20 rounded-control p-3 overflow-x-auto whitespace-pre-wrap">
-          {runResult.runtime_error}
-        </pre>
-        {runResult.results && runResult.results.length > 0 && (
-          <ResultCaseList results={runResult.results} revealedCount={revealedCount} />
-        )}
-      </div>
-    );
-  }
-
-  const allRevealed = revealedCount >= runResult.results.length;
-
-  return (
-    <div className="p-4 space-y-3">
-      {allRevealed && (
-        <div
-          className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-control text-xs font-bold",
-            runResult.all_passed
-              ? "bg-status-success/10 text-status-success border border-status-success/25"
-              : "bg-status-danger/10 text-status-danger border border-status-danger/25"
-          )}
-        >
-          {runResult.all_passed ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-          <span>{runResult.all_passed ? "Accepted" : "Wrong Answer"}</span>
-          {runResult.time && (
-            <span className="ml-auto text-3xs font-mono font-normal opacity-80">{runResult.time}s</span>
-          )}
-          {runResult.memory != null && (
-            <span className="text-3xs font-mono font-normal opacity-80">{Math.round(runResult.memory / 1024)}MB</span>
-          )}
-        </div>
-      )}
-
-      <ResultCaseList results={runResult.results} revealedCount={revealedCount} />
-    </div>
-  );
-}
-
-function ResultCaseList({ results, revealedCount }: { results: RunResultCase[]; revealedCount: number }) {
-  return (
-    <div className="space-y-2">
-      {results.map((r, idx) => (
-        <ResultCaseRow key={r.case} result={r} running={idx >= revealedCount} />
-      ))}
-    </div>
-  );
-}
-
-function ResultCaseRow({ result: r, running }: { result: RunResultCase; running: boolean }) {
-  if (running) {
-    return (
-      <div className="rounded-control border border-border-subtle bg-elevated/40 p-3">
-        <div className="flex items-center gap-1.5 text-2xs font-bold text-text-muted">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          <span>Case {r.case} — running…</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (r.not_run) {
-    return (
-      <div className="rounded-control border border-dashed border-border-subtle bg-elevated/20 p-3">
-        <div className="flex items-center gap-1.5 text-2xs font-bold text-text-muted">
-          <MinusCircle className="w-3.5 h-3.5" />
-          <span>Case {r.case} — not evaluated</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (r.hidden) {
-    return (
-      <div
-        className={cn(
-          "rounded-control border p-3",
-          r.passed ? "border-border-subtle bg-elevated/40" : "border-status-danger/30 bg-status-danger/5"
-        )}
-      >
-        <div className="flex items-center gap-1.5 text-2xs font-bold">
-          <Lock className="w-3.5 h-3.5 text-text-muted" />
-          {r.passed ? (
-            <CheckCircle2 className="w-3.5 h-3.5 text-status-success" />
-          ) : (
-            <XCircle className="w-3.5 h-3.5 text-status-danger" />
-          )}
-          <span className={r.passed ? "text-status-success" : "text-status-danger"}>
-            Hidden Test Case {r.case} — {r.passed ? "Passed" : "Failed"}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={cn(
-        "rounded-control border p-3 space-y-1.5",
-        r.passed ? "border-border-subtle bg-elevated/40" : "border-status-danger/30 bg-status-danger/5"
-      )}
-    >
-      <div className="flex items-center gap-1.5 text-2xs font-bold">
-        {r.passed ? (
-          <CheckCircle2 className="w-3.5 h-3.5 text-status-success" />
-        ) : (
-          <XCircle className="w-3.5 h-3.5 text-status-danger" />
-        )}
-        <span className={r.passed ? "text-status-success" : "text-status-danger"}>Case {r.case}</span>
-      </div>
-      <div className="font-mono text-2xs text-text-secondary space-y-1">
-        <div>
-          <span className="text-text-muted">Input: </span>
-          {r.input}
-        </div>
-        <div>
-          <span className="text-text-muted">Expected: </span>
-          {r.expected}
-        </div>
-        <div>
-          <span className="text-text-muted">Output: </span>
-          <span className={!r.passed ? "text-status-danger font-semibold" : undefined}>{r.actual || "(no output)"}</span>
-        </div>
-      </div>
-    </div>
-  );
+  return <VerdictView key={resultKey} result={runResult} action={lastAction} onSubmit={onSubmit} onSettled={onSettled} />;
 }

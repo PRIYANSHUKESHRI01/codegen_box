@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Award, Loader2, Radio, Rocket, Search, SearchX, X } from "lucide-react";
 import { ArenaShell } from "@/components/arena/ArenaShell";
@@ -17,6 +18,7 @@ import { HeroSkeleton, LobbyCardSkeleton, LobbyEmpty } from "@/components/arena/
 import { arenaApi, errorMessage, MODE_LABEL, type CatalogueQuery } from "@/lib/hackathon";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { useEntitlements } from "@/lib/useEntitlements";
 import { cn } from "@/lib/utils";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import type { ArenaHome, CatalogueFilter, HackathonCard as Card, HackathonMode } from "@/types/hackathon";
@@ -124,6 +126,9 @@ export function Lobby() {
     if (status === "ready") load(1);
   }, [status, load]);
 
+  // A hook, so it sits above the early return below.
+  const entitlements = useEntitlements(status === "ready" && user?.role === "user");
+
   if (status !== "ready" || !user) return <SessionLoader />;
 
   const isStudent = user.role === "user";
@@ -131,6 +136,8 @@ export function Lobby() {
   const filtersActive = filter !== "all" || mode !== "" || host !== "" || theme !== "" || debouncedSearch.trim() !== "";
   const liveRow = (home?.live ?? []).filter((c) => c.id !== home?.featured?.id);
   const firstTimer = isStudent && !!home && (stats?.joined ?? 0) === 0;
+  // Browsing is open to every student; taking part is part of Expert.
+  const arenaLocked = isStudent && entitlements?.hackathon_access === false;
 
   const resetFilters = () => {
     setFilter("all");
@@ -160,6 +167,18 @@ export function Lobby() {
       {homeError && (
         <div className="mb-8">
           <PageNotice>{homeError}</PageNotice>
+        </div>
+      )}
+
+      {arenaLocked && (
+        <div className="mb-8">
+          <PageNotice tone="info">
+            <span className="font-semibold">You can browse every hackathon here, but taking part is part of the Expert plan.</span>{" "}
+            <Link href="/dashboard/billing" className="font-bold underline underline-offset-2 hover:text-white">
+              Upgrade to Expert
+            </Link>{" "}
+            to register, build with a team and compete for prizes and placement opportunities.
+          </PageNotice>
         </div>
       )}
 

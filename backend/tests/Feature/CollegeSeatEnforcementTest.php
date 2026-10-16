@@ -31,7 +31,7 @@ class CollegeSeatEnforcementTest extends TestCase
             'code' => 'test-institution-plan-'.uniqid(),
             'name' => 'Standard',
             'audience' => Plan::AUDIENCE_INSTITUTION,
-            'monthly_price' => null,
+            'list_price' => null,
             'annual_price' => 149000,
             'duration_days' => 365,
             'is_active' => true,

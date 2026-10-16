@@ -24,7 +24,8 @@ class JudgeResultStore
 
     public const STATE_ERROR = 'error';
 
-    public function putQueued(string $token, JudgeRequest $request, int $position): void
+    /** `$totalCases` is how many test cases this job will judge — shown to the student while it waits (display only). */
+    public function putQueued(string $token, JudgeRequest $request, int $position, ?int $totalCases = null): void
     {
         $this->put($token, [
             'user_id' => $request->userId,
@@ -32,6 +33,7 @@ class JudgeResultStore
             'kind' => $request->kind,
             'queue' => $request->queue,
             'position' => $position,
+            'total_cases' => $totalCases,
             'queued_at' => microtime(true),
         ]);
     }

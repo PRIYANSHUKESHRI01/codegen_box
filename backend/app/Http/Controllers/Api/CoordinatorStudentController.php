@@ -38,7 +38,7 @@ class CoordinatorStudentController extends Controller
         $activeMappings = $this->cohort->activeMappingsFor($coordinator->college_id);
 
         return response()->json([
-            'students' => $students->map(fn (User $student) => $this->cohort->payload($student, $activeMappings))->all(),
+            'students' => $this->cohort->payloads($students, $activeMappings),
             'section' => $coordinator->section,
         ]);
     }

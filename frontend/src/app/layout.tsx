@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/lib/AuthContext";
+import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
+import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
 import "./globals.css";
 
 // Inter + JetBrains Mono are self-hosted (the latin-subset variable woff2
@@ -44,7 +46,8 @@ export const metadata: Metadata = {
   keywords: [
     "campus placements",
     "placement management system",
-    "talent pool",
+    "readiness score",
+    "hire students",
     "proctored assessments",
     "AI interviews",
     "placement preparation",
@@ -111,7 +114,13 @@ export default function RootLayout({
             next route's data has even started loading. Patches next/link and
             router.push/replace automatically; no per-page wiring needed. */}
         <NextTopLoader color="#4F46E5" height={3} showSpinner={false} shadow="0 0 10px #4F46E5,0 0 5px #4F46E5" />
-        <AuthProvider>{children}</AuthProvider>
+        {/* If Back / Forward ever leaves the address bar on one page and the screen on another, repair it (see the component). */}
+        <RouteSyncGuard />
+        <AuthProvider>
+          {children}
+          {/* Present on every page while a superadmin is looking at the product as someone else. */}
+          <ImpersonationBanner />
+        </AuthProvider>
       </body>
     </html>
   );

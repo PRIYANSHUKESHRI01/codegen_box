@@ -4,7 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound } from "lucide-react";
+import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { cn } from "@/lib/utils";
@@ -31,8 +31,11 @@ import { MellowStaffPanel } from "@/components/admin/superadmin/MellowStaffPanel
 import { AccountsPanel } from "@/components/admin/superadmin/AccountsPanel";
 import { InfrastructurePanel } from "@/components/admin/superadmin/InfrastructurePanel";
 import { AuditLogPanel } from "@/components/admin/superadmin/AuditLogPanel";
+import { PlansPricingPanel } from "@/components/admin/superadmin/PlansPricingPanel";
+import { PaymentsPanel } from "@/components/admin/superadmin/PaymentsPanel";
+import { SubscriptionsPanel } from "@/components/admin/superadmin/SubscriptionsPanel";
 
-type Tab = "overview" | "students" | "leads" | "marketing" | "colleges" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "students" | "leads" | "marketing" | "colleges" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -40,6 +43,9 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "leads", label: "Leads", icon: UserSearch },
   { id: "marketing", label: "Marketing Performance", icon: Megaphone },
   { id: "colleges", label: "Colleges & TPOs", icon: Building2 },
+  { id: "plans", label: "Plans & Pricing", icon: Wallet },
+  { id: "subscriptions", label: "Subscriptions", icon: BadgeCheck },
+  { id: "payments", label: "Payments", icon: CreditCard },
   { id: "staff", label: "Mellow Staff", icon: Users2 },
   { id: "accounts", label: "Accounts & Logins", icon: KeyRound },
   { id: "infrastructure", label: "Infrastructure & Flags", icon: Cpu },
@@ -150,6 +156,9 @@ function SuperAdminPageContent() {
       {activeTab === "leads" && <LeadsPanel triggerToast={triggerToast} />}
       {activeTab === "marketing" && <MarketingPerformancePanel />}
       {activeTab === "colleges" && <PartnerCollegesPanel triggerToast={triggerToast} canDeleteColleges />}
+      {activeTab === "plans" && <PlansPricingPanel triggerToast={triggerToast} />}
+      {activeTab === "subscriptions" && <SubscriptionsPanel triggerToast={triggerToast} />}
+      {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}
       {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}
       {activeTab === "accounts" && <AccountsPanel triggerToast={triggerToast} />}
       {activeTab === "infrastructure" && <InfrastructurePanel triggerToast={triggerToast} />}

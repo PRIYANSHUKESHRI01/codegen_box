@@ -6,6 +6,7 @@ use App\Models\ListeningLesson;
 use App\Models\SpeakingAttempt;
 use App\Models\SpeakingPrompt;
 use App\Models\VocabularyAttempt;
+use App\Services\PlanGate;
 use Illuminate\Http\Request;
 
 /**
@@ -18,13 +19,20 @@ use Illuminate\Http\Request;
  * assertWithinDailyMockInterviewLimit() exactly: null entitlement =
  * unlimited, a plan opts INTO a limit by setting a number.
  *
+ * Each call site also names its PlanGate trial feature: a plan that only
+ * allows a one-time try of each AI feature (the free Coder plan — see
+ * Plan::$feature_trial_uses) is refused with `trial_used` once that feature's
+ * try is spent, before the daily counter is even consulted.
+ *
  * A speaking take that FAILED to score (Gemini down, rate-limited) is not
  * counted — the student got nothing for it, so it must not eat their quota.
  */
 trait EnforcesLearningCentreAiLimit
 {
-    private function assertWithinDailyLearningCentreAiLimit(Request $request): void
+    private function assertWithinDailyLearningCentreAiLimit(Request $request, string $trialFeature): void
     {
+        app(PlanGate::class)->assertTrialAvailable($request->user(), $trialFeature);
+
         $limit = $request->user()->effectiveEntitlements()['max_learning_centre_ai_attempts_per_day'];
 
         if ($limit === null) {

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Search, Ban, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { StudentDetailDrawer } from "./StudentDetailDrawer";
+import { UserManageDrawer } from "./UserManageDrawer";
 import { formatDateTime, type ApiCollege, type ApiPage, type ApiPlatformUser } from "./types";
 
 const TIER_BADGE_CLASS: Record<string, string> = {
@@ -144,7 +144,18 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
                     </td>
                     <td className="px-4 py-3 text-text-secondary font-medium">{s.college?.name ?? "—"}</td>
                     <td className="px-4 py-3 text-text-secondary">{s.branch ?? "—"}</td>
-                    <td className="px-4 py-3 text-text-secondary">{s.subscription_plan_name ?? "—"}</td>
+                    <td className="px-4 py-3 text-text-secondary">
+                      {s.subscription ? (
+                        <>
+                          <div className="font-semibold text-primary">{s.subscription.plan_name}</div>
+                          <div className="text-3xs text-text-muted">
+                            {s.subscription.source === "institution" ? "via college" : s.subscription.days_remaining === null ? "never expires" : s.subscription.days_remaining <= 0 ? "ended" : `${s.subscription.days_remaining} days left`}
+                          </div>
+                        </>
+                      ) : (
+                        s.subscription_plan_name ?? "—"
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       {s.readiness_tier ? (
                         <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", TIER_BADGE_CLASS[s.readiness_tier])}>
@@ -186,7 +197,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
       )}
 
       {activeStudentId && (
-        <StudentDetailDrawer
+        <UserManageDrawer
           userId={activeStudentId}
           onClose={() => setActiveStudentId(null)}
           onChanged={load}

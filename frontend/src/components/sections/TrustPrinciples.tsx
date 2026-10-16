@@ -31,7 +31,7 @@ const PRINCIPLES: {
     tone: "cyan",
     label: "Privacy",
     title: "Students stay in control",
-    description: "Nobody joins the talent pool without consent, and students can hide their profile at any time.",
+    description: "Nobody is listed in the Vault without saying yes, and students can hide their profile at any time.",
   },
   {
     icon: Sparkles,

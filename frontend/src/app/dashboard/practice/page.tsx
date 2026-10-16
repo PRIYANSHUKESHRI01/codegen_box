@@ -20,6 +20,8 @@ import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryLis
 import { StatTile } from "@/components/dashboard/student/StatTile";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { CompanyBadgeList } from "@/components/problems/CompanyBadge";
+import { SolveButton, solveHref } from "@/components/practice/SolveButton";
+import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { COMPANY_ICONS } from "@/components/icons/CompanyIcons";
 import { ProblemSummary } from "@/types/problem";
 import type { MySubscriptionResponse } from "@/types/subscription";
@@ -75,6 +77,31 @@ function pageNumbersWithEllipsis(current: number, total: number): (number | "ell
 function PracticeArenaPageContent() {
   const { status } = useAuthGuard(["user"]);
   const router = useRouter();
+  const nav = useResilientNavigation();
+
+  // The problem being opened right now: its Solve button answers at once, the rest wait their turn.
+  const [openingSlug, setOpeningSlug] = useState<string | null>(null);
+  const openProblem = (slug: string) => {
+    if (openingSlug) return;
+    setOpeningSlug(slug);
+    // If the next screen's data is slow to arrive, `go` loads it properly after a few seconds instead of leaving "Opening…" hanging.
+    nav.go(solveHref(slug));
+  };
+
+  // If the navigation never lands (offline, or they came back with Back and this page was restored from
+  // memory), don't leave the list stuck on "Opening…".
+  useEffect(() => {
+    if (!openingSlug) return;
+    const giveUp = setTimeout(() => setOpeningSlug(null), 12_000);
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) setOpeningSlug(null);
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      clearTimeout(giveUp);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+  }, [openingSlug]);
   const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   // The input stays instantly responsive (bound to `query` directly) — only
@@ -365,8 +392,23 @@ function PracticeArenaPageContent() {
               displayList.map((problem) => (
                 <div
                   key={problem.id}
-                  className="p-4 flex items-center justify-between gap-4 hover:bg-surface-hover/60 transition-colors"
+                  aria-busy={openingSlug === problem.slug}
+                  className={cn(
+                    "relative p-4 flex items-center justify-between gap-4 transition-all duration-200",
+                    openingSlug === problem.slug
+                      ? "bg-accent-primary/5 ring-1 ring-inset ring-accent-primary/30"
+                      : "hover:bg-surface-hover/60",
+                    openingSlug && openingSlug !== problem.slug && "opacity-60"
+                  )}
                 >
+                  {openingSlug === problem.slug && (
+                    <>
+                      <span aria-hidden className="judge-bar absolute inset-x-0 bottom-0 h-0.5 overflow-hidden bg-accent-primary/10" />
+                      <span role="status" className="sr-only">
+                        Opening {problem.title}…
+                      </span>
+                    </>
+                  )}
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span
@@ -411,12 +453,12 @@ function PracticeArenaPageContent() {
                         aria-label="Solved"
                       />
                     )}
-                    <button
-                      onClick={() => router.push(`/dashboard/practice/view?slug=${problem.slug}`)}
-                      className="px-3 py-1.5 rounded-control bg-elevated hover:bg-accent-primary hover:text-white border border-border-subtle hover:border-transparent text-xs font-bold text-primary transition-all shrink-0"
-                    >
-                      Solve
-                    </button>
+                    <SolveButton
+                      slug={problem.slug}
+                      opening={openingSlug === problem.slug}
+                      disabled={openingSlug !== null}
+                      onOpen={openProblem}
+                    />
                   </div>
                 </div>
               ))

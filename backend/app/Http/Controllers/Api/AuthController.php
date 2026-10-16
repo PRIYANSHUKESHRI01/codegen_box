@@ -4,16 +4,25 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendWelcomeEmail;
+use App\Models\ActivityLog;
 use App\Models\User;
+use App\Services\LifecycleMailService;
 use App\Support\SingleMail;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /** How stale users.last_seen_at may get before a session re-check refreshes it. */
+    private const LAST_SEEN_THROTTLE_MINUTES = 10;
+
     /**
      * Public self-registration — always a personal, college-less ("Mellow
      * Direct") student account. Staff, TPO, and superadmin accounts are
@@ -89,6 +98,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth')->plainTextToken;
 
+        $this->touchLastSeen($user, force: true);
+
         return response()->json([
             'user' => $user->load(['college', 'company']),
             'token' => $token,
@@ -97,16 +108,64 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        // Leaving a superadmin's "view as" is worth a line in their audit trail, just like entering it.
+        if ($user->isBeingImpersonated() && ($superadmin = User::find($user->impersonatorId())) !== null) {
+            ActivityLog::record($superadmin, 'Stopped viewing an account ("view as")', 'User', $user->name, ['user_id' => $user->id]);
+        }
+
+        $user->currentAccessToken()->delete();
 
         return response()->json(['message' => 'Logged out.']);
     }
 
     public function me(Request $request)
     {
+        // A superadmin looking at the account ("view as") is not the owner being active, so it must
+        // not move their "last seen" — a TPO would otherwise see a student online who never was.
+        if (! $request->user()->isBeingImpersonated()) {
+            $this->touchLastSeen($request->user());
+        }
+
         return response()->json([
             'user' => $request->user()->load(['college', 'company']),
         ]);
+    }
+
+    /**
+     * Stamps users.last_seen_at — what the TPO's cohort view shows as "last
+     * seen". Always on login; otherwise at most once per throttle window, so
+     * the value is accurate to a few minutes without a database write on every
+     * session re-check (the app re-verifies on every tab focus). A raw update on
+     * purpose: this is bookkeeping, not an edit, so it must not bump
+     * users.updated_at.
+     */
+    private function touchLastSeen(User $user, bool $force = false): void
+    {
+        if (! $force
+            && $user->last_seen_at !== null
+            && $user->last_seen_at->gt(now()->subMinutes(self::LAST_SEEN_THROTTLE_MINUTES))) {
+            return;
+        }
+
+        $now = now();
+
+        try {
+            DB::table('users')->where('id', $user->id)->update(['last_seen_at' => $now]);
+        } catch (QueryException $e) {
+            // Best-effort bookkeeping — it must never stand between someone and
+            // their dashboard (e.g. this code reaching a database before the
+            // migration that adds the column). Logged once an hour, not per request.
+            if (Cache::add('last-seen-write-failed', true, 3600)) {
+                Log::warning('Could not stamp users.last_seen_at: '.$e->getMessage());
+            }
+
+            return;
+        }
+
+        $user->setAttribute('last_seen_at', $now);
+        $user->syncOriginalAttribute('last_seen_at');
     }
 
     /**
@@ -140,6 +199,15 @@ class AuthController extends Controller
         }
 
         $user->forceFill($validated)->save();
+
+        // A listed student's name is part of what Mellow Vault shows — pass a change on. Fails soft.
+        if ($user->isStudent() && $user->wasChanged('name')) {
+            try {
+                app(\App\Services\Vault\VaultService::class)->profileChanged($user);
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
 
         return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
     }
@@ -201,6 +269,8 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'must_change_password' => false,
         ])->save();
+
+        app(LifecycleMailService::class)->passwordChanged($user, 'settings');
 
         return response()->json(['message' => 'Password updated.']);
     }

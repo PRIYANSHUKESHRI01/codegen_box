@@ -46,7 +46,9 @@ export function UsageLimitBanner({ label, used, max }: UsageLimitBannerProps) {
             {used} of {max} {label} used today
           </span>
           {atLimit && (
-            <Link href="/pricing" className="text-3xs font-bold text-accent-primary hover:underline shrink-0">
+            // Signed-in students only (practice, interviews, settings): their own plans page, where they can pay —
+            // not the public marketing page, which can't know who they are.
+            <Link href="/dashboard/billing" className="text-3xs font-bold text-accent-primary hover:underline shrink-0">
               Upgrade →
             </Link>
           )}

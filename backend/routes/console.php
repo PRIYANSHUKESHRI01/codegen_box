@@ -16,8 +16,25 @@ Artisan::command('inspire', function () {
 // "is it time yet" every minute and dispatches due tasks).
 Schedule::command('report:weekly-readiness')->weekly();
 
+// Every 10 minutes: re-score students who were just active and apply it to the Vault — list those who have
+// reached the bar and said yes, take down those who have fallen clearly below it. Nightly, the same for every
+// student seen in the last 120 days plus the whole Vault, because a score also falls as time passes.
+Schedule::command('readiness:refresh')->everyTenMinutes()->withoutOverlapping(15);
+Schedule::command('readiness:refresh --all')->dailyAt('02:30')->withoutOverlapping(180);
+
+// Every minute: hand whatever is waiting in the Vault outbox to Mellow Vault (see VaultSyncService). It does
+// nothing, and loses nothing, until VAULT_SYNC_URL and VAULT_SYNC_SECRET are set.
+Schedule::command('vault:sync')->everyMinute()->withoutOverlapping(5);
+
+// Daily: drop delivered Vault outbox events past their retention.
+Schedule::command('vault:prune')->daily();
+
 // Daily: flip any subscription past its current_period_end to expired.
 Schedule::command('subscriptions:expire')->daily();
+
+// Every 5 minutes: ask the payment gateways (PayU, Razorpay) about orders still unpaid — the net under a lost webhook
+// and a student who paid and closed the tab (see ReconcilePayments). withoutOverlapping: a slow gateway must not stack runs.
+Schedule::command('payments:reconcile')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Every minute: stop Project Lab workspaces that are idle, lapsed or out of
 // hours (see ReapWorkspaces). Needs the every-minute `schedule:run` cron above —
@@ -47,3 +64,27 @@ Schedule::command('contests:generate-daily')
     ->timezone(config('contests.daily.timezone'))
     ->dailyAt('00:05')
     ->onOneServer();
+
+// Daily, mid-morning IST (a sensible hour to receive a nudge, and well clear of the 00:05 contest generation): the due
+// lifecycle e-mails — plans about to end, students a few points short of the Vault, Vault-ready students whose plan
+// has no Vault, free-plan students who have not bought, and win-backs for students who stopped coming. Every message
+// carries its own once-only key, so a double run (or two servers) cannot double-send; `php artisan lifecycle:send
+// --dry-run` shows what a run would do. onOneServer() is safe: the default CACHE_STORE supports atomic locks.
+Schedule::command('lifecycle:send')
+    ->timezone(config('lifecycle_mail.timezone'))
+    ->dailyAt(config('lifecycle_mail.run_at', '11:00'))
+    ->withoutOverlapping(120)
+    ->onOneServer();
+
+// Every minute: work off the DEFAULT queue, then exit. On a server whose only background process is the `schedule:run`
+// cron, this is what delivers the queued e-mails — bulk notifications to a whole cohort, interview shortlists, drive
+// proposals, proctoring reports, and any single e-mail whose first send failed and was handed over for a retry
+// (App\Support\SingleMail). Without it those sit in the `jobs` table for ever. If a real `queue:work` is also running,
+// the two simply share the jobs (each job is claimed atomically). The judge never runs here: it uses its own named
+// queues (judge-*), and a `--queue=default` worker does not read those.
+if (config('lifecycle_mail.drain_queue_from_scheduler') && config('queue.default') !== 'sync') {
+    Schedule::command('queue:work --queue=default --stop-when-empty --max-time=55 --tries=3 --sleep=1')
+        ->everyMinute()
+        ->withoutOverlapping(30)
+        ->runInBackground();
+}

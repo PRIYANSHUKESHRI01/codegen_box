@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\Concerns\ManagesSoftSkillQuestions;
 use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -17,6 +18,7 @@ class TpoSoftSkillController extends Controller
     {
         $assessments = SoftSkillAssessment::where('owning_college_id', $request->user()->college_id)
             ->withCount(['sessions', 'assessmentQuestions'])
+            ->with('appliedSets')
             ->latest('created_at')
             ->get();
 
@@ -36,9 +38,9 @@ class TpoSoftSkillController extends Controller
             'description' => ['nullable', 'string'],
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
-        ]);
+        ] + $this->questionSetCreationRules());
 
-        $assessment = SoftSkillAssessment::create([
+        $assessment = $this->createAssessment($request, [
             'title' => $validated['title'],
             'slug' => SoftSkillAssessment::uniqueSlug($validated['title']),
             'description' => $validated['description'] ?? null,
@@ -51,7 +53,7 @@ class TpoSoftSkillController extends Controller
             // TPO explicitly tightens it via update().
             'max_attempts' => null,
             'created_by' => $request->user()->id,
-        ]);
+        ], $validated);
 
         return response()->json(['assessment' => $assessment], 201);
     }
@@ -68,6 +70,8 @@ class TpoSoftSkillController extends Controller
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
+
+        $this->assertCanPublish($softSkillAssessment, $validated);
 
         $softSkillAssessment->update($validated);
 
@@ -87,6 +91,11 @@ class TpoSoftSkillController extends Controller
         $softSkillAssessment->delete();
 
         return response()->json(['message' => 'Assessment deleted.']);
+    }
+
+    protected function scopeOwnTests(Request $request, Builder $tests): mixed
+    {
+        return $tests->where('owning_college_id', $request->user()->college_id);
     }
 
     private function authorizeAssessmentOwnership(Request $request, SoftSkillAssessment $softSkillAssessment): void

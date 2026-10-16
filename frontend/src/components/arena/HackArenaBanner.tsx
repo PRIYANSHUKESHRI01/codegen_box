@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Radio, Rocket, Trophy } from "lucide-react";
+import { ArrowRight, Lock, Radio, Rocket, Trophy } from "lucide-react";
 import { useSpotlight } from "@/components/arena/motion";
 import { arenaApi, relativeTime } from "@/lib/hackathon";
+import { useEntitlements } from "@/lib/useEntitlements";
 import type { ArenaHome } from "@/types/hackathon";
 import "@/app/arena/lobby.css";
 
@@ -22,6 +23,8 @@ import "@/app/arena/lobby.css";
 export function HackArenaBanner() {
   const [home, setHome] = useState<ArenaHome | null>(null);
   const spot = useSpotlight<HTMLAnchorElement>();
+  // Anyone can look around the Arena; taking part is part of Expert, so the doorway says so.
+  const expertOnly = useEntitlements()?.hackathon_access === false;
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +66,11 @@ export function HackArenaBanner() {
               Hack <span className="bg-gradient-to-r from-[#a78bfa] to-[#67e8f9] bg-clip-text text-transparent">Arena</span>
             </h2>
             <span className="rounded-full bg-white/15 px-2 py-0.5 text-3xs font-bold uppercase tracking-[0.12em] ring-1 ring-inset ring-white/20">New</span>
+            {expertOnly && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-3xs font-bold uppercase tracking-[0.1em] text-amber-100 ring-1 ring-inset ring-amber-300/40">
+                <Lock className="h-3 w-3" aria-hidden /> Expert
+              </span>
+            )}
             {live > 0 && (
               <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2 py-0.5 text-3xs font-bold uppercase tracking-[0.1em] text-rose-100 ring-1 ring-inset ring-rose-400/40">
                 <Radio className="h-3 w-3" aria-hidden /> {live} live now
@@ -72,6 +80,7 @@ export function HackArenaBanner() {
 
           <p className="mt-1.5 max-w-2xl text-13 leading-relaxed text-white/75">
             <span className="font-semibold text-white/90">Build. Ship. Get hired.</span>{" "}
+            {expertOnly && "Browse any hackathon — taking part comes with Expert. "}
             {next
               ? `Next up: ${next.title} — ${next.phase === "registration_open" ? "registration is open" : `opens ${relativeTime(next.registration_opens_at)}`}.`
               : "Team up, ship a project and climb the leaderboard in hackathons hosted by AptRun and hiring partners."}

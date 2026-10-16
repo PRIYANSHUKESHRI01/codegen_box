@@ -20,7 +20,7 @@ const ITEMS = [
   { icon: Brain, label: "Soft-skills assessments" },
   { icon: BookOpenCheck, label: "Company prep packs" },
   { icon: Swords, label: "Mock contests" },
-  { icon: Users2, label: "Recruiter talent pool" },
+  { icon: Users2, label: "The Vault" },
   { icon: BarChart3, label: "Readiness analytics" },
 ];
 

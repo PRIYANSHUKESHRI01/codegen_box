@@ -94,7 +94,7 @@ class SpeakingPracticeScoringTest extends TestCase
     {
         Plan::create([
             'code' => 'free-test-'.uniqid(), 'name' => 'Free', 'audience' => Plan::AUDIENCE_INDIVIDUAL,
-            'monthly_price' => 0, 'annual_price' => 0, 'duration_days' => null, 'is_active' => true, 'sort_order' => 1,
+            'list_price' => 0, 'annual_price' => 0, 'duration_days' => null, 'is_active' => true, 'sort_order' => 1,
             'max_learning_centre_ai_attempts_per_day' => $limit,
         ]);
     }

@@ -12,6 +12,8 @@ interface ConsentCopy {
   title: string;
   subtitle: string;
   strikes: string;
+  /** Only for attempts where the editor's clipboard is restricted (contests); omitted = no line shown. */
+  paste?: string;
   footer: string;
 }
 
@@ -28,6 +30,8 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
     subtitle: "Required for every contest problem — not for practice.",
     strikes:
       "Switching tabs, exiting fullscreen, or opening developer tools counts as a strike. You get 2 warnings — a 3rd strike submits your current code and ends your attempt. This is reported to your TPO and section coordinator.",
+    paste:
+      "Pasting is limited to code you copied from the contest editor itself — anything copied from elsewhere is blocked and recorded in your report (it isn't a strike).",
     footer: "By continuing you consent to being recorded and monitored for the duration of this contest attempt.",
   },
   soft_skill: {

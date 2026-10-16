@@ -36,6 +36,15 @@ const nextConfig = {
     // lucide-react alone is imported in dozens of files across this app,
     // making this the single highest-value, lowest-risk bundle win available.
     optimizePackageImports: ["lucide-react", "framer-motion", "@monaco-editor/react"],
+
+    // How long the browser keeps a visited page's route data before Back / Forward / a link has to
+    // fetch it again. Next's default is 30 seconds — shorter than the time it takes to solve a problem —
+    // so a student who clicked "Back to Practice Arena" after a minute at the editor was sent back to the
+    // server for a page they had just left, and when that fetch was slow the screen sat on the old page
+    // (see lib/useResilientNavigation.ts). Every page here is a client component that loads its own data
+    // from the API on mount, so what is cached is only the page's shell: keeping it for ten minutes can
+    // never show stale data, and makes "Back" instant.
+    staleTimes: { dynamic: 600, static: 600 },
   },
 
   images: {

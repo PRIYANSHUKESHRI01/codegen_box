@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Loader2, Mic, ArrowRight, Trophy, Sparkles, AlertTriangle } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -181,6 +182,8 @@ export default function SpeakingPracticeListPage() {
       title="Speaking Practice"
       subtitle="Read a passage aloud and get coached on clarity, fluency and accuracy — the way an interviewer will hear you. Score 60+ to pass, or try again instantly."
     >
+      <FreeTrialBanner feature="speaking" />
+
       {loading ? (
         <div className="p-16 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
           <Loader2 className="w-4 h-4 animate-spin" />

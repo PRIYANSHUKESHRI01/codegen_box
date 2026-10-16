@@ -31,15 +31,18 @@ import { StatTile } from "@/components/dashboard/student/StatTile";
 import { RatingChart } from "@/components/dashboard/student/RatingChart";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
+import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
 import { ActivityHeatmap } from "@/components/dashboard/student/ActivityHeatmap";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
+import { LanguageFocusCard } from "@/components/dashboard/student/LanguageFocusCard";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
 import { cn, greeting } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
 import { getRatingTier, nextTierGap } from "@/lib/rating";
 import { useMyStats } from "@/lib/useMyStats";
+import { WEEKLY_PACES, choiceLabel } from "@/lib/studentPreferences";
 import { buildActivityWeeks } from "@/lib/activityGrid";
 import { RatingHistoryPoint } from "@/types/studentStats";
 import type { UpcomingPlacementDrive, MyDriveApplication } from "@/types/placement";
@@ -94,7 +97,7 @@ export default function UserDashboardPage() {
   const [ratingHistory, setRatingHistory] = useState<RatingHistoryPoint[]>([]);
   const [globalRank, setGlobalRank] = useState<number | null>(null);
 
-  const { stats, loading: statsLoading } = useMyStats(status === "ready");
+  const { stats, loading: statsLoading } = useMyStats(status === "ready", user?.weekly_pace ?? "");
   const activityWeeks = useMemo(() => buildActivityWeeks(stats?.activity ?? []), [stats]);
 
   const triggerToast = (msg: string) => {
@@ -219,22 +222,22 @@ export default function UserDashboardPage() {
       case "Placement Ready":
         return {
           chip: "bg-status-success/10 text-status-success",
-          blurb: "You're clearing the bar your placement cell screens on. Keep the streak going.",
+          blurb: "You're clearing the bar placement cells and employers screen on. Keep showing up to hold it.",
         };
       case "In Progress":
         return {
           chip: "bg-status-warning/10 text-status-warning",
-          blurb: "Close. More consistent problem solving will move you into the ready band.",
+          blurb: "Close. A few more interviews, tests and contests — and showing up on more days — will move you into the ready band.",
         };
       case "Needs Training":
         return {
           chip: "bg-status-danger/10 text-status-danger",
-          blurb: "Keep practicing to improve your problem solving, DSA and system design skills.",
+          blurb: "Start with an AI mock interview, a soft-skills test and a daily contest — every one of them moves this score.",
         };
       default:
         return {
           chip: "bg-elevated text-text-muted",
-          blurb: "Solve a few problems to generate your readiness score.",
+          blurb: "Take part in a few things on AptRun to generate your readiness score.",
         };
     }
   })();
@@ -542,6 +545,8 @@ export default function UserDashboardPage() {
             </div>
           )}
 
+          {stats && <VaultLine score={stats.readiness.score} vault={stats.readiness.vault} className="mt-5" />}
+
           <Link
             href="/dashboard/reports"
             className="group mt-5 flex items-center gap-1.5 border-t border-border-subtle pt-4 text-2xs font-bold text-accent-primary transition-colors"
@@ -567,6 +572,14 @@ export default function UserDashboardPage() {
               <ListChecks className="w-4 h-4 text-status-success" />
               <span>This Week&apos;s Goals</span>
             </h3>
+            {/* The targets follow the pace they chose in onboarding — say so, and make it one click to change. */}
+            <Link
+              href="/settings?tab=preferences"
+              title="Change your weekly pace in Settings"
+              className="rounded-full bg-elevated px-2.5 py-1 text-3xs font-bold text-text-secondary transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+            >
+              {choiceLabel(WEEKLY_PACES, user?.weekly_pace) ?? "Steady"} pace
+            </Link>
           </div>
 
           <div className="space-y-3.5 flex-1">
@@ -857,6 +870,11 @@ export default function UserDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* ------------------------------------------------------------ */}
+      {/* 6b. Language focus — what they really code in, where to improve */}
+      {/* ------------------------------------------------------------ */}
+      <LanguageFocusCard enabled={status === "ready"} />
 
       {/* ------------------------------------------------------------ */}
       {/* 7. Activity heatmap                                           */}

@@ -12,22 +12,36 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Sanctum;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Concerns\CreatesProjectLabFixtures;
+use Tests\Concerns\FakesRazorpay;
 use Tests\TestCase;
 
 /**
- * "Plan only → pay for the plan, Project Lab only → pay for Lab, both → pay the
- * combined price." Prices come from the real PlanSeeder; this is where the
- * numbers advertised to students are pinned.
+ * The cart mechanics: a plan, an add-on, or both, priced by the server. Prices
+ * come from the real PlanSeeder.
+ *
+ * Project Lab is part of Expert now and the stand-alone add-on is retired
+ * from sale (see PlanPricingTest for that). The mechanism it exercised — add-on
+ * lines, the bundle discount, stacking renewals, an add-on's own period — is
+ * kept for the next add-on and for students who still hold this one, so these
+ * tests switch the add-on back on to keep covering it. The plan prices are the
+ * live ones: Expert's 4,999 at 40% off is 2,999. The cart mechanics need a second, cheaper plan to price
+ * (see seedStarterPlan() — a test-only plan; the shipped catalogue sells one paid plan online).
  */
 class ProjectLabPricingTest extends TestCase
 {
     use CreatesProjectLabFixtures;
+    use FakesRazorpay;
     use RefreshDatabase;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->seedPlans();
+        $this->seedStarterPlan();
+        $this->setUpRazorpay();
+
+        // Retired in production; switched back on here to exercise the add-on mechanics.
+        Plan::where('code', Plan::CODE_PROJECT_LAB)->update(['is_active' => true]);
     }
 
     private function quote(User $user, ?string $plan, array $addons = []): array
@@ -37,11 +51,13 @@ class ProjectLabPricingTest extends TestCase
 
     public function test_a_plan_alone_costs_exactly_its_price(): void
     {
-        $quote = $this->quote($this->student(), 'expert');
+        $quote = $this->quote($this->student(), 'starter');
 
-        $this->assertSame(399, $quote['total']);
-        $this->assertSame(0, $quote['discount']);
-        $this->assertFalse($quote['bundle_applied']);
+        // Charged the sale price: 1,999 list, 40% (800) off.
+        $this->assertSame(1199, $quote['total']);
+        $this->assertSame(800, $quote['discount']);
+        $this->assertSame(1999, $quote['subtotal']);
+        $this->assertFalse($quote['bundle_applied'], 'a plan discount is not the add-on bundle discount');
         $this->assertCount(1, $quote['lines']);
     }
 
@@ -54,13 +70,13 @@ class ProjectLabPricingTest extends TestCase
         $this->assertFalse($quote['bundle_applied']);
     }
 
-    public function test_expert_plus_project_lab_is_bundled(): void
+    public function test_starter_plus_project_lab_is_bundled(): void
     {
-        $quote = $this->quote($this->student(), 'expert', [Plan::CODE_PROJECT_LAB]);
+        $quote = $this->quote($this->student(), 'starter', [Plan::CODE_PROJECT_LAB]);
 
-        $this->assertSame(399 + 349, $quote['total']);
-        $this->assertSame(150, $quote['discount']);
-        $this->assertSame(399 + 499, $quote['subtotal']);
+        $this->assertSame(1199 + 349, $quote['total']);
+        $this->assertSame(800 + 150, $quote['discount']);
+        $this->assertSame(1999 + 499, $quote['subtotal']);
         $this->assertTrue($quote['bundle_applied']);
 
         $lab = collect($quote['lines'])->firstWhere('code', Plan::CODE_PROJECT_LAB);
@@ -68,11 +84,11 @@ class ProjectLabPricingTest extends TestCase
         $this->assertSame(349, $lab['price']);
     }
 
-    public function test_grandmaster_plus_project_lab_is_bundled(): void
+    public function test_expert_plus_project_lab_is_bundled(): void
     {
-        $quote = $this->quote($this->student(), 'grandmaster', [Plan::CODE_PROJECT_LAB]);
+        $quote = $this->quote($this->student(), 'expert', [Plan::CODE_PROJECT_LAB]);
 
-        $this->assertSame(799 + 349, $quote['total']);
+        $this->assertSame(2999 + 349, $quote['total']);
     }
 
     public function test_a_free_base_plan_in_the_cart_does_not_earn_the_bundle_discount(): void
@@ -86,7 +102,7 @@ class ProjectLabPricingTest extends TestCase
     public function test_an_existing_paid_plan_holder_gets_the_bundle_price_when_adding_lab_later(): void
     {
         $student = $this->student();
-        $this->buy($student, 'expert');
+        $this->buy($student, 'starter');
 
         $quote = $this->quote($student->fresh(), null, [Plan::CODE_PROJECT_LAB]);
 
@@ -97,8 +113,8 @@ class ProjectLabPricingTest extends TestCase
     public function test_an_expired_paid_plan_does_not_earn_the_discount(): void
     {
         $student = $this->student();
-        $this->buy($student, 'expert');
-        Subscription::query()->where('subscriber_id', $student->id)->whereHas('plan', fn ($q) => $q->where('code', 'expert'))
+        $this->buy($student, 'starter');
+        Subscription::query()->where('subscriber_id', $student->id)->whereHas('plan', fn ($q) => $q->where('code', 'starter'))
             ->update(['current_period_end' => now()->subDay()]);
 
         $quote = $this->quote($student->fresh(), null, [Plan::CODE_PROJECT_LAB]);
@@ -110,9 +126,9 @@ class ProjectLabPricingTest extends TestCase
     {
         config(['billing.addon_bundle_discount_percent' => 0]);
 
-        $quote = $this->quote($this->student(), 'expert', [Plan::CODE_PROJECT_LAB]);
+        $quote = $this->quote($this->student(), 'starter', [Plan::CODE_PROJECT_LAB]);
 
-        $this->assertSame(399 + 499, $quote['total']);
+        $this->assertSame(1199 + 499, $quote['total']);
         $this->assertFalse($quote['bundle_applied']);
     }
 
@@ -138,7 +154,7 @@ class ProjectLabPricingTest extends TestCase
             'empty cart' => [null, []],
             'unknown plan' => ['nope', []],
             'an add-on offered as the plan' => [Plan::CODE_PROJECT_LAB, []],
-            'a plan offered as an add-on' => [null, ['expert']],
+            'a plan offered as an add-on' => [null, ['starter']],
             'an institution plan' => ['standard', []],
             'unknown add-on' => [null, ['nope']],
         ];
@@ -159,32 +175,34 @@ class ProjectLabPricingTest extends TestCase
     {
         $student = $this->student();
 
-        $this->buy($student, 'expert', [Plan::CODE_PROJECT_LAB]);
+        $this->buy($student, 'starter', [Plan::CODE_PROJECT_LAB]);
 
         $subs = Subscription::where('subscriber_id', $student->id)->where('subscriber_type', User::class)
             ->where('status', Subscription::STATUS_ACTIVE)->with('plan')->get()->keyBy(fn ($s) => $s->plan->code);
 
-        $this->assertEqualsCanonicalizing(['expert', Plan::CODE_PROJECT_LAB], $subs->keys()->all());
+        $this->assertEqualsCanonicalizing(['starter', Plan::CODE_PROJECT_LAB], $subs->keys()->all());
         $this->assertSame(349, $subs[Plan::CODE_PROJECT_LAB]->meta['price_paid']);
         $this->assertSame(499, $subs[Plan::CODE_PROJECT_LAB]->meta['list_price']);
         $this->assertSame(150, $subs[Plan::CODE_PROJECT_LAB]->meta['discount']);
-        $this->assertSame(399, $subs['expert']->meta['price_paid']);
-        $this->assertSame(748, $subs['expert']->meta['quote_total']);
-        $this->assertSame($subs['expert']->meta['purchase_ref'], $subs[Plan::CODE_PROJECT_LAB]->meta['purchase_ref']);
+        $this->assertSame(1199, $subs['starter']->meta['price_paid']);
+        $this->assertSame(1999, $subs['starter']->meta['list_price']);
+        $this->assertSame(800, $subs['starter']->meta['discount']);
+        $this->assertSame(1199 + 349, $subs['starter']->meta['quote_total']);
+        $this->assertSame($subs['starter']->meta['purchase_ref'], $subs[Plan::CODE_PROJECT_LAB]->meta['purchase_ref']);
     }
 
     public function test_an_addon_never_changes_the_students_plan_or_limits(): void
     {
         $student = $this->student();
-        $this->buy($student, 'expert');
+        $this->buy($student, 'starter');
         $before = $student->fresh()->effectiveEntitlements();
 
         $this->buy($student, null, [Plan::CODE_PROJECT_LAB]);
         $student = $student->fresh();
 
-        $this->assertSame('expert', $student->activeSubscription()->plan->code, 'activeSubscription() must stay base-only');
+        $this->assertSame('starter', $student->activeSubscription()->plan->code, 'activeSubscription() must stay base-only');
         $this->assertSame($before, $student->effectiveEntitlements());
-        $this->assertSame('expert', $student->subscriptionCoverage()['plan']->code);
+        $this->assertSame('starter', $student->subscriptionCoverage()['plan']->code);
         $this->assertTrue($student->hasProjectLabAccess());
     }
 
@@ -200,18 +218,18 @@ class ProjectLabPricingTest extends TestCase
     public function test_changing_plan_does_not_cancel_the_addon_and_vice_versa(): void
     {
         $student = $this->student();
-        $this->buy($student, 'expert', [Plan::CODE_PROJECT_LAB]);
+        $this->buy($student, 'starter', [Plan::CODE_PROJECT_LAB]);
 
-        $this->buy($student, 'grandmaster');
+        $this->buy($student, 'expert');
         $student = $student->fresh();
 
-        $this->assertSame('grandmaster', $student->activeSubscription()->plan->code);
+        $this->assertSame('expert', $student->activeSubscription()->plan->code);
         $this->assertTrue($student->hasProjectLabAccess(), 'upgrading the plan must not cost the student Project Lab');
         $this->assertSame(1, Subscription::where('subscriber_id', $student->id)->where('status', Subscription::STATUS_CANCELED)
-            ->whereHas('plan', fn ($q) => $q->where('code', 'expert'))->count());
+            ->whereHas('plan', fn ($q) => $q->where('code', 'starter'))->count());
 
         $this->buy($student, null, [Plan::CODE_PROJECT_LAB]);
-        $this->assertSame('grandmaster', $student->fresh()->activeSubscription()->plan->code, 'renewing Lab must not touch the plan');
+        $this->assertSame('expert', $student->fresh()->activeSubscription()->plan->code, 'renewing Lab must not touch the plan');
     }
 
     public function test_renewing_the_addon_early_stacks_the_remaining_days(): void
@@ -259,14 +277,23 @@ class ProjectLabPricingTest extends TestCase
         $student = $this->student();
         Sanctum::actingAs($student);
 
-        $this->getJson('/api/me/purchase-quote?plan_code=expert&addons[]=project-lab')
+        $this->getJson('/api/me/purchase-quote?plan_code=starter&addons[]=project-lab')
             ->assertOk()
-            ->assertJsonPath('quote.total', 748)
-            ->assertJsonPath('quote.discount', 150)
+            ->assertJsonPath('quote.total', 1199 + 349)
+            ->assertJsonPath('quote.discount', 800 + 150)
             ->assertJsonPath('quote.bundle_applied', true);
 
         $this->assertFalse($student->fresh()->hasProjectLabAccess());
         $this->assertSame('coder', $student->fresh()->activeSubscription()->plan->code);
+    }
+
+    /** Opens a checkout for this cart, pays it at the (fake) gateway and runs the browser's verify callback. */
+    private function payCart(array $cart): \Illuminate\Testing\TestResponse
+    {
+        $order = $this->postJson('/api/me/checkout', $cart)->assertCreated();
+        $payment = $this->razorpay->pay($order->json('checkout.order_id'));
+
+        return $this->postJson('/api/me/checkout/verify', $this->razorpay->callback($payment));
     }
 
     public function test_checkout_charges_the_server_price_and_returns_the_new_state(): void
@@ -274,12 +301,17 @@ class ProjectLabPricingTest extends TestCase
         $student = $this->student();
         Sanctum::actingAs($student);
 
-        $this->postJson('/api/me/subscription', ['plan_code' => 'expert', 'addons' => ['project-lab'], 'expected_total' => 748])
+        $order = $this->postJson('/api/me/checkout', ['plan_code' => 'starter', 'addons' => ['project-lab'], 'expected_total' => 1199 + 349])
+            ->assertCreated()
+            ->assertJsonPath('checkout.amount', (1199 + 349) * 100);
+        $this->assertSame((1199 + 349) * 100, $this->razorpay->orders[$order->json('checkout.order_id')]['amount']);
+
+        $this->postJson('/api/me/checkout/verify', $this->razorpay->callback($this->razorpay->pay($order->json('checkout.order_id'))))
             ->assertOk()
-            ->assertJsonPath('coverage.plan.code', 'expert')
+            ->assertJsonPath('coverage.plan.code', 'starter')
             ->assertJsonPath('project_lab.enabled', true)
             ->assertJsonPath('project_lab.source', 'addon')
-            ->assertJsonPath('purchase.total', 748)
+            ->assertJsonPath('payment.amount', 1199 + 349)
             ->assertJsonPath('addons.0.code', 'project-lab')
             ->assertJsonPath('addons.0.price_paid', 349);
     }
@@ -289,11 +321,12 @@ class ProjectLabPricingTest extends TestCase
         $student = $this->student();
         Sanctum::actingAs($student);
 
-        $this->postJson('/api/me/subscription', ['plan_code' => 'expert', 'addons' => ['project-lab'], 'expected_total' => 898])
+        $this->postJson('/api/me/checkout', ['plan_code' => 'starter', 'addons' => ['project-lab'], 'expected_total' => 1999 + 499])
             ->assertStatus(409)
             ->assertJsonPath('code', 'price_changed')
-            ->assertJsonPath('quote.total', 748);
+            ->assertJsonPath('quote.total', 1199 + 349);
 
+        $this->assertSame(0, $this->razorpay->calls('POST', '/orders'), 'no order was opened at the gateway');
         $this->assertFalse($student->fresh()->hasProjectLabAccess());
         $this->assertSame('coder', $student->fresh()->activeSubscription()->plan->code);
     }
@@ -303,21 +336,22 @@ class ProjectLabPricingTest extends TestCase
         $student = $this->student();
         Sanctum::actingAs($student);
 
-        $this->postJson('/api/me/subscription', ['addons' => ['project-lab'], 'price' => 1, 'total' => 1, 'amount' => 1])
+        $this->payCart(['addons' => ['project-lab'], 'price' => 1, 'total' => 1, 'amount' => 1])
             ->assertOk()
-            ->assertJsonPath('purchase.total', 499);
+            ->assertJsonPath('payment.amount', 499);
 
         $this->assertSame(499, $student->fresh()->activeAddonSubscription(Plan::CODE_PROJECT_LAB)->meta['price_paid']);
+        $this->assertSame(49900, collect($this->razorpay->orders)->first()['amount']);
     }
 
-    public function test_the_original_plan_only_request_still_works(): void
+    public function test_the_plan_only_request_works(): void
     {
         $student = $this->student();
         Sanctum::actingAs($student);
 
-        $this->postJson('/api/me/subscription', ['plan_code' => 'expert'])
+        $this->payCart(['plan_code' => 'starter'])
             ->assertOk()
-            ->assertJsonPath('coverage.plan.code', 'expert')
+            ->assertJsonPath('coverage.plan.code', 'starter')
             ->assertJsonPath('project_lab.enabled', false);
     }
 
@@ -325,18 +359,18 @@ class ProjectLabPricingTest extends TestCase
     {
         Sanctum::actingAs($this->student());
 
-        $this->postJson('/api/me/subscription', [])->assertStatus(422)->assertJsonValidationErrors('plan_code');
+        $this->postJson('/api/me/checkout', [])->assertStatus(422)->assertJsonValidationErrors('plan_code');
     }
 
     public function test_only_students_can_buy_or_quote(): void
     {
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_ADMIN_TPO]));
 
-        $this->postJson('/api/me/subscription', ['addons' => ['project-lab']])->assertForbidden();
+        $this->postJson('/api/me/checkout', ['addons' => ['project-lab']])->assertForbidden();
         $this->getJson('/api/me/purchase-quote?addons[]=project-lab')->assertForbidden();
     }
 
-    public function test_subscription_state_lists_lab_and_its_offer_for_a_student_without_it(): void
+    public function test_subscription_state_offers_expert_to_a_student_without_lab(): void
     {
         Sanctum::actingAs($this->student());
 
@@ -344,8 +378,8 @@ class ProjectLabPricingTest extends TestCase
             ->assertOk()
             ->assertJsonPath('project_lab.enabled', false)
             ->assertJsonPath('project_lab.source', 'none')
-            ->assertJsonPath('project_lab.offer.code', 'project-lab')
-            ->assertJsonPath('project_lab.offer.monthly_price', 499)
+            ->assertJsonPath('project_lab.upgrade.code', 'expert')
+            ->assertJsonPath('project_lab.upgrade.sale_price', 2999)
             ->assertJsonPath('addons', []);
     }
 

@@ -15,9 +15,10 @@ use App\Http\Controllers\Api\AdminPlacementDriveController;
 use App\Http\Controllers\Api\AdminProblemController;
 use App\Http\Controllers\Api\AdminSoftSkillController;
 use App\Http\Controllers\Api\AdminSoftSkillQuestionBankController;
-use App\Http\Controllers\Api\AdminTalentPoolController;
+use App\Http\Controllers\Api\AdminVaultController;
 use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\ContestProctoringController;
 use App\Http\Controllers\Api\ContestSubmissionController;
@@ -32,7 +33,7 @@ use App\Http\Controllers\Api\CompanyInterviewTrackController;
 use App\Http\Controllers\Api\CompanyProctoringController;
 use App\Http\Controllers\Api\CompanyReportsController;
 use App\Http\Controllers\Api\CompanySoftSkillController;
-use App\Http\Controllers\Api\CompanyTalentPoolController;
+use App\Http\Controllers\Api\CompanyVaultController;
 use App\Http\Controllers\Api\ContactRequestController;
 use App\Http\Controllers\Api\CoordinatorProctoringController;
 use App\Http\Controllers\Api\CoordinatorStudentController;
@@ -51,6 +52,7 @@ use App\Http\Controllers\Api\ListeningLabController;
 use App\Http\Controllers\Api\MarketingContactRequestController;
 use App\Http\Controllers\Api\MarketingLeadController;
 use App\Http\Controllers\Api\MySubmissionsController;
+use App\Http\Controllers\Api\EmailPreferenceController;
 use App\Http\Controllers\Api\NewsletterController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PhoneVerificationController;
@@ -59,17 +61,26 @@ use App\Http\Controllers\Api\AdminProjectLabController;
 use App\Http\Controllers\Api\ProjectLabController;
 use App\Http\Controllers\Api\ProjectWorkspaceController;
 use App\Http\Controllers\Api\PublicController;
+use App\Http\Controllers\Api\PublicPlanController;
+use App\Http\Controllers\Api\PayuReturnController;
+use App\Http\Controllers\Api\PayuWebhookController;
+use App\Http\Controllers\Api\RazorpayWebhookController;
 use App\Http\Controllers\Api\SoftSkillController;
 use App\Http\Controllers\Api\SoftSkillProctoringController;
 use App\Http\Controllers\Api\SpeakingPracticeController;
 use App\Http\Controllers\Api\StudentDriveController;
 use App\Http\Controllers\Api\StudentImportController;
+use App\Http\Controllers\Api\StudentPreferencesController;
 use App\Http\Controllers\Api\StudentProfileController;
 use App\Http\Controllers\Api\StudentStatsController;
-use App\Http\Controllers\Api\StudentTalentPoolController;
+use App\Http\Controllers\Api\StudentVaultController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\SubscriptionController;
+use App\Http\Controllers\Api\SuperAdminAccountController;
 use App\Http\Controllers\Api\SuperAdminController;
+use App\Http\Controllers\Api\SuperAdminPaymentController;
+use App\Http\Controllers\Api\SuperAdminPlanController;
+use App\Http\Controllers\Api\SuperAdminSubscriptionController;
 use App\Http\Controllers\Api\TpoContestController;
 use App\Http\Controllers\Api\TpoCoordinatorController;
 use App\Http\Controllers\Api\TpoInterviewController;
@@ -82,6 +93,7 @@ use App\Http\Controllers\Api\TpoReportsController;
 use App\Http\Controllers\Api\TpoSoftSkillController;
 use App\Http\Controllers\Api\TpoStudentController;
 use App\Http\Controllers\Api\TpoStudentReportController;
+use App\Http\Controllers\Api\VaultIntegrationController;
 use App\Http\Controllers\Api\VocabularyController;
 use App\Http\Controllers\Api\VocabularyProgressController;
 use App\Models\User;
@@ -99,6 +111,13 @@ Route::post('/contact-requests', [ContactRequestController::class, 'store'])
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
     ->middleware('throttle:newsletter-subscribe');
 
+// The unsubscribe page behind the link in every nudge e-mail (and its List-Unsubscribe header). Signed, not
+// authenticated: the person is reading an e-mail, not using the app. GET only shows the state; POST changes it.
+Route::middleware(['signed', 'throttle:30,1'])->group(function () {
+    Route::get('/email/preferences/{user}', [EmailPreferenceController::class, 'show'])->name('email.preferences');
+    Route::post('/email/preferences/{user}', [EmailPreferenceController::class, 'update']);
+});
+
 // The only unauthenticated data reads in this API — the public marketing
 // landing page's real-numbers Stats section and Problem Explorer/navbar
 // search preview. See PublicController's own docblock for exactly what's
@@ -109,6 +128,39 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('/problems/sample', [PublicController::class, 'sampleProblems']);
 });
 
+// The pricing page's live price list. Its own named limiter, not the 60/min group above: the
+// page polls it every few seconds, and a campus lab shares one IP across a whole class.
+Route::get('/public/plans', [PublicPlanController::class, 'index'])->middleware('throttle:public-plans');
+
+// Razorpay → us: payments, failures and refunds, whether or not the student's browser is still open.
+// Unauthenticated by design; the HMAC signature over the raw body is the credential (see
+// RazorpayWebhookController). Outside the throttled `public` group: a bursty sender must not be
+// 429'd into a retry storm, so it has its own generous per-IP limiter.
+Route::post('/webhooks/razorpay', RazorpayWebhookController::class)->middleware('throttle:payment-webhook');
+
+// PayU → us, same idea: payment events carry PayU's response hash, refund/dispute events are unsigned
+// (the optional ?token= secret + PayU's own API are what vet those — see PayuWebhookController).
+Route::post('/webhooks/payu', PayuWebhookController::class)->middleware('throttle:payment-webhook');
+
+// PayU's hosted page sending the STUDENT'S BROWSER back after paying / failing / cancelling (a form POST,
+// so no login token — the signed transaction is the credential). Always answers with a redirect into the
+// app; see PayuReturnController. GET is accepted only to bounce a stray visit to the billing page.
+Route::match(['get', 'post'], '/payu/return', PayuReturnController::class)->middleware('throttle:payment-return');
+
+// Mellow Vault → us: the pull API a Mellow Vault can reconcile against, the resume download for a listed
+// student, and the "this student was hired" callback. Not a user's session: a shared bearer key (VAULT_API_KEY)
+// is the credential, and with none configured every route here answers 503 (see AuthenticateVaultIntegration).
+// The other direction — AptRun pushing profile.upsert / profile.withdraw — is the `vault:sync` command.
+Route::prefix('vault/v1')
+    ->middleware(['vault.integration', 'throttle:vault-integration'])
+    ->group(function () {
+        Route::get('/ping', [VaultIntegrationController::class, 'ping']);
+        Route::get('/profiles', [VaultIntegrationController::class, 'index']);
+        Route::get('/profiles/{profile:public_id}', [VaultIntegrationController::class, 'show']);
+        Route::get('/profiles/{profile:public_id}/resume', [VaultIntegrationController::class, 'resume']);
+        Route::post('/profiles/{profile:public_id}/status', [VaultIntegrationController::class, 'status']);
+    });
+
 Route::prefix('password')->group(function () {
     Route::post('/forgot', [PasswordResetController::class, 'forgot'])
         ->middleware('throttle:password-reset-request');
@@ -118,7 +170,10 @@ Route::prefix('password')->group(function () {
         ->middleware('throttle:password-reset-verify');
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+// Every signed-in request also passes two guards that read the account itself: a blocked
+// account is refused at once (not just at its next login), and a superadmin's "view as"
+// session may only read. See each middleware for the reasoning.
+Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
 
@@ -140,14 +195,36 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/me/resume', [StudentProfileController::class, 'deleteResume']);
     Route::get('/me/resume', [StudentProfileController::class, 'downloadOwnResume']);
 
+    // First-login onboarding + the preferences it collects (primary language,
+    // skill level, goal, focus, pace) — student-only; see
+    // StudentPreferencesController. The same answers are edited later from
+    // Settings via PUT /me/preferences.
+    Route::post('/me/onboarding', [StudentPreferencesController::class, 'complete']);
+    Route::post('/me/onboarding/skip', [StudentPreferencesController::class, 'skip']);
+    Route::put('/me/preferences', [StudentPreferencesController::class, 'update']);
+    Route::get('/me/language-insights', [StudentPreferencesController::class, 'languageInsights']);
+
     // Settings → Billing, and the /pricing page when signed in. mine()
     // branches internally per role (student's own/college coverage, TPO's
     // college, or "internal" for staff) — subscribe() further restricts
     // itself to role:user, so no route-level role middleware is needed here.
     Route::get('/me/subscription', [SubscriptionController::class, 'mine']);
-    // Live price of a cart (plan and/or Project Lab) — the same service prices the POST below.
+    // A few bytes saying whether the plan changed, polled by every open dashboard — so a plan a
+    // superadmin grants or cancels shows up on the student's screen within seconds. Deliberately
+    // far cheaper than /me/subscription (no usage counts, no gateway call).
+    Route::get('/me/plan-signal', [SubscriptionController::class, 'signal'])->middleware('throttle:plan-signal');
+    // Live price of a cart — the same service prices the real checkout below.
     Route::get('/me/purchase-quote', [SubscriptionController::class, 'quote']);
-    Route::post('/me/subscription', [SubscriptionController::class, 'subscribe'])->middleware('throttle:lab-purchase');
+
+    // Paying for a plan (PayU hosted checkout — docs/payments-payu.md — or Razorpay Standard Checkout —
+    // docs/payments-razorpay.md; config billing.gateway picks). There is no route that activates a paid plan
+    // without a verified payment: /me/checkout opens an order on the active gateway, PayU's browser return
+    // (/payu/return) or Razorpay's signed /me/checkout/verify callback reports the result, and the webhooks +
+    // reconcile job are the safety nets behind them. Student-only (CheckoutController refuses everyone else).
+    Route::post('/me/checkout', [CheckoutController::class, 'create'])->middleware('throttle:checkout-create');
+    Route::post('/me/checkout/verify', [CheckoutController::class, 'verify'])->middleware('throttle:checkout-verify');
+    Route::get('/me/payments', [CheckoutController::class, 'index']);
+    Route::get('/me/payments/{publicId}', [CheckoutController::class, 'show'])->middleware('throttle:checkout-status');
 
     // Mellow-internal-staff-only: manage partner colleges and their TPO
     // accounts. A logged-in admin_tpo user gets a 403 from every route in
@@ -377,6 +454,9 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/soft-skills/{softSkillAssessment}/questions', [AdminSoftSkillController::class, 'storeQuestion']);
                 Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [AdminSoftSkillController::class, 'destroyQuestion']);
                 Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [AdminSoftSkillController::class, 'autoFillQuestions']);
+                // The AptRun question-set library (with this caller's own "already used" markers), and building a test from one set.
+                Route::get('/soft-skill-question-sets', [AdminSoftSkillController::class, 'questionSets']);
+                Route::post('/soft-skills/{softSkillAssessment}/question-sets', [AdminSoftSkillController::class, 'attachQuestionSet']);
 
                 // The shared question bank — reachable by every authoring
                 // role (see routes below), registered here too since
@@ -392,16 +472,17 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::post('/soft-skill-question-bank/{softSkillQuestion}', [AdminSoftSkillQuestionBankController::class, 'update']);
             });
 
-            Route::middleware('permission:'.User::PERM_TALENT_POOL)->group(function () {
-                // Marketplace oversight only — authoring the sourcing
-                // assessment itself (the `talent_pool` contest/interview
-                // that qualifies a candidate) reuses the Contests/AI
-                // Interviews sections above (permission:contests /
-                // permission:interviews), same "one source of truth per
-                // concept" pattern as every other contest/interview type.
-                Route::get('/talent-pool/colleges', [AdminTalentPoolController::class, 'colleges']);
-                Route::get('/talent-pool/candidates', [AdminTalentPoolController::class, 'index']);
-                Route::post('/talent-pool/candidates/{candidate}/visibility', [AdminTalentPoolController::class, 'updateVisibility']);
+            Route::middleware('permission:'.User::PERM_VAULT)->group(function () {
+                // The Vault — students whose readiness score says they are ready to
+                // be hired. Nothing is authored here (the score is what gets a
+                // student in); this is oversight: the roster, a policy override to
+                // hide a profile, and the state of the hand-off to Mellow Vault.
+                Route::get('/vault/summary', [AdminVaultController::class, 'summary']);
+                Route::get('/vault/profiles', [AdminVaultController::class, 'index']);
+                Route::post('/vault/profiles/{profile}/visibility', [AdminVaultController::class, 'updateVisibility']);
+                Route::post('/vault/profiles/{profile}/resync', [AdminVaultController::class, 'resync']);
+                Route::get('/vault/sync-events', [AdminVaultController::class, 'syncEvents']);
+                Route::post('/vault/sync-events/retry', [AdminVaultController::class, 'retrySync']);
             });
 
             Route::middleware('permission:'.User::PERM_ARTICLES)->group(function () {
@@ -469,6 +550,42 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/judge-nodes', [SuperAdminController::class, 'judgeNodes']);
             Route::get('/feature-flags', [SuperAdminController::class, 'featureFlags']);
             Route::post('/feature-flags/{flag}/toggle', [SuperAdminController::class, 'toggleFeatureFlag']);
+
+            // One account, any role: the 360° "Manage" drawer and its hand tools. Everything that
+            // can lock someone out, impersonate or destroy re-asks for the caller's own password.
+            Route::get('/users/{user}/manage', [SuperAdminAccountController::class, 'show']);
+            Route::put('/users/{user}', [SuperAdminAccountController::class, 'update']);
+            Route::post('/users/{user}/revoke-sessions', [SuperAdminAccountController::class, 'revokeSessions'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/users/{user}/impersonate', [SuperAdminAccountController::class, 'impersonate'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::get('/users/{user}/deletion-preview', [SuperAdminAccountController::class, 'deletionPreview']);
+            Route::delete('/users/{user}', [SuperAdminAccountController::class, 'destroy'])
+                ->middleware('throttle:superadmin-sensitive');
+
+            // Subscriptions: every plan anyone holds, and the hand tools to give, extend and end them.
+            // A change is live on the holder's next request (see SuperAdminSubscriptionController).
+            Route::get('/subscriptions', [SuperAdminSubscriptionController::class, 'index']);
+            Route::get('/students/search', [SuperAdminSubscriptionController::class, 'searchStudents']);
+            Route::post('/users/{user}/subscription', [SuperAdminSubscriptionController::class, 'grant'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/subscriptions/{subscription}/extend', [SuperAdminSubscriptionController::class, 'extend'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/subscriptions/{subscription}/cancel', [SuperAdminSubscriptionController::class, 'cancel'])
+                ->middleware('throttle:superadmin-sensitive');
+            // Plans & Pricing: the live price and discount of the individual plans. A change is
+            // visible on the public pricing page at once, so it shares the sensitive-action limiter.
+            Route::get('/plans', [SuperAdminPlanController::class, 'index']);
+            Route::put('/plans/{plan:code}', [SuperAdminPlanController::class, 'update'])
+                ->middleware('throttle:superadmin-sensitive');
+            // What a plan INCLUDES (daily limits, free tries, Arena / Pool / Project Lab access) — live too.
+            Route::put('/plans/{plan:code}/entitlements', [SuperAdminPlanController::class, 'updateEntitlements'])
+                ->middleware('throttle:superadmin-sensitive');
+
+            // Payments: every plan purchase and what it is worth; "re-check" asks the order's gateway again for one order.
+            Route::get('/payments', [SuperAdminPaymentController::class, 'index']);
+            Route::post('/payments/{payment:public_id}/reconcile', [SuperAdminPaymentController::class, 'reconcile'])
+                ->middleware('throttle:superadmin-sensitive');
         });
 
     // Mellow Marketing team's own surface — "Mellow Direct" leads only (see
@@ -560,6 +677,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/soft-skills/{softSkillAssessment}/questions', [TpoSoftSkillController::class, 'storeQuestion']);
             Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [TpoSoftSkillController::class, 'destroyQuestion']);
             Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [TpoSoftSkillController::class, 'autoFillQuestions']);
+            // The AptRun question-set library (with this caller's own "already used" markers), and building a test from one set.
+            Route::get('/soft-skill-question-sets', [TpoSoftSkillController::class, 'questionSets']);
+            Route::post('/soft-skills/{softSkillAssessment}/question-sets', [TpoSoftSkillController::class, 'attachQuestionSet']);
             Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
             Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
                 ->middleware('throttle:ai-generation');
@@ -723,19 +843,19 @@ Route::middleware('auth:sanctum')->group(function () {
 
             Route::get('/reports/data', [CompanyReportsController::class, 'data']);
 
-            // The shared Talent Pool marketplace — candidates Mellow itself
-            // already tested (see CompanyTalentPoolController's docblock),
-            // independent of any job opening this company created. Every
-            // action here is mediated by the platform (no candidate email/
-            // phone is ever returned directly).
-            Route::get('/talent-pool', [CompanyTalentPoolController::class, 'index']);
-            Route::get('/talent-pool/inquiries', [CompanyTalentPoolController::class, 'myInquiries']);
-            Route::get('/talent-pool/{candidate}', [CompanyTalentPoolController::class, 'show']);
-            Route::get('/talent-pool/{candidate}/resume', [CompanyTalentPoolController::class, 'resume']);
-            Route::post('/talent-pool/{candidate}/interest', [CompanyTalentPoolController::class, 'expressInterest']);
-            Route::post('/talent-pool/{candidate}/interview', [CompanyTalentPoolController::class, 'scheduleInterview']);
-            Route::post('/talent-pool/{candidate}/hire', [CompanyTalentPoolController::class, 'hire']);
-            Route::post('/talent-pool/{candidate}/notify', [CompanyTalentPoolController::class, 'notify']);
+            // The Vault — students whose AptRun readiness score says they are
+            // ready to be hired, and who agreed to be found (see
+            // CompanyVaultController's docblock), independent of any job opening
+            // this company created. Every action here is mediated by the platform
+            // (no student email/phone is ever returned directly).
+            Route::get('/vault', [CompanyVaultController::class, 'index']);
+            Route::get('/vault/inquiries', [CompanyVaultController::class, 'myInquiries']);
+            Route::get('/vault/{profile}', [CompanyVaultController::class, 'show']);
+            Route::get('/vault/{profile}/resume', [CompanyVaultController::class, 'resume']);
+            Route::post('/vault/{profile}/interest', [CompanyVaultController::class, 'expressInterest']);
+            Route::post('/vault/{profile}/interview', [CompanyVaultController::class, 'scheduleInterview']);
+            Route::post('/vault/{profile}/hire', [CompanyVaultController::class, 'hire']);
+            Route::post('/vault/{profile}/notify', [CompanyVaultController::class, 'notify']);
 
             // Soft Skills — this hiring partner's own tests
             // (assessment_type=company), visible to students at any college
@@ -751,6 +871,9 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/soft-skills/{softSkillAssessment}/questions', [CompanySoftSkillController::class, 'storeQuestion']);
             Route::delete('/soft-skills/{softSkillAssessment}/questions/{assessmentQuestion}', [CompanySoftSkillController::class, 'destroyQuestion']);
             Route::post('/soft-skills/{softSkillAssessment}/questions/auto-fill', [CompanySoftSkillController::class, 'autoFillQuestions']);
+            // The AptRun question-set library (with this caller's own "already used" markers), and building a test from one set.
+            Route::get('/soft-skill-question-sets', [CompanySoftSkillController::class, 'questionSets']);
+            Route::post('/soft-skills/{softSkillAssessment}/question-sets', [CompanySoftSkillController::class, 'attachQuestionSet']);
             Route::get('/soft-skill-question-bank', [AdminSoftSkillQuestionBankController::class, 'index']);
             Route::post('/soft-skill-question-bank/generate', [AdminSoftSkillQuestionBankController::class, 'generate'])
                 ->middleware('throttle:ai-generation');
@@ -1030,14 +1153,14 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/start', [ContestProctoringController::class, 'start']);
             Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/violations', [ContestProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
 
-            // A student's own Talent Pool standing — see
-            // StudentTalentPoolController's docblock. Qualification itself
-            // happens server-side (TalentPoolQualificationService), never
-            // here; this is consent (opt in/out of being discoverable) and
-            // responding to a hiring partner's HR interview invite.
-            Route::get('/me/talent-pool', [StudentTalentPoolController::class, 'mine']);
-            Route::post('/me/talent-pool/opt-in', [StudentTalentPoolController::class, 'optIn']);
-            Route::post('/me/talent-pool/opt-out', [StudentTalentPoolController::class, 'optOut']);
-            Route::post('/me/talent-pool/inquiries/{inquiry}/respond', [StudentTalentPoolController::class, 'respondToInterview']);
+            // A student's own place in the Vault — see StudentVaultController's
+            // docblock. Getting in is the readiness score's doing (refreshed
+            // server-side, never here); this is the student's half: where they
+            // stand, the one standing consent to be listed (and to take it back),
+            // and responding to a hiring partner's HR interview invite.
+            Route::get('/me/vault', [StudentVaultController::class, 'show']);
+            Route::post('/me/vault/consent', [StudentVaultController::class, 'consent']);
+            Route::delete('/me/vault/consent', [StudentVaultController::class, 'withdraw']);
+            Route::post('/me/vault/inquiries/{inquiry}/respond', [StudentVaultController::class, 'respondToInterview']);
         });
 });

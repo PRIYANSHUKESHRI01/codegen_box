@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Http\Controllers\Api\Concerns\ConfirmsSuperadminPassword;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\ActivityLog;
@@ -10,6 +11,7 @@ use App\Models\Company;
 use App\Models\ContactRequest;
 use App\Models\NewsletterSubscriber;
 use App\Models\FeatureFlag;
+use App\Models\Plan;
 use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
@@ -36,6 +38,8 @@ use Illuminate\Validation\ValidationException;
  */
 class SuperAdminController extends Controller
 {
+    use ConfirmsSuperadminPassword;
+
     /**
      * Every account on the platform, any role — admin_internal's own user
      * list is student-only by design, so this is the only real cross-role
@@ -83,6 +87,23 @@ class SuperAdminController extends Controller
             $query->where('college_id', $collegeId);
         }
 
+        // The plan a student holds THEMSELVES (not their college's): a plan code, `paid` for any
+        // paid one, `free` for Coder, or `none` for no running plan at all. This is the filter the
+        // "who is on what" question needs — a college-covered student's own plan is what lapses
+        // if the college does.
+        if ($plan = $request->query('plan')) {
+            $running = fn ($s) => $s->where('status', Subscription::STATUS_ACTIVE)
+                ->where(fn ($q) => $q->whereNull('current_period_end')->orWhere('current_period_end', '>', now()))
+                ->whereHas('plan', fn ($p) => $p->where('kind', Plan::KIND_BASE));
+
+            match ($plan) {
+                'none' => $query->whereDoesntHave('subscriptions', $running),
+                'paid' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->paidTier())),
+                'free' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('list_price', 0))),
+                default => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('code', $plan))),
+            };
+        }
+
         $page = $query->latest()->paginate(50);
 
         // Real, cheap-per-row enrichment bounded to this one page (≤50 rows)
@@ -90,7 +111,16 @@ class SuperAdminController extends Controller
         // MarketingLeadController::leadSummary(), never run across the whole
         // unfiltered table.
         $page->getCollection()->transform(function (User $user) {
-            $user->subscription_plan_name = $user->effectiveSubscription()?->plan?->name;
+            $coverage = $user->subscriptionCoverage();
+            $user->subscription_plan_name = $coverage['plan']?->name;
+            $user->subscription = $coverage['plan'] ? [
+                'plan_code' => $coverage['plan']->code,
+                'plan_name' => $coverage['plan']->name,
+                'source' => $coverage['source'],
+                'days_remaining' => $coverage['days_remaining'],
+                'is_trial' => $coverage['is_trial'],
+                'ends_at' => $coverage['subscription']?->current_period_end,
+            ] : null;
             if ($user->role === User::ROLE_USER) {
                 $user->readiness_tier = $user->readinessTier();
             }
@@ -473,9 +503,7 @@ class SuperAdminController extends Controller
         } catch (QueryException $e) {
             report($e);
 
-            return response()->json([
-                'message' => 'The university could not be deleted because some of its records are still in use elsewhere. Nothing was deleted.',
-            ], 409);
+            return response()->json(['message' => $this->collegePurgeFailureMessage($e)], 409);
         }
 
         ActivityLog::record($request->user(), 'Permanently deleted a partner university', 'College', $name, $removed);
@@ -484,18 +512,25 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * Re-check the signed-in superadmin's own password before an action that
-     * can take over accounts or destroy data. Answers 422, never 401: the
-     * frontend treats a 401 as "session expired" and would log them out for a
-     * typo.
+     * Why a university delete was refused, in words a superadmin can act on. This endpoint is superadmin-only, so
+     * naming the blocking table is fine — "still in use elsewhere" alone gave no way to tell a record that needs
+     * clearing from a database that was merely busy. The full error is already in the log (report($e) above).
      */
-    private function confirmSuperadminPassword(Request $request, string $password): void
+    private function collegePurgeFailureMessage(QueryException $e): string
     {
-        if (! Hash::check($password, $request->user()->password)) {
-            throw ValidationException::withMessages([
-                'password' => ['That is not your password. Enter the password you sign in with.'],
-            ]);
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        // 1205 lock wait timeout, 1213 deadlock: another request held the same rows.
+        if (in_array($driverCode, [1205, 1213], true)) {
+            return 'The database was busy with other work on the same records. Nothing was deleted — wait a minute and try again.';
         }
+
+        // 1451: a foreign key from a child table still points at a row being deleted.
+        if ($driverCode === 1451 && preg_match('/fails \(`[^`]+`\.`([^`]+)`/', $e->getMessage(), $m) === 1) {
+            return "The university could not be deleted because records in \"{$m[1]}\" still depend on it. Nothing was deleted.";
+        }
+
+        return 'The university could not be deleted because the database refused part of it (error '.($driverCode ?: 'unknown').'). Nothing was deleted; the details are in the server log.';
     }
 
     /**
@@ -585,7 +620,19 @@ class SuperAdminController extends Controller
         // What the student was actually charged for the line (a bundled add-on
         // is discounted), falling back to list price for rows from before
         // purchases recorded it.
-        $linePrice = fn (Subscription $s): int => (int) ($s->meta['price_paid'] ?? $s->plan?->monthly_price ?? 0);
+        $linePrice = fn (Subscription $s): int => (int) ($s->meta['price_paid'] ?? $s->plan?->salePrice() ?? 0);
+
+        // Individual plans are billed per term — a 30-day add-on or legacy plan, a
+        // 365-day Expert, a three-year Grandmaster — so a flat sum of what was paid is NOT a
+        // monthly figure. Each line is spread over its own term and expressed per
+        // 30 days; a plan that never expires (free Coder) contributes nothing.
+        // A plan given by hand for a custom term (SubscriptionService::grantIndividualPlan) records that
+        // term, and it — not the plan's usual length — is what the money was paid for.
+        $monthlyEquivalent = function (Subscription $s) use ($linePrice): float {
+            $termDays = (int) ($s->meta['term_days'] ?? $s->plan?->duration_days ?? 0);
+
+            return $termDays > 0 ? $linePrice($s) * 30 / $termDays : 0.0;
+        };
 
         $institutionalPriced = $institutionalSubs->filter(fn (Subscription $s) => $s->plan?->annual_price !== null);
 
@@ -593,16 +640,17 @@ class SuperAdminController extends Controller
             'segments' => $segments,
             'submissions_today' => Submission::where('submitted_on', now()->toDateString())->count(),
             'signups_last_7_days' => User::where('created_at', '>=', now()->subDays(7))->count(),
-            // Individual subs bill on a real ~30-day cycle at monthly_price
-            // (SubscriptionService::activate() sets current_period_end
-            // accordingly), so this sum genuinely is a monthly recurring
-            // figure — not fabricated, but explicitly list-price, not
-            // collected cash (no payment gateway exists yet).
+            // Each individual subscription's price (what the student was charged,
+            // else the plan's sale price) spread over its own billing term and
+            // expressed per 30 days — so a ₹1,199 yearly plan counts as about ₹98
+            // a month and a legacy ₹399 30-day plan as ₹399. Not fabricated, but
+            // explicitly the price on file, not collected cash (no payment
+            // gateway exists yet).
             'individual_recurring' => [
                 'count' => $baseSubs->count(),
-                'monthly_total' => $individualSubs->sum($linePrice),
+                'monthly_total' => (int) round($individualSubs->sum($monthlyEquivalent)),
                 'addon_count' => $addonSubs->count(),
-                'addon_monthly_total' => $addonSubs->sum($linePrice),
+                'addon_monthly_total' => (int) round($addonSubs->sum($monthlyEquivalent)),
             ],
             // Institutional subs bill annually. Academic Enterprise has no
             // fixed annual_price on file (custom/enterprise sales) — those

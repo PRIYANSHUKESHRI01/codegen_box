@@ -6,6 +6,7 @@ use App\Models\College;
 use App\Models\Company;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\PurchaseQuoteService;
 use App\Services\SubscriptionService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -156,6 +157,16 @@ class DatabaseSeeder extends Seeder
         $this->call(DsaHundredProblemSeederV8::class);
         $this->call(DsaHundredProblemSeederV9::class);
         $this->call(DsaHundredProblemSeederV10::class);
+        $this->call(DsaHundredProblemSeederV11::class);
+        $this->call(DsaHundredProblemSeederV12::class);
+        $this->call(DsaHundredProblemSeederV13::class);
+        $this->call(DsaHundredProblemSeederV14::class);
+        $this->call(DsaHundredProblemSeederV15::class);
+        $this->call(DsaHundredProblemSeederV16::class);
+        $this->call(DsaHundredProblemSeederV17::class);
+        $this->call(DsaHundredProblemSeederV18::class);
+        $this->call(DsaHundredProblemSeederV19::class);
+        $this->call(DsaHundredProblemSeederV20::class);
         $this->call(CompanyTagSeeder::class);
         // InterviewQuestionBankSeeder before CampusRosterSeeder: both
         // CompanyHiringSeeder and InterviewSeeder below attach real
@@ -179,6 +190,7 @@ class DatabaseSeeder extends Seeder
         // already seeded above).
         $this->call(SoftSkillQuestionSeeder::class);
         $this->call(SoftSkillAssessmentSeeder::class);
+        $this->call(SoftSkillTwentySetsSeeder::class);
         $this->call(FeatureFlagSeeder::class);
         // Project Lab's project catalogue (SOW + milestones), read from files.
         $this->call(ProjectLabContentSeeder::class);
@@ -228,15 +240,15 @@ class DatabaseSeeder extends Seeder
 
         User::where('role', User::ROLE_USER)->get()->each(fn (User $user) => $service->ensureDefaultIndividualPlan($user));
 
-        // Exercises the real conversion path (SubscriptionService::subscribeIndividual
+        // Exercises the real conversion path (SubscriptionService::purchase
         // -> LeadAssignmentService::convertLead) so the demo data shows one
         // lead already converted-and-handed-to-Internal, not just a raw new
-        // one — same real code path a live checkout would run, not a
-        // fabricated lead_status write.
+        // one — the same fulfilment step a paid checkout runs once Razorpay
+        // has confirmed the money, not a fabricated lead_status write. It is
+        // demo data, so no payment record exists behind it: nothing was paid.
         $rohan = User::where('email', 'rohan.verma@gmail.com')->first();
-        $expertPlan = Plan::where('code', 'expert')->first();
-        if ($rohan !== null && $expertPlan !== null && $rohan->lead_status !== User::LEAD_STATUS_CONVERTED) {
-            $service->subscribeIndividual($rohan, $expertPlan);
+        if ($rohan !== null && Plan::where('code', 'expert')->exists() && $rohan->lead_status !== User::LEAD_STATUS_CONVERTED) {
+            $service->purchase($rohan, app(PurchaseQuoteService::class)->quote($rohan, 'expert'));
         }
     }
 }

@@ -5,6 +5,8 @@ import { pdfSafe } from "@/lib/pdfTextSafe";
 import type { PlacementReportData } from "@/types/placement";
 import type { CohortStudent } from "@/types/cohort";
 import { computeSectionStats, sectionLabel } from "@/lib/sectionBreakdown";
+import { ENGAGEMENT_LABEL, rollupLanguages } from "@/lib/cohortInsights";
+import { languageLabel } from "@/lib/judgeLanguages";
 
 export interface TpoReportStudent {
   id: number;
@@ -18,6 +20,12 @@ export interface TpoReportStudent {
   readiness_score: number;
   readiness_tier: "Placement Ready" | "In Progress" | "Needs Training";
   practice_score: number;
+  /** Practice progress and language profile — the same per-student numbers the Student Cohort roster shows (StudentCohortService). */
+  activated: CohortStudent["activated"];
+  onboarded: CohortStudent["onboarded"];
+  solved: CohortStudent["solved"];
+  activity: CohortStudent["activity"];
+  coding: CohortStudent["coding"];
 }
 
 export interface TpoReportDrive {
@@ -347,6 +355,91 @@ export async function generateCohortExcelReport(data: TpoReportsData, sectionFil
 }
 
 // ---------------------------------------------------------------------------
+// 2b. Coding Languages & Progress Report (Excel)
+// ---------------------------------------------------------------------------
+
+/**
+ * One row per student: how actively they practise, how much they've solved, and
+ * which languages they code in (and struggle in). The single source for both the
+ * downloaded workbook and the "View" preview, like cohortRows() above.
+ */
+export function languageProgressRows(data: TpoReportsData, sectionFilter: string | null = null): ReportPreview {
+  const students = sectionFilter ? data.students.filter((s) => sectionLabel(s.section) === sectionFilter) : data.students;
+
+  return {
+    headers: [
+      "Name",
+      "Roll Number",
+      "Branch",
+      "Section",
+      "Practice Status",
+      "Days Since Practice",
+      "Problems Solved",
+      "Easy",
+      "Medium",
+      "Hard",
+      "Main Language",
+      "Says They Code In",
+      "Languages Used (solved)",
+      "Struggling In",
+    ],
+    rows: students.map((s) => [
+      s.name,
+      s.roll_number ?? "—",
+      s.branch ?? "—",
+      s.section ?? "—",
+      ENGAGEMENT_LABEL[s.activity.engagement],
+      s.activity.days_since_practice ?? "—",
+      s.solved.total,
+      s.solved.easy,
+      s.solved.medium,
+      s.solved.hard,
+      s.coding.primary_language ? languageLabel(s.coding.primary_language) : "—",
+      s.coding.stated_language ? languageLabel(s.coding.stated_language) : "—",
+      s.coding.languages.length ? s.coding.languages.map((l) => `${languageLabel(l.language)} (${l.solved})`).join(", ") : "—",
+      s.coding.needs_work.length ? s.coding.needs_work.map(languageLabel).join(", ") : "—",
+    ]),
+  };
+}
+
+export async function generateLanguageProgressReport(data: TpoReportsData, sectionFilter: string | null = null): Promise<GeneratedReport> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "AptRun";
+  workbook.created = new Date();
+
+  const header = (sheet: ExcelJS.Worksheet) => {
+    sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+  };
+
+  const students = workbook.addWorksheet(sectionFilter ? `Section ${sectionFilter}` : "Student Progress");
+  const { headers, rows } = languageProgressRows(data, sectionFilter);
+  students.addRow(headers);
+  header(students);
+  students.columns.forEach((col) => (col.width = 18));
+  rows.forEach((row) => students.addRow(row));
+  students.autoFilter = { from: "A1", to: { row: 1, column: headers.length } };
+
+  // The same students, rolled up by language — what a TPO plans workshops from.
+  const scoped = sectionFilter ? data.students.filter((s) => sectionLabel(s.section) === sectionFilter) : data.students;
+  const languages = workbook.addWorksheet("Languages");
+  languages.addRow(["Language", "Students Using It", "Students Mainly Using It", "Submissions", "Accepted %", "Problems Solved", "Students Struggling"]);
+  header(languages);
+  languages.columns.forEach((col) => (col.width = 22));
+  const rollup = rollupLanguages(scoped);
+  rollup.forEach((r) => languages.addRow([languageLabel(r.language), r.students, r.mainly, r.attempts, r.acceptanceRate, r.solved, r.needsWork]));
+  if (rollup.length === 0) languages.addRow(["No code submitted yet"]);
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  const suffix = sectionFilter ? `-section-${fileSafe(sectionFilter)}` : "";
+  return {
+    blob: new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+    filename: `${fileSafe(data.college.name)}-coding-languages-progress-report${suffix}.xlsx`,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // 3. Company & Drive Directory (Excel)
 // ---------------------------------------------------------------------------
 export async function generateDriveDirectoryReport(data: TpoReportsData): Promise<GeneratedReport> {
@@ -637,6 +730,79 @@ export function generateIndividualStudentReport(student: CohortStudent, collegeN
 
   // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
   y = doc.lastAutoTable.finalY + 24;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text("Coding Activity", margin, y);
+  y += 10;
+
+  const lastPractice =
+    !student.activated
+      ? "Hasn't signed in yet"
+      : student.activity.days_since_practice === null
+        ? "Never practised"
+        : student.activity.days_since_practice === 0
+          ? "Today"
+          : `${student.activity.days_since_practice} day(s) ago`;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [["Practice Status", "Last Practised", "Problems Solved", "Easy / Medium / Hard", "Active Days (30d)"]],
+    body: [
+      [
+        ENGAGEMENT_LABEL[student.activity.engagement],
+        lastPractice,
+        String(student.solved.total),
+        `${student.solved.easy} / ${student.solved.medium} / ${student.solved.hard}`,
+        String(student.activity.active_days_30),
+      ],
+    ],
+    headStyles: { fillColor: ACCENT, fontSize: 8 },
+    bodyStyles: { fontSize: 9 },
+    theme: "grid",
+  });
+
+  // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
+  y = doc.lastAutoTable.finalY + 14;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [["Language", "Problems Solved", "Submissions", "Accepted", "Verdict"]],
+    body: student.coding.languages.length
+      ? student.coding.languages.map((l) => [
+          pdfSafe(languageLabel(l.language)),
+          String(l.solved),
+          String(l.attempts),
+          `${l.acceptance_rate}%`,
+          student.coding.needs_work.includes(l.language) ? "Needs work" : l.proficiency === "strong" ? "Strong" : l.proficiency === "getting_started" ? "Getting started" : "Steady",
+        ])
+      : [["No code submitted yet", "—", "—", "—", "—"]],
+    headStyles: { fillColor: ACCENT, fontSize: 8 },
+    bodyStyles: { fontSize: 9 },
+    theme: "grid",
+  });
+
+  if (student.coding.stated_language) {
+    // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
+    y = doc.lastAutoTable.finalY + 14;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...MUTED);
+    doc.text(
+      pdfSafe(
+        `Says they code in ${languageLabel(student.coding.stated_language)}` +
+          (student.coding.mismatch && student.coding.primary_language ? `, but solves mostly in ${languageLabel(student.coding.primary_language)}.` : ".")
+      ),
+      margin,
+      y
+    );
+    doc.setTextColor(17, 24, 39);
+  }
+
+  // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
+  y = doc.lastAutoTable.finalY + (student.coding.stated_language ? 40 : 24);
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);

@@ -8,7 +8,10 @@ use App\Models\Hackathon;
 use App\Models\HackathonParticipant;
 use App\Models\HackathonSubmission;
 use App\Models\HackathonTeam;
+use App\Models\Plan;
 use App\Models\User;
+use App\Services\PurchaseQuoteService;
+use App\Services\SubscriptionService;
 use Database\Seeders\PlanSeeder;
 
 /**
@@ -24,9 +27,20 @@ trait CreatesHackathonFixtures
         $this->seed(PlanSeeder::class);
     }
 
-    protected function student(array $attributes = []): User
+    /**
+     * A student who can take part in a hackathon. Taking part is an Expert feature, so — when the plans
+     * have been seeded — the student is put on that plan; pass `false` for the free-plan student the gate
+     * is meant to turn away (see PlanAccessGatesTest).
+     */
+    protected function student(array $attributes = [], bool $withArenaAccess = true): User
     {
-        return User::factory()->create(['role' => User::ROLE_USER] + $attributes);
+        $user = User::factory()->create(['role' => User::ROLE_USER] + $attributes);
+
+        if ($withArenaAccess && Plan::where('code', Plan::CODE_EXPERT)->exists()) {
+            app(SubscriptionService::class)->purchase($user, app(PurchaseQuoteService::class)->quote($user, Plan::CODE_EXPERT));
+        }
+
+        return $user;
     }
 
     /** An Ops account holding exactly the given permissions. */

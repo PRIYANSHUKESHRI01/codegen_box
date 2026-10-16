@@ -113,14 +113,15 @@ const DETAILS = [
   },
   {
     icon: Users2,
-    badge: "Talent pool",
+    badge: "The Vault",
     title: "Get noticed — on your terms",
-    body: "Top performers can join the recruiter talent pool. Your profile stays hidden until you say yes, and you can withdraw at any time. Recruiters only see you because you chose to be seen.",
+    body: "Once your readiness score reaches the Vault bar you can join it. Your profile stays hidden until you say yes, and you can withdraw at any time. Recruiters only see you because you chose to be seen.",
     points: [
       "Enter by scoring above the qualifying mark in a contest",
       "Invisible until you give explicit consent",
       "You can withdraw from the pool at any time",
       "Decline interest from any company you don't want to pursue",
+      "Joining the pool is part of the Expert plan",
     ],
   },
 ];
@@ -130,7 +131,7 @@ const STEPS = [
   { n: "01", title: "Create your account", body: "Sign up free, or use the login your placement cell sent you — you're in your learning centre the same day.", icon: GraduationCap },
   { n: "02", title: "Study the companies", body: "Open the prep pack for every drive you're eligible for. Know the role, the rounds and the past questions before anyone else.", icon: BookOpenCheck },
   { n: "03", title: "Practise until it clicks", body: "Work through the recommended problems in the arena, run AI mock interviews, and track your readiness score day by day.", icon: Code2 },
-  { n: "04", title: "Apply and get noticed", body: "Apply to eligible drives and, if you qualify in a contest, opt in to the talent pool so recruiters can find you.", icon: Trophy },
+  { n: "04", title: "Apply and get noticed", body: "Apply to eligible drives and, once your readiness score reaches the bar, opt in to the Vault so recruiters can find you.", icon: Trophy },
 ];
 
 // ─── FAQ ───────────────────────────────────────────────────────────────────────
@@ -148,8 +149,8 @@ const FAQS = [
     a: "You'll see the exact reason — CGPA, backlog or branch — so you know what's holding you back. Eligible drives are clearly marked too.",
   },
   {
-    q: "How does the talent pool work?",
-    a: "You enter by scoring above the qualifying mark in a contest. Your profile only becomes visible to recruiters after you give consent, and you can hide it or decline interest at any time.",
+    q: "How does the Vault work?",
+    a: "You become eligible when your readiness score — one score for everything you do on AptRun — reaches 60. Your profile only becomes visible to recruiters, and to employers on Mellow Vault, after you give consent, and you can hide it or decline interest at any time. Getting hired directly through Mellow Vault is part of the Expert plan — if you reach 60 on another plan your standing is kept and you can join the day you upgrade.",
   },
   {
     q: "Is my interview practice private?",
@@ -503,7 +504,7 @@ export function StudentsPageContent() {
         </Container>
       </section>
 
-      {/* ── Privacy note: talent pool ──────────────────────────────────────── */}
+      {/* ── Privacy note: the Vault ──────────────────────────────────────── */}
       <section className="py-16 sm:py-20 border-b border-border-subtle">
         <Container size="md">
           <SpotlightCard className={cn("relative rounded-panel bg-surface border border-border-subtle p-8 sm:p-10 overflow-hidden", T.shadow)}>
@@ -515,10 +516,10 @@ export function StudentsPageContent() {
               <div>
                 <h3 className="text-xl font-bold text-primary mb-2">Your visibility, your choice</h3>
                 <p className="text-base font-medium text-text-secondary leading-relaxed mb-4">
-                  The talent pool is fully opt-in. Your profile only becomes visible to hiring partners after you give explicit consent — and you can withdraw it, or decline interest from any company, at any time.
+                  The Vault is fully opt-in. Your profile only becomes visible to hiring partners after you give explicit consent — and you can withdraw it, or decline interest from any company, at any time.
                 </p>
                 <ul className="space-y-2">
-                  {["Enter by earning a qualifying score in a contest", "Invisible until you say yes — no silent sharing", "Withdraw from the pool whenever you like", "Decline interest from any company"].map((pt) => (
+                  {["Become eligible by reaching a readiness score of 60", "Invisible until you say yes — no silent sharing", "Withdraw from the Vault whenever you like", "Decline interest from any company"].map((pt) => (
                     <li key={pt} className="flex items-center gap-2.5 text-sm font-medium text-text-secondary">
                       <span className={cn("w-4 h-4 rounded-full border flex items-center justify-center shrink-0", T.icon)}>
                         <Check className="w-2.5 h-2.5" strokeWidth={3} />
@@ -591,7 +592,7 @@ export function StudentsPageContent() {
           <div className="grid sm:grid-cols-2 gap-5">
             {[
               { href: "/colleges", label: "For Colleges", desc: "Placement cell command center — drives, analytics, onboarding.", icon: Building2, tone: "text-indigo-600 dark:text-indigo-400", shadow: "hover:shadow-[0_24px_48px_-20px_rgba(99,102,241,0.45)]" },
-              { href: "/recruiters", label: "For Recruiters", desc: "Post openings, screen with assessments, search the talent pool.", icon: Briefcase, tone: "text-violet-600 dark:text-violet-400", shadow: "hover:shadow-[0_24px_48px_-20px_rgba(139,92,246,0.45)]" },
+              { href: "/recruiters", label: "For Recruiters", desc: "Post openings, screen with assessments, search the Vault.", icon: Briefcase, tone: "text-violet-600 dark:text-violet-400", shadow: "hover:shadow-[0_24px_48px_-20px_rgba(139,92,246,0.45)]" },
             ].map((o) => {
               const OIcon = o.icon;
               return (

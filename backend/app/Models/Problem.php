@@ -79,6 +79,20 @@ class Problem extends Model
         return $this->hasMany(ProblemTestCase::class)->orderBy('display_order');
     }
 
+    /**
+     * How many test cases a Run (the public samples) and a Submit (all of them) will judge — what the
+     * solve screen draws while the judge works, so it is the right number from the first moment even
+     * when the queue is synchronous and there is no polling to learn it from. Display only.
+     *
+     * @return array{samples: int, total: int}
+     */
+    public function caseCounts(): array
+    {
+        $counts = $this->testCases()->reorder()->selectRaw('count(*) as total, sum(case when is_sample then 1 else 0 end) as samples')->first();
+
+        return ['samples' => (int) ($counts->samples ?? 0), 'total' => (int) ($counts->total ?? 0)];
+    }
+
     public function sampleTestCases(): HasMany
     {
         return $this->testCases()->where('is_sample', true);

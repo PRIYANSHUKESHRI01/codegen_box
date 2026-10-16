@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\LeadAssignmentService;
 use App\Services\SubscriptionService;
+use App\Services\Vault\VaultService;
 use App\Services\Workspaces\DockerCliRuntime;
 use App\Services\Workspaces\FakeWorkspaceRuntime;
 use App\Services\Workspaces\ProcessRunner;
@@ -15,6 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -151,6 +154,13 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('phone-verify:'.$request->user()?->id);
         });
 
+        // The public pricing page's live price list (GET /public/plans). Per IP — there is no user —
+        // but generous: the page polls every ~20 s, and a campus lab puts a whole class behind one
+        // address. Anything past this is a script, not a student.
+        RateLimiter::for('public-plans', function (Request $request) {
+            return Limit::perMinute(300)->by('public-plans:'.$request->ip());
+        });
+
         // Superadmin actions that re-ask for the caller's own password (reset-and-reveal
         // an account's password, permanently delete a university). Per USER: a wrong
         // password is a guess at the superadmin's password, and a stolen session token
@@ -158,6 +168,20 @@ class AppServiceProvider extends ServiceProvider
         // handful of times a day.
         RateLimiter::for('superadmin-sensitive', function (Request $request) {
             return Limit::perMinute(10)->by('superadmin-sensitive:'.$request->user()?->id);
+        });
+
+        // Routine plan support work (give a student a plan, add days). Per user and far looser than the
+        // password-confirming actions above: nothing here guesses a password, and a superadmin working
+        // through a list of scholarship students must not be throttled halfway down it.
+        RateLimiter::for('superadmin-subscriptions', function (Request $request) {
+            return Limit::perMinute(60)->by('superadmin-subscriptions:'.$request->user()?->id);
+        });
+
+        // The plan-change poll every open dashboard makes (every ~30 s, plus on focus). Per user, never per
+        // IP: a campus lab puts a whole class behind one address. Generous so several tabs and the odd
+        // refresh never trip it; a script hammering it still does.
+        RateLimiter::for('plan-signal', function (Request $request) {
+            return Limit::perMinute(90)->by('plan-signal:'.($request->user()?->id ?? $request->ip()));
         });
 
         // Project Lab. One NAMED limiter per route family, keyed per user — never
@@ -176,9 +200,27 @@ class AppServiceProvider extends ServiceProvider
             'lab-workspace-stop' => 20,
             'lab-submit' => 5,
             'lab-purchase' => 20,
+            // Paying for a plan. Per user, never per IP (a campus lab shares one address). Opening a checkout
+            // creates a real gateway order, so it is the tightest; the verify callback and the status poll
+            // are what a student's browser legitimately repeats while waiting on a bank.
+            'checkout-create' => 10,
+            'checkout-verify' => 20,
+            'checkout-status' => 40,
         ] as $name => $perMinute) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by($name.':'.($request->user()?->id ?? $request->ip())));
         }
+
+        // The payment gateways' webhook senders (Razorpay, PayU). Per IP (it is a handful of gateway addresses,
+        // not people), generous on purpose: throttling it would not stop a flood, it would turn a burst of real
+        // payment events into 429s and a retry storm. The signature/hash check, not this limit, is what keeps
+        // strangers out.
+        RateLimiter::for('payment-webhook', fn (Request $request) => Limit::perMinute(600)->by('payment-webhook:'.$request->ip()));
+
+        // PayU sending a student's BROWSER back to us after they paid. Per IP, but loose: a campus lab puts a
+        // whole class behind one address and they all finish a payment around the same time. A 429 here would
+        // strand a student who has just paid on an error page (their payment would still be found by the webhook,
+        // but they would not know that), so this only exists to blunt a script, not to meter people.
+        RateLimiter::for('payment-return', fn (Request $request) => Limit::perMinute(300)->by('payment-return:'.$request->ip()));
 
         // Hack Arena. Named, per user (never per IP: a campus lab shares one address), and one
         // per route family so they do not spend each other's allowance. Registering and team
@@ -191,6 +233,11 @@ class AppServiceProvider extends ServiceProvider
         ] as $name => $perMinute) {
             RateLimiter::for($name, fn (Request $request) => Limit::perMinute($perMinute)->by($name.':'.($request->user()?->id ?? $request->ip())));
         }
+
+        // Mellow Vault calling AptRun (the pull API and the "hired" callback). Per IP: it is one system, not people,
+        // and generous enough for a full reconcile of a large Vault in pages of 200. The bearer key, not this
+        // limit, is what keeps strangers out.
+        RateLimiter::for('vault-integration', fn (Request $request) => Limit::perMinute(300)->by('vault-integration:'.$request->ip()));
 
         // Every student account — however it's created (self-registration,
         // admin storeUser, bulk CSV import, seeders) — starts on the free
@@ -208,6 +255,39 @@ class AppServiceProvider extends ServiceProvider
             // least-loaded formula.
             if ($user->isMellowDirectLead()) {
                 app(LeadAssignmentService::class)->assignLead($user);
+            }
+        });
+
+        // A plan starting, ending or changing decides whether a student may be listed in the Vault (it is a
+        // Expert feature), so the same reconcile runs. A college's own plan reaches its students through the
+        // nightly `readiness:refresh --all`. Fails soft: a Vault problem must never fail a purchase or a cancellation.
+        Subscription::saved(function (Subscription $subscription) {
+            if ($subscription->subscriber_type !== User::class
+                || ! ($subscription->wasRecentlyCreated || $subscription->wasChanged(['status', 'plan_id', 'current_period_end']))) {
+                return;
+            }
+
+            try {
+                $user = User::find($subscription->subscriber_id);
+
+                if ($user?->isStudent()) {
+                    app(VaultService::class)->accountStateChanged($user);
+                }
+            } catch (Throwable $e) {
+                report($e);
+            }
+        });
+
+        // Blocking a student must take them off the Vault list at once (and unblocking restores them). The block
+        // is toggled from several admin screens, so one model hook beats remembering to call it from each.
+        // Fails soft: a Vault hiccup must never stop an administrator blocking an account.
+        User::updated(function (User $user) {
+            if ($user->role === User::ROLE_USER && $user->wasChanged('is_blocked')) {
+                try {
+                    app(VaultService::class)->accountStateChanged($user);
+                } catch (Throwable $e) {
+                    report($e);
+                }
             }
         });
     }

@@ -105,7 +105,9 @@ function Build-Backend {
     $envFile = Join-Path $src '.env'
     if (Test-Path $envFile) {
         $secretKeys = 'APP_KEY', 'DB_PASSWORD', 'REDIS_PASSWORD', 'MAIL_PASSWORD', 'GEMINI_API_KEY',
-                      'WHATSAPP_ACCESS_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'SUPERADMIN_PASSWORD'
+                      'WHATSAPP_ACCESS_TOKEN', 'AWS_SECRET_ACCESS_KEY', 'SUPERADMIN_PASSWORD',
+                      'RAZORPAY_KEY_SECRET', 'RAZORPAY_WEBHOOK_SECRET',
+                      'PAYU_SALT', 'PAYU_WEBHOOK_TOKEN'
         $secrets = @{}
         foreach ($line in Get-Content $envFile) {
             if ($line -match '^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$' -and $secretKeys -contains $Matches[1]) {

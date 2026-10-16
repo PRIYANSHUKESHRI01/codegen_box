@@ -17,6 +17,8 @@ interface JudgeEnvelope<T> {
   state: "queued" | "running" | "done" | "error";
   token: string | null;
   position?: number;
+  /** How many test cases this job will judge (a Run: the samples; a Submit: all of them). Display only. */
+  total_cases?: number | null;
   poll_after_ms?: number;
   http_status?: number;
   result?: T;
@@ -27,6 +29,8 @@ export interface JudgeProgress {
   state: "queued" | "running";
   /** Approximate place in line when it was queued (1 = next up). */
   position?: number;
+  /** How many test cases are being judged, when the server says. */
+  totalCases?: number;
 }
 
 const MAX_WAIT_MS = 120_000;
@@ -72,7 +76,7 @@ export async function executeJudged<T>(
       throw new ApiError("Judging is taking longer than usual. Your code is still queued — check back in a moment.", 504);
     }
 
-    onProgress?.({ state: envelope.state, position: envelope.position });
+    onProgress?.({ state: envelope.state, position: envelope.position, totalCases: envelope.total_cases ?? undefined });
 
     await sleep(delay);
     delay = Math.min(Math.round(delay * 1.5), MAX_POLL_INTERVAL_MS);

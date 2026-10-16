@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -50,7 +51,7 @@ class Interview extends Model
     /** A company hiring tenant's own interview, tied to one of their job openings. Always invite-only — see isVisibleToUser(). */
     public const INTERVIEW_TYPE_COMPANY_HIRING = 'company_hiring';
 
-    /** Mellow-staff-curated, NOT tied to any company/drive — the optional second stage of a Talent Pool scouting assessment, alongside CONTEST_TYPE_TALENT_POOL. Targeted the same way (audience_scope). */
+    /** RETIRED — no new ones can be created (see Contest::CONTEST_TYPE_TALENT_POOL). Existing rows stay as ordinary Mellow interviews and still count toward readiness. Targeted by audience_scope. */
     public const INTERVIEW_TYPE_TALENT_POOL = 'talent_pool';
 
     public const INTERVIEW_TYPES = [
@@ -106,6 +107,18 @@ class Interview extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * The one definition of "this interview may raise a student's readiness
+     * score": anything Mellow or a TPO set up, never a hiring partner's own
+     * `company_hiring` interview (those are the partner's screening, not the
+     * student's preparation). ReadinessScoreService reads interviews only
+     * through this scope.
+     */
+    public function scopeCountsTowardReadiness(Builder $query): Builder
+    {
+        return $query->where('interviews.interview_type', '!=', self::INTERVIEW_TYPE_COMPANY_HIRING);
     }
 
     public function interviewQuestions(): HasMany

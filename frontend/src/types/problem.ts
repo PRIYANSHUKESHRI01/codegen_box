@@ -51,6 +51,8 @@ export interface ProblemDetail extends ProblemSummary {
   constraints: string[];
   hints: string[];
   starter_code: Record<string, string>;
+  /** How many test cases a Run (the public samples) and a Submit (all of them, hidden included) will judge. */
+  case_counts?: { samples: number; total: number };
 }
 
 // --- Code execution (POST /problems/{slug}/run) ---

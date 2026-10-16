@@ -64,5 +64,7 @@ class SoftSkillAssessmentSeeder extends Seeder
                 ]);
             }
         }
+
+        $this->call(SoftSkillTwentySetsSeeder::class);
     }
 }

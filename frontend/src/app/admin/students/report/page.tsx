@@ -40,6 +40,8 @@ import {
   Minus,
   Lightbulb,
   type LucideIcon,
+  Hourglass,
+  Languages,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
@@ -76,6 +78,8 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn, withMinDelay } from "@/lib/utils";
 import { languageLabel } from "@/lib/judgeLanguages";
+import { LanguageBreakdown } from "@/components/dashboard/LanguageBreakdown";
+import { daysAgo, relativeDays } from "@/lib/languageInsights";
 import { DRIVE_APPLICATION_STAGES, DRIVE_APPLICATION_STAGE_LABELS, DRIVE_APPLICATION_TERMINAL_STAGES, type DriveApplicationStage } from "@/types/placement";
 import type {
   StudentReport,
@@ -450,6 +454,13 @@ function StudentReportPageContent() {
             <div className="rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
               <h2 className="mb-4 text-sm font-bold text-primary">Daily Activity</h2>
               <ActivityHeatmap weeks={activityWeeks} />
+            </div>
+
+            {/* Languages — what they actually code in and where to improve */}
+            <div className="rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
+              <h2 className="mb-1 text-sm font-bold text-primary">Coding Languages</h2>
+              <p className="mb-4 text-2xs text-text-muted">Per-language results from practice and contest submissions, next to what the student said in onboarding.</p>
+              <LanguageBreakdown insights={report.languages} audience="staff" />
             </div>
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -893,6 +904,10 @@ function PremiumReport({
             </HpItem>
 
             <HpItem>
+              <LanguagesPanel report={report} />
+            </HpItem>
+
+            <HpItem>
               <ContestHistoryPanel
                 contests={report.contests}
                 expandedContestId={expandedContestId}
@@ -925,6 +940,7 @@ function IdentityHero({ report }: { report: StudentReport }) {
   const s = report.student;
   const tier = report.readiness.tier;
   const jumps: { href: string; label: string; value: number; icon: LucideIcon; tone: HpTone }[] = [
+    { href: "#report-languages", label: "Languages", value: report.languages.totals.languages_used, icon: Languages, tone: "violet" },
     { href: "#report-contests", label: "Contests", value: report.contests.length, icon: Swords, tone: "indigo" },
     { href: "#report-interviews", label: "Interviews", value: report.interviews.length, icon: Mic, tone: "violet" },
     { href: "#report-drives", label: "Drives", value: report.drive_applications.length, icon: Briefcase, tone: "sky" },
@@ -1024,10 +1040,19 @@ function IdentityHero({ report }: { report: StudentReport }) {
             <HpPill tone={PREMIUM_TIER_TONE[tier]} dot>
               {tier}
             </HpPill>
+            {s.activated === false ? (
+              <HpPill tone="slate" icon={Hourglass}>
+                Hasn&apos;t signed in yet
+              </HpPill>
+            ) : (
+              <HpPill tone="slate" icon={Clock}>
+                Last seen {relativeDays(daysAgo(s.last_seen_at))}
+              </HpPill>
+            )}
           </div>
         </div>
 
-        <nav aria-label="Jump to a report section" className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <nav aria-label="Jump to a report section" className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
           {jumps.map((j) => (
             <a
               key={j.href}
@@ -1292,6 +1317,25 @@ function ActivityPanel({ weeks, solved }: { weeks: ReturnType<typeof buildActivi
 }
 
 /* ── Contest history ────────────────────────────────────────────────────── */
+
+function LanguagesPanel({ report }: { report: StudentReport }) {
+  const { languages } = report;
+  const used = languages.totals.languages_used;
+
+  return (
+    <HpCard spotlight={false} id="report-languages" className="scroll-mt-24 p-4 sm:p-6">
+      <HpSectionHeader
+        icon={Code2}
+        tone="violet"
+        title="Coding languages"
+        subtitle="What they actually code in, how it's going in each, and where to improve — next to what they said in onboarding"
+        action={used > 0 ? <CountBadge value={used} /> : undefined}
+        className="mb-5"
+      />
+      <LanguageBreakdown insights={languages} audience="staff" />
+    </HpCard>
+  );
+}
 
 function ContestHistoryPanel({
   contests,
@@ -1796,6 +1840,7 @@ function StageMeter({ step, done }: { step: number; done: boolean }) {
  */
 function PremiumSubmissionHistory({ submissions, onOpenCode }: { submissions: SubmissionHistoryRow[]; onOpenCode: (row: SubmissionHistoryRow) => void }) {
   const [filter, setFilter] = useState<"all" | SubmissionSource>("all");
+  const [languageFilter, setLanguageFilter] = useState<string>("all");
 
   const sourceCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -1803,7 +1848,17 @@ function PremiumSubmissionHistory({ submissions, onOpenCode }: { submissions: Su
     return counts;
   }, [submissions]);
 
-  const filtered = useMemo(() => (filter === "all" ? submissions : submissions.filter((s) => s.source === filter)), [submissions, filter]);
+  const languageCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of submissions) counts.set(s.language, (counts.get(s.language) ?? 0) + 1);
+    return Array.from(counts.entries()).sort((a, b) => b[1] - a[1]);
+  }, [submissions]);
+
+  const filtered = useMemo(
+    () =>
+      submissions.filter((s) => (filter === "all" || s.source === filter) && (languageFilter === "all" || s.language === languageFilter)),
+    [submissions, filter, languageFilter]
+  );
 
   const tabs: HpTabItem<"all" | SubmissionSource>[] = [
     { id: "all", label: "All", count: submissions.length },
@@ -1830,8 +1885,26 @@ function PremiumSubmissionHistory({ submissions, onOpenCode }: { submissions: Su
         </div>
       ) : (
         <>
-          <div className="border-y border-border-subtle bg-elevated/30 px-4 py-3 sm:px-6">
+          <div className="flex flex-col gap-2.5 border-y border-border-subtle bg-elevated/30 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
             <HpTabs tabs={tabs} value={filter} onChange={setFilter} />
+            {languageCounts.length > 1 && (
+              <label className="flex shrink-0 items-center gap-2 text-2xs font-semibold text-text-muted">
+                Language
+                <select
+                  value={languageFilter}
+                  onChange={(e) => setLanguageFilter(e.target.value)}
+                  aria-label="Filter submissions by language"
+                  className="h-8 cursor-pointer rounded-[10px] border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] px-2.5 text-xs font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                >
+                  <option value="all">All languages</option>
+                  {languageCounts.map(([language, count]) => (
+                    <option key={language} value={language}>
+                      {languageLabel(language)} ({count})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <p className="sr-only" aria-live="polite">
               Showing {filtered.length} of {plural(submissions.length, "submission")}
             </p>

@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Inbox, Users2, UserPlus, CheckCircle2, Loader2, GraduationCap, Briefcase } from "lucide-react";
+import { Inbox, Users2, UserPlus, CheckCircle2, Loader2, GraduationCap, Briefcase, Crown } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { ContactRequestDetailDrawer } from "@/components/marketing-site/ContactRequestDetailDrawer";
@@ -185,6 +185,8 @@ export default function MarketingInquiriesPage() {
                         <span className="inline-flex items-center gap-1.5 text-2xs font-semibold text-text-secondary">
                           {r.audience === "institution" ? (
                             <GraduationCap className="w-3.5 h-3.5 text-accent-primary" />
+                          ) : r.audience === "academy" ? (
+                            <Crown className="w-3.5 h-3.5 text-amber-500" />
                           ) : (
                             <Briefcase className="w-3.5 h-3.5 text-accent-secondary" />
                           )}

@@ -43,7 +43,8 @@ const SECTIONS: LegalSection[] = [
     body: [
       [
         "Your college: the placement cell and your section coordinator can see your profile, scores, readiness and proctoring reports for the cohort they manage.",
-        "Hiring partners: a company can see your information for hiring processes you take part in, such as an opening you are invited to. For the talent pool, your profile stays hidden until you give consent, and you can hide it again at any time.",
+        "Hiring partners: a company can see your information for hiring processes you take part in, such as an opening you are invited to. For the Vault, your profile stays hidden until you give consent, and you can hide it again at any time.",
+        "Mellow Vault: if you choose to join the Vault, we share your profile with Mellow Vault, the hiring platform run by the same company as AptRun, where employers can find you. That means your name and email address, your college, branch, CGPA and backlogs if your college recorded them, your skills, bio, links and resume, your readiness score and what it is made of, and your contest rating if you have one. We never share your phone number or your parents' phone number. If you hide your profile, or delete your account, we tell Mellow Vault to take it down.",
         "Service providers: we use providers who process data on our behalf, for example to deliver email, verify phone numbers and help score interview and learning-centre responses.",
         "Legal and safety: we may disclose information where the law requires it or to protect the platform and its users.",
       ],
@@ -54,7 +55,7 @@ const SECTIONS: LegalSection[] = [
     title: "Your choices",
     body: [
       [
-        "Hide your talent-pool profile, or decline a company's interest, whenever you like.",
+        "Hide your Vault profile or take back your consent, or decline a company's interest, whenever you like.",
         "Unsubscribe from product updates using the link in any update email.",
         "Ask us to access, correct or delete your information by writing to support@mellowvault.com. Some records are held on behalf of your college, and we may need to involve them.",
       ],

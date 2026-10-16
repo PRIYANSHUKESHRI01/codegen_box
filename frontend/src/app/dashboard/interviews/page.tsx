@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Mic, CheckCircle2, Loader2, PlayCircle, Layers } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
+import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -60,6 +61,8 @@ export default function InterviewsListPage() {
           max={entitlements.max_mock_interviews_per_day}
         />
       )}
+      {/* The free plan gets one AI mock interview, ever — no daily counter, so this is its banner. */}
+      <FreeTrialBanner feature="mock_interview" />
 
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">

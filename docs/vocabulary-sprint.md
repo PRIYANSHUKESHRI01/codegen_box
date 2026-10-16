@@ -96,4 +96,4 @@ is whether each wrong answer is *definitely* wrong in its sentence — read new 
 * "Today" (daily goal, streak, due dates) follows the app timezone, which is UTC, so for students in India it rolls
   over at 05:30 IST. Same as the rest of the Learning Centre.
 * Pronunciation uses the browser's own voices; quality varies by device.
-* Not yet wired into the readiness score or TPO reports.
+* Wired into the readiness score (Learning Centre component, 30% of its points — `docs/readiness-and-vault.md`); not yet in the TPO reports.

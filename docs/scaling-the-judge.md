@@ -59,6 +59,11 @@ Browser ── POST /problems/{id}/submit ──▶ API (PHP-FPM)
 Browser ◀── polls GET /judge/{token}: queued(position) → running → done(verdict)
 ```
 
+While a job waits or runs, each poll also carries `total_cases` — how many test cases it will judge (a Run: the
+public samples; a Submit: all of them). It is display only: the solve screen draws that many cases being checked
+(see `docs/practice-editor-ux.md`). The same numbers are in the problem payload (`problem.case_counts`), so the
+screen knows them from the first moment even with a synchronous queue, where there is no polling.
+
 Guarantees, each covered by a test in `backend/tests/Feature/Judge/`:
 
 - **Infrastructure failures never become verdicts.** A node that is down or

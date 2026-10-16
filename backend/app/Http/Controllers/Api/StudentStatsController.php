@@ -28,6 +28,8 @@ class StudentStatsController extends Controller
                 'practice_score' => $user->practiceScore(),
                 'components' => $user->readinessBreakdown()['components'],
                 'next_steps' => $user->readinessBreakdown()['next_steps'],
+                // How far this score is from the Vault line — see VaultService. The Vault page is where it is acted on.
+                'vault' => $user->readinessBreakdown()['vault'],
             ],
             'rating' => [
                 'current_rating' => $user->current_rating,

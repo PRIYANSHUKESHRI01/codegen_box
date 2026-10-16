@@ -30,7 +30,7 @@ use Illuminate\Support\Collection;
  */
 class StudentReportService
 {
-    public function __construct(private readonly StudentStatsService $stats) {}
+    public function __construct(private readonly StudentStatsService $stats, private readonly LanguageInsightsService $languages) {}
 
     /**
      * Every contest this student has ever registered for, most recent
@@ -272,6 +272,8 @@ class StudentReportService
                 'backlogs' => $student->backlogs,
                 'phone' => $student->phone,
                 'is_blocked' => $student->is_blocked,
+                'last_seen_at' => $student->last_seen_at?->toIso8601String(),
+                'activated' => ! $student->must_change_password,
             ],
             'readiness' => [
                 'score' => $student->readinessScore(),
@@ -288,6 +290,9 @@ class StudentReportService
             'solved' => $this->stats->solvedByDifficulty($student),
             'streak' => $this->stats->streak($student),
             'activity' => $this->stats->activityHeatmap($student),
+            // Which language they actually code in, how well it goes in each, where to
+            // improve — and what they told us in onboarding, side by side.
+            'languages' => $this->languages->forStudent($student),
             'submissions' => $this->submissionHistory($student),
             'contests' => $this->contestHistory($student),
             'interviews' => $this->interviewHistory($student),

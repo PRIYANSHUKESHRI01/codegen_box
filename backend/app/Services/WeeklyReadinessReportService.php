@@ -24,9 +24,15 @@ class WeeklyReadinessReportService
     /** @return Collection<int, User> */
     public function atRiskStudents(College $college): Collection
     {
-        return User::where('college_id', $college->id)
+        $students = User::where('college_id', $college->id)
             ->where('role', User::ROLE_USER)
-            ->get()
+            ->get();
+
+        // Scored in bulk — a per-student score here was ~8 queries each, and
+        // this runs across every college in one cron pass.
+        app(ReadinessScoreService::class)->prime($students);
+
+        return $students
             ->filter(fn (User $student) => $student->readinessScore() < self::AT_RISK_THRESHOLD)
             ->sortBy(fn (User $student) => $student->readinessScore())
             ->values();

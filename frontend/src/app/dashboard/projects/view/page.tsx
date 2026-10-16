@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MarkdownRenderer } from "@/components/dashboard/articles/MarkdownRenderer";
-import { PurchasePanel } from "@/components/dashboard/projectLab/PurchasePanel";
+import { UpgradePanel } from "@/components/billing/UpgradePanel";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { api, ApiError } from "@/lib/api";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -231,16 +231,10 @@ function ProjectViewContent() {
             {enrollment && !topic.has_sow && <p className="mt-3 text-xs text-text-secondary">This project&apos;s SOW is being finalised.</p>}
           </section>
 
-          {/* ── Unlock (instead of the SOW) ────────────────────────────── */}
+          {/* ── Upgrade (instead of the SOW) ───────────────────────────── */}
           {!unlocked && (
             <div id="unlock" className="scroll-mt-24">
-              <PurchasePanel
-                summary={summary}
-                onPurchased={(s) => {
-                  setSummary(s);
-                  load();
-                }}
-              />
+              <UpgradePanel feature="project_lab" initialPlan={summary.upgrade} />
             </div>
           )}
 
@@ -259,9 +253,9 @@ function ProjectViewContent() {
                     <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-text-secondary">
                       <Lock className="h-5 w-5" />
                     </span>
-                    <p className="mt-3 text-sm font-bold text-primary">The Statement of Work is part of Project Lab</p>
+                    <p className="mt-3 text-sm font-bold text-primary">The Statement of Work is part of Project Lab, included with Expert</p>
                     <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-text-secondary">
-                      The full scope, requirements, data model and acceptance criteria unlock with Project Lab.
+                      The full scope, requirements, data model and acceptance criteria unlock with Expert.
                     </p>
                   </div>
                 ) : topic.sow_markdown ? (
@@ -308,7 +302,7 @@ function ProjectViewContent() {
                 </ol>
                 {!unlocked && topic.milestones.length > 0 && (
                   <p className="border-t border-border-subtle px-5 py-3 text-2xs font-medium text-text-secondary">
-                    Descriptions and acceptance criteria unlock with Project Lab.
+                    Descriptions and acceptance criteria unlock with Expert.
                   </p>
                 )}
               </div>

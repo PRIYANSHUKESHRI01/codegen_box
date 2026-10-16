@@ -4,8 +4,8 @@ namespace App\Services;
 
 use App\Models\College;
 use App\Models\User;
+use App\Services\Vault\VaultSyncService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Permanently deletes a partner university and everything that belongs to it.
@@ -40,6 +40,8 @@ use Illuminate\Support\Facades\Storage;
  */
 class CollegePurgeService
 {
+    public function __construct(private readonly UserPurgeService $users) {}
+
     /** Roles that belong to exactly one college and are deleted with it. */
     public const PURGED_ROLES = [User::ROLE_USER, User::ROLE_ADMIN_TPO, User::ROLE_SECTION_COORDINATOR];
 
@@ -87,7 +89,7 @@ class CollegePurgeService
             $id = $college->id;
 
             $userIds = User::where('college_id', $id)->whereIn('role', self::PURGED_ROLES)->pluck('id')->all();
-            $files = $this->collectFiles($userIds);
+            $files = $this->users->collectFiles($userIds);
 
             $this->deleteOwnedContent($id);
 
@@ -97,6 +99,10 @@ class CollegePurgeService
             DB::table('drive_applications')->where('college_id', $id)->delete();
 
             foreach (array_chunk($userIds, 500) as $chunk) {
+                // Students listed in the Vault have a copy on Mellow Vault — queue their withdrawal (and scrub
+                // the outbox of their data) before the rows that carry the information disappear.
+                app(VaultSyncService::class)->withdrawForDeletedUsers($chunk);
+
                 DB::table('personal_access_tokens')
                     ->where('tokenable_type', User::class)
                     ->whereIn('tokenable_id', $chunk)
@@ -115,9 +121,7 @@ class CollegePurgeService
         });
 
         // Only now that the data is really gone.
-        foreach ($files as $disk => $paths) {
-            Storage::disk($disk)->delete(array_values(array_unique($paths)));
-        }
+        $this->users->deleteFiles($files);
 
         return $removed;
     }
@@ -171,33 +175,5 @@ class CollegePurgeService
         if ($driveIds !== []) {
             DB::table('placement_drives')->whereIn('id', $driveIds)->delete();
         }
-    }
-
-    /**
-     * Paths of files the soon-to-be-deleted users uploaded or recorded, grouped
-     * by storage disk (avatars are public; resumes and recordings are private).
-     *
-     * @param  list<int>  $userIds
-     * @return array<string, list<string>>
-     */
-    private function collectFiles(array $userIds): array
-    {
-        $files = ['public' => [], 'local' => []];
-
-        foreach (array_chunk($userIds, 500) as $chunk) {
-            $files['public'] = array_merge($files['public'], DB::table('users')->whereIn('id', $chunk)->whereNotNull('avatar_path')->pluck('avatar_path')->all());
-            $files['local'] = array_merge(
-                $files['local'],
-                DB::table('users')->whereIn('id', $chunk)->whereNotNull('resume_path')->pluck('resume_path')->all(),
-                DB::table('speaking_attempts')->whereIn('user_id', $chunk)->whereNotNull('audio_path')->pluck('audio_path')->all(),
-                DB::table('interview_responses')
-                    ->whereIn('interview_session_id', DB::table('interview_sessions')->whereIn('user_id', $chunk)->select('id'))
-                    ->whereNotNull('audio_path')
-                    ->pluck('audio_path')
-                    ->all(),
-            );
-        }
-
-        return $files;
     }
 }

@@ -9,6 +9,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { EligibilityBadge } from "@/components/dashboard/EligibilityBadge";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
 import { BulkNotifyModal } from "@/components/dashboard/tpo/BulkNotifyModal";
+import { EngagementPill, LanguageChips, SolvedCount, lastPracticeText } from "@/components/dashboard/tpo/cohortProgress";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -315,6 +316,8 @@ export default function CoordinatorDashboardPage() {
                 <th className="px-4 py-3">Branch</th>
                 <th className="px-4 py-3">CGPA</th>
                 <th className="px-4 py-3">Readiness Score</th>
+                <th className="px-4 py-3">Practice</th>
+                <th className="px-4 py-3">Languages</th>
                 <th className="px-4 py-3">Eligibility</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3 text-right">Actions</th>
@@ -323,13 +326,13 @@ export default function CoordinatorDashboardPage() {
             <tbody className="divide-y divide-border-subtle">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-text-muted">
+                  <td colSpan={10} className="px-4 py-10 text-center text-text-muted">
                     Loading your section...
                   </td>
                 </tr>
               ) : loadError ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-status-danger">
+                  <td colSpan={10} className="px-4 py-10 text-center text-status-danger">
                     {loadError}{" "}
                     <button onClick={loadStudents} className="font-bold underline">
                       Retry
@@ -338,7 +341,7 @@ export default function CoordinatorDashboardPage() {
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-10 text-center text-text-muted">
+                  <td colSpan={10} className="px-4 py-10 text-center text-text-muted">
                     {students.length === 0
                       ? "No students assigned to your section yet — your TPO sets this via the roster import."
                       : "No students match your filters."}
@@ -377,6 +380,16 @@ export default function CoordinatorDashboardPage() {
                         </div>
                         <span className="font-mono font-bold text-primary">{s.readiness_score}</span>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex min-w-[8rem] flex-col items-start gap-1">
+                        <EngagementPill engagement={s.activity.engagement} />
+                        <span className="text-3xs text-text-muted">{lastPracticeText(s)}</span>
+                        <SolvedCount solved={s.solved} />
+                      </div>
+                    </td>
+                    <td className="max-w-[13rem] px-4 py-3">
+                      <LanguageChips coding={s.coding} />
                     </td>
                     <td className="px-4 py-3">
                       {s.eligible_for_active_drive === null ? (

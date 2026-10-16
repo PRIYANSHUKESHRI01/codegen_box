@@ -1,10 +1,11 @@
 import { LeadStatus } from "@/types/lead";
 
-export type ContactRequestAudience = "institution" | "company";
+export type ContactRequestAudience = "institution" | "company" | "academy";
 
 export const CONTACT_REQUEST_AUDIENCE_LABELS: Record<ContactRequestAudience, string> = {
   institution: "College / TPO",
   company: "Employer",
+  academy: "Mellow Academy",
 };
 
 /** One row of GET /marketing/contact-requests — reuses the same status vocabulary as a Mellow Direct lead (LeadStatus). */

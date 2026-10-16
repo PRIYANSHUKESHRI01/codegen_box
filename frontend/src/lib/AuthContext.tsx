@@ -3,6 +3,8 @@
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { AuthUser, clearSession, getStoredUser, getToken, saveSession } from "./auth";
+import { clearEverything, getImpersonation, restoreOriginalSession } from "./impersonation";
+import { SESSION_ENDED_EVENT, resetSessionEndedFlag, takeSignedOutNotice } from "./sessionEvents";
 
 export type AuthStatus = "loading" | "ready" | "signed_out";
 
@@ -77,6 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const rejected = err instanceof ApiError && (err.status === 401 || err.status === 403);
 
       if (rejected || !getStoredUser()) {
+        // A superadmin's "view as" token that has run out must land them back in their own console, not on a login page.
+        const restored = getImpersonation() ? restoreOriginalSession() : null;
+        if (restored) {
+          setUser(restored);
+          setStatus("ready");
+          return;
+        }
+
         clearSession();
         setUser(null);
         setStatus("signed_out");
@@ -116,14 +126,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [verify]);
 
+  // The server ended this session behind the page's back (the account was blocked, or signed out of every
+  // device) — see lib/sessionEvents. api.ts raises this once; leave cleanly and let the login page explain.
+  useEffect(() => {
+    const onEnded = () => {
+      const restored = getImpersonation() ? restoreOriginalSession() : null;
+      if (restored) {
+        // Back in their own console: nothing to explain on a login page, and a later failure can announce itself again.
+        takeSignedOutNotice();
+        resetSessionEndedFlag();
+        setUser(restored);
+        setStatus("ready");
+        return;
+      }
+
+      clearSession();
+      setUser(null);
+      setStatus("signed_out");
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, []);
+
   const login = useCallback((token: string, freshUser: AuthUser) => {
+    resetSessionEndedFlag();
     saveSession(token, freshUser);
     setUser(freshUser);
     setStatus("ready");
   }, []);
 
   const logout = useCallback(() => {
-    clearSession();
+    // Signing out while viewing as someone is a full sign-out: it also drops the parked superadmin session.
+    clearEverything();
     setUser(null);
     setStatus("signed_out");
   }, []);

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -34,10 +35,11 @@ class Contest extends Model
     public const CONTEST_TYPE_COMPANY_HIRING = 'company_hiring';
 
     /**
-     * Mellow-staff-curated, NOT tied to any company/drive — the sourcing
-     * event for the shared Talent Pool marketplace (see
-     * App\Models\TalentPoolCandidate, App\Services\TalentPoolQualificationService).
-     * Never rated (these are qualification tests, not rating events).
+     * RETIRED — no new ones can be created. These were the sourcing tests for the
+     * old Talent Pool; students now reach the Vault through their readiness
+     * score (App\Models\VaultProfile) and need no special test. Existing rows
+     * stay as ordinary Mellow contests (they still count toward readiness).
+     * Mellow-staff-curated, NOT tied to any company/drive, never rated.
      * Targeted via `audience_scope` (see that column's migration) rather
      * than a drive's college mappings: all students, specific colleges
      * (`contest_colleges`, same pivot `company` contests use), or only
@@ -102,6 +104,20 @@ class Contest extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * The one definition of "this contest may raise a student's readiness score":
+     * anything Mellow, the platform or a TPO scheduled (general, daily, company,
+     * tpo_mock, and the retired talent_pool assessments) — but never a hiring
+     * partner's own `company_hiring` assessment, and never a cancelled one.
+     * ReadinessScoreService reads contests only through this scope.
+     */
+    public function scopeCountsTowardReadiness(Builder $query): Builder
+    {
+        return $query
+            ->where('contests.contest_type', '!=', self::CONTEST_TYPE_COMPANY_HIRING)
+            ->where('contests.status', '!=', self::STATUS_CANCELLED);
     }
 
     public function contestProblems(): HasMany

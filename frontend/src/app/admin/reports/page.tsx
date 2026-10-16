@@ -35,6 +35,7 @@ import {
   Sparkles,
   Table2,
   type LucideIcon,
+  Code2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { cn } from "@/lib/utils";
@@ -66,6 +67,8 @@ import {
   type HpTone,
 } from "@/components/portal/kit";
 import { HpErrorCard } from "@/components/portal/pipeline-kit";
+import { rollupLanguages } from "@/lib/cohortInsights";
+import { languageLabel } from "@/lib/judgeLanguages";
 
 // jsPDF + jspdf-autotable + ExcelJS (~500kB combined) live behind this one
 // dynamic import instead of a top-level one — every REPORTS entry below
@@ -91,6 +94,11 @@ interface CohortSummary {
   avgReadiness: number;
   mappedDrives: number;
   nonCompliantTotal: number;
+  /** Students who have submitted at least one solution, and who practised in the last 7 days. */
+  codingStudents: number;
+  activeStudents: number;
+  /** The language the most students have submitted in, if anyone has. */
+  topLanguage: string | null;
 }
 
 /**
@@ -113,6 +121,9 @@ function computeSummary(data: TpoReportsData, sectionFilter: string | null): Coh
     avgReadiness: students.length ? Math.round(students.reduce((sum, s) => sum + s.readiness_score, 0) / students.length) : 0,
     mappedDrives: drives.length,
     nonCompliantTotal: drives.reduce((sum, d) => sum + d.non_compliant.length, 0),
+    codingStudents: students.filter((s) => s.coding.languages.length > 0).length,
+    activeStudents: students.filter((s) => s.activity.engagement === "active").length,
+    topLanguage: rollupLanguages(students)[0]?.language ?? null,
   };
 }
 
@@ -165,6 +176,20 @@ const REPORTS: ReportDef[] = [
     preview: async (data, sectionFilter) => (await loadReportLib()).cohortRows(data, sectionFilter),
     sectionAware: true,
     liveStat: (s) => ({ text: `${s.totalStudents} student${s.totalStudents === 1 ? "" : "s"} on file` }),
+  },
+  {
+    id: "languages",
+    name: "Coding Languages & Progress Report",
+    description: "Who practises and how much they've solved, which language each student codes in, and where the batch is struggling — with a per-language roll-up.",
+    format: "Excel",
+    category: "Analytics",
+    icon: Code2,
+    generate: async (data, sectionFilter) => (await loadReportLib()).generateLanguageProgressReport(data, sectionFilter),
+    preview: async (data, sectionFilter) => (await loadReportLib()).languageProgressRows(data, sectionFilter),
+    sectionAware: true,
+    liveStat: (s) => ({
+      text: s.codingStudents === 0 ? "No code submitted yet" : `${s.codingStudents} coding · ${s.activeStudents} active this week${s.topLanguage ? ` · most use ${languageLabel(s.topLanguage)}` : ""}`,
+    }),
   },
   {
     id: "directory",

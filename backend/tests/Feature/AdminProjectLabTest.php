@@ -361,9 +361,10 @@ class AdminProjectLabTest extends TestCase
     public function test_superadmin_revenue_counts_students_once_and_reports_lab_separately(): void
     {
         $a = $this->student();
-        $this->buy($a, 'expert', ['project-lab']); // 399 + 349
+        $this->buy($a, 'expert');                              // 2,999 for a year
+        $this->grantLegacyProjectLabAddon($a, pricePaid: 349); // bought alongside it, before the add-on was retired
         $b = $this->student();
-        $this->buy($b, null, ['project-lab']);      // 499 on free Coder
+        $this->grantLegacyProjectLabAddon($b);                 // 499 on free Coder
         Sanctum::actingAs(User::factory()->create(['role' => User::ROLE_SUPERADMIN]));
 
         $recurring = $this->getJson('/api/superadmin/overview')->assertOk()->json('individual_recurring');
@@ -371,7 +372,9 @@ class AdminProjectLabTest extends TestCase
         // Active base rows: a's Expert, b's Coder. (Other students in this test DB: the two superadmin/staff factories aren't students.)
         $this->assertSame(2, $recurring['count']);
         $this->assertSame(2, $recurring['addon_count']);
+        // Spread over each line's own term and expressed per 30 days: the two 30-day add-ons count
+        // as paid, the 365-day Expert at 2,999 counts as about 246 a month, and free Coder as nothing.
         $this->assertSame(349 + 499, $recurring['addon_monthly_total']);
-        $this->assertSame(399 + 0 + 349 + 499, $recurring['monthly_total']);
+        $this->assertSame((int) round(2999 * 30 / 365 + 349 + 499), $recurring['monthly_total']);
     }
 }

@@ -9,6 +9,7 @@ use App\Models\SpeakingPrompt;
 use App\Services\GeminiSpeakingPassageService;
 use App\Services\GeminiSpeakingScoringService;
 use App\Services\NoSpeechDetectedException;
+use App\Services\PlanGate;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use RuntimeException;
@@ -91,7 +92,7 @@ class SpeakingPracticeController extends Controller
 
     public function generate(Request $request)
     {
-        $this->assertWithinDailyLearningCentreAiLimit($request);
+        $this->assertWithinDailyLearningCentreAiLimit($request, PlanGate::TRIAL_SPEAKING_PROMPT);
 
         $validated = $request->validate([
             'topic' => ['required', 'string', 'min:3', 'max:80'],
@@ -138,7 +139,7 @@ class SpeakingPracticeController extends Controller
     {
         abort_unless($speakingPrompt->is_active && $speakingPrompt->isVisibleTo($request->user()->id), 404);
 
-        $this->assertWithinDailyLearningCentreAiLimit($request);
+        $this->assertWithinDailyLearningCentreAiLimit($request, PlanGate::TRIAL_SPEAKING_TAKE);
 
         $validated = $request->validate([
             // The recording is the only thing that is scored. `transcript_text` is the browser's live

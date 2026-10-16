@@ -5,15 +5,15 @@ import type { AuthUser } from "@/lib/auth";
 
 /**
  * Honest, weighted copy tiers matching User::computeProfileCompletion()'s
- * real thresholds — the 100% line is literally true, not just motivational:
- * see CompanyTalentPoolController::index(), which orders Talent Pool search
- * results by profile_completion_percent first.
+ * real thresholds. A hiring partner's Vault search ranks by readiness first and
+ * uses profile completeness to break ties (CompanyVaultController::index()), so a
+ * fuller profile is what puts you ahead of someone with the same readiness.
  */
 function tierCopy(percent: number): string {
-  if (percent >= 100) return "Your profile is complete — you now rank at the top when recruiters search by name or skill.";
-  if (percent >= 70) return "Almost recruiter-ready — finish the last few details to move to the top of every search.";
-  if (percent >= 40) return "You're halfway there. Candidates above 70% complete get noticed first.";
-  return "Recruiters skim dozens of profiles a day — an empty one gets skipped. Add a few details to start showing up in search.";
+  if (percent >= 100) return "Your profile is complete — among students with the same readiness, you show up first when recruiters search.";
+  if (percent >= 70) return "Almost recruiter-ready — finish the last few details to move to the front among equally ready students.";
+  if (percent >= 40) return "You're halfway there. Complete profiles get opened first.";
+  return "Recruiters skim dozens of profiles a day — an empty one gets skipped. Add a few details so yours gets opened.";
 }
 
 /** Deliberately just a bar + one line, not a checklist — the fields below it already show what's filled in vs. empty, so listing them twice was more clutter than help. */

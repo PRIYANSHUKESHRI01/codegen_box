@@ -9,6 +9,7 @@ use App\Models\PlacementDrive;
 use App\Models\User;
 use App\Services\EligibilityService;
 use App\Services\PlacementReportService;
+use App\Services\StudentCohortService;
 use Illuminate\Http\Request;
 
 /**
@@ -24,7 +25,7 @@ use Illuminate\Http\Request;
  */
 class TpoReportsController extends Controller
 {
-    public function data(Request $request, PlacementReportService $placementReportService)
+    public function data(Request $request, PlacementReportService $placementReportService, StudentCohortService $cohort)
     {
         $collegeId = $request->user()->college_id;
         $college = College::findOrFail($collegeId);
@@ -34,18 +35,28 @@ class TpoReportsController extends Controller
             ->orderBy('name')
             ->get();
 
-        $studentPayload = $students->map(fn (User $s) => [
-            'id' => $s->id,
-            'name' => $s->name,
-            'email' => $s->email,
-            'roll_number' => $s->roll_number,
-            'branch' => $s->branch,
-            'section' => $s->section,
-            'cgpa' => $s->cgpa,
-            'backlogs' => $s->backlogs,
-            'readiness_score' => $s->readinessScore(),
-            'readiness_tier' => $s->readinessTier(),
-            'practice_score' => $s->practiceScore(),
+        // Built from the same bulk cohort rows the Student Cohort page uses (no
+        // drive mappings passed — nothing here reads eligibility), so a report's
+        // student numbers can never disagree with the roster's, and scoring a
+        // whole college costs a handful of queries instead of a few dozen per
+        // student.
+        $studentPayload = collect($cohort->payloads($students, collect()))->map(fn (array $row) => [
+            'id' => $row['id'],
+            'name' => $row['name'],
+            'email' => $row['email'],
+            'roll_number' => $row['roll_number'],
+            'branch' => $row['branch'],
+            'section' => $row['section'],
+            'cgpa' => $row['cgpa'],
+            'backlogs' => $row['backlogs'],
+            'readiness_score' => $row['readiness_score'],
+            'readiness_tier' => $row['readiness_tier'],
+            'practice_score' => $row['practice_score'],
+            'activated' => $row['activated'],
+            'onboarded' => $row['onboarded'],
+            'solved' => $row['solved'],
+            'activity' => $row['activity'],
+            'coding' => $row['coding'],
         ])->all();
 
         $mappings = DriveCollegeMapping::with('placementDrive.company')

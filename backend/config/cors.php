@@ -19,10 +19,21 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-    ],
+    /*
+    | Who may call this API from a browser. The frontend is a static site on its own origin, so on a real
+    | server its address MUST be listed here or every request is blocked by the browser (login, pricing,
+    | checkout — everything). It is taken from FRONTEND_URL, which every deployment already sets; add more
+    | origins (a www/non-www twin, a staging site) comma-separated in CORS_ALLOWED_ORIGINS. The local dev
+    | origins are allowed everywhere except production.
+    */
+    'allowed_origins' => array_values(array_unique(array_filter(array_map(
+        fn ($origin) => rtrim(trim((string) $origin), '/'),
+        array_merge(
+            env('APP_ENV') === 'production' ? [] : ['http://localhost:3000', 'http://127.0.0.1:3000'],
+            [env('FRONTEND_URL')],
+            explode(',', (string) env('CORS_ALLOWED_ORIGINS', '')),
+        )
+    )))),
 
     'allowed_origins_patterns' => [],
 

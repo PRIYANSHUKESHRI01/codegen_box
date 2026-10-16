@@ -1,3 +1,5 @@
+import type { CareerGoal, FocusArea, SkillLevel, WeeklyPace } from "./studentPreferences";
+
 export type Role =
   | "user"
   | "admin_internal"
@@ -74,6 +76,22 @@ export interface AuthUser {
   resume_uploaded_at: string | null;
   /** 0-100, stored (not computed on read) — see User::computeProfileCompletion(). Distinct from the TPO-facing "readiness score," which isn't exposed to the student themselves today. */
   profile_completion_percent: number;
+  /**
+   * First-login onboarding (students only) — what the student told us about
+   * themselves, and whether to ask them now. `onboarding_pending` is decided by
+   * the server (never completed, and not skipped within the cool-off — see
+   * User::needsOnboarding()), so the client never re-derives that rule.
+   * Language values are the judge's own ids (lib/judgeLanguages.ts).
+   */
+  onboarding_pending?: boolean;
+  onboarding_completed_at?: string | null;
+  onboarding_skipped_at?: string | null;
+  primary_language?: string | null;
+  preferred_languages?: string[] | null;
+  skill_level?: SkillLevel | null;
+  career_goal?: CareerGoal | null;
+  focus_areas?: FocusArea[] | null;
+  weekly_pace?: WeeklyPace | null;
 }
 
 /** True for superadmin (always) or when `key` is present in the signed-in user's granted permissions. */

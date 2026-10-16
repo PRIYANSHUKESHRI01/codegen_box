@@ -1,7 +1,7 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
@@ -29,6 +29,11 @@ import {
   AlertTriangle,
   UserRound,
   ChevronRight,
+  RefreshCw,
+  Code2,
+  Activity,
+  ArrowUpDown,
+  LifeBuoy,
   type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -36,12 +41,34 @@ import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileD
 import { BulkImportStudentsPanel } from "@/components/dashboard/tpo/BulkImportStudentsPanel";
 import { AddStudentModal } from "@/components/dashboard/tpo/AddStudentModal";
 import { BulkNotifyModal } from "@/components/dashboard/tpo/BulkNotifyModal";
+import { CohortEngagementCard, CohortLanguagesCard, CohortPagination, SortHeader } from "@/components/dashboard/tpo/cohortPanels";
+import { EngagementPill, LanguageChips, SolvedCount, lastPracticeText } from "@/components/dashboard/tpo/cohortProgress";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import type { CohortStudent } from "@/types/cohort";
 import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { languageLabel } from "@/lib/judgeLanguages";
+import {
+  ALL,
+  DEFAULT_FILTERS,
+  DEFAULT_SORT,
+  PAGE_SIZES,
+  SORT_OPTIONS,
+  branchOptions,
+  engagementCounts,
+  hasActiveFilters,
+  matchesFilters,
+  paginate,
+  rollupLanguages,
+  sortId,
+  sortStudents,
+  type CohortFilters,
+  type SortDir,
+  type SortKey,
+  type SortState,
+} from "@/lib/cohortInsights";
 import {
   HP_TONES,
   HpAvatar,
@@ -64,7 +91,6 @@ import {
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 
-const BRANCHES = ["ALL", "CSE", "IT", "ECE", "EE", "MECH", "CIVIL"] as const;
 const TIERS = ["ALL", "Placement Ready", "In Progress", "Needs Training"] as const;
 
 /** Tier → tone: emerald only for the positive outcome, sky (the TPO identity) for in-flight, amber for attention. */
@@ -79,25 +105,39 @@ const scoreTone = (score: number): HpTone => (score >= 75 ? "emerald" : score >=
 
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
+/** The filters, sort and page size a TPO has set — kept for the browser session so opening a student's report and coming back lands on the same view. */
+const VIEW_STORAGE_PREFIX = "aptrun:cohort-view:v1:";
+
+/** "just now" / "3 min ago" / "2 h ago" — how stale the loaded roster is. */
+function timeAgo(timestamp: number | null, now: number): string {
+  if (timestamp === null) return "";
+  const minutes = Math.floor((now - timestamp) / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  return `${Math.floor(minutes / 60)} h ago`;
+}
+
 export default function StudentCohortPage() {
   const { user, status } = useAuthGuard(["admin_tpo"]);
   const [students, setStudents] = useState<CohortStudent[]>([]);
   const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
-  const [search, setSearch] = useState("");
-  // The input itself stays instantly responsive (bound to `search` directly
-  // in the JSX below) — only the actual re-filtering of the cohort array
-  // uses this debounced value, so a fast typist isn't re-scanning the whole
-  // list on every keystroke.
-  const debouncedSearch = useDebouncedValue(search, 250);
-  const [branchFilter, setBranchFilter] = useState<(typeof BRANCHES)[number]>("ALL");
-  const [sectionFilter, setSectionFilter] = useState<string>("ALL");
-  const [tierFilter, setTierFilter] = useState<(typeof TIERS)[number]>("ALL");
-  const [eligibleOnly, setEligibleOnly] = useState(false);
-  const [minScore, setMinScore] = useState(0);
-  const [maxScore, setMaxScore] = useState(100);
+  const [filters, setFilters] = useState<CohortFilters>(DEFAULT_FILTERS);
+  // The search box itself stays instantly responsive (bound to `filters.search`
+  // directly in the JSX below) — only the actual re-filtering of the cohort
+  // array uses this debounced value, so a fast typist isn't re-scanning the
+  // whole list on every keystroke.
+  const debouncedSearch = useDebouncedValue(filters.search, 250);
+  const effectiveFilters = useMemo(() => ({ ...filters, search: debouncedSearch }), [filters, debouncedSearch]);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+  const [viewRestored, setViewRestored] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeStudent, setActiveStudent] = useState<CohortStudent | null>(null);
@@ -110,13 +150,20 @@ export default function StudentCohortPage() {
 
   const AT_RISK_THRESHOLD = 60;
 
+  const setFilter = <K extends keyof CohortFilters>(key: K, value: CohortFilters[K]) => setFilters((prev) => ({ ...prev, [key]: value }));
+
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const loadStudents = useCallback(async () => {
-    setLoading(true);
+  /**
+   * `background` refreshes the numbers in place (the roster stays on screen)
+   * instead of swapping the page for a skeleton — what the Refresh button uses.
+   */
+  const loadStudents = useCallback(async (background = false) => {
+    if (background) setRefreshing(true);
+    else setLoading(true);
     setLoadError(null);
     try {
       const [studentsRes, coordinatorsRes] = await Promise.all([
@@ -125,10 +172,15 @@ export default function StudentCohortPage() {
       ]);
       setStudents(studentsRes.students);
       setCoordinators(coordinatorsRes.coordinators);
+      setLoadedAt(Date.now());
+      // A refresh can drop students (deleted / moved) — never keep a selection that points at someone no longer here.
+      const ids = new Set(studentsRes.students.map((s) => s.id));
+      setSelectedIds((prev) => new Set(Array.from(prev).filter((id) => ids.has(id))));
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "Failed to load the student cohort.");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -136,33 +188,82 @@ export default function StudentCohortPage() {
     if (status === "ready") loadStudents();
   }, [status, loadStudents]);
 
+  // Keeps "Updated 3 min ago" honest while the page stays open.
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Restore this session's view (filters / sort / page size) once we know whose it is…
+  const viewKey = user ? `${VIEW_STORAGE_PREFIX}${user.id}` : null;
+  useEffect(() => {
+    if (!viewKey) return;
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(viewKey) ?? "null");
+      if (saved?.filters) setFilters({ ...DEFAULT_FILTERS, ...saved.filters });
+      if (saved?.sort?.key && saved?.sort?.dir) setSort(saved.sort);
+      if (PAGE_SIZES.includes(saved?.pageSize)) setPageSize(saved.pageSize);
+    } catch {
+      // Storage blocked or a stale shape — start from the defaults.
+    }
+    setViewRestored(true);
+  }, [viewKey]);
+
+  // …and keep it saved as it changes.
+  useEffect(() => {
+    if (!viewKey || !viewRestored) return;
+    try {
+      window.sessionStorage.setItem(viewKey, JSON.stringify({ filters, sort, pageSize }));
+    } catch {
+      // Private mode — the view simply isn't remembered.
+    }
+  }, [viewKey, viewRestored, filters, sort, pageSize]);
+
+  // Sections aren't a fixed enum like tiers — every college names its own
+  // (A/B/C, or CSE-1/CSE-2), and the same goes for branches ("CSE (AI & ML)",
+  // "AIDS"…) — so both filters' option lists are derived from whatever the
+  // cohort actually has on file, never hardcoded.
+  const sections = useMemo(() => Array.from(new Set(students.map((s) => s.section).filter((s): s is string => !!s))).sort(), [students]);
+  const branches = useMemo(() => branchOptions(students), [students]);
+  const languageRollup = useMemo(() => rollupLanguages(students), [students]);
+
+  // A restored filter pointing at something that's gone (a branch nobody is in any more) would silently show an empty roster.
+  useEffect(() => {
+    if (loading || students.length === 0) return;
+    setFilters((prev) => {
+      const next = { ...prev };
+      if (next.branch !== ALL && !branches.includes(next.branch)) next.branch = ALL;
+      if (next.section !== ALL && !sections.includes(next.section)) next.section = ALL;
+      if (next.language !== ALL && !languageRollup.some((l) => l.language === next.language)) next.language = ALL;
+      return next.branch === prev.branch && next.section === prev.section && next.language === prev.language ? prev : next;
+    });
+  }, [loading, students.length, branches, sections, languageRollup]);
+
+  const filtered = useMemo(
+    () => sortStudents(students.filter((s) => matchesFilters(s, effectiveFilters)), sort),
+    [students, effectiveFilters, sort]
+  );
+  const pageData = useMemo(() => paginate(filtered, page, pageSize), [filtered, page, pageSize]);
+
+  // A different set of filters, order or page size starts back at page 1, and a selection made under one view
+  // must not silently carry into another (someone could "Notify Selected" people they can no longer see).
+  useEffect(() => {
+    setPage(1);
+  }, [effectiveFilters, sort, pageSize]);
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [effectiveFilters]);
+
   if (status !== "ready") {
     return (
       <SessionLoader />
     );
   }
 
-  // Sections aren't a fixed enum like BRANCHES — every college names its own
-  // (A/B/C, or CSE-1/CSE-2), so the filter's option list is derived from
-  // whatever the cohort actually has on file, never hardcoded.
-  const sections = Array.from(new Set(students.map((s) => s.section).filter((s): s is string => !!s))).sort();
-
-  const filtered = students.filter((s) => {
-    const matchSearch =
-      s.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      (s.roll_number ?? "").toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      s.email.toLowerCase().includes(debouncedSearch.toLowerCase());
-    const matchBranch = branchFilter === "ALL" || s.branch === branchFilter;
-    const matchSection = sectionFilter === "ALL" || s.section === sectionFilter;
-    const matchTier = tierFilter === "ALL" || s.readiness_tier === tierFilter;
-    const matchEligible = !eligibleOnly || s.eligible_for_active_drive === true;
-    const matchScore = s.readiness_score >= minScore && s.readiness_score <= maxScore;
-    return matchSearch && matchBranch && matchSection && matchTier && matchEligible && matchScore;
-  });
-
   const eligibleCount = students.filter((s) => s.eligible_for_active_drive === true).length;
   const needsTrainingCount = students.filter((s) => s.readiness_tier === "Needs Training").length;
   const blockedCount = students.filter((s) => s.is_blocked).length;
+  const engagement = engagementCounts(students);
 
   // Per-section snapshot (ranked best-average-readiness first, shared with
   // the Placement Reports page's Section Performance list and the Academic
@@ -178,26 +279,12 @@ export default function StudentCohortPage() {
   // The filtered section's coordinator — surfaced so a TPO who's just
   // narrowed the table down to one section can immediately see (and
   // contact) whoever manages it, without a separate trip to Coordinators.
-  const activeSectionCoordinator = sectionFilter !== "ALL" ? coordinators.find((c) => c.section === sectionFilter) ?? null : null;
+  const sectionFilter = filters.section;
+  const activeSectionCoordinator = sectionFilter !== ALL ? coordinators.find((c) => c.section === sectionFilter) ?? null : null;
 
-  const hasActiveFilters =
-    search !== "" ||
-    branchFilter !== "ALL" ||
-    sectionFilter !== "ALL" ||
-    tierFilter !== "ALL" ||
-    eligibleOnly ||
-    minScore !== 0 ||
-    maxScore !== 100;
+  const filtersActive = hasActiveFilters(filters);
 
-  const clearFilters = () => {
-    setSearch("");
-    setBranchFilter("ALL");
-    setSectionFilter("ALL");
-    setTierFilter("ALL");
-    setEligibleOnly(false);
-    setMinScore(0);
-    setMaxScore(100);
-  };
+  const clearFilters = () => setFilters(DEFAULT_FILTERS);
 
   const toggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -208,13 +295,25 @@ export default function StudentCohortPage() {
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map((s) => s.id)));
-    }
+  // Select-all works on the page you're looking at (like every inbox); a banner then offers the whole filtered list.
+  const pageIds = pageData.rows.map((s) => s.id);
+  const allPageSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
+  const somePageSelected = pageIds.some((id) => selectedIds.has(id)) && !allPageSelected;
+  const allFilteredSelected = filtered.length > 0 && filtered.every((s) => selectedIds.has(s.id));
+
+  const toggleSelectPage = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) pageIds.forEach((id) => next.delete(id));
+      else pageIds.forEach((id) => next.add(id));
+      return next;
+    });
   };
+
+  const selectAllFiltered = () => setSelectedIds(new Set(filtered.map((s) => s.id)));
+
+  const handleSort = (key: SortKey, firstDir: SortDir) =>
+    setSort((prev) => (prev.key === key ? { key, dir: prev.dir === "asc" ? "desc" : "asc" } : { key, dir: firstDir }));
 
   const handleNotifySent = (message: string) => {
     triggerToast(message);
@@ -249,9 +348,8 @@ export default function StudentCohortPage() {
     "In Progress": inProgressCount,
     "Needs Training": needsTrainingCount,
   };
-  const allFilteredSelected = filtered.length > 0 && selectedIds.size === filtered.length;
-  const someSelected = selectedIds.size > 0 && !allFilteredSelected;
-  const atRiskActive = maxScore === AT_RISK_THRESHOLD - 1 && minScore === 0;
+  const someSelected = selectedIds.size > 0;
+  const atRiskActive = filters.maxScore === AT_RISK_THRESHOLD - 1 && filters.minScore === 0;
   const showInsights = !loading && !loadError && students.length > 0;
 
   return (
@@ -271,7 +369,7 @@ export default function StudentCohortPage() {
       <HpStagger className="space-y-6">
         {/* KPI strip */}
         <HpItem>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
             <HpStatCard
               label="Total cohort"
               value={students.length}
@@ -282,8 +380,31 @@ export default function StudentCohortPage() {
             />
             <button
               type="button"
-              onClick={() => setEligibleOnly(!eligibleOnly)}
-              aria-pressed={eligibleOnly}
+              onClick={() => setFilter("engagement", filters.engagement === "active" ? ALL : "active")}
+              aria-pressed={filters.engagement === "active"}
+              title="Click to filter the roster to students who practised in the last 7 days"
+              className="block h-full rounded-[20px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <HpStatCard
+                label="Practising this week"
+                value={engagement.active}
+                icon={Activity}
+                tone="violet"
+                loading={loading}
+                hint={
+                  loading ? undefined : filters.engagement === "active" ? (
+                    <span className="font-semibold text-violet-700 dark:text-violet-300">Filtering roster · tap to clear</span>
+                  ) : (
+                    `${pct(engagement.active, students.length)}% of the cohort`
+                  )
+                }
+                className={cn("h-full", filters.engagement === "active" && "border-violet-500/40 bg-violet-500/[0.04] ring-2 ring-violet-500/20")}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilter("eligibleOnly", !filters.eligibleOnly)}
+              aria-pressed={filters.eligibleOnly}
               title="Click to filter the table to students eligible for at least one active drive"
               className="block h-full rounded-[20px] text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
@@ -294,13 +415,13 @@ export default function StudentCohortPage() {
                 tone="emerald"
                 loading={loading}
                 hint={
-                  loading ? undefined : eligibleOnly ? (
+                  loading ? undefined : filters.eligibleOnly ? (
                     <span className="font-semibold text-emerald-700 dark:text-emerald-300">Filtering roster · tap to clear</span>
                   ) : (
                     "Tap to filter the roster"
                   )
                 }
-                className={cn("h-full", eligibleOnly && "border-emerald-500/40 bg-emerald-500/[0.04] ring-2 ring-emerald-500/20")}
+                className={cn("h-full", filters.eligibleOnly && "border-emerald-500/40 bg-emerald-500/[0.04] ring-2 ring-emerald-500/20")}
               />
             </button>
             <HpStatCard
@@ -334,8 +455,8 @@ export default function StudentCohortPage() {
                     icon={Layers}
                     tone="sky"
                     action={
-                      sectionFilter !== "ALL" ? (
-                        <HpButton variant="ghost" size="sm" onClick={() => setSectionFilter("ALL")} leftIcon={<X className="h-3.5 w-3.5" />}>
+                      sectionFilter !== ALL ? (
+                        <HpButton variant="ghost" size="sm" onClick={() => setFilter("section", ALL)} leftIcon={<X className="h-3.5 w-3.5" />}>
                           <span className="hidden sm:inline">Clear section filter</span>
                           <span className="sm:hidden">Clear</span>
                         </HpButton>
@@ -351,7 +472,7 @@ export default function StudentCohortPage() {
                           key={section}
                           type="button"
                           aria-pressed={active}
-                          onClick={() => setSectionFilter(sectionFilter === section ? "ALL" : section)}
+                          onClick={() => setFilter("section", sectionFilter === section ? ALL : section)}
                           title={coordinator ? `Coordinator: ${coordinator.name}` : "No coordinator assigned"}
                           className={cn(
                             "group flex min-w-0 flex-col gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
@@ -425,7 +546,7 @@ export default function StudentCohortPage() {
                       whole point of tying reports/cohort to coordinators: make it a
                       one-look, one-click action instead of a trip to Coordinators. */}
                   <AnimatePresence initial={false}>
-                    {sectionFilter !== "ALL" && (
+                    {sectionFilter !== ALL && (
                       <motion.div
                         key="coordinator"
                         initial={{ height: 0, opacity: 0 }}
@@ -504,13 +625,13 @@ export default function StudentCohortPage() {
 
                 <ul className="mt-4 space-y-1">
                   {(TIERS.slice(1) as CohortStudent["readiness_tier"][]).map((t) => {
-                    const active = tierFilter === t;
+                    const active = filters.tier === t;
                     return (
                       <li key={t}>
                         <button
                           type="button"
                           aria-pressed={active}
-                          onClick={() => setTierFilter(active ? "ALL" : t)}
+                          onClick={() => setFilter("tier", active ? ALL : t)}
                           className={cn(
                             "flex w-full items-center justify-between gap-3 rounded-xl px-2.5 py-2 text-left transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500",
                             active ? "bg-indigo-500/[0.08] ring-1 ring-inset ring-indigo-500/25" : "hover:bg-elevated/70"
@@ -538,6 +659,22 @@ export default function StudentCohortPage() {
           </HpItem>
         )}
 
+        {/* Practice engagement + coding languages */}
+        {showInsights && (
+          <HpItem>
+            <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+              <CohortEngagementCard students={students} active={filters.engagement} onSelect={(e) => setFilter("engagement", e)} />
+              <CohortLanguagesCard
+                students={students}
+                activeLanguage={filters.language}
+                onSelectLanguage={(language) => setFilter("language", language)}
+                needsHelpActive={filters.needsLanguageHelp}
+                onToggleNeedsHelp={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
+              />
+            </div>
+          </HpItem>
+        )}
+
         {/* Roster */}
         <HpItem>
           <HpCard spotlight={false} className="overflow-hidden">
@@ -554,10 +691,22 @@ export default function StudentCohortPage() {
                   <p className="text-2xs text-text-muted" aria-live="polite">
                     Showing <span className="tabular font-bold text-primary">{filtered.length}</span> of{" "}
                     <span className="tabular font-bold text-primary">{students.length}</span> students
+                    {loadedAt !== null && <span> · updated {timeAgo(loadedAt, now)}</span>}
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <HpButton
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => loadStudents(true)}
+                  disabled={loading || refreshing}
+                  aria-label="Refresh the roster"
+                  title="Reload the latest numbers"
+                  leftIcon={<RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />}
+                >
+                  Refresh
+                </HpButton>
                 <HpButton
                   variant="secondary"
                   size="sm"
@@ -585,36 +734,37 @@ export default function StudentCohortPage() {
 
             {/* Filter bar */}
             <div className="space-y-3 border-y border-border-subtle bg-elevated/30 px-4 py-3.5 sm:px-5">
-              <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+              <div className="flex flex-col gap-2.5">
                 <HpSearch
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={filters.search}
+                  onChange={(e) => setFilter("search", e.target.value)}
                   placeholder="Search name, roll no, or email..."
                   aria-label="Search students by name, roll number or email"
-                  wrapperClassName="min-w-0 flex-1"
+                  wrapperClassName="min-w-0"
                 />
-                <div className="grid grid-cols-1 gap-2.5 min-[520px]:grid-cols-3 lg:flex lg:items-center">
+                <div className="grid grid-cols-1 gap-2.5 min-[520px]:grid-cols-2 lg:grid-cols-3 xl:flex xl:flex-wrap xl:items-center">
                   <HpSelect
                     aria-label="Filter by branch"
-                    value={branchFilter}
-                    onChange={(e) => setBranchFilter(e.target.value as (typeof BRANCHES)[number])}
+                    value={filters.branch}
+                    onChange={(e) => setFilter("branch", e.target.value)}
                     leading={<GitBranch className="h-3.5 w-3.5 text-text-muted" />}
-                    wrapperClassName="lg:w-40"
+                    wrapperClassName="xl:w-40"
                   >
-                    {BRANCHES.map((b) => (
+                    <option value={ALL}>All Branches</option>
+                    {branches.map((b) => (
                       <option key={b} value={b}>
-                        {b === "ALL" ? "All Branches" : b}
+                        {b}
                       </option>
                     ))}
                   </HpSelect>
                   <HpSelect
                     aria-label="Filter by section"
-                    value={sectionFilter}
-                    onChange={(e) => setSectionFilter(e.target.value)}
+                    value={filters.section}
+                    onChange={(e) => setFilter("section", e.target.value)}
                     leading={<LayoutGrid className="h-3.5 w-3.5 text-text-muted" />}
-                    wrapperClassName="lg:w-40"
+                    wrapperClassName="xl:w-44"
                   >
-                    <option value="ALL">All Sections</option>
+                    <option value={ALL}>All Sections</option>
                     {sections.map((sec) => (
                       <option key={sec} value={sec}>
                         Section {sec}
@@ -623,21 +773,62 @@ export default function StudentCohortPage() {
                   </HpSelect>
                   <HpSelect
                     aria-label="Filter by readiness status"
-                    value={tierFilter}
-                    onChange={(e) => setTierFilter(e.target.value as (typeof TIERS)[number])}
+                    value={filters.tier}
+                    onChange={(e) => setFilter("tier", e.target.value)}
                     leading={
                       <span
                         className={cn(
                           "h-2 w-2 rounded-full",
-                          tierFilter === "ALL" ? "bg-border-strong" : HP_TONES[TIER_TONE[tierFilter]].fill
+                          filters.tier === ALL ? "bg-border-strong" : HP_TONES[TIER_TONE[filters.tier as CohortStudent["readiness_tier"]]].fill
                         )}
                       />
                     }
-                    wrapperClassName="lg:w-48"
+                    wrapperClassName="xl:w-44"
                   >
                     {TIERS.map((t) => (
                       <option key={t} value={t}>
                         {t === "ALL" ? "All Statuses" : t}
+                      </option>
+                    ))}
+                  </HpSelect>
+                  <HpSelect
+                    aria-label="Filter by coding language"
+                    value={filters.language}
+                    onChange={(e) => setFilter("language", e.target.value)}
+                    leading={<Code2 className="h-3.5 w-3.5 text-text-muted" />}
+                    wrapperClassName="xl:w-44"
+                  >
+                    <option value={ALL}>All Languages</option>
+                    {languageRollup.map((l) => (
+                      <option key={l.language} value={l.language}>
+                        {languageLabel(l.language)} ({l.students})
+                      </option>
+                    ))}
+                  </HpSelect>
+                  <HpSelect
+                    aria-label="Filter by practice engagement"
+                    value={filters.engagement}
+                    onChange={(e) => setFilter("engagement", e.target.value as CohortFilters["engagement"])}
+                    leading={<Activity className="h-3.5 w-3.5 text-text-muted" />}
+                    wrapperClassName="xl:w-44"
+                  >
+                    <option value={ALL}>All Practice</option>
+                    <option value="active">Active ({engagement.active})</option>
+                    <option value="slipping">Slipping ({engagement.slipping})</option>
+                    <option value="dormant">Dormant ({engagement.dormant})</option>
+                    <option value="not_started">Not started ({engagement.not_started})</option>
+                    <option value="pending_activation">Not activated ({engagement.pending_activation})</option>
+                  </HpSelect>
+                  <HpSelect
+                    aria-label="Sort roster by"
+                    value={sortId(sort)}
+                    onChange={(e) => setSort(SORT_OPTIONS.find((o) => o.id === e.target.value)?.sort ?? DEFAULT_SORT)}
+                    leading={<ArrowUpDown className="h-3.5 w-3.5 text-text-muted" />}
+                    wrapperClassName="xl:w-52"
+                  >
+                    {SORT_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
                       </option>
                     ))}
                   </HpSelect>
@@ -650,10 +841,10 @@ export default function StudentCohortPage() {
                   Refine
                 </span>
                 <FilterChip
-                  active={eligibleOnly}
+                  active={filters.eligibleOnly}
                   tone="emerald"
                   icon={CheckCircle2}
-                  onClick={() => setEligibleOnly(!eligibleOnly)}
+                  onClick={() => setFilter("eligibleOnly", !filters.eligibleOnly)}
                   title="Students eligible for at least one currently active drive mapped to your college"
                 >
                   Eligible Only
@@ -662,13 +853,19 @@ export default function StudentCohortPage() {
                   active={atRiskActive}
                   tone="rose"
                   icon={ShieldAlert}
-                  onClick={() => {
-                    setMinScore(0);
-                    setMaxScore(AT_RISK_THRESHOLD - 1);
-                  }}
+                  onClick={() => setFilters((prev) => ({ ...prev, minScore: 0, maxScore: AT_RISK_THRESHOLD - 1 }))}
                   title={`Same threshold used by the weekly readiness report (< ${AT_RISK_THRESHOLD}%)`}
                 >
                   At Risk (&lt;{AT_RISK_THRESHOLD}%)
+                </FilterChip>
+                <FilterChip
+                  active={filters.needsLanguageHelp}
+                  tone="amber"
+                  icon={LifeBuoy}
+                  onClick={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
+                  title="Students with enough submissions in a language to show it's going badly (low acceptance, many compile or runtime errors)"
+                >
+                  Struggling in a language
                 </FilterChip>
 
                 {/* Readiness score range filter — the TPO sets their own threshold */}
@@ -683,9 +880,9 @@ export default function StudentCohortPage() {
                     type="number"
                     min={0}
                     max={100}
-                    value={minScore}
+                    value={filters.minScore}
                     aria-label="Minimum readiness score"
-                    onChange={(e) => setMinScore(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
+                    onChange={(e) => setFilter("minScore", Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
                     className="tabular h-6 w-12 rounded-full bg-elevated text-center text-2xs font-bold text-primary outline-none ring-1 ring-inset ring-border-subtle transition-shadow focus:ring-2 focus:ring-indigo-500/50"
                   />
                   <span className="text-text-muted" aria-hidden>
@@ -695,15 +892,15 @@ export default function StudentCohortPage() {
                     type="number"
                     min={0}
                     max={100}
-                    value={maxScore}
+                    value={filters.maxScore}
                     aria-label="Maximum readiness score"
-                    onChange={(e) => setMaxScore(Math.max(0, Math.min(100, Number(e.target.value) || 100)))}
+                    onChange={(e) => setFilter("maxScore", Math.max(0, Math.min(100, Number(e.target.value) || 100)))}
                     className="tabular h-6 w-12 rounded-full bg-elevated text-center text-2xs font-bold text-primary outline-none ring-1 ring-inset ring-border-subtle transition-shadow focus:ring-2 focus:ring-indigo-500/50"
                   />
                 </div>
 
                 <AnimatePresence>
-                  {hasActiveFilters && (
+                  {filtersActive && (
                     <motion.button
                       type="button"
                       onClick={clearFilters}
@@ -721,12 +918,33 @@ export default function StudentCohortPage() {
               </div>
             </div>
 
+            {/* Selection banner — the header checkbox picks this page; this offers the whole filtered list */}
+            {!loading && !loadError && allPageSelected && filtered.length > pageData.rows.length && (
+              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-b border-border-subtle bg-indigo-500/[0.06] px-4 py-2 text-2xs text-text-secondary" role="status">
+                {allFilteredSelected ? (
+                  <>
+                    All <span className="tabular font-bold text-primary">{filtered.length}</span> filtered students are selected.
+                    <button type="button" onClick={() => setSelectedIds(new Set())} className="font-semibold text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300">
+                      Clear selection
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    All <span className="tabular font-bold text-primary">{pageData.rows.length}</span> students on this page are selected.
+                    <button type="button" onClick={selectAllFiltered} className="font-semibold text-indigo-600 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:text-indigo-300">
+                      Select all {filtered.length} filtered students
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Body */}
             {loading ? (
               <RosterSkeleton />
             ) : loadError ? (
               <div className="p-4 sm:p-5">
-                <HpErrorCard message={loadError} onRetry={loadStudents} />
+                <HpErrorCard message={loadError} onRetry={() => loadStudents()} />
               </div>
             ) : filtered.length === 0 ? (
               students.length === 0 ? (
@@ -770,23 +988,20 @@ export default function StudentCohortPage() {
                       <tr>
                         <th scope="col" className="w-12 py-3 pl-5 pr-1">
                           <SelectBox
-                            checked={allFilteredSelected}
-                            indeterminate={someSelected}
-                            onChange={toggleSelectAll}
-                            label={`Select all ${filtered.length} filtered students`}
+                            checked={allPageSelected}
+                            indeterminate={somePageSelected}
+                            onChange={toggleSelectPage}
+                            label={`Select all ${pageData.rows.length} students on this page`}
                           />
                         </th>
+                        <SortHeader label="Student" sortKey="name" firstDir="asc" sort={sort} onSort={handleSort} />
                         <th scope="col" className={cn(hpTh, "px-4")}>
-                          Student
+                          Academics
                         </th>
+                        <SortHeader label="Readiness" sortKey="readiness" firstDir="desc" sort={sort} onSort={handleSort} />
+                        <SortHeader label="Practice" sortKey="inactivity" firstDir="desc" sort={sort} onSort={handleSort} />
                         <th scope="col" className={cn(hpTh, "px-4")}>
-                          Branch · Section
-                        </th>
-                        <th scope="col" className={cn(hpTh, "px-4")}>
-                          CGPA
-                        </th>
-                        <th scope="col" className={cn(hpTh, "px-4")}>
-                          Readiness
+                          Languages
                         </th>
                         <th scope="col" className={cn(hpTh, "px-4")}>
                           Status · Eligibility
@@ -797,7 +1012,7 @@ export default function StudentCohortPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-subtle">
-                      {filtered.map((s) => {
+                      {pageData.rows.map((s) => {
                         const selected = selectedIds.has(s.id);
                         return (
                           <tr
@@ -810,20 +1025,26 @@ export default function StudentCohortPage() {
                             <td className="py-3 pl-5 pr-1">
                               <SelectBox checked={selected} onChange={() => toggleSelect(s.id)} label={`Select ${s.name}`} />
                             </td>
-                            <td className="max-w-[17rem] px-4 py-3">
+                            <td className="max-w-[16rem] px-4 py-3">
                               <StudentIdentity student={s} onOpen={() => setActiveStudent(s)} />
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col items-start gap-1">
-                                <BranchChip branch={s.branch} className="max-w-[12rem]" />
-                                <SectionChip section={s.section} />
+                                <div className="flex flex-wrap items-center gap-1">
+                                  <BranchChip branch={s.branch} className="max-w-[10rem]" />
+                                  <SectionChip section={s.section} />
+                                </div>
+                                <CgpaCell student={s} />
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <CgpaCell student={s} />
+                              <ReadinessCell score={s.readiness_score} practice={s.practice_score} />
                             </td>
                             <td className="px-4 py-3">
-                              <ReadinessCell score={s.readiness_score} practice={s.practice_score} />
+                              <PracticeCell student={s} />
+                            </td>
+                            <td className="max-w-[14rem] px-4 py-3">
+                              <LanguageChips coding={s.coding} />
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col items-start gap-1.5">
@@ -845,15 +1066,15 @@ export default function StudentCohortPage() {
                 <div className="xl:hidden">
                   <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-elevated/40 px-4 py-2.5 sm:px-5">
                     <SelectBox
-                      checked={allFilteredSelected}
-                      indeterminate={someSelected}
-                      onChange={toggleSelectAll}
-                      label={`Select all ${filtered.length} filtered students`}
-                      visibleLabel={`Select all (${filtered.length})`}
+                      checked={allPageSelected}
+                      indeterminate={somePageSelected}
+                      onChange={toggleSelectPage}
+                      label={`Select all ${pageData.rows.length} students on this page`}
+                      visibleLabel={`Select page (${pageData.rows.length})`}
                     />
                   </div>
                   <ul className="divide-y divide-border-subtle">
-                    {filtered.map((s) => {
+                    {pageData.rows.map((s) => {
                       const selected = selectedIds.has(s.id);
                       return (
                         <li
@@ -880,6 +1101,10 @@ export default function StudentCohortPage() {
                               <StatusCell student={s} />
                               <EligibilityCell student={s} />
                             </div>
+                            <div className="mt-3 space-y-2 rounded-xl bg-elevated/40 p-2.5">
+                              <PracticeCell student={s} inline />
+                              <LanguageChips coding={s.coding} />
+                            </div>
                             <div className="mt-3">
                               <RowActions student={s} onProfile={() => setActiveStudent(s)} align="start" />
                             </div>
@@ -889,6 +1114,8 @@ export default function StudentCohortPage() {
                     })}
                   </ul>
                 </div>
+
+                <CohortPagination slice={pageData} total={filtered.length} pageSize={pageSize} onPage={setPage} onPageSize={setPageSize} />
               </>
             )}
           </HpCard>
@@ -926,12 +1153,12 @@ export default function StudentCohortPage() {
         </HpItem>
 
         {/* Room for the floating selection bar so it never covers the last row */}
-        {selectedIds.size > 0 && <div aria-hidden className="h-16" />}
+        {someSelected && <div aria-hidden className="h-16" />}
       </HpStagger>
 
       {/* Floating selection toolbar */}
       <AnimatePresence>
-        {selectedIds.size > 0 && (
+        {someSelected && (
           <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 md:pl-rail">
             <motion.div
               role="region"
@@ -1095,7 +1322,7 @@ function FilterChip({
   children,
 }: {
   active: boolean;
-  tone: "emerald" | "rose";
+  tone: "emerald" | "rose" | "amber";
   icon: LucideIcon;
   onClick: () => void;
   title?: string;
@@ -1112,7 +1339,9 @@ function FilterChip({
         active
           ? tone === "emerald"
             ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/30 shadow-[0_4px_12px_-6px_rgba(16,185,129,0.6)] dark:text-emerald-300"
-            : "bg-rose-500/10 text-rose-700 ring-rose-500/30 shadow-[0_4px_12px_-6px_rgba(244,63,94,0.6)] dark:text-rose-300"
+            : tone === "amber"
+              ? "bg-amber-500/10 text-amber-700 ring-amber-500/30 shadow-[0_4px_12px_-6px_rgba(245,158,11,0.6)] dark:text-amber-300"
+              : "bg-rose-500/10 text-rose-700 ring-rose-500/30 shadow-[0_4px_12px_-6px_rgba(244,63,94,0.6)] dark:text-rose-300"
           : "bg-[rgb(var(--bg-surface-rgb))] text-text-secondary ring-border-subtle hover:bg-elevated hover:text-primary hover:ring-border-strong"
       )}
     >
@@ -1192,6 +1421,17 @@ function ReadinessCell({ score, practice }: { score: number; practice: number })
           <span className="tabular text-3xs font-bold text-text-secondary">{practice}%</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** How actively a student practises: the engagement pill, when they last did, and how many problems they've solved. */
+function PracticeCell({ student: s, inline = false }: { student: CohortStudent; inline?: boolean }) {
+  return (
+    <div className={cn("flex min-w-[8.5rem] gap-1", inline ? "flex-row flex-wrap items-center gap-x-2.5" : "flex-col items-start")}>
+      <EngagementPill engagement={s.activity.engagement} />
+      <span className="text-3xs font-medium text-text-muted">{lastPracticeText(s)}</span>
+      <SolvedCount solved={s.solved} />
     </div>
   );
 }

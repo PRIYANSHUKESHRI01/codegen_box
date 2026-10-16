@@ -82,7 +82,7 @@ class LeadAssignmentService
 
     /**
      * The lead-to-customer handoff: called the moment a Mellow Direct lead
-     * buys a paid plan (see SubscriptionService::subscribeIndividual).
+     * buys a paid plan (see SubscriptionService::purchase, run when the payment is confirmed).
      * Marketing keeps credit for the conversion — assigned_marketing_id is
      * never touched here — but servicing ownership now passes to Mellow
      * Internal via assignInternalOwner(). Idempotent: a plan renewal or

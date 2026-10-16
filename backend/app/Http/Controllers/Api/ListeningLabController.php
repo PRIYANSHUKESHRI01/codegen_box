@@ -9,6 +9,7 @@ use App\Models\ListeningLesson;
 use App\Services\GeminiListeningLessonService;
 use App\Services\GeminiSpeakingPassageService;
 use App\Services\ListeningProgressService;
+use App\Services\PlanGate;
 use App\Support\SpeechAlignment;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -116,7 +117,7 @@ class ListeningLabController extends Controller
 
     public function generate(Request $request)
     {
-        $this->assertWithinDailyLearningCentreAiLimit($request);
+        $this->assertWithinDailyLearningCentreAiLimit($request, PlanGate::TRIAL_LISTENING_LESSON);
 
         $validated = $request->validate([
             'topic' => ['required', 'string', 'min:3', 'max:80'],

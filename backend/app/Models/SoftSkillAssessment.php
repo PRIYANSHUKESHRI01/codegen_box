@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -38,6 +39,8 @@ class SoftSkillAssessment extends Model
         'description',
         'status',
         'assessment_type',
+        'is_question_set',
+        'question_set_number',
         'owning_college_id',
         'owning_company_id',
         'duration_minutes',
@@ -52,12 +55,57 @@ class SoftSkillAssessment extends Model
             'duration_minutes' => 'integer',
             'pass_percentage' => 'integer',
             'max_attempts' => 'integer',
+            'is_question_set' => 'boolean',
+            'question_set_number' => 'integer',
         ];
     }
 
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * The one definition of "this soft-skills test may raise a student's
+     * readiness score": Mellow's general tests and a TPO's own, never a hiring
+     * partner's (`company`) test. ReadinessScoreService reads soft-skills tests
+     * only through this scope.
+     */
+    public function scopeCountsTowardReadiness(Builder $query): Builder
+    {
+        return $query->where('soft_skill_assessments.assessment_type', '!=', self::TYPE_COMPANY);
+    }
+
+    /**
+     * The AptRun question-set library: Mellow-owned general assessments flagged as sets
+     * (see the add_question_sets_to_soft_skills migration). `published` is deliberately not part
+     * of the definition — a set being withdrawn from students must not erase the history of
+     * which tests were built from it.
+     */
+    public function scopeQuestionSets(Builder $query): Builder
+    {
+        return $query->where('soft_skill_assessments.is_question_set', true)
+            ->where('soft_skill_assessments.assessment_type', self::TYPE_GENERAL)
+            ->whereNull('soft_skill_assessments.owning_college_id')
+            ->whereNull('soft_skill_assessments.owning_company_id');
+    }
+
+    /** Everything that is not a library set — the tests somebody scheduled (or Mellow wrote by hand). */
+    public function scopeNotQuestionSets(Builder $query): Builder
+    {
+        return $query->where('soft_skill_assessments.is_question_set', false);
+    }
+
+    /** Every time this (library set) was used to build a test — see SoftSkillAssessmentSet. */
+    public function usages(): HasMany
+    {
+        return $this->hasMany(SoftSkillAssessmentSet::class, 'question_set_id');
+    }
+
+    /** Which library sets this test was built from. */
+    public function appliedSets(): HasMany
+    {
+        return $this->hasMany(SoftSkillAssessmentSet::class)->orderBy('created_at');
     }
 
     public function assessmentQuestions(): HasMany
@@ -83,6 +131,12 @@ class SoftSkillAssessment extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** "Set 12" for a numbered library set, otherwise the plain title. */
+    public function setLabel(): string
+    {
+        return $this->question_set_number !== null ? "Set {$this->question_set_number}" : $this->title;
     }
 
     public function isPublished(): bool

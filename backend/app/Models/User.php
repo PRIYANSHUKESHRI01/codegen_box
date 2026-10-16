@@ -12,10 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Services\ReadinessScoreService;
+use App\Support\StudentPreferences;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class User extends Authenticatable
 {
@@ -82,8 +84,8 @@ class User extends Authenticatable
 
     public const PERM_ARTICLES = 'articles';
 
-    /** Author Talent Pool scouting assessments and oversee the shared candidate marketplace — see App\Models\TalentPoolCandidate. */
-    public const PERM_TALENT_POOL = 'talent_pool';
+    /** Oversee the Vault — the students who are ready to be hired, and their hand-off to Mellow Vault. See App\Models\VaultProfile. */
+    public const PERM_VAULT = 'vault';
 
     /** Author Mellow-curated (general) Soft Skills tests and manage the shared question bank — see App\Models\SoftSkillAssessment. */
     public const PERM_SOFT_SKILLS = 'soft_skills';
@@ -103,7 +105,7 @@ class User extends Authenticatable
         self::PERM_INTERVIEWS,
         self::PERM_CUSTOMERS,
         self::PERM_ARTICLES,
-        self::PERM_TALENT_POOL,
+        self::PERM_VAULT,
         self::PERM_SOFT_SKILLS,
         self::PERM_PROJECT_LAB,
         self::PERM_HACKATHONS,
@@ -188,7 +190,7 @@ class User extends Authenticatable
         // to append at all; only has_resume (a boolean) is ever serialized,
         // and the actual file is only reachable through an authenticated,
         // ownership-checked download route (StudentProfileController::downloadOwnResume(),
-        // CompanyTalentPoolController's resume route).
+        // CompanyVaultController's resume route).
         'resume_path',
     ];
 
@@ -201,7 +203,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $appends = ['avatar_url', 'has_resume'];
+    protected $appends = ['avatar_url', 'has_resume', 'onboarding_pending'];
 
     /**
      * The attributes that should be cast.
@@ -238,6 +240,18 @@ class User extends Authenticatable
             // these, via forceFill().
             'resume_uploaded_at' => 'datetime',
             'profile_completion_percent' => 'integer',
+            // Onboarding answers — cast but deliberately NOT in $fillable,
+            // same as is_blocked: only StudentPreferencesController writes
+            // them, via forceFill(), after validating against
+            // App\Support\StudentPreferences.
+            'onboarding_completed_at' => 'datetime',
+            'onboarding_skipped_at' => 'datetime',
+            // Stamped by AuthController (login + throttled /me) — never mass-assigned.
+            'last_seen_at' => 'datetime',
+            // Set by the unsubscribe link in a nudge e-mail (EmailPreferenceController) — never mass-assigned.
+            'email_nudges_opt_out_at' => 'datetime',
+            'preferred_languages' => 'array',
+            'focus_areas' => 'array',
         ];
     }
 
@@ -259,6 +273,31 @@ class User extends Authenticatable
     {
         return Attribute::make(
             get: fn () => $this->resume_path !== null,
+        );
+    }
+
+    /**
+     * True when this student should be shown the first-login onboarding
+     * wizard now: they are a student, have never completed it, and either
+     * never skipped it or skipped it long enough ago (see
+     * StudentPreferences::SKIP_COOLDOWN_DAYS) to be worth asking again. The
+     * rule lives here, on the server, so every client agrees on it.
+     */
+    public function needsOnboarding(): bool
+    {
+        if (! $this->isStudent() || $this->onboarding_completed_at !== null) {
+            return false;
+        }
+
+        return $this->onboarding_skipped_at === null
+            || $this->onboarding_skipped_at->lte(now()->subDays(StudentPreferences::SKIP_COOLDOWN_DAYS));
+    }
+
+    /** Serialized as `onboarding_pending` so the frontend never re-derives the skip cool-off itself. */
+    protected function onboardingPending(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->needsOnboarding(),
         );
     }
 
@@ -294,10 +333,16 @@ class User extends Authenticatable
         return $this->hasMany(ArticleRead::class);
     }
 
-    /** This student's Talent Pool standing, if they've ever qualified — see App\Models\TalentPoolCandidate. Null for everyone else (staff/TPO/company accounts never have one). */
-    public function talentPoolCandidate(): HasOne
+    /** This student's place in the Vault, if they have ever been ready or said they want in — see App\Models\VaultProfile. Null for everyone else (staff/TPO/company accounts never have one). */
+    public function vaultProfile(): HasOne
     {
-        return $this->hasOne(TalentPoolCandidate::class);
+        return $this->hasOne(VaultProfile::class);
+    }
+
+    /** Every lifecycle e-mail sent to this user — see App\Models\LifecycleEmailLog. */
+    public function lifecycleEmails(): HasMany
+    {
+        return $this->hasMany(LifecycleEmailLog::class);
     }
 
     /** Notes the marketing team has logged about this lead — meaningless (and expected to stay empty) for anyone who isn't one. */
@@ -396,6 +441,41 @@ class User extends Authenticatable
         return $this->phone_verified_at !== null;
     }
 
+    /** Prefix of the Sanctum token name a superadmin's "view as" session carries; the rest is the superadmin's id. */
+    public const IMPERSONATION_TOKEN_PREFIX = 'impersonation:';
+
+    /** The one ability such a token carries — never '*', so it can be told apart from a real login. */
+    public const IMPERSONATION_ABILITY = 'impersonated';
+
+    /**
+     * True when THIS request is a superadmin looking at the account through
+     * "view as" rather than the account's own owner signed in. Judged from the
+     * token the request arrived with, so it cannot be spoofed by anything the
+     * client sends; false for a first-party/transient token (and in tests that
+     * act as a user without a real token).
+     */
+    public function isBeingImpersonated(): bool
+    {
+        $token = $this->currentAccessToken();
+
+        return $token instanceof PersonalAccessToken
+            && in_array(self::IMPERSONATION_ABILITY, $token->abilities ?? [], true);
+    }
+
+    /** The superadmin behind a "view as" session, or null when this is not one. */
+    public function impersonatorId(): ?int
+    {
+        $token = $this->currentAccessToken();
+
+        if (! $token instanceof PersonalAccessToken || ! $this->isBeingImpersonated()) {
+            return null;
+        }
+
+        $id = substr((string) $token->name, strlen(self::IMPERSONATION_TOKEN_PREFIX));
+
+        return ctype_digit($id) ? (int) $id : null;
+    }
+
     /** The full permission catalog available to a given role — what a superadmin is allowed to pick from when hiring/editing that role. Empty for any role with no granular permissions of its own. */
     public static function permissionCatalogForRole(string $role): array
     {
@@ -477,13 +557,13 @@ class User extends Authenticatable
      * A 0-100 "recruiter-ready profile" completion score — see
      * StudentProfileController, which recomputes and persists this into
      * `profile_completion_percent` after every write (bio/links/skills save,
-     * resume upload/delete) so CompanyTalentPoolController can `ORDER BY` it
+     * resume upload/delete) so CompanyVaultController can `ORDER BY` it
      * directly in SQL to rank more-complete profiles first in search.
      *
-     * NOT the same thing as readinessScore() below — that's academic CGPA +
-     * daily-practice consistency for the TPO cohort view; this is entirely
-     * different fields (bio/links/skills/resume/avatar/phone), self-edited
-     * on the Settings page, and recruiter-facing rather than TPO-facing.
+     * NOT the same thing as readinessScore() below — that is what a student
+     * has done on the platform; this is entirely different fields
+     * (bio/links/skills/resume/avatar/phone), self-edited on the Settings
+     * page, and recruiter-facing.
      * Deliberately only weighs fields the student can personally act on from
      * that page — nothing TPO-imported (roll_number/branch/cgpa/backlogs)
      * counts here, since a student has no way to fix those themselves.
@@ -507,23 +587,41 @@ class User extends Authenticatable
     }
 
     /**
-     * The explainable form of readinessScore() — see
-     * App\Services\ReadinessScoreService for the actual weighting (Interview
-     * Performance 35%, Contest Rating 20%, Practice Depth & Breadth 20%,
-     * Consistency 15%, Academic Standing 10%) and its docblock for why the
-     * balance shifted away from CGPA toward demonstrated skill. Cached on
-     * the instance so a single request never recomputes this more than
-     * once — readinessScore()/readinessTier() both read from here instead
-     * of each re-deriving it, and practiceScore() below is cached
-     * separately for the same reason (it's read both by this breakdown's
-     * consistency component and directly by callers like
-     * StudentStatsController).
+     * The explainable form of readinessScore() — one score, one set of rules,
+     * for every student whether or not they belong to a college. See
+     * App\Services\ReadinessScoreService for the weighting (AI interviews,
+     * coding practice, Learning Centre, soft skills, contests, participation,
+     * consistency) and config/readiness.php for the numbers.
      *
-     * @return array{score: int, tier: string, components: array, next_steps: array<int, string>}
+     * Computed once per instance: readinessScore()/readinessTier() read from
+     * here instead of each re-deriving it, and the 7-day practice score the
+     * roster shows beside it is seeded in the same pass so practiceScore() is
+     * free afterwards.
+     *
+     * @return array{score: int, tier: string, components: array, next_steps: array<int, string>, vault: array{threshold: int, qualifies: bool, points_needed: int}}
      */
     public function readinessBreakdown(): array
     {
-        return $this->readinessBreakdownCache ??= app(ReadinessScoreService::class)->breakdown($this);
+        if ($this->readinessBreakdownCache === null) {
+            $result = app(ReadinessScoreService::class)->compute([$this])[$this->id];
+            $this->primeReadiness($result['breakdown'], $result['practice_score']);
+        }
+
+        return $this->readinessBreakdownCache;
+    }
+
+    /**
+     * Seeds the per-instance caches above from a bulk computation — see
+     * ReadinessScoreService::prime(), which scores a whole cohort in a handful
+     * of queries. Callers that loop over many students prime first;
+     * readinessScore()/practiceScore() then never query.
+     *
+     * @param  array{score: int, tier: string, components: array, next_steps: array<int, string>, vault: array}  $breakdown
+     */
+    public function primeReadiness(array $breakdown, int $practiceScore): void
+    {
+        $this->readinessBreakdownCache = $breakdown;
+        $this->practiceScoreCache = $practiceScore;
     }
 
     public function readinessScore(): int
@@ -618,21 +716,33 @@ class User extends Authenticatable
      * subscription at all (shouldn't happen — every student gets one via
      * SubscriptionService::ensureDefaultIndividualPlan() on creation).
      *
-     * @return array{max_practice_problems_per_day: ?int, max_mock_interviews_per_day: ?int, drive_access: bool}
+     * hackathon_access / vault_access / feature_trial_uses are the plan's
+     * feature switches and free-trial allowance — see PlanGate, which is what
+     * actually enforces them.
+     *
+     * @return array{max_practice_problems_per_day: ?int, max_mock_interviews_per_day: ?int, max_learning_centre_ai_attempts_per_day: ?int, feature_trial_uses: ?int, drive_access: bool, hackathon_access: bool, vault_access: bool}
      */
     public function effectiveEntitlements(): array
     {
-        $plan = $this->effectiveSubscription()?->plan;
+        $subscription = $this->effectiveSubscription();
+
+        // A paid plan past its end date grants nothing, the moment the date passes — not whenever
+        // `subscriptions:expire` next flips its status (daily, and only if the host's cron runs at
+        // all). Judging the date here is what makes "paid features only while the plan is paid" hold.
+        $plan = $subscription !== null && $subscription->isActive() ? $subscription->plan : null;
 
         if ($plan === null) {
-            $plan = Plan::where('audience', Plan::AUDIENCE_INDIVIDUAL)->where('monthly_price', 0)->first();
+            $plan = Plan::where('audience', Plan::AUDIENCE_INDIVIDUAL)->where('list_price', 0)->first();
         }
 
         return [
             'max_practice_problems_per_day' => $plan?->max_practice_problems_per_day,
             'max_mock_interviews_per_day' => $plan?->max_mock_interviews_per_day,
             'max_learning_centre_ai_attempts_per_day' => $plan?->max_learning_centre_ai_attempts_per_day,
+            'feature_trial_uses' => $plan?->feature_trial_uses,
             'drive_access' => $plan?->drive_access ?? true,
+            'hackathon_access' => $plan?->hackathon_access ?? true,
+            'vault_access' => $plan?->vault_access ?? true,
         ];
     }
 
@@ -646,7 +756,7 @@ class User extends Authenticatable
      *   2. the plan that governs them (their college's, else their own base
      *      plan) when that plan sets project_lab_access — a college can later
      *      be granted Lab without every student buying it. Hours then count
-     *      per calendar month. No plan sets the flag today.
+     *      per calendar month. Expert and Grandmaster set the flag, and so can a college plan.
      *
      * @return array{access: bool, source: 'addon'|'plan'|'institution'|'none', plan: ?Plan, subscription: ?Subscription, period_started_at: ?\Illuminate\Support\Carbon, period_ends_at: ?\Illuminate\Support\Carbon, days_remaining: ?int, max_workspace_hours_per_month: ?int, max_active_projects: ?int}
      */

@@ -109,14 +109,14 @@ export const AUDIENCE_HUBS: AudienceHubData[] = [
       {
         icon: Users2,
         title: "Get noticed, on your terms",
-        body: "Strong performers can opt in to the recruiter talent pool, and stay hidden until they say yes.",
+        body: "Once your readiness score reaches the Vault bar you can opt in to be found by recruiters, and stay hidden until you say yes.",
       },
     ],
     featureSlugs: ["learning-centre", "company-prep", "practice-arena", "ai-interviews"],
     steps: [
       { title: "Create your account", body: "Sign up free, or use the login your placement cell sent you." },
       { title: "Prepare", body: "Work through your learning centre, the prep pack and the recommended problems." },
-      { title: "Apply and get noticed", body: "Apply to the drives you are eligible for, and opt in to the talent pool if you qualify." },
+      { title: "Apply and get noticed", body: "Apply to the drives you are eligible for, and opt in to the Vault once your readiness score gets there." },
     ],
   },
   {
@@ -132,7 +132,7 @@ export const AUDIENCE_HUBS: AudienceHubData[] = [
     description:
       "Post an opening, reach partner colleges, and screen candidates with proctored assessments and AI interviews, all from one pipeline.",
     metaDescription:
-      "Post openings, reach partner campuses, screen with proctored assessments and AI interviews, and hire from a consent-based talent pool.",
+      "Post openings, reach partner campuses, screen with proctored assessments and AI interviews, and hire from the Vault, students whose readiness says they are ready.",
     outcomes: [
       {
         icon: Building2,
@@ -147,10 +147,10 @@ export const AUDIENCE_HUBS: AudienceHubData[] = [
       {
         icon: UserCheck,
         title: "Discover with consent",
-        body: "Search a talent pool of students who qualified on real scores and chose to be visible.",
+        body: "Search the Vault of students whose readiness score says they are ready, and who chose to be visible.",
       },
     ],
-    featureSlugs: ["campus-hiring", "talent-pool", "proctored-assessments", "ai-interviews"],
+    featureSlugs: ["campus-hiring", "vault", "proctored-assessments", "ai-interviews"],
     steps: [
       { title: "Talk to our team", body: "Hiring-partner accounts are set up by our team after a short conversation." },
       { title: "Post and propose", body: "Describe the role, then propose it to partner colleges or open it up." },

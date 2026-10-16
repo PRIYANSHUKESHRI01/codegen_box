@@ -30,6 +30,9 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { HP_TONES, HpAvatar, HpPill, HpProgress, HpRing, hpBtn, hpEase, type HpTone } from "@/components/portal/kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
+import { EngagementPill, LanguageChips, lastPracticeText } from "./cohortProgress";
+import { daysAgo, relativeDays } from "@/lib/languageInsights";
+import { languageLabel } from "@/lib/judgeLanguages";
 
 interface StudentProfileDrawerProps {
   student: CohortStudent | null;
@@ -195,12 +198,36 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                     <span className="font-mono font-bold text-primary">{student.readiness_score}/100</span>
                   </div>
                   <p className="text-text-secondary mt-1">
-                    Computed from CGPA, active backlogs, academic profile completeness, and daily practice consistency.
+                    One score for everything the student does on AptRun: AI mock interviews (20), coding practice (15), the Learning Centre (15), soft skills (10), contests (15), events and projects (10) and day-to-day consistency (15). Academics are not part of it, so it reads the same for every student.
                   </p>
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-current/10 text-2xs">
                     <span className="text-text-secondary">7-Day Practice Streak</span>
                     <span className="font-mono font-bold text-primary">{student.practice_score}%</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Coding activity — same facts the TPO's drawer shows */}
+              <div>
+                <h4 className="text-2xs font-bold uppercase tracking-wider text-text-muted mb-2">
+                  Coding Activity
+                </h4>
+                <div className="space-y-2.5 rounded-control border border-border-subtle bg-elevated/60 p-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <EngagementPill engagement={student.activity.engagement} />
+                    <span className="text-2xs text-text-muted">{lastPracticeText(student)}</span>
+                  </div>
+                  <p className="text-text-secondary">
+                    <span className="font-mono font-bold text-primary">{student.solved.total}</span> problems solved
+                    <span className="text-text-muted">
+                      {" "}
+                      ({student.solved.easy} easy · {student.solved.medium} medium · {student.solved.hard} hard)
+                    </span>
+                  </p>
+                  <LanguageChips coding={student.coding} max={6} />
+                  <p className="text-3xs text-text-muted">
+                    Last seen {relativeDays(daysAgo(student.activity.last_seen_at))} · practised on {student.activity.active_days_30} of the last 30 days
+                  </p>
                 </div>
               </div>
 
@@ -413,8 +440,52 @@ function PremiumDrawer({
 
                   <p className="flex items-start gap-2 rounded-xl bg-elevated/50 px-3 py-2.5 text-2xs leading-relaxed text-text-muted">
                     <Info className="mt-px h-3.5 w-3.5 shrink-0 text-sky-500" aria-hidden />
-                    Readiness is computed from CGPA, active backlogs, academic profile completeness, and daily practice consistency.
+                    Readiness is one score for everything the student does on AptRun: AI mock interviews (20), coding practice (15), the Learning Centre (15), soft skills (10), contests (15), events and projects (10) and consistency (15). Academics are not part of it, and anything a hiring partner posted never counts.
                   </p>
+
+                  {/* Coding activity — is this student practising, and in what */}
+                  <section className="space-y-2.5">
+                    <SectionLabel>Coding Activity</SectionLabel>
+                    <div className="space-y-3.5 rounded-2xl border border-border-subtle p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <EngagementPill engagement={student.activity.engagement} size="md" />
+                        <span className="text-2xs font-medium text-text-muted">{lastPracticeText(student)}</span>
+                      </div>
+
+                      <dl className="grid grid-cols-4 gap-2 text-center">
+                        {(
+                          [
+                            ["Solved", student.solved.total, "text-primary"],
+                            ["Easy", student.solved.easy, "text-emerald-700 dark:text-emerald-300"],
+                            ["Medium", student.solved.medium, "text-amber-700 dark:text-amber-300"],
+                            ["Hard", student.solved.hard, "text-rose-700 dark:text-rose-300"],
+                          ] as const
+                        ).map(([label, value, tone]) => (
+                          <div key={label} className="rounded-xl bg-elevated/50 px-1 py-2">
+                            <dd className={cn("tabular text-base font-extrabold leading-none", tone)}>{value}</dd>
+                            <dt className="mt-1 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">{label}</dt>
+                          </div>
+                        ))}
+                      </dl>
+
+                      <div className="space-y-1.5">
+                        <p className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">Languages</p>
+                        <LanguageChips coding={student.coding} max={6} />
+                        {student.coding.stated_language ? (
+                          <p className="text-2xs text-text-muted">
+                            Says they code in <span className="font-semibold text-text-secondary">{languageLabel(student.coding.stated_language)}</span>.
+                          </p>
+                        ) : (
+                          <p className="text-2xs text-text-muted">{student.onboarded ? "Didn't name a main language." : "Hasn't answered the first-login questions yet."}</p>
+                        )}
+                      </div>
+
+                      <p className="border-t border-border-subtle pt-2.5 text-3xs text-text-muted">
+                        Last seen <span className="font-semibold text-text-secondary">{relativeDays(daysAgo(student.activity.last_seen_at))}</span> · practised on{" "}
+                        <span className="tabular font-semibold text-text-secondary">{student.activity.active_days_30}</span> of the last 30 days
+                      </p>
+                    </div>
+                  </section>
 
                   {/* Academic profile */}
                   <section className="space-y-2.5">

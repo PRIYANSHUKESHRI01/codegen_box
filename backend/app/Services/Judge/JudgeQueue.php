@@ -61,6 +61,7 @@ class JudgeQueue
                     'state' => $entry['state'],
                     'token' => $existingToken,
                     'position' => $entry['position'] ?? 0,
+                    'total_cases' => $entry['total_cases'] ?? null,
                     'poll_after_ms' => $this->pollHint($entry['state'], $entry['position'] ?? 0),
                 ]);
             }
@@ -92,7 +93,8 @@ class JudgeQueue
                 return $this->response(503, ['message' => 'The judge is at capacity right now. Please try again in a few seconds.'], ['Retry-After' => (string) $retry]);
             }
 
-            $this->results->putQueued($token, $request, $depth + 1);
+            $totalCases = $this->totalCases($request, $problem);
+            $this->results->putQueued($token, $request, $depth + 1, $totalCases);
 
             JudgeSubmissionJob::dispatch($token, $request->toArray(), $cacheKey)
                 ->onConnection(config('judge.connection'))
@@ -116,6 +118,7 @@ class JudgeQueue
             'state' => JudgeResultStore::STATE_QUEUED,
             'token' => $token,
             'position' => $depth + 1,
+            'total_cases' => $totalCases,
             'poll_after_ms' => $this->pollHint(JudgeResultStore::STATE_QUEUED, $depth + 1),
         ]);
     }
@@ -144,6 +147,7 @@ class JudgeQueue
                 'state' => $entry['state'],
                 'token' => $token,
                 'position' => $entry['position'] ?? 0,
+                'total_cases' => $entry['total_cases'] ?? null,
                 'poll_after_ms' => $this->pollHint($entry['state'], $entry['position'] ?? 0),
             ],
         };
@@ -224,6 +228,21 @@ class JudgeQueue
         });
 
         return hash('sha256', $request->fingerprint().'|'.$testSet);
+    }
+
+    /**
+     * How many test cases this job will judge: a Run judges the public samples, a Submit the whole set —
+     * the same split the job makes (JudgeSubmissionJob). Display only (the UI shows that many cases being
+     * checked while it waits), so it is cached for a minute rather than counted on every click.
+     */
+    private function totalCases(JudgeRequest $request, Problem $problem): int
+    {
+        $counts = Cache::remember("judge:casecounts:{$problem->id}", 60, fn () => [
+            'all' => $problem->testCases()->reorder()->count(),
+            'samples' => $problem->sampleTestCases()->reorder()->count(),
+        ]);
+
+        return (int) ($request->kind === JudgeRequest::KIND_SUBMIT ? $counts['all'] : $counts['samples']);
     }
 
     private function activeKey(int $userId): string

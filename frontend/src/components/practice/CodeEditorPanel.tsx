@@ -1,12 +1,15 @@
 "use client";
 
+import { useRef } from "react";
 import dynamic from "next/dynamic";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import type { OnMount } from "@monaco-editor/react";
 import { monacoLanguageFor } from "@/lib/judgeLanguages";
+import { EDITOR_CLIPBOARD_SOURCE_PROPS } from "@/lib/proctoring/editorClipboardGuard";
 import { LanguagePicker } from "./LanguagePicker";
+import { EditorBootPlaceholder } from "./EditorBootPlaceholder";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false });
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), { ssr: false, loading: () => <EditorBootPlaceholder /> });
 
 /**
  * Monaco's own built-in "auto-scroll the viewport while dragging a
@@ -88,6 +91,22 @@ interface CodeEditorPanelProps {
   fontSize: number;
   onFontSizeChange: (size: number) => void;
   savedAt: number | null;
+  /**
+   * Ctrl/Cmd+Enter runs and Ctrl/Cmd+Shift+Enter submits — wherever the cursor is. They have to be
+   * registered INSIDE the editor: Monaco claims those keystrokes for itself ("insert line below"), so a
+   * window-level listener never hears them while the student is typing, which is exactly when they press them.
+   */
+  onRun?: () => void;
+  onSubmit?: () => void;
+  /**
+   * Proctored contests only: code can be pasted into this editor only if it was copied or cut out of
+   * this editor (see lib/proctoring/editorClipboardGuard.ts, installed by useProctoring). This marks the
+   * editor as the one trusted clipboard source and switches off Monaco's own paste entry points that
+   * don't go through a DOM paste event — its context menu (whose Paste can read the clipboard directly;
+   * inert in the pinned 0.55.1 build, but not something to rely on) and drop-into-editor. Practice
+   * leaves it off, where pasting is fine.
+   */
+  restrictClipboard?: boolean;
 }
 
 export function CodeEditorPanel({
@@ -100,7 +119,22 @@ export function CodeEditorPanel({
   fontSize,
   onFontSizeChange,
   savedAt,
+  onRun,
+  onSubmit,
+  restrictClipboard = false,
 }: CodeEditorPanelProps) {
+  // The editor registers its commands once, when it mounts; these always point at the latest handlers.
+  const runRef = useRef(onRun);
+  const submitRef = useRef(onSubmit);
+  runRef.current = onRun;
+  submitRef.current = onSubmit;
+
+  const handleMount: OnMount = (editorInstance, monaco) => {
+    attachDragAutoScroll(editorInstance);
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runRef.current?.());
+    editorInstance.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.Enter, () => submitRef.current?.());
+  };
+
   return (
     <div className="h-full flex flex-col bg-[#1e1e1e]">
       <div className="flex items-center justify-between gap-2 px-3 h-11 border-b border-black/30 bg-surface shrink-0">
@@ -142,14 +176,14 @@ export function CodeEditorPanel({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0" {...(restrictClipboard ? EDITOR_CLIPBOARD_SOURCE_PROPS : {})}>
         <MonacoEditor
           language={monacoLanguageFor(language)}
           value={code}
           onChange={(value) => onCodeChange(value ?? "")}
-          onMount={attachDragAutoScroll}
+          onMount={handleMount}
           theme="vs-dark"
-          loading={<div className="h-full bg-[#1e1e1e]" />}
+          loading={<EditorBootPlaceholder />}
           options={{
             fontSize,
             minimap: { enabled: false },
@@ -176,6 +210,7 @@ export function CodeEditorPanel({
             // fixes elsewhere via the shared type scale.
             fontFamily: "var(--font-mono), 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace",
             cursorBlinking: "smooth",
+            ...(restrictClipboard ? { contextmenu: false, dropIntoEditor: { enabled: false } } : {}),
           }}
         />
       </div>

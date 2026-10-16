@@ -54,6 +54,6 @@ export const HIRING_LOOP_STEPS = [
     icon: "Award",
     title: "Get students placed",
     college: "Track every drive funnel and export placement reports.",
-    network: "Top performers opt in to the talent pool and get hired.",
+    network: "Students who reach the readiness bar opt in to the Vault and get hired.",
   },
 ];

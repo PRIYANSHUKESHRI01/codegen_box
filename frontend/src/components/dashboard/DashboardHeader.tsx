@@ -22,6 +22,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/navigation/ThemeToggle";
+import { PlanChip } from "@/components/billing/PlanChip";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { DashboardRole } from "./DashboardSidebar";
@@ -460,6 +461,10 @@ export function DashboardHeader({
               )}
             </span>
           </button>
+
+          {/* The student's plan, one click from pricing — the page to upgrade from used to be
+              reachable only through a small link at the foot of the sidebar. */}
+          {role === "user" && <PlanChip />}
 
           {/* Notifications */}
           <div className="relative" ref={notificationsRef}>

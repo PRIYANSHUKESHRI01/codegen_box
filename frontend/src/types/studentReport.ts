@@ -1,5 +1,6 @@
 import type { ActivityDay } from "./studentStats";
 import type { DriveApplicationStage } from "./placement";
+import type { LanguageInsights } from "./languageInsights";
 
 /** Mirrors Contest::CONTEST_TYPES on the backend — also doubles as a submission-history filter value alongside "practice" (see SubmissionHistoryRow). */
 export type ContestType = "general" | "daily" | "company" | "tpo_mock" | "company_hiring" | "talent_pool";
@@ -22,6 +23,10 @@ export interface StudentReportProfile {
   backlogs: number | null;
   phone: string | null;
   is_blocked: boolean;
+  /** When they were last in the app; null if they never have been. */
+  last_seen_at?: string | null;
+  /** False while the account is still on its one-time emailed password. */
+  activated?: boolean;
 }
 
 export interface StudentReportContest {
@@ -115,6 +120,8 @@ export interface StudentReport {
   solved: { total_solved: number; easy: { solved: number; total: number }; medium: { solved: number; total: number }; hard: { solved: number; total: number } };
   streak: { current: number; max: number };
   activity: ActivityDay[];
+  /** Which language they actually code in, how it's going in each, where to improve — and what they said in onboarding. */
+  languages: LanguageInsights;
   submissions: SubmissionHistoryRow[];
   contests: StudentReportContest[];
   interviews: StudentReportInterview[];

@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureUserHasRole::class,
             'permission' => \App\Http\Middleware\EnsureUserHasPermission::class,
+            'account.active' => \App\Http\Middleware\EnsureAccountIsActive::class,
+            'not.impersonating' => \App\Http\Middleware\RejectWritesWhileImpersonating::class,
+            'vault.integration' => \App\Http\Middleware\AuthenticateVaultIntegration::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

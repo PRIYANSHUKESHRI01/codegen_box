@@ -2,12 +2,12 @@
 
 Students pick a real-world project (LMS, hospital system, e-commerce store…), read and
 download its **Statement of Work**, build it in a **full-stack VS Code that runs in the
-browser**, tick off milestones, and **submit their code** for review. It is sold as an
-**add-on** to the student plans (or on its own). Staff write every SOW by hand in the admin
-editor — nothing is generated.
+browser**, tick off milestones, and **submit their code** for review. It is part of the
+**Expert** plan, and Grandmaster (Mellow Academy) carries it too (it used to be a separate paid add-on — see §2). Staff write every SOW by
+hand in the admin editor — nothing is generated.
 
-- Student UI: sidebar → **Project Lab** (`/dashboard/projects`). Without the add-on the item
-  shows a lock and the page is the unlock/upgrade screen.
+- Student UI: sidebar → **Project Lab** (`/dashboard/projects`). Without Expert the item
+  shows a lock and the page is the upgrade screen (it shows Expert's live price).
 - Staff UI: **Mellow Ops → Project Lab** (`/admin/projects`) — needs the `project_lab` permission.
 - Code map and gotchas: see the memory note `project_project_lab.md`; this file is the
   operator's guide.
@@ -30,8 +30,8 @@ decides, meters and records; the host runs. There is **no Python** anywhere.
 
 | Piece | Where | Notes |
 |---|---|---|
-| Entitlement | `User::projectLabCoverage()` | own add-on first, then a plan flag (`project_lab_access`) |
-| Pricing | `PurchaseQuoteService`, `config/billing.php`, `PlanSeeder` | server-side only |
+| Entitlement | `User::projectLabCoverage()` | the plan's `project_lab_access` flag (Expert, Grandmaster); a legacy add-on first |
+| Pricing | `PurchaseQuoteService`, `Plan::salePrice()` | server-side only — see `docs/pricing-and-plans.md` |
 | Control plane | `app/Services/Workspaces/WorkspaceManager` | start/stop/heartbeat/reap |
 | Runtime | `DockerCliRuntime` (prod), `FakeWorkspaceRuntime` (tests, `WORKSPACE_RUNTIME=fake`) | docker CLI over `ssh://` |
 | Image | `infra/workspaces/Dockerfile` | OpenVSCode Server (MIT) |
@@ -41,39 +41,33 @@ decides, meters and records; the host runs. There is **no Python** anywhere.
 
 ## 2. Plans and pricing
 
-Project Lab is a plan of `kind = addon` (`plans.code = project-lab`). A student has one active
-**base** subscription (Coder / Expert / Grandmaster, unchanged) and, independently, an active
-Project Lab subscription. The two never cancel each other.
+**Project Lab is included in Expert** (`plans.project_lab_access = true`, **80 workspace hours a month**
+and **3 projects in progress** at once — `max_workspace_hours_per_month` / `max_active_projects` on the
+`expert` row) and in Grandmaster (Mellow Academy), which has the same access. Coder does not have it. There is nothing to
+buy separately any more: the pricing page and "Your Plan" no longer show a Project Lab card, and the lock screen offers
+Expert at its live price. What Expert costs is set by the superadmin — see `docs/pricing-and-plans.md`.
 
-| The student buys | Pays |
-|---|---|
-| a plan only | the plan's price (unchanged) |
-| Project Lab only | **₹499 / month** |
-| Expert + Project Lab | ₹399 + **₹349** = **₹748** (saves ₹150) |
-| Grandmaster + Project Lab | ₹799 + **₹349** = **₹1,148** (saves ₹150) |
-| Project Lab, while already holding a paid plan | **₹349** |
+Hours on a plan are counted per **calendar month**.
 
-A free Coder plan never earns the discount (Coder + Lab = ₹499). Each purchase = **30 days**.
-Lab includes **80 workspace hours** and **3 projects in progress** per period.
-
-**To retune:** price / hours / projects → the `project-lab` row in `database/seeders/PlanSeeder.php`
-(then `php artisan db:seed --class=PlanSeeder`); the bundle discount → `BILLING_ADDON_BUNDLE_DISCOUNT_PERCENT`
-(default 30, 0 turns it off). The public `/pricing` marketing copy is static — update
-`PROJECT_LAB_ADDON` in `frontend/src/data/pricing.ts` to match.
+**The retired add-on.** Project Lab used to be sold on its own (`plans.code = project-lab`, `kind = addon`,
+₹499 / month, ₹349 next to a paid plan). That row still exists with `is_active = false`: nobody can buy it
+(`PurchaseQuoteService` refuses an inactive plan), but a student who bought it before keeps access until
+the period they paid for ends — `projectLabCoverage()` still honours an in-date add-on, with its own
+period and limits. They are not refunded or migrated; after it ends they have Lab only if they are on
+Expert or Grandmaster. The add-on machinery in `PurchaseQuoteService` (add-on lines, `BILLING_ADDON_BUNDLE_DISCOUNT_PERCENT`
+bundle discount, stacking renewals) is kept for the next add-on.
 
 Rules worth knowing:
-- The browser never sets a price. The pricing UI shows `GET /me/purchase-quote`; checkout recomputes and
-  refuses (409 `price_changed`) if the total the student saw is stale.
-- Renewing early **stacks** the remaining days onto the new period; the hours counter **resets** at renewal.
-- **Lapse:** the workspace is stopped within a minute. The student keeps their files and their submissions + feedback
+- The browser never sets a price. Checkout recomputes and refuses (409 `price_changed`) if the total the
+  student saw is stale.
+- **Lapse** (the plan expires, or a downgrade): the workspace is stopped within a minute. The student keeps their files and their submissions + feedback
   (volumes are never deleted automatically yet — a retention/cleanup job, e.g. 90 days after a lapse, is a Phase 2 item, so disk on the host grows until
   you remove old `wsvol-*` volumes by hand), and loses the SOW body, PDF, workspace and
-  submitting until they renew.
-- A college can later include Lab for its students by setting `project_lab_access = true` on its
-  institution plan; no plan does today.
-- **Payment is still the instant stand-in** used everywhere else — there is no gateway yet. Each line
-  records `price_paid` / `purchase_ref` in `subscriptions.meta`, so reconciliation works the day Razorpay
-  is wired in (it needs one SKU per combination; Razorpay subscriptions take a single plan).
+  submitting until they are on Expert (or Grandmaster) again.
+- A college can include Lab for its students by setting `project_lab_access = true` on its
+  institution plan; no college plan does today.
+- **Payment** goes through the active gateway — PayU by default, Razorpay as the alternative (`docs/payments-payu.md`, `docs/payments-razorpay.md`). Each purchase records `price_paid` / `purchase_ref` /
+  `gateway_payment_id` in `subscriptions.meta`, so a subscription can always be traced to its payment.
 
 ## 3. Writing SOWs (staff)
 
@@ -207,8 +201,9 @@ level down), tool caches, `.env` and `.env.*` (but **not** `.env.example`), `*.p
    The backend image needs the `docker` CLI and an `ssh` client, and the private key for the `deploy` user.
 6. **Scheduler:** `workspaces:reap` runs **every minute** — the host cron must run `php artisan schedule:run`
    every minute (until now only daily jobs existed).
-7. **Database:** `php artisan migrate`, then `php artisan db:seed --class=PlanSeeder` (adds the `project-lab`
-   plan row; safe to re-run).
+7. **Database:** `php artisan migrate` (the 2026_10_14 migration moves Project Lab into the paid plan and retires the
+   add-on — see `docs/pricing-and-plans.md`). `db:seed --class=PlanSeeder` is safe to re-run: it never overwrites a
+   price the superadmin has set.
 8. **Snapshots** go to the private `local` disk by default. Render's disk is ephemeral — point
    `WORKSPACE_SNAPSHOT_DISK` at an S3-compatible disk (`FILESYSTEM`/`AWS_*`) before launch.
 9. Staff: grant the **Project Lab** permission (Mellow Staff → Manage Access), write SOWs, publish.
@@ -240,7 +235,7 @@ level down), tool caches, `.env` and `.env.*` (but **not** `.env.example`), `*.p
 - the editor may only be framed by the dashboard (`frame-ancestors 'self' <app origins>` — `'self'` is required because VS Code frames its own pages for webviews and the extension host); both iframes are sandboxed so framed
   code cannot navigate the dashboard away;
 - every Project Lab route family has its **own named rate limiter** (`lab-*` in `AppServiceProvider`). Do not switch them to `throttle:N,1`: Laravel keys an unnamed numeric throttle by user only, so differently-limited routes would share one counter and polling the boot status would use up the Start button's allowance (found by the real-Docker end-to-end run);
-- the SOW and its PDF are withheld server-side without the add-on (the paywall is the API, not the UI); PDFs
+- the SOW and its PDF are withheld server-side without Project Lab access (the paywall is the API, not the UI); PDFs
   are watermarked with the student's name + email and every download is logged;
 - snapshots are private, never publicly served; staff downloads are authorised and audited; student-facing
   JSON never contains a storage path or operator error text.
@@ -257,7 +252,6 @@ level down), tool caches, `.env` and `.env.*` (but **not** `.env.example`), `*.p
   not prevented. Watch host load.
 - Volumes live on the host: losing the host loses un-submitted work. Periodic snapshots to object storage are
   a Phase 2 item.
-- Payment is a stand-in, so anyone can currently "buy" without paying.
 
 ## 7. Operating it
 
@@ -317,7 +311,7 @@ Student (`role:user`, per-user throttles):
 | `POST …/enrollments/{id}/milestones/{m}/toggle` · `…/abandon` | |
 | `POST …/enrollments/{id}/workspace/start` · `GET …/workspace` · `POST …/heartbeat` · `POST …/stop` | |
 | `POST …/enrollments/{id}/submit` | `repo_url?` `live_url?` `notes?` |
-| `GET /me/purchase-quote` · `POST /me/subscription` | `plan_code?` `addons[]?` `expected_total?` |
+| `GET /me/purchase-quote` · `POST /me/checkout` (+ `/verify`) | `plan_code?` `addons[]?` `expected_total?` — see `docs/payments-payu.md` |
 
 Staff (`permission:project_lab`): `GET|POST /admin/project-lab/topics`, `GET|PUT|DELETE …/topics/{id}`,
 `GET /admin/project-lab/submissions`, `GET …/submissions/{id}`, `GET …/submissions/{id}/snapshot`,
@@ -352,7 +346,7 @@ behaviour under load (many concurrent workspaces) was not measured.
 ## 11. Not built yet (Phase 2)
 
 AI review of submissions against the acceptance criteria · periodic snapshots to object storage and
-host-to-host migration · a payment gateway · giving a college's students Lab through the TPO dashboard ·
+host-to-host migration · giving a college's students Lab through the TPO dashboard ·
 certificates · automatic cleanup of the volumes of students who never came back · export to GitHub · a workspace-hours report for staff · notifications when a review lands.
 
 ## 12. Authorship: students write the code themselves

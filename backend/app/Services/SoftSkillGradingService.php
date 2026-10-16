@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SoftSkillSession;
+use App\Services\Vault\VaultRefreshService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,13 +29,17 @@ class SoftSkillGradingService
      */
     public function finalize(SoftSkillSession $session, bool $terminatedByProctoring = false): SoftSkillSession
     {
-        return DB::transaction(function () use ($session, $terminatedByProctoring) {
+        $justFinalized = false;
+
+        $finalized = DB::transaction(function () use ($session, $terminatedByProctoring, &$justFinalized) {
             /** @var SoftSkillSession $locked */
             $locked = SoftSkillSession::whereKey($session->id)->lockForUpdate()->first();
 
             if ($locked->isCompleted()) {
                 return $locked;
             }
+
+            $justFinalized = true;
 
             $locked->loadMissing('assessment');
             $responses = $locked->responses()->with('assessmentQuestion.question')->get();
@@ -68,5 +73,14 @@ class SoftSkillGradingService
 
             return $locked->fresh();
         });
+
+        // A finished test is part of the student's readiness (and so, maybe, of the
+        // Vault) — re-score now instead of at the next scheduled refresh. Only for an
+        // attempt that actually ended just now, and it can never fail the submit.
+        if ($justFinalized) {
+            app(VaultRefreshService::class)->refreshQuietly([$finalized->user_id]);
+        }
+
+        return $finalized;
     }
 }

@@ -1,7 +1,22 @@
-import { FeatureRoute, featureMetadata } from "@/components/marketing-site/FeatureRoute";
+"use client";
 
-export const metadata = featureMetadata("talent-pool");
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-export default function Page() {
-  return <FeatureRoute slug="talent-pool" />;
+/**
+ * The Talent Pool became the Vault. Search results, shared links and bookmarks to the old
+ * address move straight on (this is a static export, so a client-side replace is the redirect).
+ */
+export default function TalentPoolMovedPage() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.replace("/features/vault");
+  }, [router]);
+
+  return (
+    <main className="mx-auto max-w-xl px-4 py-24 text-center text-sm text-text-secondary">
+      The Talent Pool is now <a href="/features/vault" className="font-bold text-accent-primary underline">the Vault</a>.
+    </main>
+  );
 }

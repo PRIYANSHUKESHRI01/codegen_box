@@ -1,0 +1,20 @@
+# The site is a static export: every page is its own file (pricing.html, dashboard/billing.html), but the
+# app links to extensionless URLs (/pricing, /dashboard/billing). Without this, a refresh or a pasted link
+# to any page except "/" is a 404 on Apache / cPanel hosting (the usual BigRock setup). Nginx does not read
+# this file — see infra/deploy/README.md for the one-line try_files equivalent.
+#
+# Deliberately small: nothing else is rewritten or redirected, and a real file always wins.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # /pricing -> pricing.html, /dashboard/billing/ -> dashboard/billing.html — only when that .html exists.
+  # The .html path is built from the URL ($1), not REQUEST_FILENAME: for a folder that shares a page's name
+  # (/dashboard is both dashboard/ and dashboard.html) Apache's filename ends in "/", and it would otherwise
+  # answer "301 -> /dashboard/" -> 404 before this rule ever ran.
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{DOCUMENT_ROOT}/$1.html -f
+  RewriteRule ^(.+?)/?$ $1.html [L]
+</IfModule>
+
+# Anything else gets the app's own "page not found".
+ErrorDocument 404 /404.html

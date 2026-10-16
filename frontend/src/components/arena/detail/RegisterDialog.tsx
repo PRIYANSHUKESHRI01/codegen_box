@@ -21,11 +21,13 @@ interface RegisterDialogProps {
   hackathon: HackathonDetail;
   open: boolean;
   onClose: () => void;
+  /** The server refused because the student's plan has no Hack Arena (HTTP 402 `plan_required`) — the page explains and offers the upgrade. */
+  onPlanRequired?: () => void;
   /** Called with the refreshed hackathon once registration succeeds. */
   onRegistered: (hackathon: HackathonDetail) => void;
 }
 
-export function RegisterDialog({ hackathon, open, onClose, onRegistered }: RegisterDialogProps) {
+export function RegisterDialog({ hackathon, open, onClose, onPlanRequired, onRegistered }: RegisterDialogProps) {
   const { allows_teams: allowsTeams, team_required: teamRequired } = hackathon.registration;
   const available = OPTIONS.filter((o) => (o.key === "solo" ? !teamRequired : allowsTeams));
 
@@ -77,6 +79,10 @@ export function RegisterDialog({ hackathon, open, onClose, onRegistered }: Regis
       onRegistered(res.hackathon);
     } catch (err) {
       const reason = errorCode(err);
+      if (reason === "plan_required" && onPlanRequired) {
+        onPlanRequired();
+        return;
+      }
       setError(errorMessage(err, "Couldn't register you. Please try again."));
       if (reason === "team_name_taken" || reason === "invalid_team_name") setFieldError("team_name");
       if (reason === "invalid_invite_code" || reason === "team_full" || reason === "team_locked") setFieldError("invite_code");

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Ear, Headphones, Loader2, PartyPopper, Sparkles, Target } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
 import { GenerateLessonForm } from "@/components/listening/GenerateLessonForm";
 import { LessonCard } from "@/components/listening/LessonCard";
@@ -81,6 +82,8 @@ export default function ListeningLabListPage() {
       title="Listening Lab"
       subtitle="Train your ear for interviews, calls and placement tests — passages, real conversations and dictation, with a skill-by-skill picture of how you listen."
     >
+      <FreeTrialBanner feature="listening" />
+
       {loading ? (
         <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-16 text-xs text-text-muted">
           <Loader2 className="h-4 w-4 animate-spin" />

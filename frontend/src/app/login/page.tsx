@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +28,7 @@ import { api, ApiError } from "@/lib/api";
 import { AuthUser, homeRouteForRole } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
+import { takeSignedOutNotice } from "@/lib/sessionEvents";
 
 // The three real customer-facing account types — every one of them is
 // something a real visitor could plausibly land on this page needing.
@@ -149,6 +150,13 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forcePasswordResetEmail, setForcePasswordResetEmail] = useState<string | null>(null);
+
+  // Sent here because the server ended the session (the account was blocked, or signed out of every device):
+  // say why, in the same banner a failed sign-in uses.
+  useEffect(() => {
+    const notice = takeSignedOutNotice();
+    if (notice) setError(notice);
+  }, []);
 
   // Selecting a tab always updates which persona's copy/labels show; in dev
   // only, it also convenience-prefills that persona's demo credentials

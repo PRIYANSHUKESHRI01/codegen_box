@@ -49,7 +49,7 @@ const T = {
 const PAINS = [
   { before: "Coordinate with each college separately for every hire", after: "Post once — propose to any partner campus or open to all" },
   { before: "Candidates with polished CVs but no verified skills", after: "Proctored scores and AI interview feedback per candidate" },
-  { before: "No way to reach top students before they apply elsewhere", after: "Consent-based talent pool of verified performers, ready to contact" },
+  { before: "No way to reach top students before they apply elsewhere", after: "The Vault: students whose readiness is proven, who agreed to be contacted" },
   { before: "Assessment process differs campus to campus", after: "Same proctored test and AI interview for every candidate" },
 ];
 
@@ -64,9 +64,9 @@ const CAPS = [
   },
   {
     icon: Users2,
-    title: "Talent Pool",
-    body: "Search verified candidates who scored well in contests and chose to be visible. Every entry shows the score and the contest it came from — no unverified CVs.",
-    href: "/features/talent-pool",
+    title: "The Vault",
+    body: "Search students whose readiness score says they are ready and who chose to be visible. Every entry shows the score and what it is made of — no unverified CVs.",
+    href: "/features/vault",
     badge: "Discovery",
   },
   {
@@ -113,9 +113,9 @@ const DETAILS = [
   },
   {
     icon: Users2,
-    badge: "Talent pool",
+    badge: "The Vault",
     title: "Find the candidates you didn't know to look for",
-    body: "The talent pool surfaces students who earned a qualifying contest score and chose to be visible. You see verified numbers, not curated CVs — and every candidate has already consented.",
+    body: "The Vault surfaces students whose readiness score reached the bar and who chose to be visible. You see verified numbers, not curated CVs — and every candidate has already consented.",
     points: [
       "Scores come from real contests with proctored enforcement",
       "Students are visible only after giving explicit consent",
@@ -148,8 +148,8 @@ const FAQS = [
     a: "Fullscreen exits, tab switches and developer-tools opens are logged as violations. Students are warned twice; a third strike submits their current work and ends the session. Camera and microphone are used for the student's local monitoring only — no video is uploaded or stored.",
   },
   {
-    q: "How is the talent pool different from a normal job board?",
-    a: "Every talent-pool profile comes with a real contest score from a proctored assessment. Students only appear after giving explicit consent — they can withdraw or decline your interest at any time.",
+    q: "How is the Vault different from a normal job board?",
+    a: "Every Vault profile comes with a readiness score built from real activity — interviews, practice, tests and contests — and shows what it is made of. Students only appear after giving explicit consent — they can withdraw or decline your interest at any time.",
   },
   {
     q: "Can a human review and override AI interview scores?",
@@ -495,9 +495,9 @@ export function RecruitersPageContent() {
                 <EyeOff className="w-7 h-7" />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-primary mb-2">The talent pool is built on consent</h3>
+                <h3 className="text-xl font-bold text-primary mb-2">The Vault is built on consent</h3>
                 <p className="text-base font-medium text-text-secondary leading-relaxed mb-4">
-                  Every candidate in the talent pool is there by choice. They earned a qualifying score in a proctored contest, then gave explicit consent to be visible. They can withdraw at any time, and they can decline interest from any company — including yours.
+                  Every candidate in the Vault is there by choice. They earned a readiness score above the bar, then gave explicit consent to be visible. They can withdraw at any time, and they can decline interest from any company — including yours.
                 </p>
                 <p className="text-sm text-text-secondary">
                   This means the candidates you reach are not just verified — they are actively open to hearing from you.

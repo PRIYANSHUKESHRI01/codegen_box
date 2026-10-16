@@ -72,7 +72,7 @@ const STATUS: Record<CompanyCommandCenterDrive["status"], { label: string; tone:
 const QUICK_ACTIONS: { label: string; hint: string; href: string; icon: LucideIcon; tone: HpTone }[] = [
   { label: "Run an assessment", hint: "Proctored coding contests", href: "/admin/company/assessments", icon: Swords, tone: "indigo" },
   { label: "AI interviews", hint: "Screen at scale", href: "/admin/company/interviews", icon: Mic, tone: "violet" },
-  { label: "Search talent pool", hint: "Discover top candidates", href: "/admin/company/talent-pool", icon: Award, tone: "teal" },
+  { label: "Search the Vault", hint: "Students ready to be hired", href: "/admin/company/vault", icon: Award, tone: "teal" },
   { label: "Partner colleges", hint: "Campuses you hire from", href: "/admin/company/colleges", icon: GraduationCap, tone: "sky" },
 ];
 

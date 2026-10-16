@@ -44,7 +44,11 @@ class ProjectLabAccessTest extends TestCase
         $response = $this->getJson('/api/project-lab/topics')->assertOk();
 
         $response->assertJsonPath('project_lab.enabled', false)
-            ->assertJsonPath('project_lab.offer.monthly_price', 499)
+            // The lock screen's offer is the plan that includes Project Lab, at today's live price.
+            ->assertJsonPath('project_lab.upgrade.code', 'expert')
+            ->assertJsonPath('project_lab.upgrade.list_price', 4999)
+            ->assertJsonPath('project_lab.upgrade.sale_price', 2999)
+            ->assertJsonPath('project_lab.upgrade.workspace_hours', 80)
             ->assertJsonCount(1, 'topics') // the draft is invisible
             ->assertJsonPath('topics.0.slug', 'hms')
             ->assertJsonPath('topics.0.milestone_count', 2)

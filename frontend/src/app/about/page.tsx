@@ -28,7 +28,7 @@ const PRINCIPLES: { icon: typeof ShieldCheck; tone: Tone; title: string; body: s
     icon: UserCheck,
     tone: "cyan",
     title: "Students stay in control",
-    body: "Nobody enters the recruiter-facing talent pool without consent, and students can hide their profile whenever they choose.",
+    body: "Nobody is listed in the recruiter-facing Vault without saying yes, and students can hide their profile whenever they choose.",
   },
   {
     icon: Eye,

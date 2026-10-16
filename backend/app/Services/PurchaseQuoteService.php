@@ -13,10 +13,17 @@ use Illuminate\Validation\ValidationException;
  * never be the source of a price.
  *
  * What a student can buy in one checkout: one base plan, any number of
- * add-ons, or both. Add-ons are discounted (config billing.addon_bundle_
- * discount_percent) when the buyer ends up with a PAID base plan — either one
- * in this cart or an in-date paid plan they already hold. A free Coder
- * student buying Project Lab alone pays the full add-on price.
+ * add-ons, or both.
+ *
+ *   - A base plan is charged its SALE price: list_price minus the plan's own
+ *     discount_percent, both set by the superadmin (Plan::salePrice()). The
+ *     line carries the list price and the discount separately so the receipt,
+ *     the audit trail and the pricing page all show the same "was / now".
+ *   - An add-on is discounted by config billing.addon_bundle_discount_percent
+ *     when the buyer ends up with a PAID base plan — either one in this cart
+ *     or an in-date paid plan they already hold. No add-on is on sale today
+ *     (Project Lab became part of Expert), but the mechanism is kept
+ *     because the next add-on will want it.
  *
  * Pure of side effects: it reads plans and the buyer's subscription, writes
  * nothing, and is safe to call on every keystroke of the pricing toggle.
@@ -27,7 +34,7 @@ class PurchaseQuoteService
      * @param  list<string>  $addonCodes
      * @return array{
      *   currency: string,
-     *   lines: list<array{code: string, name: string, kind: string, list_price: int, discount: int, price: int, duration_days: ?int}>,
+     *   lines: list<array{code: string, name: string, kind: string, list_price: int, discount: int, discount_percent: int, price: int, duration_days: ?int}>,
      *   subtotal: int,
      *   discount: int,
      *   total: int,
@@ -60,19 +67,19 @@ class PurchaseQuoteService
         $lines = [];
 
         if ($basePlan !== null) {
-            $lines[] = $this->line($basePlan, (int) $basePlan->monthly_price, 0);
+            $lines[] = $this->line($basePlan, $basePlan->listPrice(), $basePlan->discountAmount(), (int) $basePlan->discount_percent);
         }
 
         $bundleApplied = false;
 
         foreach ($addons as $addon) {
-            $list = (int) $addon->monthly_price;
+            $list = $addon->listPrice();
             $discount = $buyerWillHavePaidBase && $percent > 0 && $list > 0
                 ? $list - (int) round($list * (100 - $percent) / 100)
                 : 0;
 
             $bundleApplied = $bundleApplied || $discount > 0;
-            $lines[] = $this->line($addon, $list, $discount);
+            $lines[] = $this->line($addon, $list, $discount, $discount > 0 ? $percent : 0);
         }
 
         $subtotal = array_sum(array_column($lines, 'list_price'));
@@ -92,14 +99,16 @@ class PurchaseQuoteService
     {
         $plan = Plan::where('code', $code)->first();
 
-        // One message for "doesn't exist", "inactive" and "wrong audience/kind":
-        // the caller can't tell which plans exist, and none of the three is
-        // something a student can fix except by choosing again.
+        // One message for "doesn't exist", "inactive", "wrong audience/kind" and "sold by the team"
+        // (Grandmaster / Mellow Academy): the caller can't tell which plans exist, and none of
+        // these is something a student can fix except by choosing again. The contact-only check
+        // comes before any price is read — a plan with no online price must never be bought at ₹0.
         if ($plan === null
             || ! $plan->is_active
             || $plan->audience !== Plan::AUDIENCE_INDIVIDUAL
             || ($plan->kind ?? Plan::KIND_BASE) !== $kind
-            || $plan->monthly_price === null) {
+            || $plan->isContactOnly()
+            || $plan->list_price === null) {
             throw ValidationException::withMessages([$field => ['That option is not available for self-serve purchase.']]);
         }
 
@@ -116,8 +125,8 @@ class PurchaseQuoteService
             && ! $subscription->plan->isFree();
     }
 
-    /** @return array{code: string, name: string, kind: string, list_price: int, discount: int, price: int, duration_days: ?int} */
-    private function line(Plan $plan, int $listPrice, int $discount): array
+    /** @return array{code: string, name: string, kind: string, list_price: int, discount: int, discount_percent: int, price: int, duration_days: ?int} */
+    private function line(Plan $plan, int $listPrice, int $discount, int $discountPercent): array
     {
         return [
             'code' => $plan->code,
@@ -125,6 +134,7 @@ class PurchaseQuoteService
             'kind' => $plan->kind ?? Plan::KIND_BASE,
             'list_price' => $listPrice,
             'discount' => $discount,
+            'discount_percent' => $discountPercent,
             'price' => $listPrice - $discount,
             'duration_days' => $plan->duration_days,
         ];

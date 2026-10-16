@@ -2,19 +2,21 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
-import { Group, Panel, Separator } from "react-resizable-panels";
+import { useSearchParams } from "next/navigation";
+import { Group, Panel, Separator, usePanelRef } from "react-resizable-panels";
 import { GripVertical, GripHorizontal, Code2, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ProblemHeaderBar } from "@/components/practice/ProblemHeaderBar";
 import { ProblemDescriptionPanel } from "@/components/practice/ProblemDescriptionPanel";
 import { CodeEditorPanel } from "@/components/practice/CodeEditorPanel";
-import { ConsolePanel, ConsoleTab, LastAction, RunState } from "@/components/practice/ConsolePanel";
+import { ConsolePanel, ConsoleTab } from "@/components/practice/ConsolePanel";
 import { Button } from "@/components/ui/Button";
-import { ProblemDetail, RunResponse } from "@/types/problem";
+import { ProblemDetail } from "@/types/problem";
 import { api, ApiError } from "@/lib/api";
-import { executeJudged } from "@/lib/judge";
+import { useJudgedRun } from "@/lib/useJudgedRun";
+import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { pickInitialLanguage, recallLastLanguage, rememberLastLanguage } from "@/lib/studentPreferences";
 import { cn } from "@/lib/utils";
 import { useProctoring } from "@/lib/proctoring/useProctoring";
 import { ProctoringConsentGate } from "@/components/proctoring/ProctoringConsentGate";
@@ -38,7 +40,7 @@ function ContestProblemSolvePageContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
   const contestProblemId = searchParams.get("contestProblemId") ?? "";
-  const router = useRouter();
+  const nav = useResilientNavigation();
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [points, setPoints] = useState<number | null>(null);
@@ -50,11 +52,7 @@ function ContestProblemSolvePageContent() {
   const [revealedHints, setRevealedHints] = useState(0);
   const [activeExample, setActiveExample] = useState(0);
   const [consoleTab, setConsoleTab] = useState<ConsoleTab>("testcase");
-  const [lastAction, setLastAction] = useState<LastAction>(null);
-  const [runState, setRunState] = useState<RunState>("idle");
-  const [runResult, setRunResult] = useState<RunResponse | null>(null);
-  const [queueNote, setQueueNote] = useState<string | null>(null);
-  const [runError, setRunError] = useState<string | null>(null);
+  const consolePanel = usePanelRef();
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
@@ -85,7 +83,7 @@ function ContestProblemSolvePageContent() {
         if (cancelled) return;
         setProblem(res.problem);
         setPoints(res.points);
-        setLanguage(Object.keys(res.problem.starter_code ?? {})[0] ?? "javascript");
+        setLanguage(pickInitialLanguage(Object.keys(res.problem.starter_code ?? {}), user, recallLastLanguage(user?.id)));
         setLoadState("ready");
       })
       .catch((err) => {
@@ -114,6 +112,11 @@ function ContestProblemSolvePageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problem, language]);
 
+  const handleLanguageChange = (next: string) => {
+    setLanguage(next);
+    rememberLastLanguage(user?.id, next);
+  };
+
   const handleCodeChange = (value: string) => {
     setCode(value);
     if (!problem) return;
@@ -129,45 +132,43 @@ function ContestProblemSolvePageContent() {
     setSavedAt(Date.now());
   };
 
-  const executeCode = async (action: "run" | "submit") => {
-    if (!problem || runState === "running") return;
-
-    setLastAction(action);
-    setConsoleTab("result");
-    setMobileView("code");
-    setRunState("running");
-    setRunError(null);
-    setQueueNote(null);
-
-    try {
-      // Live-contest work is judged on the highest-priority queue; executeJudged polls for the verdict.
-      const result = await executeJudged<RunResponse>(`${basePath}/${action}`, { language, code }, (p) =>
-        setQueueNote(p.state === "queued" && (p.position ?? 0) > 1 ? `In queue — about #${p.position} in line` : null)
-      );
-      setRunResult(result);
-      setRunState("done");
-    } catch (err) {
-      setRunError(err instanceof ApiError ? err.message : "Couldn't reach the execution engine. Please try again.");
-      setRunState("error");
-    } finally {
-      setQueueNote(null);
-    }
+  /** When a run starts and the console is squeezed small, give it room so the verdict is in view. */
+  const ensureConsoleVisible = () => {
+    const panel = consolePanel.current;
+    if (panel && panel.getSize().asPercentage < 40) panel.resize("46%");
   };
 
-  const handleRun = () => executeCode("run");
-  const handleSubmit = () => executeCode("submit");
+  // Live-contest work is judged on the highest-priority queue. Run / Submit: sending → queued → running → verdict,
+  // driven by the judge's real state (see useJudgedRun). The "checking" beat is shorter here: it is display only
+  // (penalties are timed from the click on the server), but nobody in a contest wants to wait for it.
+  const judge = useJudgedRun({
+    endpoint: problem ? basePath : null,
+    language,
+    code,
+    minCheckingMs: { run: 450, submit: 650 },
+    onStart: () => {
+      setConsoleTab("result");
+      setMobileView("code");
+      ensureConsoleVisible();
+    },
+  });
+  const { state: runState, lastAction, result: runResult, error: runError, progress, startedAt, resultKey, execute: executeCode } = judge;
+
+  const handleRun = () => void executeCode("run");
+  const handleSubmit = () => void executeCode("submit");
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
         e.preventDefault();
-        handleRun();
+        if (e.shiftKey) handleSubmit();
+        else handleRun();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [problem, language, code, runState]);
+  }, []);
 
   if (status !== "ready") {
     return (
@@ -190,7 +191,7 @@ function ContestProblemSolvePageContent() {
           <CenteredNotice
             heading="Problem not found"
             body="This contest problem doesn't exist."
-            onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
+            onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
           />
         )}
 
@@ -198,7 +199,7 @@ function ContestProblemSolvePageContent() {
           <CenteredNotice
             heading={forbiddenMessage?.toLowerCase().includes("locked out") ? "You've been locked out" : "Not available yet"}
             body={forbiddenMessage ?? "You need to register for this contest before you can open its problems."}
-            onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
+            onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
           />
         )}
 
@@ -218,7 +219,7 @@ function ContestProblemSolvePageContent() {
         )}
 
         {loadState === "ready" && problem && proctoring.phase === "locked" && (
-          <ProctoringLockedScreen session={proctoring.session} onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)} />
+          <ProctoringLockedScreen session={proctoring.session} onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)} />
         )}
 
         {loadState === "ready" && problem && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost") && (
@@ -234,10 +235,12 @@ function ContestProblemSolvePageContent() {
 
             <ProblemHeaderBar
               problem={problem}
-              onBack={() => router.push(`/dashboard/contests/view?slug=${slug}`)}
+              onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
+              backPending={nav.pending}
               onRun={handleRun}
               onSubmit={handleSubmit}
               running={runState === "running"}
+              activeAction={runState === "running" ? lastAction : null}
               backLabel="Back to Contest"
             />
 
@@ -259,17 +262,20 @@ function ContestProblemSolvePageContent() {
                       <CodeEditorPanel
                         language={language}
                         availableLanguages={Object.keys(problem.starter_code)}
-                        onLanguageChange={setLanguage}
+                        onLanguageChange={handleLanguageChange}
                         code={code}
                         onCodeChange={handleCodeChange}
                         onReset={handleReset}
                         fontSize={fontSize}
                         onFontSizeChange={setFontSize}
                         savedAt={savedAt}
+                        onRun={handleRun}
+                        onSubmit={handleSubmit}
+                        restrictClipboard
                       />
                     </Panel>
                     <ResizeHandle direction="vertical" />
-                    <Panel defaultSize="32" minSize="18">
+                    <Panel defaultSize="32" minSize="18" panelRef={consolePanel}>
                       <ConsolePanel
                         examples={problem.examples}
                         activeExample={activeExample}
@@ -280,7 +286,12 @@ function ContestProblemSolvePageContent() {
                         runState={runState}
                         runResult={runResult}
                         errorMessage={runError}
-                        statusNote={queueNote}
+                        progress={progress}
+                        startedAt={startedAt}
+                        resultKey={resultKey}
+                        caseCounts={problem.case_counts}
+                        onSubmit={handleSubmit}
+                        onRetry={() => lastAction && void executeCode(lastAction)}
                       />
                     </Panel>
                   </Group>
@@ -325,16 +336,19 @@ function ContestProblemSolvePageContent() {
                       <CodeEditorPanel
                         language={language}
                         availableLanguages={Object.keys(problem.starter_code)}
-                        onLanguageChange={setLanguage}
+                        onLanguageChange={handleLanguageChange}
                         code={code}
                         onCodeChange={handleCodeChange}
                         onReset={handleReset}
                         fontSize={fontSize}
                         onFontSizeChange={setFontSize}
                         savedAt={savedAt}
+                        onRun={handleRun}
+                        onSubmit={handleSubmit}
+                        restrictClipboard
                       />
                     </div>
-                    <div className="h-52 border-t border-border-subtle shrink-0">
+                    <div className="h-64 border-t border-border-subtle shrink-0">
                       <ConsolePanel
                         examples={problem.examples}
                         activeExample={activeExample}
@@ -345,7 +359,12 @@ function ContestProblemSolvePageContent() {
                         runState={runState}
                         runResult={runResult}
                         errorMessage={runError}
-                        statusNote={queueNote}
+                        progress={progress}
+                        startedAt={startedAt}
+                        resultKey={resultKey}
+                        caseCounts={problem.case_counts}
+                        onSubmit={handleSubmit}
+                        onRetry={() => lastAction && void executeCode(lastAction)}
                       />
                     </div>
                   </div>

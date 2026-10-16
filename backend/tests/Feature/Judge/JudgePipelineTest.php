@@ -400,6 +400,33 @@ class JudgePipelineTest extends TestCase
             ->assertJsonPath('result.all_passed', true);
     }
 
+    public function test_while_a_job_waits_the_student_is_told_how_many_test_cases_it_will_judge(): void
+    {
+        Queue::fake();
+        $problem = $this->makeTenCaseProblem(); // 3 public samples + 7 hidden
+        $user = $this->student();
+
+        $run = $this->sendTo($problem, $user, 'run', 'run-code')->assertStatus(202)->assertJsonPath('total_cases', 3);
+        $submit = $this->sendTo($problem, $user, 'submit', 'submit-code')->assertStatus(202)->assertJsonPath('total_cases', 10);
+
+        // The same answer on every poll while it waits (the browser draws that many cases being checked)…
+        $this->poll($user, $run->json('token'))->assertOk()->assertJsonPath('state', 'queued')->assertJsonPath('total_cases', 3);
+        $this->poll($user, $submit->json('token'))->assertOk()->assertJsonPath('total_cases', 10);
+
+        // …and for a double-click that lands on the job already in flight.
+        $this->sendTo($problem, $user, 'submit', 'submit-code')->assertStatus(202)->assertJsonPath('token', $submit->json('token'))->assertJsonPath('total_cases', 10);
+    }
+
+    public function test_the_problem_payload_says_how_many_cases_a_run_and_a_submit_judge(): void
+    {
+        $problem = $this->makeTenCaseProblem(); // 3 public samples + 7 hidden
+        Sanctum::actingAs($this->student());
+
+        $this->getJson("/api/problems/{$problem->slug}")
+            ->assertOk()
+            ->assertJsonPath('problem.case_counts', ['samples' => 3, 'total' => 10]);
+    }
+
     public function test_a_result_can_only_be_read_by_its_owner(): void
     {
         Queue::fake();

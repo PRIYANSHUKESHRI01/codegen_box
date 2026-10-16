@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
+use App\Support\StudentPreferences;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -21,11 +22,6 @@ class StudentStatsService
 {
     /** Difficulty-weighted score used for the leaderboard/badge before a student has ever entered a rated contest. */
     private const DIFFICULTY_POINTS = ['easy' => 10, 'medium' => 25, 'hard' => 50];
-
-    /** A configured goal, not a claimed fact about the user — legitimate to be a fixed default. */
-    private const WEEKLY_SOLVED_TARGET = 20;
-
-    private const WEEKLY_HARD_TARGET = 5;
 
     public function solvedByDifficulty(User $user): array
     {
@@ -231,11 +227,16 @@ class StudentStatsService
             ->distinct()
             ->get();
 
+        // A configured goal, not a claimed fact about the user: it follows the
+        // weekly pace they chose in onboarding (the 20 / 5 the dashboard always
+        // had for anyone who hasn't chosen one).
+        $targets = StudentPreferences::weeklyTargets($user->weekly_pace);
+
         return [
-            'solved_this_week' => ['current' => $solvedThisWeek->count(), 'target' => self::WEEKLY_SOLVED_TARGET],
+            'solved_this_week' => ['current' => $solvedThisWeek->count(), 'target' => $targets['solved']],
             'hard_solved_this_week' => [
                 'current' => $solvedThisWeek->where('difficulty', 'hard')->count(),
-                'target' => self::WEEKLY_HARD_TARGET,
+                'target' => $targets['hard'],
             ],
         ];
     }

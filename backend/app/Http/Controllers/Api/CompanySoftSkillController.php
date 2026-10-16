@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\Concerns\ManagesSoftSkillQuestions;
 use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -24,6 +25,7 @@ class CompanySoftSkillController extends Controller
     {
         $assessments = SoftSkillAssessment::where('owning_company_id', $request->user()->company_id)
             ->withCount(['sessions', 'assessmentQuestions'])
+            ->with('appliedSets')
             ->latest('created_at')
             ->get();
 
@@ -44,9 +46,9 @@ class CompanySoftSkillController extends Controller
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:20'],
-        ]);
+        ] + $this->questionSetCreationRules());
 
-        $assessment = SoftSkillAssessment::create([
+        $assessment = $this->createAssessment($request, [
             'title' => $validated['title'],
             'slug' => SoftSkillAssessment::uniqueSlug($validated['title']),
             'description' => $validated['description'] ?? null,
@@ -61,7 +63,7 @@ class CompanySoftSkillController extends Controller
             // still loosen this explicitly via update().
             'max_attempts' => $validated['max_attempts'] ?? 1,
             'created_by' => $request->user()->id,
-        ]);
+        ], $validated);
 
         return response()->json(['assessment' => $assessment], 201);
     }
@@ -78,6 +80,8 @@ class CompanySoftSkillController extends Controller
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:20'],
         ]);
+
+        $this->assertCanPublish($softSkillAssessment, $validated);
 
         $softSkillAssessment->update($validated);
 
@@ -97,6 +101,11 @@ class CompanySoftSkillController extends Controller
         $softSkillAssessment->delete();
 
         return response()->json(['message' => 'Assessment deleted.']);
+    }
+
+    protected function scopeOwnTests(Request $request, Builder $tests): mixed
+    {
+        return $tests->where('owning_company_id', $request->user()->company_id);
     }
 
     private function authorizeAssessmentOwnership(Request $request, SoftSkillAssessment $softSkillAssessment): void

@@ -11,6 +11,7 @@ use App\Services\Hackathons\HackathonPresenter;
 use App\Services\Hackathons\HackathonRegistrationService;
 use App\Services\Hackathons\HackathonRuleException;
 use App\Services\Hackathons\HackathonSubmissionService;
+use App\Services\PlanGate;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -23,6 +24,13 @@ use Illuminate\Validation\Rule;
  * roles (Ops, hiring partners, superadmin), so a host can see exactly what
  * students see; writes (register, team, submit) are student-only and gated in
  * the routes. A college TPO has no route in here at all.
+ *
+ * Taking part is an Expert feature (Plan::$hackathon_access): browsing the
+ * lobby, a hackathon's page, its gallery and results stays open to every
+ * student — that is the shop window, and it shows what a plan unlocks — but
+ * registering and saving or submitting a project are refused with a 402
+ * (PlanGate::requireHackathonAccess) on any plan that does not include it.
+ * Leaving a hackathon is never refused: nobody should be stuck in a team.
  *
  * A hackathon that is not published is invisible (404) to everyone except
  * someone who may manage it, who sees it as a preview. Private data never
@@ -38,6 +46,7 @@ class HackathonArenaController extends Controller
         private readonly HackathonPresenter $presenter,
         private readonly HackathonRegistrationService $registration,
         private readonly HackathonSubmissionService $submissions,
+        private readonly PlanGate $planGate,
     ) {}
 
     // ───────────────────────────── lobby ─────────────────────────────
@@ -177,6 +186,7 @@ class HackathonArenaController extends Controller
     public function register(Request $request, Hackathon $hackathon)
     {
         $this->visibleOrFail($request, $hackathon);
+        $this->planGate->requireHackathonAccess($request->user());
 
         $data = $request->validate([
             'mode' => ['required', Rule::in(HackathonRegistrationService::MODES)],
@@ -211,6 +221,7 @@ class HackathonArenaController extends Controller
     public function saveSubmission(Request $request, Hackathon $hackathon)
     {
         $this->visibleOrFail($request, $hackathon);
+        $this->planGate->requireHackathonAccess($request->user());
 
         $data = $request->validate([
             'title' => ['required', 'string', 'min:3', 'max:120'],

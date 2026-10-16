@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VocabularyAttempt;
 use App\Models\VocabularyWord;
 use App\Services\GeminiVocabularyQuizService;
+use App\Services\PlanGate;
 use App\Services\VocabularyAnswerService;
 use App\Services\VocabularyProgressService;
 use App\Services\VocabularyQuestionFactory;
@@ -100,7 +101,7 @@ class VocabularyController extends Controller
 
     public function generate(Request $request)
     {
-        $this->assertWithinDailyLearningCentreAiLimit($request);
+        $this->assertWithinDailyLearningCentreAiLimit($request, PlanGate::TRIAL_VOCABULARY_QUIZ);
 
         $validated = $request->validate([
             'topic' => ['required', 'string', 'max:80'],

@@ -25,7 +25,7 @@ function formatDate(iso: string) {
 /**
  * Mellow Internal's "My Customers" dashboard — the other half of the lead
  * pipeline from /marketing. A lead lands here the instant it converts (buys
- * a real paid plan — see SubscriptionService::subscribeIndividual ->
+ * a real paid plan — see SubscriptionService::purchase ->
  * LeadAssignmentService::convertLead) and is handed off from Marketing to
  * whichever internal employee has the lightest book, exactly mirroring how
  * /marketing itself is scoped to "my own leads" for an admin_marketing

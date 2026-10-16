@@ -37,6 +37,8 @@ export function ReadinessBreakdown({ components, nextSteps, compact = false }: R
                 style={{ width: `${c.score}%` }}
               />
             </div>
+            {/* What the score is made of — shown in full mode; the compact dashboard card stays a glance. */}
+            {!compact && c.detail && <p className="text-3xs leading-relaxed text-text-muted">{c.detail}</p>}
           </div>
         ))}
       </div>

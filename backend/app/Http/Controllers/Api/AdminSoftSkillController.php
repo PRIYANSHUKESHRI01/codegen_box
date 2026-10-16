@@ -5,8 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\Concerns\ManagesSoftSkillQuestions;
 use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
+use App\Services\SoftSkillQuestionSetService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Mellow-internal-staff-only (role: admin_internal, superadmin) — Soft
@@ -20,11 +23,19 @@ class AdminSoftSkillController extends Controller
 {
     use ManagesSoftSkillQuestions;
 
-    public function index()
+    /**
+     * `?kind=tests` leaves the AptRun question-set library out (the screen lists the tests people scheduled; the
+     * library has its own browser), `?kind=sets` returns only the library. No `kind` = everything, as before.
+     */
+    public function index(Request $request)
     {
-        $assessments = SoftSkillAssessment::withCount(['sessions', 'assessmentQuestions'])
-            ->with(['owningCollege:id,name,short_code', 'owningCompany:id,name,logo'])
-            ->latest('created_at')
+        $kind = $request->query('kind');
+
+        $assessments = SoftSkillAssessment::withCount(['sessions', 'assessmentQuestions', 'usages'])
+            ->with(['owningCollege:id,name,short_code', 'owningCompany:id,name,logo', 'appliedSets'])
+            ->when($kind === 'tests', fn (Builder $q) => $q->notQuestionSets())
+            ->when($kind === 'sets', fn (Builder $q) => $q->questionSets())
+            ->when($kind === 'sets', fn (Builder $q) => $q->orderBy('question_set_number'), fn (Builder $q) => $q->latest('created_at'))
             ->get();
 
         return response()->json(['assessments' => $assessments]);
@@ -38,9 +49,9 @@ class AdminSoftSkillController extends Controller
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:20'],
-        ]);
+        ] + $this->questionSetCreationRules());
 
-        $assessment = SoftSkillAssessment::create([
+        $assessment = $this->createAssessment($request, [
             'title' => $validated['title'],
             'slug' => SoftSkillAssessment::uniqueSlug($validated['title']),
             'description' => $validated['description'] ?? null,
@@ -50,7 +61,7 @@ class AdminSoftSkillController extends Controller
             'pass_percentage' => $validated['pass_percentage'] ?? 60,
             'max_attempts' => $validated['max_attempts'] ?? null,
             'created_by' => $request->user()->id,
-        ]);
+        ], $validated);
 
         return response()->json(['assessment' => $assessment], 201);
     }
@@ -66,7 +77,15 @@ class AdminSoftSkillController extends Controller
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
             'pass_percentage' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'max_attempts' => ['nullable', 'integer', 'min:1', 'max:20'],
+            // Lists this (Mellow-written) test in the AptRun question-set library, or takes it out again.
+            'is_question_set' => ['sometimes', 'boolean'],
         ]);
+
+        $this->assertCanPublish($softSkillAssessment, $validated);
+
+        if (array_key_exists('is_question_set', $validated)) {
+            $validated += $this->libraryChange($softSkillAssessment, (bool) $validated['is_question_set']);
+        }
 
         $softSkillAssessment->update($validated);
 
@@ -87,6 +106,40 @@ class AdminSoftSkillController extends Controller
         $softSkillAssessment->delete();
 
         return response()->json(['message' => 'Assessment deleted.']);
+    }
+
+    protected function scopeOwnTests(Request $request, Builder $tests): mixed
+    {
+        // Mellow's own scheduling history: the general tests it wrote by hand — never the library sets themselves, and
+        // never a college's or a hiring partner's tests (those are theirs to know about, not Mellow Ops').
+        return $tests->where('assessment_type', SoftSkillAssessment::TYPE_GENERAL)->where('is_question_set', false);
+    }
+
+    /**
+     * What changes on the row when a test is added to / removed from the library: it gets the next free "Set N" number,
+     * and can only be taken out again while no test has been built from it (use "cancelled" to withdraw a used one).
+     *
+     * @return array<string, mixed>
+     */
+    private function libraryChange(SoftSkillAssessment $assessment, bool $listed): array
+    {
+        if ($listed) {
+            if ($assessment->assessment_type !== SoftSkillAssessment::TYPE_GENERAL) {
+                throw ValidationException::withMessages(['is_question_set' => ['Only Mellow\'s own tests can be added to the question-set library.']]);
+            }
+
+            if (! $assessment->assessmentQuestions()->exists()) {
+                throw ValidationException::withMessages(['is_question_set' => ['Add questions to this test before listing it as a question set.']]);
+            }
+
+            return ['question_set_number' => $assessment->question_set_number ?? app(SoftSkillQuestionSetService::class)->nextSetNumber()];
+        }
+
+        if ($assessment->usages()->exists()) {
+            throw ValidationException::withMessages(['is_question_set' => ['Tests have already been built from this set, so it cannot leave the library. Cancel it instead to stop it being offered.']]);
+        }
+
+        return [];
     }
 
     private function authorizeAssessmentOwnership(Request $request, SoftSkillAssessment $softSkillAssessment): void

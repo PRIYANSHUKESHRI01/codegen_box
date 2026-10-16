@@ -46,7 +46,7 @@ class TpoStudentController extends Controller
         $activeMappings = $this->cohort->activeMappingsFor($collegeId);
 
         return response()->json([
-            'students' => $students->map(fn (User $student) => $this->cohort->payload($student, $activeMappings))->all(),
+            'students' => $this->cohort->payloads($students, $activeMappings),
             'active_drive_count' => $activeMappings->count(),
         ]);
     }

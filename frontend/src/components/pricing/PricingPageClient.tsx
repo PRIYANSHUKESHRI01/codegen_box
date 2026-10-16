@@ -6,16 +6,20 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, X } from "lucide-react";
 import { PricingHero } from "@/components/pricing/PricingHero";
 import { PricingPlans } from "@/components/pricing/PricingPlans";
-import { ProjectLabPricing } from "@/components/pricing/ProjectLabPricing";
+import { InstitutionPlans } from "@/components/pricing/InstitutionPlans";
+import { PlanComparison } from "@/components/pricing/PlanComparison";
+import { VaultExplainer } from "@/components/pricing/VaultExplainer";
 import { PricingAudience } from "@/data/pricing";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
+import type { CheckoutInfo } from "@/types/payments";
 
 export function PricingPageClient() {
   const { user, status } = useAuth();
   const [audience, setAudience] = useState<PricingAudience>("individual");
   const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
+  const [checkout, setCheckout] = useState<CheckoutInfo | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,13 +27,17 @@ export function PricingPageClient() {
     // signed-out visitors just see the plain marketing cards.
     if (status !== "ready" || !user) {
       setCoverage(null);
+      setCheckout(null);
       return;
     }
     if (user.role !== "user" && user.role !== "admin_tpo") return;
 
     api
       .get<MySubscriptionResponse>("/me/subscription")
-      .then((res) => setCoverage(res.coverage))
+      .then((res) => {
+        setCoverage(res.coverage);
+        setCheckout(res.checkout ?? null);
+      })
       .catch(() => setCoverage(null));
   }, [status, user]);
 
@@ -84,9 +92,14 @@ export function PricingPageClient() {
 
       <main className="relative flex flex-col items-center pb-16 sm:pb-24">
         <PricingHero audience={audience} onAudienceChange={setAudience} />
-        <PricingPlans audience={audience} billingCycle="monthly" coverage={coverage} onSubscribed={handleSubscribed} />
-        {audience === "individual" && (
-          <ProjectLabPricing onPurchased={() => triggerToast("Project Lab is active — find it in the sidebar.")} />
+        {audience === "institution" ? (
+          <InstitutionPlans coverage={coverage} />
+        ) : (
+          <>
+            <PricingPlans coverage={coverage} checkout={checkout} onSubscribed={handleSubscribed} />
+            <PlanComparison />
+            <VaultExplainer />
+          </>
         )}
       </main>
     </div>

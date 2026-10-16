@@ -8,6 +8,7 @@ use App\Models\Contest;
 use App\Models\ContestParticipant;
 use App\Models\ContestSubmission;
 use App\Models\ProctoringSession;
+use App\Services\Vault\VaultRefreshService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,7 +28,7 @@ class ContestFinalizeService
 {
     public function __construct(
         private readonly ContestRatingService $ratingService,
-        private readonly TalentPoolQualificationService $talentPoolService,
+        private readonly VaultRefreshService $vaultRefresh,
     ) {}
 
     public function finalize(Contest $contest): array
@@ -84,10 +85,14 @@ class ContestFinalizeService
         // sessions' final state are actually durable.
         $this->dispatchProctoringReports($contest);
 
-        // Same "after commit" reasoning applies here — qualification reads
-        // Contest::participants().score, which must already be durably
-        // ranked/finalized before this runs.
-        $this->talentPoolService->qualifyFromContest($contest);
+        // Same "after commit" reasoning applies here — a contest result feeds the
+        // students' readiness scores (and so the Vault), and it only counts once
+        // the score and rank are durably written. Re-scoring now, rather than at
+        // the next scheduled refresh, is what makes "I just finished a contest"
+        // show up in the score straight away. It can never fail the finalize.
+        $this->vaultRefresh->refreshQuietly(
+            ContestSubmission::where('contest_id', $contest->id)->distinct()->pluck('user_id')->all()
+        );
 
         return $result;
     }

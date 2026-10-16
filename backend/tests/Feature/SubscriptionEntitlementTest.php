@@ -30,7 +30,7 @@ class SubscriptionEntitlementTest extends TestCase
             'code' => 'test-plan-'.uniqid(),
             'name' => 'Test Plan',
             'audience' => Plan::AUDIENCE_INDIVIDUAL,
-            'monthly_price' => 0,
+            'list_price' => 0,
             'annual_price' => 0,
             'duration_days' => null,
             'is_active' => true,

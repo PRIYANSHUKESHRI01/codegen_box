@@ -92,9 +92,9 @@ class Company extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    /** This tenant's own Talent Pool engagements (interest/interview/hire) — see App\Models\TalentPoolInquiry. */
-    public function talentPoolInquiries(): HasMany
+    /** This tenant's own Vault engagements (interest/interview/hire) — see App\Models\VaultInquiry. */
+    public function vaultInquiries(): HasMany
     {
-        return $this->hasMany(TalentPoolInquiry::class);
+        return $this->hasMany(VaultInquiry::class);
     }
 }

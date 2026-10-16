@@ -66,7 +66,10 @@ export function DeleteCollegeModal({ college, onClose, onDeleted }: DeleteColleg
     };
   }, [college.id]);
 
-  const nameMatches = typedName === college.name;
+  // The server trims what is typed before comparing, so a trailing space or newline picked up when the name is
+  // copied off the page must not keep the button disabled here either.
+  const nameMatches = typedName.trim() === college.name;
+  const nameLooksWrong = typedName.trim() !== "" && !nameMatches;
   const canDelete = impact !== null && nameMatches && password.length > 0 && !working;
 
   const submit = async (e: React.FormEvent) => {
@@ -75,10 +78,16 @@ export function DeleteCollegeModal({ college, onClose, onDeleted }: DeleteColleg
     setWorking(true);
     setError(null);
     try {
-      await api.delete(`/superadmin/colleges/${college.id}`, { password, confirm_name: typedName });
+      await api.delete(`/superadmin/colleges/${college.id}`, { password, confirm_name: typedName.trim() });
       onDeleted(college.name);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not delete the university. Check your connection and try again.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : // No answer at all (timeout, dropped connection). A big university is a long delete that keeps running on the
+            // server after the browser gives up, so "try again" would be the wrong advice.
+            "No answer from the server. A large university can take a while, so it may still be deleting — close this dialog, refresh the list, and only try again if the university is still there."
+      );
       setWorking(false);
     }
   };
@@ -127,6 +136,9 @@ export function DeleteCollegeModal({ college, onClose, onDeleted }: DeleteColleg
           {impactError ? (
             <div role="alert" className="p-3 rounded-control border border-status-danger/30 bg-status-danger/10 text-status-danger text-xs font-semibold">
               {impactError}
+              <span className="block mt-1 font-normal">
+                The delete stays locked until this loads. Close the dialog and try again; if it keeps failing, the server may be running an older version without this feature.
+              </span>
             </div>
           ) : impact === null ? (
             <div className="text-xs text-text-muted">Counting…</div>
@@ -160,8 +172,14 @@ export function DeleteCollegeModal({ college, onClose, onDeleted }: DeleteColleg
             autoComplete="off"
             value={typedName}
             onChange={(e) => setTypedName(e.target.value)}
+            aria-describedby={nameLooksWrong ? "delete-college-name-hint" : undefined}
             className="w-full px-3 py-2 text-xs rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-status-danger"
           />
+          {nameLooksWrong && (
+            <p id="delete-college-name-hint" className="mt-1 text-2xs text-status-warning">
+              Doesn&apos;t match yet — type the name exactly as shown above, including capital letters and punctuation.
+            </p>
+          )}
         </div>
 
         <div>

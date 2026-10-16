@@ -20,6 +20,16 @@ export interface ApiPlatformUser {
   branch: string | null;
   /** Real, attached server-side only on this endpoint's page rows — never fabricated, never computed per-row at unbounded scale. */
   subscription_plan_name?: string | null;
+  /** The plan that governs this student right now — their own, or their college's — with where it comes from. Only meaningful for role=user rows. */
+  subscription?: {
+    plan_code: string;
+    plan_name: string;
+    source: "individual" | "institution" | "none";
+    /** null = never expires. */
+    days_remaining: number | null;
+    is_trial: boolean;
+    ends_at: string | null;
+  } | null;
   /** Only present for role=user rows. */
   readiness_tier?: "Placement Ready" | "In Progress" | "Needs Training";
   /** Granular section access — only ever non-null for admin_internal/admin_marketing rows. See User::hasPermission on the backend. */

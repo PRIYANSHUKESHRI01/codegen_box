@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  * Mellow Internal's own surface for converted "Mellow Direct" customers —
  * the other half of MarketingLeadController's lifecycle. A lead lands here
  * the instant it converts (see LeadAssignmentService::convertLead(), fired
- * from SubscriptionService::subscribeIndividual()) and is scoped to
+ * from SubscriptionService::purchase(), once a payment is confirmed) and is scoped to
  * whichever admin_internal employee it was handed off to, mirroring
  * MarketingLeadController's own-book-vs-superadmin-sees-all convention
  * exactly. Deliberately has no status-changer: unlike a lead, a converted

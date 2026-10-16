@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Search, Users2, UserPlus, CheckCircle2, TrendingUp, StickyNote, Ban, ExternalLink } from "lucide-react";
+import { Search, Users2, UserPlus, CheckCircle2, TrendingUp, StickyNote, Ban, ExternalLink, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { LeadDetailDrawer } from "@/components/leads/LeadDetailDrawer";
+import { UserManageDrawer } from "./UserManageDrawer";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_BADGE_CLASS, type LeadSummary, type LeadPage } from "@/types/lead";
 import { formatDate } from "./types";
 
@@ -31,6 +32,7 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeLeadId, setActiveLeadId] = useState<number | null>(null);
+  const [managedId, setManagedId] = useState<number | null>(null);
   const [blockedIds, setBlockedIds] = useState<Set<number>>(new Set());
 
   const load = useCallback(() => {
@@ -171,6 +173,15 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => setManagedId(lead.id)}
+                            aria-label={`Manage ${lead.name}`}
+                            className="px-2 py-1 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-text-secondary hover:text-primary transition-colors text-2xs font-medium flex items-center gap-1"
+                            title="Plan, details, sign-in tools and activity for this person — including giving or ending a plan."
+                          >
+                            <UserCog className="w-3 h-3" />
+                            <span>Manage</span>
+                          </button>
                           <Link
                             href={`/marketing?leadId=${lead.id}`}
                             target="_blank"
@@ -207,6 +218,8 @@ export function LeadsPanel({ triggerToast }: { triggerToast: (msg: string) => vo
       {activeLeadId && (
         <LeadDetailDrawer leadId={activeLeadId} onClose={() => setActiveLeadId(null)} onChanged={load} />
       )}
+
+      {managedId !== null && <UserManageDrawer userId={managedId} onClose={() => setManagedId(null)} onChanged={load} triggerToast={triggerToast} />}
     </div>
   );
 }

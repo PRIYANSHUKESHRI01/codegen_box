@@ -39,12 +39,17 @@ import {
   FlaskConical,
   Lock,
   Rocket,
+  Wallet,
+  CreditCard,
+  BadgeCheck,
+  KeyRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { getStoredUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
+import { isTopPlan } from "@/lib/pricing";
 import { SUBSCRIPTION_CHANGED_EVENT } from "@/lib/projectLab";
 import { useMyStats } from "@/lib/useMyStats";
 import type { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
@@ -88,9 +93,10 @@ interface NavItem {
   badge?: string;
   badgeTone?: BadgeTone;
   /**
-   * The destination is part of a plan add-on the signed-in student doesn't have.
-   * The item stays in the rail (so they can find it and see what it is) but wears
-   * a lock instead of a badge; following it lands on that section's unlock page.
+   * The destination is part of a plan the signed-in student isn't on (Project Lab, the Hack
+   * Arena and the Vault come with Expert). The item stays in the rail (so they
+   * can find it and see what it is) but wears a lock instead of a badge; following it lands
+   * on that section's upgrade page.
    */
   locked?: boolean;
   /** Highlight this item on its sub-pages too (/dashboard/projects/view, …), not only on its exact path. */
@@ -187,9 +193,13 @@ export function DashboardSidebar({
   // "only Mellow staff can change it" rule as Settings' Billing tab). No
   // other role has a plan concept at all, so this never fetches for them.
   const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
-  // null = not known yet (or not applicable): the Project Lab item then shows no lock,
-  // so an entitled student never sees a lock flash while the request is in flight.
+  // null = not known yet (or not applicable): the Project Lab and Vault items then show no lock, so an
+  // entitled student never sees a lock flash while the request is in flight.
+  // A paid plan whose days have run out: the server already treats the student as free, so say so.
+  const planEnded =
+    coverage?.source === "individual" && !!coverage.plan && coverage.plan.code !== "coder" && coverage.days_remaining !== null && coverage.days_remaining <= 0;
   const [projectLabEnabled, setProjectLabEnabled] = useState<boolean | null>(null);
+  const [vaultEnabled, setVaultEnabled] = useState<boolean | null>(null);
   useEffect(() => {
     if (currentRole !== "user" && currentRole !== "admin_tpo") return;
     let cancelled = false;
@@ -201,6 +211,7 @@ export function DashboardSidebar({
           if (cancelled) return;
           setCoverage(res.coverage);
           setProjectLabEnabled(res.project_lab ? res.project_lab.enabled : null);
+          setVaultEnabled(res.entitlements ? res.entitlements.vault_access : null);
         })
         .catch(() => {});
 
@@ -375,8 +386,8 @@ export function DashboardSidebar({
             badgeTone: "count",
           },
           {
-            label: "Talent Pool",
-            href: "/admin/talent-pool",
+            label: "Vault",
+            href: "/admin/vault",
             icon: Award,
             badge: "New",
             badgeTone: "new",
@@ -423,7 +434,7 @@ export function DashboardSidebar({
       // Including both made the sidebar read as two dashboards stapled
       // together, which is exactly what was reported as a bug. What's left
       // (Problem Bank, Placement Drives, Contests, AI Interviews, Articles,
-      // Talent Pool, Platform Users, Customer Success) has no superadmin-
+      // Vault, Platform Users, Customer Success) has no superadmin-
       // console equivalent at all, so it stays reachable, clearly labeled
       // as a distinct toolset rather than folded into Executive/Governance.
       const mellowOpsExtrasForSuperadmin = mellowOpsSections.map((section) =>
@@ -443,6 +454,9 @@ export function DashboardSidebar({
           items: [
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
+            { label: "Plans & Pricing", href: "/superadmin?tab=plans", icon: Wallet },
+            { label: "Payments", href: "/superadmin?tab=payments", icon: CreditCard },
+            { label: "Subscriptions", href: "/superadmin?tab=subscriptions", icon: BadgeCheck },
           ],
         },
         {
@@ -452,6 +466,7 @@ export function DashboardSidebar({
             { label: "Leads", href: "/superadmin?tab=leads", icon: UserSearch },
             { label: "Marketing Performance", href: "/superadmin?tab=marketing", icon: Megaphone },
             { label: "Mellow Staff", href: "/superadmin?tab=staff", icon: Users2 },
+            { label: "Accounts & Logins", href: "/superadmin?tab=accounts", icon: KeyRound },
             {
               label: "Audit & Security",
               href: "/superadmin?tab=audit",
@@ -561,8 +576,8 @@ export function DashboardSidebar({
               badgeTone: "new",
             },
             {
-              label: "Talent Pool",
-              href: "/admin/company/talent-pool",
+              label: "Vault",
+              href: "/admin/company/vault",
               icon: Award,
               badge: "New",
               badgeTone: "new",
@@ -629,8 +644,8 @@ export function DashboardSidebar({
             badge: "AI",
             badgeTone: "new",
           },
-          // Visible to every student. Without the Project Lab add-on it wears a
-          // lock and its page is the unlock/upgrade screen — see ProjectLabPage.
+          // Visible to every student. Without Expert it wears a lock and its
+          // page is the upgrade screen — see ProjectLabPage.
           {
             label: "Project Lab",
             href: "/dashboard/projects",
@@ -651,12 +666,14 @@ export function DashboardSidebar({
           { label: "Contests", href: "/dashboard/contests", icon: Swords },
           { label: "AI Interviews", href: "/dashboard/interviews", icon: Mic },
           { label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain },
+          // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their
+          // readiness score and how to raise it are there), so the item wears a lock rather than hiding —
+          // see StudentVaultPage, which shows the upgrade panel in place of the consent button.
           {
-            label: "Talent Pool",
-            href: "/dashboard/talent-pool",
+            label: "Vault",
+            href: "/dashboard/vault",
             icon: Award,
-            badge: "New",
-            badgeTone: "new",
+            ...(vaultEnabled === false ? { locked: true } : { badge: "New", badgeTone: "new" as const }),
           },
           { label: "Submissions", href: "/dashboard#submissions", icon: Activity },
           { label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Swords },
@@ -667,11 +684,32 @@ export function DashboardSidebar({
 
   // Every role gets the same account section — profile settings live at one
   // shared route rather than being duplicated per dashboard.
+  // A student's plans and prices used to be reachable only through the small "Upgrade" link under their name,
+  // so many never found them. Now a real nav item, and its badge says where they stand: the plan they hold, or
+  // the invitation to upgrade (or the warning that it has ended).
+  const billingItem: NavItem | null =
+    currentRole === "user"
+      ? {
+          label: "Plans & Billing",
+          href: "/dashboard/billing",
+          icon: CreditCard,
+          ...(coverage === null
+            ? {}
+            : planEnded
+            ? { badge: "Renew", badgeTone: "live" as const }
+            : coverage.source === "institution"
+            ? { badge: "Campus", badgeTone: "count" as const }
+            : isTopPlan(coverage.plan?.code)
+            ? { badge: coverage.plan?.name ?? "Plan", badgeTone: "ok" as const }
+            : { badge: "Upgrade", badgeTone: "new" as const }),
+        }
+      : null;
+
   const navSections: NavSection[] = [
     ...getNavSections(),
     {
       title: "Account",
-      items: [{ label: "Profile Settings", href: "/settings", icon: Settings }],
+      items: [...(billingItem ? [billingItem] : []), { label: "Profile Settings", href: "/settings", icon: Settings }],
     },
   ];
 
@@ -1028,7 +1066,7 @@ export function DashboardSidebar({
                           ? "bg-sidebar-active text-sidebar-strong"
                           : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-strong"
                       )}
-                      title={isExpanded ? undefined : item.locked ? `${item.label} — requires Project Lab` : item.label}
+                      title={isExpanded ? undefined : item.locked ? `${item.label} — requires Expert` : item.label}
                     >
                       {/* Selection rule: one 3px bar flush to the rail's inner
                           edge. The cheapest unambiguous "you are here" there
@@ -1112,11 +1150,11 @@ export function DashboardSidebar({
                             {item.locked && (
                               <span
                                 className="flex shrink-0 items-center gap-1 rounded-full bg-sidebar-chip px-2 py-[3px] text-3xs font-bold leading-none text-sidebar-chip-text"
-                                title="Requires Project Lab"
+                                title="Part of the Expert plan"
                               >
                                 <Lock aria-hidden className="h-3 w-3" />
                                 <span>Pro</span>
-                                <span className="sr-only">— requires Project Lab</span>
+                                <span className="sr-only">— requires the Expert plan</span>
                               </span>
                             )}
                           </motion.span>
@@ -1162,7 +1200,7 @@ export function DashboardSidebar({
                     {coverage === null
                       ? "…"
                       : coverage.plan?.name
-                      ? `${coverage.plan.name} Plan`
+                      ? `${coverage.plan.name} Plan${planEnded ? " ended" : ""}`
                       : "No active plan"}
                   </span>
                   {coverage?.source === "individual" && (
@@ -1170,7 +1208,7 @@ export function DashboardSidebar({
                       href="/dashboard/billing"
                       className="sb-focus shrink-0 font-bold text-sidebar-accent hover:underline"
                     >
-                      Upgrade
+                      {planEnded ? "Renew" : isTopPlan(coverage.plan?.code) ? "Manage" : "Upgrade"}
                     </Link>
                   )}
                 </p>

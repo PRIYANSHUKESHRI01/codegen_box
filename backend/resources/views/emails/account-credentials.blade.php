@@ -12,6 +12,8 @@
                                     on AptRun. Use the credentials below to sign in and start running placement drives.
                                 @elseif ($user->role === 'admin_internal')
                                     Mellow has created your internal staff account on AptRun. Use the credentials below to sign in.
+                                @elseif ($user->role === 'admin_marketing')
+                                    Mellow has created your marketing team account on AptRun. Use the credentials below to sign in.
                                 @elseif ($user->role === 'section_coordinator')
                                     {{ $user->college?->name ?? 'Your college' }} has set up your Section Coordinator account for
                                     Section {{ $user->section }} on AptRun. Use the credentials below to sign in and manage your section's roster.

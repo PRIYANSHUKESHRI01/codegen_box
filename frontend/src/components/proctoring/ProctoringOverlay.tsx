@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, Maximize } from "lucide-react";
+import { AlertTriangle, ClipboardX, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { VIOLATION_LABEL, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
 
@@ -82,8 +82,22 @@ export function ProctoringOverlay({
         </div>
       )}
 
+      {/* Blocked paste — logged, but not a strike, so it must not read like one ("Warning 1/3 … 2 more strikes"). */}
+      {toast?.type === "paste_attempt" && (
+        <div className="fixed top-16 right-4 z-50 max-w-xs p-3.5 rounded-panel bg-status-warning/10 border border-status-warning/30 shadow-card">
+          <p className="text-xs font-bold text-status-warning flex items-center gap-1.5">
+            <ClipboardX className="w-3.5 h-3.5" />
+            Paste blocked
+          </p>
+          <p className="text-2xs text-text-secondary mt-1">
+            You can only paste code you copied from this editor. Nothing was pasted. This isn&apos;t a strike, but it is
+            recorded in your proctoring report.
+          </p>
+        </div>
+      )}
+
       {/* Violation toast */}
-      {toast && (
+      {toast && toast.type !== "paste_attempt" && (
         <div className="fixed top-16 right-4 z-50 max-w-xs p-3.5 rounded-panel bg-status-danger/10 border border-status-danger/30 shadow-card">
           <p className="text-xs font-bold text-status-danger flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />

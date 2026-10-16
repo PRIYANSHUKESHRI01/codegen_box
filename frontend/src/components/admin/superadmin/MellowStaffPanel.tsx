@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Users2, Search, Plus, Ban, CheckCircle2, ShieldCheck } from "lucide-react";
+import { Users2, Search, Plus, Ban, CheckCircle2, ShieldCheck, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { credentialsEmailNote } from "@/lib/credentialsEmail";
 import { Modal } from "@/components/ui/Modal";
+import { UserManageDrawer } from "./UserManageDrawer";
 import { ROLE_LABEL, ROLE_BADGE_CLASS, formatDateTime, type ApiPage, type ApiPlatformUser, type ApiCollege } from "./types";
 import { permissionCatalogForRole, PERMISSION_LABELS, PERMISSION_DESCRIPTIONS, type Permission } from "@/types/permissions";
 
@@ -48,6 +49,7 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
   // regardless of what's sent, so this default is purely a UX convenience.
   const [newPermissions, setNewPermissions] = useState<Permission[]>([...permissionCatalogForRole("admin_internal")]);
 
+  const [managedId, setManagedId] = useState<number | null>(null);
   const [accessModalTarget, setAccessModalTarget] = useState<ApiPlatformUser | null>(null);
   const [accessPermissions, setAccessPermissions] = useState<Permission[]>([]);
   const [savingAccess, setSavingAccess] = useState(false);
@@ -247,6 +249,14 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => setManagedId(usr.id)}
+                          aria-label={`Manage ${usr.name}`}
+                          className="px-2.5 py-1 rounded-control text-xs font-semibold transition-colors border bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary border-border-subtle flex items-center gap-1"
+                        >
+                          <UserCog className="w-3.5 h-3.5" />
+                          <span>Manage</span>
+                        </button>
                         {(usr.role === "admin_internal" || usr.role === "admin_marketing") && (
                           <button
                             onClick={() => {
@@ -528,6 +538,8 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
             )}
         </Modal>
       )}
+
+      {managedId !== null && <UserManageDrawer userId={managedId} onClose={() => setManagedId(null)} onChanged={() => load(searchDebounced)} triggerToast={triggerToast} />}
     </div>
   );
 }

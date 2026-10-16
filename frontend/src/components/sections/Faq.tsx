@@ -14,11 +14,11 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
   },
   {
     q: "How do recruiters hire from our campus?",
-    a: "Hiring partners post openings and propose them to partner colleges, then invite students to proctored assessments and AI interviews. Students who perform well can also opt in to the talent pool, where recruiters can discover and invite them directly.",
+    a: "Hiring partners post openings and propose them to partner colleges, then invite students to proctored assessments and AI interviews. Students on the Expert plan whose readiness score reaches the Vault bar can also opt in, and recruiters can discover and invite them directly.",
   },
   {
-    q: "Who can see a student's profile in the talent pool?",
-    a: "Only hiring partners, and only after the student gives consent. Students choose whether their profile is visible and can hide it again at any time.",
+    q: "Who can see a student's profile in the Vault?",
+    a: "Only hiring partners on AptRun and employers on Mellow Vault, and only after the student gives consent. Students choose whether their profile is visible and can hide it again at any time.",
   },
   {
     q: "How do you keep assessments fair?",
@@ -28,7 +28,7 @@ const FAQS: { q: string; a: React.ReactNode }[] = [
     q: "What does it cost for students and institutions?",
     a: (
       <>
-        Students can start free, and colleges are on seat-based institution plans. See the{" "}
+        Students can start free, and colleges get a plan tailored to their campus by our team. See the{" "}
         <Link href="/pricing" className="font-bold text-accent-primary hover:underline">
           pricing page
         </Link>{" "}

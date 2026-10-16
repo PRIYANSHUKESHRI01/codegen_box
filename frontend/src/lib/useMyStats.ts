@@ -10,9 +10,11 @@ import { MyStats } from "@/types/studentStats";
  * never independently re-derive (or worse, re-fabricate) the same numbers.
  * A plain per-page hook (matching this codebase's existing loadX()
  * useCallback+useEffect pattern), not a global context — the payload is
- * cheap enough to refetch per page.
+ * cheap enough to refetch per page. `refreshKey` re-fetches when it changes — the
+ * dashboard passes the weekly pace, so a pace chosen in onboarding (or Settings)
+ * while the page is open updates the goal targets straight away.
  */
-export function useMyStats(enabled: boolean = true) {
+export function useMyStats(enabled: boolean = true, refreshKey: string = "") {
   const [stats, setStats] = useState<MyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,7 +34,8 @@ export function useMyStats(enabled: boolean = true) {
     } finally {
       setLoading(false);
     }
-  }, [enabled]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, refreshKey]);
 
   useEffect(() => {
     reload();

@@ -39,6 +39,62 @@ class Subscription extends Model
         ];
     }
 
+    /** A student paid for it through Razorpay checkout. */
+    public const SOURCE_PURCHASE = 'purchase';
+
+    /** A superadmin gave it by hand — free of charge, or against a payment taken outside the gateway (bank transfer, cash). */
+    public const SOURCE_ADMIN_GRANT = 'admin_grant';
+
+    /** Assigned by Mellow staff to a college or company through a sales conversation, or started as a demo. */
+    public const SOURCE_ADMIN_ASSIGNED = 'admin_assigned';
+
+    /** The free plan every student starts on, or a row from before sources were recorded. */
+    public const SOURCE_SYSTEM = 'system';
+
+    /**
+     * How this subscription came to exist, for the superadmin's list and a
+     * student's plan history. Rows written before sources were recorded carry
+     * no `source`, so it is worked out from what they do carry: a payment
+     * reference means checkout, a college/company subscriber means Ops
+     * assigned it, anything else is the default free plan.
+     */
+    public function source(): string
+    {
+        $recorded = $this->meta['source'] ?? null;
+
+        if (is_string($recorded) && $recorded !== '') {
+            return $recorded;
+        }
+
+        if (! empty($this->meta['purchase_ref'])) {
+            return self::SOURCE_PURCHASE;
+        }
+
+        return $this->subscriber_type === User::class ? self::SOURCE_SYSTEM : self::SOURCE_ADMIN_ASSIGNED;
+    }
+
+    /** What the subscriber was actually charged for this row, in whole rupees — 0 for anything given free. Null when nothing was recorded (a college's price lives on its plan). */
+    public function pricePaid(): ?int
+    {
+        $paid = $this->meta['price_paid'] ?? null;
+
+        return $paid === null ? null : (int) $paid;
+    }
+
+    /**
+     * Where this row stands right now, in the words the superadmin's list uses:
+     * `canceled`, `expired` (swept or simply past its end date), or `active`.
+     * `isActive()` alone can't say it — a canceled row is also "not active".
+     */
+    public function state(): string
+    {
+        if ($this->status === self::STATUS_CANCELED) {
+            return self::STATUS_CANCELED;
+        }
+
+        return $this->isActive() ? self::STATUS_ACTIVE : self::STATUS_EXPIRED;
+    }
+
     public function subscriber(): MorphTo
     {
         return $this->morphTo();

@@ -145,7 +145,7 @@ export function ProjectCard({ project, unlocked }: ProjectCardProps) {
 
       <div className={cn("flex items-center justify-between border-t border-border-subtle px-5 py-3 text-xs font-bold", tone.text)}>
         <span className="flex items-center gap-1.5">
-          {locked && <Lock className="h-3.5 w-3.5" aria-label="Requires Project Lab" />}
+          {locked && <Lock className="h-3.5 w-3.5" aria-label="Requires Expert" />}
           {cta}
         </span>
         <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />

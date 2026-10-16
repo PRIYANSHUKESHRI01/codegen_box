@@ -14,6 +14,7 @@ import { RegisterDialog } from "@/components/arena/detail/RegisterDialog";
 import { GalleryTab, ResultsTab } from "@/components/arena/detail/ShowcaseTabs";
 import { StickyBar } from "@/components/arena/detail/StickyBar";
 import { TeamPanel } from "@/components/arena/detail/TeamPanel";
+import { UpgradeDialog } from "@/components/arena/detail/UpgradeDialog";
 import { primaryCta, useScrolledPast, useShellChrome, type DetailTab } from "@/components/arena/detail/shared";
 import { EASE, SlidingTabs, type SlideTab } from "@/components/arena/motion";
 import { PageNotice } from "@/components/arena/primitives";
@@ -21,6 +22,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { ApiError } from "@/lib/api";
 import { accentVars, arenaApi, errorMessage } from "@/lib/hackathon";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useEntitlements } from "@/lib/useEntitlements";
 import type { HackathonDetail } from "@/types/hackathon";
 import "@/app/arena/detail.css";
 
@@ -106,6 +108,7 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
   const requestedTab = params.get("tab") as TabKey | null;
 
   const [registering, setRegistering] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const { top: topbar, bottom: bottomNav } = useShellChrome();
@@ -126,6 +129,13 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
   }, [toast]);
 
   const isStudent = userRole === "user";
+
+  // Taking part is an Expert feature (browsing is open to everyone). A student whose plan doesn't
+  // include it gets the upgrade explanation instead of the register form; the server refuses a
+  // registration on such a plan anyway, so this is the friendly version of that refusal.
+  const entitlements = useEntitlements(isStudent);
+  const locked = isStudent && entitlements?.hackathon_access === false;
+  const startRegistering = useCallback(() => (locked ? setUpgrading(true) : setRegistering(true)), [locked]);
   const registered = h.registration.state === "registered";
 
   const tabs = useMemo(() => {
@@ -224,7 +234,7 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
       <div style={{ "--dt-top": `${topbar}px`, "--dt-mini": `${MINI_BAR}px`, "--ar-bottom-nav": `${bottomNav}px` } as CSSProperties}>
         <DetailHero ref={heroRef} h={h} />
 
-        <StickyBar h={h} show={heroGone} cta={cta} onRegister={() => setRegistering(true)} onOpenTab={openFromCta} />
+        <StickyBar h={h} show={heroGone} cta={cta} onRegister={startRegistering} onOpenTab={openFromCta} />
 
         <div className="mt-7 grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_372px] lg:gap-8">
           <div className="min-w-0 lg:order-1">
@@ -273,15 +283,22 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
 
           {/* On a phone the decision (Register / Open editor) comes straight after the hero, not after every tab. */}
           <div className="dt-aside order-first lg:sticky lg:order-2">
-            <ActionCard h={h} userRole={userRole} onRegister={() => setRegistering(true)} onOpenTab={openFromCta} />
+            <ActionCard h={h} userRole={userRole} onRegister={startRegistering} onOpenTab={openFromCta} />
           </div>
         </div>
+
+        {isStudent && <UpgradeDialog open={upgrading} onClose={() => setUpgrading(false)} />}
 
         {isStudent && (
           <RegisterDialog
             hackathon={h}
             open={registering}
             onClose={() => setRegistering(false)}
+            onPlanRequired={() => {
+              // The plan changed since the page loaded (e.g. it lapsed): the server refused, so explain why.
+              setRegistering(false);
+              setUpgrading(true);
+            }}
             onRegistered={(updated) => {
               setRegistering(false);
               setH(updated);

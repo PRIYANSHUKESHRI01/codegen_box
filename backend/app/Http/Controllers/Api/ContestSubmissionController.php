@@ -65,6 +65,7 @@ class ContestSubmissionController extends Controller
                     'explanation' => $tc->explanation,
                 ]),
                 'starter_code' => $starterCodeGenerator->generateAll($problem),
+                'case_counts' => $problem->caseCounts(),
             ],
             'points' => $contestProblem->points,
         ]);

@@ -85,6 +85,45 @@ describe("DeleteCollegeModal", () => {
     expect(deleteButton().disabled).toBe(true);
   });
 
+  it("accepts the name with stray spaces from copy-paste (the server trims it too) and sends it trimmed", async () => {
+    del.mockResolvedValue({ deleted: true });
+    const { onDeleted } = mount();
+    await screen.findByText(/340/);
+
+    typeName("  Tulas University \n");
+    typePassword("my-password");
+    expect(deleteButton().disabled).toBe(false);
+    fireEvent.click(deleteButton());
+
+    await waitFor(() => expect(onDeleted).toHaveBeenCalled());
+    expect(del).toHaveBeenCalledWith("/superadmin/colleges/9", { password: "my-password", confirm_name: "Tulas University" });
+  });
+
+  it("says why the button is still locked while the typed name doesn't match, and clears the hint once it does", async () => {
+    mount();
+    await screen.findByText(/340/);
+
+    expect(screen.queryByText(/doesn.t match yet/i)).toBeNull(); // nothing typed yet: no nagging
+    typeName("tulas university");
+    expect(screen.getByText(/doesn.t match yet/i)).toBeTruthy();
+    typeName("Tulas University");
+    expect(screen.queryByText(/doesn.t match yet/i)).toBeNull();
+  });
+
+  it("does not tell them to retry when the server never answered — a big delete may still be running", async () => {
+    del.mockRejectedValue(new TypeError("Failed to fetch"));
+    mount();
+    await screen.findByText(/340/);
+
+    typeName("Tulas University");
+    typePassword("pw");
+    fireEvent.click(deleteButton());
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/may still be deleting/i);
+    expect(alert.textContent).toMatch(/refresh the list/i);
+  });
+
   it("sends the confirmation to the server and reports success", async () => {
     del.mockResolvedValue({ deleted: true });
     const { onDeleted } = mount();

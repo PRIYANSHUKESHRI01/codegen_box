@@ -3,8 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, Headphones, MessageSquare, CheckCircle2, ArrowLeft, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle } from "lucide-react";
-import Link from "next/link";
+import { Mic, Headphones, MessageSquare, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -92,11 +91,6 @@ function InterviewDetailPageContent() {
 
   return (
     <DashboardShell role="user" title="AI Interview">
-      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-4">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to Interviews
-      </Link>
-
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -154,7 +148,11 @@ function InterviewDetailPageContent() {
               </div>
               <div className="flex items-start gap-3 text-xs text-text-secondary">
                 <ShieldAlert className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-                <span>After 3 strikes you&apos;ll be locked out — only whoever invited you can reinstate the interview.</span>
+                <span>
+                  {interview.interview_type === "practice"
+                    ? "After 3 strikes this round is closed — you can build a new practice interview whenever you like."
+                    : "After 3 strikes you'll be locked out — only whoever invited you can reinstate the interview."}
+                </span>
               </div>
               {estimatedTime && (
                 <div className="flex items-start gap-3 text-xs text-text-secondary">

@@ -2,7 +2,10 @@
 
 import { AlertTriangle, Camera, CheckCircle2, ClipboardX, Maximize, Mic, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { checksPass, useIntegrityUi } from "@/lib/integrity/store";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
+import { IntegrityChecklist } from "./IntegrityChecklist";
+import { IntegrityDisclosure } from "./IntegrityDisclosure";
 import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
 
 /**
@@ -17,6 +20,10 @@ import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
  * BEFORE committing to the timed, fullscreen attempt. Once that attempt
  * starts, the camera is never shown again — only this pre-start screen
  * ever renders a preview.
+ *
+ * When the server runs the exam-integrity layer, a system-check list sits between the two: screen sharing,
+ * the single-screen check and the Guardian, each with what to do about it — and Start stays disabled until
+ * every required row is green. What is recorded and for how long is spelled out from the server's own policy.
  */
 export function ProctoringConsentGate({
   phase,
@@ -39,6 +46,9 @@ export function ProctoringConsentGate({
   const starting = phase === "starting";
   const blocked = phase === "blocked";
   const copy = CONSENT_COPY[activity];
+  const ui = useIntegrityUi();
+  const integrity = ui.policy !== null;
+  const ready = !integrity || checksPass(ui.checks);
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">
@@ -71,22 +81,28 @@ export function ProctoringConsentGate({
           </div>
         </div>
 
+        <IntegrityChecklist onEnableDevices={onEnableDevices} />
+
         <ul className="space-y-2.5 text-xs text-text-secondary">
           <li className="flex items-start gap-2.5">
             <Maximize className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
             <span>Your screen will switch to fullscreen for the duration of your attempt. Exiting it is logged as a violation.</span>
           </li>
-          <li className="flex items-start gap-2.5">
-            <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-            <span>
-              Your camera turns on and records for your own attempt only — video stays in your browser and is never
-              uploaded or stored. It won't be shown on screen once your attempt begins.
-            </span>
-          </li>
-          <li className="flex items-start gap-2.5">
-            <Mic className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-            <span>Your microphone records alongside the camera, for the same reason.</span>
-          </li>
+          {!integrity && (
+            <>
+              <li className="flex items-start gap-2.5">
+                <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+                <span>
+                  Your camera turns on and records for your own attempt only — video stays in your browser and is never
+                  uploaded or stored. It won't be shown on screen once your attempt begins.
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Mic className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+                <span>Your microphone records alongside the camera, for the same reason.</span>
+              </li>
+            </>
+          )}
           <li className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
             <span>{copy.strikes}</span>
@@ -99,6 +115,8 @@ export function ProctoringConsentGate({
           )}
         </ul>
 
+        <IntegrityDisclosure />
+
         {consentError && (
           <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-2xs text-status-danger">
             {consentError}
@@ -106,8 +124,8 @@ export function ProctoringConsentGate({
         )}
 
         {devicePreviewReady ? (
-          <Button onClick={onConsent} isLoading={starting} fullWidth>
-            {starting ? "Starting..." : "Start Proctored Session"}
+          <Button onClick={onConsent} isLoading={starting} disabled={!ready} fullWidth>
+            {starting ? "Starting..." : ready ? "Start Proctored Session" : "Finish the system check to start"}
           </Button>
         ) : (
           <Button onClick={onEnableDevices} fullWidth>
@@ -115,7 +133,7 @@ export function ProctoringConsentGate({
           </Button>
         )}
 
-        <p className="text-3xs text-text-muted text-center">{copy.footer}</p>
+        <p className="text-3xs text-text-muted text-center">{integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}</p>
       </div>
     </div>
   );

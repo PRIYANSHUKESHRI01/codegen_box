@@ -8,6 +8,7 @@ use App\Models\DriveCollegeMapping;
 use App\Models\InterviewRoleTemplate;
 use App\Models\InterviewTrack;
 use App\Models\PlacementDrive;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -42,6 +43,7 @@ class AdminInterviewTrackController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'track_type' => ['sometimes', Rule::in([InterviewTrack::TRACK_TYPE_GENERAL, InterviewTrack::TRACK_TYPE_COMPANY])],
@@ -78,6 +80,7 @@ class AdminInterviewTrackController extends Controller
                 'company_id' => $companyId,
                 'placement_drive_id' => $placementDriveId,
                 'created_by' => $request->user()->id,
+                'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
             ]);
 
             $track->createRounds($template->rounds_config);
@@ -126,10 +129,15 @@ class AdminInterviewTrackController extends Controller
         $this->guardManagedElsewhere($interviewTrack);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(InterviewTrack::STATUSES)],
         ]);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $interviewTrack->update($validated);
 

@@ -1,4 +1,6 @@
-import type { CareerGoal, FocusArea, SkillLevel, WeeklyPace } from "./studentPreferences";
+import type { DisciplineCode } from "./branches";
+import type { CapabilityMap } from "./departments";
+import type { CareerGoal, FocusArea, SkillLevel, TrackFocus, WeeklyPace } from "./studentPreferences";
 
 export type Role =
   | "user"
@@ -18,6 +20,8 @@ export interface AuthCollege {
   tier: "Academic Enterprise" | "Pro Campus" | "Standard";
   placement_rate: string;
   is_active: boolean;
+  /** The departments this college runs (Engineering, Management, Commerce, Arts …). Absent on an older cached session = engineering. */
+  departments?: string[] | null;
 }
 
 /** A company hiring tenant — set only for an admin_company account, mirroring AuthCollege for admin_tpo. */
@@ -92,6 +96,27 @@ export interface AuthUser {
   career_goal?: CareerGoal | null;
   focus_areas?: FocusArea[] | null;
   weekly_pace?: WeeklyPace | null;
+  /**
+   * Branch (students only). `branch` is the college's own wording; `branch_code` / `discipline` are what it
+   * was recognised as (null until recognised or the student says what they study). `branch_pending` is the
+   * server's decision to ask now — see User::needsBranchConfirmation().
+   */
+  branch_code?: string | null;
+  discipline?: DisciplineCode | null;
+  /** The department the student belongs to (engineering · management · commerce · arts …); null = not known yet, which behaves as engineering. */
+  department?: string | null;
+  /** Which modules the student's programme has — decided by the server, which also gates the API with it. Absent on an older cached session = everything engineering has. */
+  capabilities?: Partial<CapabilityMap> | null;
+  /** The student asked for coding practice although their programme does not include it. */
+  coding_opt_in?: boolean;
+  branch_source?: "college" | "self" | null;
+  /** Set when the student told us the college's branch is wrong (their TPO sees it). */
+  branch_disputed_at?: string | null;
+  branch_pending?: boolean;
+  /** Core Prep is switched on for this student's branch at their college — live for everyone, or their college is a pilot. */
+  core_enabled?: boolean;
+  track_focus?: TrackFocus | null;
+  core_interests?: string[] | null;
 }
 
 /** True for superadmin (always) or when `key` is present in the signed-in user's granted permissions. */

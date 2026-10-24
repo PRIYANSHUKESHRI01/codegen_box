@@ -58,7 +58,7 @@ class InterviewRoleTemplateTest extends TestCase
         ]);
 
         $response->assertStatus(422)->assertJsonValidationErrors(['rounds_config']);
-        $this->assertSame(0, InterviewRoleTemplate::count());
+        $this->assertSame(0, InterviewRoleTemplate::where('name', 'Bad Template')->count());
     }
 
     public function test_tpo_creates_college_private_template_invisible_to_other_college(): void
@@ -95,7 +95,10 @@ class InterviewRoleTemplateTest extends TestCase
 
         Sanctum::actingAs($ops);
         $opsNames = collect($this->getJson('/api/admin/interview-role-templates')->json('templates'))->pluck('name');
-        $this->assertCount(3, $opsNames, 'Ops oversight must see every template');
+        // (Mellow's shipped core role templates are in the list too, so look for the three this test made.)
+        foreach (['Global Template', 'College Private', 'Company Private'] as $name) {
+            $this->assertTrue($opsNames->contains($name), "Ops oversight must see every template — missing {$name}");
+        }
 
         Sanctum::actingAs($tpo);
         $tpoNames = collect($this->getJson('/api/tpo/interview-role-templates')->json('templates'))->pluck('name');

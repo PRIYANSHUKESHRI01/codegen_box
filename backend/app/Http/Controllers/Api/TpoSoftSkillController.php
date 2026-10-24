@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\Concerns\ManagesSoftSkillQuestions;
 use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
+use App\Support\BranchAudience;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,7 @@ class TpoSoftSkillController extends Controller
         }
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
@@ -53,6 +55,7 @@ class TpoSoftSkillController extends Controller
             // TPO explicitly tightens it via update().
             'max_attempts' => null,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ], $validated);
 
         return response()->json(['assessment' => $assessment], 201);
@@ -63,6 +66,7 @@ class TpoSoftSkillController extends Controller
         $this->authorizeOwnership($request, $softSkillAssessment);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(SoftSkillAssessment::STATUSES)],
@@ -72,6 +76,10 @@ class TpoSoftSkillController extends Controller
         ]);
 
         $this->assertCanPublish($softSkillAssessment, $validated);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $softSkillAssessment->update($validated);
 

@@ -4,6 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useCallback, useEffect, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { IntegrityReview } from "@/components/proctoring/IntegrityReview";
 import { ProctoringSessionList } from "@/components/proctoring/ProctoringSessionList";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -76,6 +77,9 @@ export default function CoordinatorProctoringPage() {
       ) : (
         <ProctoringSessionList sessions={sessions} apiBasePath="/coordinator/proctoring" onToast={triggerToast} onReinstated={loadSessions} />
       )}
+
+      {/* Every proctored attempt of your students, with its tamper-evident log, pictures and network. */}
+      <IntegrityReview apiBase="/coordinator/integrity" />
     </DashboardShell>
   );
 }

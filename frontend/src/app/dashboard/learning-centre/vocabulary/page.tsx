@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, BookMarked, Loader2, Wrench } from "lucide-react";
+import { ArrowRight, BookMarked, Loader2, Wrench } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
@@ -53,14 +53,6 @@ export default function VocabularySprintPage() {
       subtitle="Learn words that stay learned: short daily sprints that bring each word back right before you'd forget it."
     >
       <div className="space-y-8">
-        <Link
-          href="/dashboard/learning-centre"
-          className="inline-flex items-center gap-1 text-2xs font-bold text-text-secondary transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
-          Learning Centre
-        </Link>
-
         <FreeTrialBanner feature="vocabulary" />
 
         {loading ? (

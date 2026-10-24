@@ -90,6 +90,7 @@ class VaultService
             $p->readiness_tier = $breakdown['tier'];
             $p->readiness_components = $breakdown['components'];
             $p->readiness_version = (int) config('readiness.version');
+            $p->readiness_profile = (string) ($breakdown['profile'] ?? 'software');
             $p->readiness_computed_at = now();
 
             if (! $p->is_eligible && $score >= $line['enter']) {
@@ -115,6 +116,12 @@ class VaultService
             // One student, one action: sent right here (a refresh command, or the request that opened the page) so
             // it needs no queue worker — the SingleMail rule.
             SingleMail::afterResponse(new SendVaultReadyEmail($user->id));
+
+            app(\App\Services\NotificationService::class)->notify($user, \App\Enums\NotificationType::VaultActivity, "You're Vault-ready", "Your readiness score of {$score} qualifies you for the Vault, where hiring partners find students. Open it to choose whether to be visible.", [
+                'url' => '/dashboard/vault',
+                'severity' => 'success',
+                'group_key' => 'vault.ready:'.$user->id,
+            ]);
         }
 
         // Ready, but the plan has no Vault: nobody can see them yet, and a plan is what changes that. The best moment

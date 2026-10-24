@@ -48,6 +48,8 @@ class SuperAdminPlanController extends Controller
         'project_lab_access',
         'max_workspace_hours_per_month',
         'max_active_projects',
+        'max_core_practice_per_day',
+        'core_tests_access',
     ];
 
     public function index(): JsonResponse
@@ -150,6 +152,9 @@ class SuperAdminPlanController extends Controller
             'project_lab_access' => ['present', 'boolean'],
             'max_workspace_hours_per_month' => ['present', 'nullable', 'integer', 'min:0', 'max:744'],
             'max_active_projects' => ['present', 'nullable', 'integer', 'min:0', 'max:50'],
+            // Added after the editor shipped: `sometimes`, so an older open editor that doesn't send them keeps working and leaves them as they are.
+            'max_core_practice_per_day' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:1000'],
+            'core_tests_access' => ['sometimes', 'boolean'],
             'version' => ['nullable', 'string', 'max:64'],
         ]);
 
@@ -167,7 +172,7 @@ class SuperAdminPlanController extends Controller
             $before = $this->limits($locked);
 
             // Through the model's casts, so "1" and true (or "5" and 5) are the same value, not a change.
-            $locked->fill(collect(self::LIMIT_FIELDS)->mapWithKeys(fn (string $field) => [$field => $validated[$field]])->all());
+            $locked->fill(collect(self::LIMIT_FIELDS)->filter(fn (string $field) => array_key_exists($field, $validated))->mapWithKeys(fn (string $field) => [$field => $validated[$field]])->all());
 
             if (! $locked->isDirty()) {
                 return $locked;

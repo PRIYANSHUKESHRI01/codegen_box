@@ -13,6 +13,9 @@
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { BranchScopeBar } from "@/components/branches/BranchScopeBar";
+import { branchGroupKey, branchShortLabel, inBranchScope, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
+import { departmentCan, useDepartmentScope } from "@/lib/departments";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -385,8 +388,12 @@ export function TpoCommandCenter({ user }: Props) {
   // replaces the TPO dashboard's previously-fictional
   // PLACEMENT_FUNNEL/RECENT_PLACEMENTS/CAMPUS_DRIVES/etc mock data.
   // -----------------------------------------------------------------
+  // The department the TPO is looking at (the switcher under the page title): every figure below — students, readiness, placements — is that department's.
+  const { scope: deptScope } = useDepartmentScope();
+  const reportsUrl = deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`;
   const [tpoReportsData, setTpoReportsData] = useState<TpoReportsData | null>(null);
   const [tpoDataLoading, setTpoDataLoading] = useState(true);
+  const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
   const [tpoCoordinators, setTpoCoordinators] = useState<TpoCoordinator[]>([]);
   const [tpoMappedDrives, setTpoMappedDrives] = useState<TpoMappedDrive[]>([]);
   // Presentation-only: lets the drives panel shimmer instead of flashing
@@ -418,7 +425,7 @@ export function TpoCommandCenter({ user }: Props) {
         target_percent: targetPercentInput ? Number(targetPercentInput) : null,
         target_deadline: targetDeadlineInput || null,
       });
-      const res = await api.get<TpoReportsData>("/tpo/reports/data");
+      const res = await api.get<TpoReportsData>(reportsUrl);
       setTpoReportsData(res);
       setEditingTarget(false);
       triggerToast("Placement target updated.");
@@ -434,12 +441,22 @@ export function TpoCommandCenter({ user }: Props) {
   // effect gated on — so it loads once on mount.
   useEffect(() => {
     setTpoDataLoading(true);
+    // Another department's students and outcomes must never flash under this one's name: the old data is dropped before the new arrives.
+    setTpoReportsData(null);
+    setBranchScope(SCOPE_ALL);
+    let alive = true;
     api
-      .get<TpoReportsData>("/tpo/reports/data")
-      .then(setTpoReportsData)
-      .catch(() => setTpoReportsData(null))
-      .finally(() => setTpoDataLoading(false));
+      .get<TpoReportsData>(reportsUrl)
+      .then((res) => alive && setTpoReportsData(res))
+      .catch(() => alive && setTpoReportsData(null))
+      .finally(() => alive && setTpoDataLoading(false));
 
+    return () => {
+      alive = false;
+    };
+  }, [reportsUrl]);
+
+  useEffect(() => {
     api
       .get<{ mappings: TpoMappedDrive[] }>("/tpo/drives/mapped")
       .then((res) => setTpoMappedDrives((res.mappings ?? []).filter((m) => m.is_active && m.placement_drive.status === "published")))
@@ -468,7 +485,13 @@ export function TpoCommandCenter({ user }: Props) {
   const placements = data?.placements;
   const funnel = placements?.funnel;
   const target = placements?.target;
-  const students = data?.students ?? [];
+  const catalog = useBranchCatalog();
+  // Shortcuts to modules the department being viewed does not have (coding contests for Commerce) would lead nowhere useful.
+  const visibleQuickLinks = QUICK_LINKS.filter((l) => l.href !== "/admin/mock-contests" || departmentCan(catalog, deptScope, "contests"));
+  // The branch switcher narrows every figure derived from the ROSTER (readiness, tiers, sections,
+  // branches). Placement outcomes and drives are college-wide and stay so.
+  const allStudents = data?.students ?? [];
+  const students = branchScope === SCOPE_ALL ? allStudents : allStudents.filter((s) => inBranchScope(s, branchScope));
 
   const enrolled = funnel?.batch_enrolled ?? 0;
   const accepted = funnel?.accepted ?? 0;
@@ -488,17 +511,20 @@ export function TpoCommandCenter({ user }: Props) {
   const tierCounts = TIERS.map((t) => ({ ...t, count: students.filter((s) => s.readiness_tier === t.id).length }));
   const readyCount = tierCounts[0].count;
 
+  // Grouped by what the branch MEANS ("Mechanical", "MECH" and "ME" are one row), labelled with the short name.
   const branchMap = students.reduce((map, s) => {
-    if (!s.branch) return map;
-    const g = map.get(s.branch) ?? { readiness: [] as number[], count: 0 };
+    const key = branchGroupKey(s);
+    if (!key) return map;
+    const g = map.get(key) ?? { label: branchShortLabel(s, catalog) ?? key, readiness: [] as number[], count: 0 };
     g.readiness.push(s.readiness_score);
     g.count++;
-    map.set(s.branch, g);
+    map.set(key, g);
     return map;
-  }, new Map<string, { readiness: number[]; count: number }>());
+  }, new Map<string, { label: string; readiness: number[]; count: number }>());
   const branches = Array.from(branchMap)
-    .map(([branch, g]) => ({ branch, count: g.count, avg: Math.round(g.readiness.reduce((a, b) => a + b, 0) / g.readiness.length) }))
+    .map(([key, g]) => ({ branch: g.label, key, count: g.count, avg: Math.round(g.readiness.reduce((a, b) => a + b, 0) / g.readiness.length) }))
     .sort((a, b) => b.avg - a.avg);
+  const cohortBranchCount = new Set(allStudents.map((s) => branchGroupKey(s)).filter(Boolean)).size;
 
   const sectionStats = computeSectionStats(students, tpoCoordinators);
   const actionItems = placements?.action_items ?? [];
@@ -620,7 +646,7 @@ export function TpoCommandCenter({ user }: Props) {
     <div className="space-y-4">
       <HpSectionHeader icon={Sparkles} tone="violet" title="Jump back in" subtitle="Everything else in your placement hub" />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {QUICK_LINKS.map((a) => (
+        {visibleQuickLinks.map((a) => (
           <Link key={a.href} href={a.href} className="group block rounded-[20px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
             <HpCard interactive className="flex items-center gap-4 p-4">
               <HpIconTile icon={a.icon} tone={a.tone} size="md" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
@@ -709,11 +735,22 @@ export function TpoCommandCenter({ user }: Props) {
 
   /* ── Ready ───────────────────────────────────────────────────────────── */
 
-  const noRoster = enrolled === 0 && students.length === 0;
+  const noRoster = enrolled === 0 && allStudents.length === 0;
 
   return (
     <HpStagger className="space-y-8">
       <HpItem>{hero}</HpItem>
+
+      {allStudents.length > 0 && (
+        <HpItem>
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <BranchScopeBar students={allStudents} value={branchScope} onChange={setBranchScope} />
+            {branchScope !== SCOPE_ALL && (
+              <p className="text-2xs text-text-muted">Readiness, tiers and sections below show this branch only. Placement outcomes and drives are college-wide.</p>
+            )}
+          </div>
+        </HpItem>
+      )}
 
       {/* KPI strip — every figure is a real TpoReportsController / mapped-drives value. */}
       <HpItem>
@@ -723,7 +760,7 @@ export function TpoCommandCenter({ user }: Props) {
             value={enrolled}
             icon={Users2}
             tone="sky"
-            hint={branches.length > 0 ? `Across ${plural(branches.length, "branch", "branches")}` : "Students on your roster"}
+            hint={cohortBranchCount > 0 ? `Across ${plural(cohortBranchCount, "branch", "branches")}` : "Students on your roster"}
           />
           <HpStatCard
             label="Students placed"
@@ -742,7 +779,7 @@ export function TpoCommandCenter({ user }: Props) {
             value={avgReadiness}
             icon={Gauge}
             tone="violet"
-            hint={students.length > 0 ? `of 100 · ${readyCount} placement-ready` : "of 100 · across your whole cohort"}
+            hint={students.length > 0 ? `of 100 · ${readyCount} placement-ready` : branchScope !== SCOPE_ALL ? "No students in this branch" : "of 100 · across your whole cohort"}
           />
           <HpStatCard
             label="Live drives"
@@ -1273,6 +1310,7 @@ export function TpoCommandCenter({ user }: Props) {
                           <>
                             <HpAvatar name={s.coordinator.name} size="xs" />
                             <span className="min-w-0 truncate text-2xs font-semibold text-text-secondary">{s.coordinator.name}</span>
+                            {s.coordinators.length > 1 && <span className="shrink-0 text-3xs font-semibold text-text-muted" title={s.coordinators.map((c) => c.name).join(", ")}>+{s.coordinators.length - 1}</span>}
                             <a href={`mailto:${s.coordinator.email}`} title={`Email ${s.coordinator.name}`} aria-label={`Email ${s.coordinator.name}`} className={iconLink}>
                               <Mail className="h-3.5 w-3.5" />
                             </a>

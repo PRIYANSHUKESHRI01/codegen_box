@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\InterviewDiscipline;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -28,7 +29,7 @@ class GeminiInterviewScoringService
      * @param  array<int, array{response_id:int, question_text:string, category:string, difficulty:string, notes_for_reviewer:?string, transcript_text:string}>  $items
      * @return array<int, array{response_id:int, score:int, feedback:string}>
      */
-    public function score(array $items, string $role): array
+    public function score(array $items, string $role, ?string $discipline = null): array
     {
         $apiKey = config('services.gemini.api_key');
 
@@ -40,7 +41,7 @@ class GeminiInterviewScoringService
             return [];
         }
 
-        $prompt = $this->buildPrompt($items, $role);
+        $prompt = $this->buildPrompt($items, $role, $discipline);
 
         try {
             $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
@@ -89,12 +90,14 @@ class GeminiInterviewScoringService
         return $sanitized;
     }
 
-    private function buildPrompt(array $items, string $role): string
+    private function buildPrompt(array $items, string $role, ?string $discipline = null): string
     {
         $lines = [
             'You are an expert, fair, consistent interviewer evaluating a candidate\'s SPOKEN interview answers (already transcribed to text) for the role: "'.$role.'".',
             'For each answer below, give a score from 0 to 100 reflecting how strong that specific answer is for its question/category/difficulty, and one short (1-2 sentence) piece of feedback written directly TO the candidate ("You explained X well, but..." not "The candidate...").',
             self::CATEGORY_GUIDANCE,
+            // Only for a core-branch interview (ECE, EEE, Mechanical, Civil): how to judge a spoken technical answer there.
+            ...array_filter([InterviewDiscipline::scoringGuidance($discipline)]),
             'Be honest, not generous — a short, vague, or off-topic answer should score low. If a transcript is empty, garbled, or clearly not a real answer to the question, score it 0-20 and say so plainly.',
             '',
         ];

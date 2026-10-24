@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
+use App\Services\IssuedCredentialVault;
 use App\Models\ActivityLog;
 use App\Models\Article;
 use App\Models\College;
@@ -15,7 +16,9 @@ use App\Models\Plan;
 use App\Models\Problem;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\CollegeDepartmentService;
 use App\Services\SectionCoordinatorService;
+use App\Support\BranchAudience;
 use App\Services\SubscriptionService;
 use App\Support\SingleMail;
 use Illuminate\Http\Request;
@@ -52,7 +55,7 @@ class AdminController extends Controller
                 'platform_users' => User::where('role', User::ROLE_USER)->count(),
                 'companies' => Company::count(),
                 'contests' => Contest::count(),
-                'interviews' => Interview::count(),
+                'interviews' => Interview::excludingPractice()->count(),
                 'placement_drives' => PlacementDrive::count(),
                 'problems' => Problem::count(),
                 'articles' => Article::count(),
@@ -84,7 +87,7 @@ class AdminController extends Controller
         $colleges = College::withCount(['users as active_students_count' => function ($query) {
             $query->where('role', User::ROLE_USER);
         }])
-            ->with(['users' => function ($query) {
+            ->with(['collegeDepartments', 'users' => function ($query) {
                 $query->where('role', User::ROLE_ADMIN_TPO);
             }])
             ->latest()
@@ -134,6 +137,9 @@ class AdminController extends Controller
             // accidental unbounded "demo" (e.g. a typo'd day count).
             'is_demo' => ['nullable', 'boolean'],
             'demo_days' => [Rule::requiredIf($request->boolean('is_demo')), 'nullable', 'integer', 'min:1', 'max:90'],
+            // The departments the college runs from day one (default: Engineering & Technology). Changeable later by the college and by staff.
+            'departments' => ['nullable', 'array', 'min:1', 'max:20'],
+            'departments.*' => ['string', Rule::exists('departments', 'code')],
         ], [
             // The default "The tpo email has already been taken." never said what to do.
             // Emails are unique across EVERY role, so a student/staff account (or a
@@ -144,7 +150,7 @@ class AdminController extends Controller
 
         $trialDays = $request->boolean('is_demo') ? (int) $validated['demo_days'] : null;
 
-        [$college, $tpo, $temporaryPassword] = DB::transaction(function () use ($validated) {
+        [$college, $tpo, $temporaryPassword] = DB::transaction(function () use ($validated, $request) {
             $college = College::create([
                 'name' => $validated['name'],
                 'short_code' => $validated['short_code'] ?? $this->uniqueShortCode($validated['name']),
@@ -164,6 +170,10 @@ class AdminController extends Controller
                 'role' => User::ROLE_ADMIN_TPO,
                 'college_id' => $college->id,
             ]);
+
+            app(IssuedCredentialVault::class)->keep($tpo, $temporaryPassword, 'created');
+
+            app(CollegeDepartmentService::class)->initialise($college, $validated['departments'] ?? null, $request->user());
 
             return [$college, $tpo, $temporaryPassword];
         });
@@ -365,6 +375,7 @@ class AdminController extends Controller
             'email' => ['required', 'string', 'email', 'max:255'],
             'section' => ['required', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            ...BranchAudience::rules('branch_scope'),
         ]);
 
         $coordinator = $coordinators->create($college->id, $validated, $request->user());
@@ -382,9 +393,10 @@ class AdminController extends Controller
         $validated = $request->validate([
             'section' => ['required', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            ...BranchAudience::rules('branch_scope'),
         ]);
 
-        $coordinator = $coordinators->updateSection($user, $validated);
+        $coordinator = $coordinators->updateSection($user, $validated, $request->user());
 
         return response()->json(['coordinator' => $coordinators->payload($coordinator, $coordinator->college_id)]);
     }
@@ -491,6 +503,8 @@ class AdminController extends Controller
             'role' => User::ROLE_USER,
             'college_id' => $validated['college_id'] ?? null,
         ]);
+
+        app(IssuedCredentialVault::class)->keep($user, $temporaryPassword, 'created', $request->user());
 
         ActivityLog::record($request->user(), 'Created a student account', 'User', $user->name, ['email' => $user->email]);
 

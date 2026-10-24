@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Mail, MessageCircle, AlertTriangle, Loader2, Send, Users, GraduationCap, UserRound, Siren, MessageSquareText, Check, type LucideIcon } from "lucide-react";
+import { Mail, MessageCircle, AlertTriangle, Loader2, Send, Users, GraduationCap, UserRound, Siren, MessageSquareText, Check, BellRing, type LucideIcon } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
@@ -10,7 +10,7 @@ import { HpButton } from "@/components/portal/kit";
 import { HpCallout } from "@/components/portal/pipeline-kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
 
-type NotifyChannel = "email" | "whatsapp";
+type NotifyChannel = "email" | "whatsapp" | "in_app";
 type NotifyTemplate = "generic" | "termination";
 type NotifyRecipient = "student" | "parent";
 
@@ -50,18 +50,25 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
   const [notifyTemplate, setNotifyTemplate] = useState<NotifyTemplate>("generic");
   const [notifyRecipient, setNotifyRecipient] = useState<NotifyRecipient>("student");
   const [sendingNotify, setSendingNotify] = useState(false);
+  // The in-app channel is the one with free text: it lands in each student's notification bell, instantly, at no cost.
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const inApp = notifyChannel === "in_app";
+  const canSend = !sendingNotify && (!inApp || (title.trim().length > 0 && message.trim().length > 0));
 
   const handleConfirm = async () => {
     setSendingNotify(true);
     try {
       const res = await api.post<{ message: string; queued_count: number; skipped_no_phone: number }>(
         endpoint,
-        {
-          student_ids: target.ids,
-          channel: notifyChannel,
-          template: notifyTemplate,
-          recipient: notifyRecipient,
-        }
+        inApp
+          ? { student_ids: target.ids, channel: "in_app", title: title.trim(), message: message.trim() }
+          : {
+              student_ids: target.ids,
+              channel: notifyChannel,
+              template: notifyTemplate,
+              recipient: notifyRecipient,
+            }
       );
       onSent(res.message);
     } catch (err) {
@@ -90,7 +97,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
               <HpButton
                 type="button"
                 onClick={handleConfirm}
-                disabled={sendingNotify}
+                disabled={!canSend}
                 isLoading={sendingNotify}
                 leftIcon={<Send className="h-4 w-4" />}
               >
@@ -118,7 +125,17 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
             {/* Channel */}
             <fieldset>
               <legend className="mb-2 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Channel</legend>
-              <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-3">
+                <OptionCard
+                  icon={BellRing}
+                  title="In-app"
+                  description="Your own words, in their bell now"
+                  active={notifyChannel === "in_app"}
+                  onClick={() => {
+                    setNotifyChannel("in_app");
+                    setNotifyRecipient("student");
+                  }}
+                />
                 <OptionCard
                   icon={Mail}
                   title="Email"
@@ -138,6 +155,42 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
                 />
               </div>
             </fieldset>
+
+            {inApp && (
+              <fieldset className="space-y-3">
+                <legend className="mb-2 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Your message</legend>
+                <div>
+                  <label htmlFor="announce-title" className="mb-1 block text-2xs font-semibold text-text-secondary">
+                    Title
+                  </label>
+                  <input
+                    id="announce-title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={120}
+                    placeholder="e.g. Pre-placement talk tomorrow"
+                    className="w-full rounded-xl border border-border-subtle bg-elevated px-3 py-2 text-13 text-primary outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="announce-message" className="mb-1 block text-2xs font-semibold text-text-secondary">
+                    Message <span className="font-normal text-text-muted">({message.length}/500)</span>
+                  </label>
+                  <textarea
+                    id="announce-message"
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    maxLength={500}
+                    rows={4}
+                    placeholder="Auditorium, 10am. Bring your ID card."
+                    className="w-full resize-none rounded-xl border border-border-subtle bg-elevated px-3 py-2 text-13 text-primary outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <HpCallout icon={BellRing} tone="amber">
+                  Appears in each student&apos;s notification bell within seconds, and pops up if they have the app open. Plain text only.
+                </HpCallout>
+              </fieldset>
+            )}
 
             {/* Recipient — parent only makes sense over WhatsApp, colleges don't collect parent emails */}
             {notifyChannel === "whatsapp" && (
@@ -159,6 +212,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
             )}
 
             {/* Template */}
+            {!inApp && (
             <fieldset>
               <legend className="mb-2 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Template</legend>
               <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2">
@@ -179,12 +233,15 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
                 />
               </div>
             </fieldset>
+            )}
 
+            {!inApp && (
             <HpCallout icon={AlertTriangle} tone="amber">
               Both templates are placeholders for now — swap them for real copy once that&apos;s ready.
               {notifyChannel === "whatsapp" &&
                 " WhatsApp messages log to the server instead of sending until a real WhatsApp Business account is configured."}
             </HpCallout>
+            )}
           </div>
         </Modal>
       </HpOverlayPortal>
@@ -208,7 +265,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
           </button>
           <button
             onClick={handleConfirm}
-            disabled={sendingNotify}
+            disabled={!canSend}
             className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             {sendingNotify && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -225,7 +282,22 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
         {/* Channel */}
         <div>
           <label className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">Channel</label>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => {
+                setNotifyChannel("in_app");
+                setNotifyRecipient("student");
+              }}
+              className={cn(
+                "flex items-center justify-center gap-1.5 py-2 rounded-control text-xs font-bold border transition-colors",
+                notifyChannel === "in_app"
+                  ? "bg-accent-primary text-white border-accent-primary"
+                  : "bg-elevated text-text-secondary border-border-subtle"
+              )}
+            >
+              <BellRing className="w-3.5 h-3.5" />
+              In-app
+            </button>
             <button
               onClick={() => {
                 setNotifyChannel("email");
@@ -297,7 +369,41 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
           </div>
         )}
 
+        {inApp && (
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="announce-title" className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                Title
+              </label>
+              <input
+                id="announce-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={120}
+                placeholder="e.g. Pre-placement talk tomorrow"
+                className="w-full rounded-control border border-border-subtle bg-elevated px-3 py-2 text-xs text-primary outline-none focus:border-accent-primary"
+              />
+            </div>
+            <div>
+              <label htmlFor="announce-message" className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">
+                Message ({message.length}/500)
+              </label>
+              <textarea
+                id="announce-message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                maxLength={500}
+                rows={4}
+                placeholder="Auditorium, 10am. Bring your ID card."
+                className="w-full resize-none rounded-control border border-border-subtle bg-elevated px-3 py-2 text-xs text-primary outline-none focus:border-accent-primary"
+              />
+            </div>
+            <p className="text-3xs text-text-muted">Appears in each student&apos;s notification bell within seconds. Plain text only.</p>
+          </div>
+        )}
+
         {/* Template */}
+        {!inApp && (
         <div>
           <label className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">Template</label>
           <div className="grid grid-cols-2 gap-2">
@@ -325,7 +431,9 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
             </button>
           </div>
         </div>
+        )}
 
+        {!inApp && (
         <div className="p-3 rounded-control bg-elevated border border-dashed border-border-strong text-2xs text-text-muted flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0 mt-0.5" />
           <span>
@@ -334,6 +442,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
               " WhatsApp messages log to the server instead of sending until a real WhatsApp Business account is configured."}
           </span>
         </div>
+        )}
       </div>
     </Modal>
   );

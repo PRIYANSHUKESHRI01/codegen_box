@@ -23,9 +23,11 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
 import { DifficultyBadge } from "@/components/problems/DifficultyBadge";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { codesAtAll } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { DriveStatus, MyDriveApplication, PlacementDriveDetail, PrepQuestionCategory } from "@/types/placement";
+import { BranchChips } from "@/components/branches/BranchChips";
 
 interface ApiDriveDetailResponse {
   drive: {
@@ -119,6 +121,7 @@ type LoadState = "loading" | "ready" | "not_found" | "error";
 
 const YEAR_FILTER_ALL = "All";
 const CATEGORY_FILTER_ALL = "All";
+const ROUND_FILTER_ALL = "All";
 
 export default function PlacementDrivePreparePage() {
   return (
@@ -132,12 +135,15 @@ function PlacementDrivePreparePageContent() {
   const searchParams = useSearchParams();
   const driveId = searchParams.get("driveId") ?? "";
   const router = useRouter();
-  const { status: authStatus } = useAuthGuard(["user"]);
+  const { status: authStatus, user: authUser } = useAuthGuard(["user"]);
+  // The recommended problems are coding practice: a programme without it is not pointed at a Practice Arena it does not have.
+  const codes = codesAtAll(authUser);
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [detail, setDetail] = useState<PlacementDriveDetail | null>(null);
   const [yearFilter, setYearFilter] = useState<string>(YEAR_FILTER_ALL);
   const [categoryFilter, setCategoryFilter] = useState<string>(CATEGORY_FILTER_ALL);
+  const [roundFilter, setRoundFilter] = useState<string>(ROUND_FILTER_ALL);
   // Computed once when the drive loads so CountdownTimer is never handed a
   // freshly-recomputed value on an unrelated re-render (which would reset its tick).
   const [minutesFromNow, setMinutesFromNow] = useState(0);
@@ -176,14 +182,22 @@ function PlacementDrivePreparePageContent() {
     return Array.from(new Set(detail.prepQuestions.map((q) => q.category)));
   }, [detail]);
 
+  const rounds = useMemo(() => {
+    if (!detail) return [];
+    return Array.from(
+      new Set(detail.prepQuestions.map((q) => q.roundName).filter(Boolean) as string[])
+    );
+  }, [detail]);
+
   const filteredQuestions = useMemo(() => {
     if (!detail) return [];
     return detail.prepQuestions.filter(
       (q) =>
         (yearFilter === YEAR_FILTER_ALL || q.askedYear === Number(yearFilter)) &&
-        (categoryFilter === CATEGORY_FILTER_ALL || q.category === categoryFilter)
+        (categoryFilter === CATEGORY_FILTER_ALL || q.category === categoryFilter) &&
+        (roundFilter === ROUND_FILTER_ALL || q.roundName === roundFilter)
     );
-  }, [detail, yearFilter, categoryFilter]);
+  }, [detail, yearFilter, categoryFilter, roundFilter]);
 
   const recommendedProblems = detail?.recommendedProblems ?? [];
   const availableRecommendedProblems = recommendedProblems.filter((p) => p.available);
@@ -228,14 +242,6 @@ function PlacementDrivePreparePageContent() {
       title={`Prepare — ${company.name}`}
       subtitle={`${drive.roleTitle} · ${drive.ctcRange ?? "CTC not disclosed"}`}
     >
-      <Link
-        href="/dashboard#placement-drives"
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" />
-        <span>Back to Placement Drives</span>
-      </Link>
-
       {/* Header */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
@@ -388,20 +394,10 @@ function PlacementDrivePreparePageContent() {
             </div>
             <div>
               <span className="text-text-muted block mb-1.5">Eligible Branches</span>
-              {drive.eligibility.eligibleBranches?.length ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {drive.eligibility.eligibleBranches.map((b) => (
-                    <span
-                      key={b}
-                      className="px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-3xs font-bold text-text-secondary"
-                    >
-                      {b}
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <span className="font-mono font-bold text-primary">All branches</span>
-              )}
+              <BranchChips
+                tokens={drive.eligibility.eligibleBranches}
+                chipClassName="px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-3xs font-bold text-text-secondary"
+              />
             </div>
           </div>
           <p className="mt-4 pt-4 border-t border-border-subtle text-3xs text-text-muted leading-relaxed">
@@ -440,146 +436,208 @@ function PlacementDrivePreparePageContent() {
           <p className="text-xs text-text-muted">No previous-year questions have been added for {company.name} yet.</p>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-4 mb-4">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  onClick={() => setYearFilter(YEAR_FILTER_ALL)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                    yearFilter === YEAR_FILTER_ALL
-                      ? "bg-accent-primary text-white border-accent-primary"
-                      : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
-                  )}
-                >
-                  All Years
-                </button>
-                {years.map((y) => (
+            <div className="space-y-3 mb-5">
+              {/* Round Filter */}
+              {rounds.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-3xs font-bold text-text-muted uppercase tracking-wider mr-1">Round:</span>
                   <button
-                    key={y}
-                    onClick={() => setYearFilter(String(y))}
+                    onClick={() => setRoundFilter(ROUND_FILTER_ALL)}
                     className={cn(
                       "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                      yearFilter === String(y)
+                      roundFilter === ROUND_FILTER_ALL
                         ? "bg-accent-primary text-white border-accent-primary"
                         : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
                     )}
                   >
-                    {y}
+                    All Rounds
                   </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <button
-                  onClick={() => setCategoryFilter(CATEGORY_FILTER_ALL)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                    categoryFilter === CATEGORY_FILTER_ALL
-                      ? "bg-accent-secondary text-white border-accent-secondary"
-                      : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
-                  )}
-                >
-                  All Categories
-                </button>
-                {categories.map((c) => (
+                  {rounds.map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setRoundFilter(r)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
+                        roundFilter === r
+                          ? "bg-accent-primary text-white border-accent-primary"
+                          : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
+                      )}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Year & Category Filters */}
+              <div className="flex flex-wrap items-center gap-4 pt-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-3xs font-bold text-text-muted uppercase tracking-wider mr-1">Year:</span>
                   <button
-                    key={c}
-                    onClick={() => setCategoryFilter(c)}
+                    onClick={() => setYearFilter(YEAR_FILTER_ALL)}
                     className={cn(
                       "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                      categoryFilter === c
+                      yearFilter === YEAR_FILTER_ALL
                         ? "bg-accent-secondary text-white border-accent-secondary"
                         : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
                     )}
                   >
-                    {c}
+                    All Years
                   </button>
-                ))}
+                  {years.map((y) => (
+                    <button
+                      key={y}
+                      onClick={() => setYearFilter(String(y))}
+                      className={cn(
+                        "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
+                        yearFilter === String(y)
+                          ? "bg-accent-secondary text-white border-accent-secondary"
+                          : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
+                      )}
+                    >
+                      {y}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-3xs font-bold text-text-muted uppercase tracking-wider mr-1">Type:</span>
+                  <button
+                    onClick={() => setCategoryFilter(CATEGORY_FILTER_ALL)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
+                      categoryFilter === CATEGORY_FILTER_ALL
+                        ? "bg-elevated font-semibold text-primary border-border-strong"
+                        : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
+                    )}
+                  >
+                    All Types
+                  </button>
+                  {categories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setCategoryFilter(c)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
+                        categoryFilter === c
+                          ? "bg-elevated font-semibold text-primary border-border-strong"
+                          : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
+                      )}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-3">
-              {filteredQuestions.map((q) => (
-                <div key={q.id} className="p-4 rounded-control bg-elevated/60 border border-border-subtle">
-                  <div className="flex items-center gap-2 flex-wrap mb-2">
-                    <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-3xs font-bold">
-                      {q.category}
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-3xs font-bold">
-                      {q.askedYear}
-                    </span>
-                    {q.roundName && <span className="text-3xs text-text-muted">{q.roundName}</span>}
-                  </div>
-                  <p className="text-xs font-semibold text-primary leading-relaxed">{q.question}</p>
-                  {q.answerNotes && <p className="text-2xs text-text-secondary mt-1.5 leading-relaxed">{q.answerNotes}</p>}
+            <div className="space-y-3.5">
+              {filteredQuestions.length === 0 ? (
+                <div className="p-6 text-center rounded-control bg-elevated/40 border border-border-subtle text-xs text-text-muted">
+                  No questions found matching your filter criteria. Try choosing &ldquo;All Rounds&rdquo; or &ldquo;All Years&rdquo;.
                 </div>
-              ))}
+              ) : (
+                filteredQuestions.map((q) => (
+                  <div key={q.id} className="p-4 sm:p-5 rounded-control bg-elevated/60 border border-border-subtle space-y-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {q.roundName && (
+                        <span className="px-2 py-0.5 rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25 text-3xs font-bold">
+                          {q.roundName}
+                        </span>
+                      )}
+                      <span className="px-2 py-0.5 rounded-full bg-accent-secondary/10 text-accent-secondary border border-accent-secondary/25 text-3xs font-bold">
+                        {q.category}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle text-3xs font-bold">
+                        {q.askedYear}
+                      </span>
+                    </div>
+
+                    <div className="text-xs font-semibold text-primary leading-relaxed whitespace-pre-wrap font-sans">
+                      {q.question}
+                    </div>
+
+                    {q.answerNotes && (
+                      <div className="mt-2.5 p-3.5 rounded-control bg-surface/90 border border-border-subtle text-2xs text-text-secondary leading-relaxed whitespace-pre-wrap">
+                        <div className="text-3xs font-bold uppercase tracking-wider text-accent-primary mb-1.5 flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-accent-primary" />
+                          <span>Answer & Solution Notes</span>
+                        </div>
+                        {q.answerNotes}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </>
         )}
       </section>
 
-      {/* Recommended Practice */}
-      <section>
-        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <h3 className="text-base font-bold text-primary flex items-center gap-2">
-            <Code2 className="w-4 h-4 text-accent-primary" />
-            <span>Recommended Practice</span>
-          </h3>
-          {availableRecommendedProblems.length > 0 && (
-            <button
-              onClick={() => router.push(practiceHref)}
-              className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1"
-            >
-              <span>Practice all {availableRecommendedProblems.length} recommended problems</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {recommendedProblems.length === 0 ? (
-          <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-            No practice problems have been mapped to {company.name} yet.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recommendedProblems.map((problem) => (
+      {/* Recommended Practice — coding problems, so only for a programme that codes */}
+      {codes && (
+        <section>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h3 className="text-base font-bold text-primary flex items-center gap-2">
+              <Code2 className="w-4 h-4 text-accent-primary" />
+              <span>Recommended Practice</span>
+            </h3>
+            {availableRecommendedProblems.length > 0 && (
               <button
-                key={problem.problemSlug}
-                disabled={!problem.available}
-                onClick={() =>
-                  problem.available &&
-                  router.push(`/dashboard/practice?slugs=${problem.problemSlug}&company=${encodeURIComponent(detail.company.name)}`)
-                }
-                className={cn(
-                  "text-left p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle transition-all space-y-3",
-                  problem.available ? "hover:border-accent-primary/40 hover:shadow-card cursor-pointer" : "opacity-60 cursor-not-allowed"
-                )}
+                onClick={() => router.push(practiceHref)}
+                className="text-2xs font-semibold text-accent-primary hover:underline flex items-center gap-1"
               >
-                <div className="flex items-center justify-between gap-2">
-                  {problem.difficulty ? (
-                    <DifficultyBadge difficulty={problem.difficulty} size="sm" />
-                  ) : (
-                    <span className="text-2xs text-text-muted">Difficulty TBD</span>
+                <span>Practice all {availableRecommendedProblems.length} recommended problems</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          {recommendedProblems.length === 0 ? (
+            <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
+              No practice problems have been mapped to {company.name} yet.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recommendedProblems.map((problem) => (
+                <button
+                  key={problem.problemSlug}
+                  disabled={!problem.available}
+                  onClick={() =>
+                    problem.available &&
+                    router.push(`/dashboard/practice?slugs=${problem.problemSlug}&company=${encodeURIComponent(detail.company.name)}`)
+                  }
+                  className={cn(
+                    "text-left p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle transition-all space-y-3",
+                    problem.available ? "hover:border-accent-primary/40 hover:shadow-card cursor-pointer" : "opacity-60 cursor-not-allowed"
                   )}
-                  {!problem.available && (
-                    <span className="text-3xs font-bold px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
-                      Coming Soon
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    {problem.difficulty ? (
+                      <DifficultyBadge difficulty={problem.difficulty} size="sm" />
+                    ) : (
+                      <span className="text-2xs text-text-muted">Difficulty TBD</span>
+                    )}
+                    {!problem.available && (
+                      <span className="text-3xs font-bold px-2 py-0.5 rounded-full bg-elevated text-text-muted border border-border-subtle whitespace-nowrap">
+                        Coming Soon
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-sm font-bold text-primary line-clamp-2">
+                    {problem.title ?? problem.problemSlug}
+                  </h4>
+                  {problem.topicTag && (
+                    <span className="inline-block text-2xs font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted">
+                      {problem.topicTag}
                     </span>
                   )}
-                </div>
-                <h4 className="text-sm font-bold text-primary line-clamp-2">
-                  {problem.title ?? problem.problemSlug}
-                </h4>
-                {problem.topicTag && (
-                  <span className="inline-block text-2xs font-mono px-2 py-0.5 rounded-[5px] bg-elevated/80 border border-border-subtle text-text-muted">
-                    {problem.topicTag}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </DashboardShell>
   );
 }

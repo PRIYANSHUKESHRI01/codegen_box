@@ -2,8 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Layers, Plus, Loader2, Trash2, ClipboardList, Users } from "lucide-react";
-import Link from "next/link";
+import { Layers, Plus, Loader2, Trash2, ClipboardList, Users } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { DriveVisibilityPanel } from "@/components/admin/contests/DriveVisibilityPanel";
@@ -117,11 +116,6 @@ export default function AdminInterviewTracksPage() {
         </div>
       )}
 
-      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-1">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to AI Interviews
-      </Link>
-
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -163,6 +157,7 @@ export default function AdminInterviewTracksPage() {
                     className="text-left p-3.5 rounded-panel bg-surface border border-border-subtle hover:border-accent-primary/40 shadow-subtle transition-colors"
                   >
                     <div className="text-xs font-bold text-primary">{t.name}</div>
+                    {t.discipline && <span className="mr-1.5 rounded border border-sky-500/25 bg-sky-500/10 px-1 py-px text-3xs font-bold uppercase text-sky-600 dark:text-sky-300">{t.discipline}</span>}
                     {t.tech_stack_tags && t.tech_stack_tags.length > 0 && (
                       <div className="text-3xs text-text-muted mt-0.5">{t.tech_stack_tags.join(" · ")}</div>
                     )}

@@ -28,6 +28,8 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewStatus, InterviewSummary } from "@/types/interview";
+import { audienceTouchesDepartment, useBranchCatalog } from "@/lib/branches";
+import { useDepartmentScope } from "@/lib/departments";
 import { Modal } from "@/components/ui/Modal";
 import {
   HpButton,
@@ -47,6 +49,7 @@ import {
   type HpTone,
 } from "@/components/portal/kit";
 import { ScIconButton, ScMeta, ScMetric, ScNotice, ScReveal } from "@/components/portal/screeningKit";
+import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 
 const BASE_PATH = "/tpo/interviews";
 
@@ -66,6 +69,8 @@ type FilterId = "all" | "published" | "draft";
  */
 export default function MockInterviewsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
+  const catalog = useBranchCatalog();
+  const { scope: deptScope } = useDepartmentScope();
   const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -126,6 +131,8 @@ export default function MockInterviewsPage() {
 
   const q = query.trim().toLowerCase();
   const visible = interviews.filter((i) => {
+    // Only what is for the department being looked at (an interview with no audience is for everyone).
+    if (!audienceTouchesDepartment(i.branch_audience, deptScope, catalog)) return false;
     if (filter !== "all" && i.status !== filter) return false;
     if (!q) return true;
     return i.title.toLowerCase().includes(q) || (i.description ?? "").toLowerCase().includes(q);
@@ -310,6 +317,7 @@ function MockInterviewCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
               <h3 className="min-w-0 line-clamp-2 text-15 font-bold leading-snug tracking-tight text-primary">{interview.title}</h3>
+              <AudienceChip audience={interview.branch_audience} className="shrink-0" />
               <HpPill tone={meta.tone} dot={meta.dot} pulse={meta.pulse} icon={meta.icon} className="shrink-0">
                 {meta.label}
               </HpPill>
@@ -362,6 +370,7 @@ function CreateMockInterviewModal({ onClose, onCreated }: { onClose: () => void;
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [acceptedIds, setAcceptedIds] = useState<number[]>([]);
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -370,7 +379,7 @@ function CreateMockInterviewModal({ onClose, onCreated }: { onClose: () => void;
     setSaving(true);
     setError(null);
     try {
-      const res = await api.post<{ interview: { slug: string } }>(BASE_PATH, { title, description: description || undefined });
+      const res = await api.post<{ interview: { slug: string } }>(BASE_PATH, { title, description: description || undefined, branch_audience: audienceForRequest(audience) });
       const slug = res.interview.slug;
       for (const bankId of acceptedIds) {
         await api.post(`${BASE_PATH}/${slug}/questions`, { interview_question_bank_id: bankId });
@@ -426,6 +435,8 @@ function CreateMockInterviewModal({ onClose, onCreated }: { onClose: () => void;
           </label>
           <textarea id="mi-desc" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} className={cn(hpInput, "resize-y")} />
         </div>
+
+        <BranchAudienceField value={audience} onChange={setAudience} />
 
         <GenerateQuestionsPanel variant="premium" onAcceptedChange={setAcceptedIds} />
 

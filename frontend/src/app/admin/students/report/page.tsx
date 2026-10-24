@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
-  ArrowLeft,
   Mail,
   Phone,
   GraduationCap,
@@ -327,6 +326,8 @@ function StudentReportPageContent() {
     <DashboardShell
       role={shellRole}
       currentTpoView={user?.role === "admin_tpo" ? "tpo" : undefined}
+      // Where "Back" leads depends on who is looking (cohort, section roster, platform users) — the header arrow says so.
+      back={{ href: backHref, label: backLabel.replace(/^Back to /, "") }}
       title={report?.student.name ?? "Student Report"}
       subtitle={
         premium
@@ -357,14 +358,6 @@ function StudentReportPageContent() {
         />
       ) : (
       <div className="space-y-6">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-1.5 text-2xs font-bold text-text-muted transition-colors hover:text-primary"
-        >
-          <ArrowLeft className="h-3.5 w-3.5" />
-          <span>{backLabel}</span>
-        </Link>
-
         {loadState === "loading" && (
           <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-10 text-xs text-text-muted">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -848,11 +841,6 @@ function PremiumReport({
 }: PremiumReportProps) {
   return (
     <div className="space-y-6">
-      <Link href={backHref} className={hpBtn("ghost", "sm", "group -ml-2")}>
-        <ArrowLeft className="h-4 w-4 transition-transform duration-200 group-hover:-translate-x-0.5" aria-hidden />
-        {backLabel}
-      </Link>
-
       {/* Keyed on the view so the ready report staggers in fresh once the
           skeleton resolves, instead of every section popping in at once. */}
       <HpStagger key={view} className="space-y-6">

@@ -45,6 +45,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { NotificationPreferences } from "@/components/notifications/NotificationPreferences";
 import { ThemeToggle } from "@/components/navigation/ThemeToggle";
 import { STUDENT_PROFILE } from "@/data/mockDashboardData";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
@@ -58,16 +59,21 @@ import { getRatingTier } from "@/lib/rating";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useAuth } from "@/lib/AuthContext";
 import { getToken, AuthUser } from "@/lib/auth";
+import { codesAtAll } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
+import { BranchTrackSection } from "@/components/settings/BranchTrackSection";
+import { CollegeDepartmentsSection } from "@/components/settings/CollegeDepartmentsSection";
+import { branchName, useBranchCatalog } from "@/lib/branches";
 
-type TabId = "profile" | "security" | "preferences" | "notifications" | "billing";
+type TabId = "profile" | "security" | "preferences" | "notifications" | "billing" | "departments";
 
 const TABS: { id: TabId; label: string; icon: typeof User }[] = [
   { id: "profile", label: "Profile", icon: User },
   { id: "security", label: "Security", icon: ShieldCheck },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "preferences", label: "Preferences", icon: Sliders },
+  { id: "departments", label: "Departments", icon: Building2 },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
 
@@ -351,6 +357,7 @@ function formatDateTime(iso: string) {
 export default function SettingsPage() {
   const { user, status } = useAuthGuard();
   const { login } = useAuth();
+  const branchCatalog = useBranchCatalog();
   const [tab, setTab] = useState<TabId>("profile");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -393,15 +400,6 @@ export default function SettingsPage() {
   // Preferences
   const [fontSize, setFontSize] = useState("14");
   const [timezone, setTimezone] = useState("Asia/Kolkata (IST)");
-
-  // Notifications
-  const [notifs, setNotifs] = useState({
-    contestReminders: true,
-    driveAlerts: true,
-    submissionResults: true,
-    weeklyDigest: false,
-    productUpdates: false,
-  });
 
   // Security — password change is real (PUT /me/password); sessions are the
   // caller's actual Sanctum tokens, not a hardcoded device list.
@@ -636,6 +634,8 @@ export default function SettingsPage() {
   };
 
   const isStudent = user.role === "user";
+  // Rating, problems solved and the Div badge describe coding practice; a programme without it has none of them to show.
+  const showsCoding = isStudent && codesAtAll(user);
   const initials = user.name
     .split(" ")
     .map((n) => n[0])
@@ -709,7 +709,7 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-lg font-bold text-primary">{user.name}</h2>
             <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
-              {ROLE_LABEL[user.role] ?? user.role}
+              {isStudent && !showsCoding ? "Student" : (ROLE_LABEL[user.role] ?? user.role)}
             </span>
           </div>
           <p className="text-xs text-text-muted font-mono mt-1">
@@ -721,20 +721,24 @@ export default function SettingsPage() {
 
         {isStudent && (
           <div className="flex items-center gap-5 sm:border-l sm:border-border-subtle sm:pl-6 shrink-0">
-            <div className="text-center">
-              <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.rating}</div>
-              <div className="text-3xs uppercase tracking-wider text-text-muted">Rating</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.totalSolved}</div>
-              <div className="text-3xs uppercase tracking-wider text-text-muted">Solved</div>
-            </div>
-            <div className="text-center">
-              <RatingBadge rating={STUDENT_PROFILE.rating} size="md" />
-              <div className="text-3xs uppercase tracking-wider text-text-muted mt-1.5">
-                Div {getRatingTier(STUDENT_PROFILE.rating).division}
-              </div>
-            </div>
+            {showsCoding && (
+              <>
+                <div className="text-center">
+                  <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.rating}</div>
+                  <div className="text-3xs uppercase tracking-wider text-text-muted">Rating</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-black text-primary font-mono">{STUDENT_PROFILE.totalSolved}</div>
+                  <div className="text-3xs uppercase tracking-wider text-text-muted">Solved</div>
+                </div>
+                <div className="text-center">
+                  <RatingBadge rating={STUDENT_PROFILE.rating} size="md" />
+                  <div className="text-3xs uppercase tracking-wider text-text-muted mt-1.5">
+                    Div {getRatingTier(STUDENT_PROFILE.rating).division}
+                  </div>
+                </div>
+              </>
+            )}
             <div className="text-center">
               <div
                 className={cn(
@@ -752,7 +756,7 @@ export default function SettingsPage() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 rounded-btn bg-surface border border-border-subtle shadow-subtle overflow-x-auto">
-        {TABS.filter((t) => t.id !== "billing" || isStudent || user.role === "admin_tpo").map((t) => {
+        {TABS.filter((t) => (t.id !== "billing" || isStudent || user.role === "admin_tpo") && (t.id !== "departments" || user.role === "admin_tpo")).map((t) => {
           const Icon = t.icon;
           return (
             <button
@@ -947,7 +951,7 @@ export default function SettingsPage() {
                     <GraduationCap className="w-3 h-3" />
                     <span>Branch</span>
                   </div>
-                  <div className="text-sm font-bold text-primary truncate">{user.branch ?? "—"}</div>
+                  <div className="text-sm font-bold text-primary truncate">{branchName(branchCatalog, user.branch_code) ?? user.branch ?? "—"}</div>
                 </div>
                 <div className="p-3 rounded-control bg-elevated/60 border border-border-subtle">
                   <div className="flex items-center gap-1.5 text-3xs uppercase tracking-wider text-text-muted font-semibold mb-1.5">
@@ -1233,6 +1237,9 @@ export default function SettingsPage() {
       )}
 
       {/* ---------------- Preferences ---------------- */}
+      {tab === "departments" && user.role === "admin_tpo" && <CollegeDepartmentsSection onToast={triggerToast} />}
+
+      {tab === "preferences" && isStudent && <BranchTrackSection user={user} onToast={triggerToast} />}
       {tab === "preferences" && isStudent && <CodingPreferencesSection user={user} onToast={triggerToast} />}
 
       {tab === "preferences" && (
@@ -1291,68 +1298,19 @@ export default function SettingsPage() {
 
       {/* ---------------- Notifications ---------------- */}
       {tab === "notifications" && (
-        <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-1">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-primary">
-              Notification Preferences{" "}
-              <span className="align-middle px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-elevated text-text-muted border border-border-subtle">
-                Early Access
-              </span>
-            </h3>
-            <p className="text-xs text-text-muted mt-0.5">
-              These preferences are saved for when email/in-app alerting ships — today, the only email you&apos;ll get
-              from us is your account credentials.
-            </p>
-          </div>
-
-          {[
-            {
-              key: "contestReminders" as const,
-              title: "Contest reminders",
-              detail: "A nudge one hour before every rated round you're registered for.",
-            },
-            {
-              key: "driveAlerts" as const,
-              title: "Campus drive alerts",
-              detail: "When your placement cell schedules or updates a recruitment drive.",
-            },
-            {
-              key: "submissionResults" as const,
-              title: "Submission verdicts",
-              detail: "Judge results for submissions made during contests.",
-            },
-            {
-              key: "weeklyDigest" as const,
-              title: "Weekly progress digest",
-              detail: "A Monday summary of your rating, streak and topic progress.",
-            },
-            {
-              key: "productUpdates" as const,
-              title: "Product updates",
-              detail: "New features, problem sets and platform announcements.",
-            },
-          ].map((row, idx, arr) => (
-            <div
-              key={row.key}
-              className={cn(
-                "flex items-center justify-between gap-4 py-4",
-                idx !== arr.length - 1 && "border-b border-border-subtle"
-              )}
-            >
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary">{row.title}</div>
-                <p className="text-2xs text-text-muted mt-0.5 leading-relaxed">{row.detail}</p>
-              </div>
-              <Toggle
-                checked={notifs[row.key]}
-                label={row.title}
-                onChange={(v) => {
-                  setNotifs((prev) => ({ ...prev, [row.key]: v }));
-                  triggerToast(`${row.title} ${v ? "enabled" : "disabled"}.`);
-                }}
-              />
+        <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-primary">Notification preferences</h3>
+              <p className="text-xs text-text-muted mt-0.5">
+                Choose what shows up in your notification bell and pops up while you are on AptRun. Changes save as you flip them.
+              </p>
             </div>
-          ))}
+            <Link href="/notifications" className="shrink-0 text-2xs font-bold text-accent-primary hover:underline">
+              Open notifications
+            </Link>
+          </div>
+          <NotificationPreferences onToast={triggerToast} />
         </section>
       )}
     </DashboardShell>

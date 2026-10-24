@@ -23,6 +23,14 @@ class GeminiQuestionGenerationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The migrations ship a starter bank for the non-engineering departments; these tests count only what the generator writes.
+        InterviewQuestionBank::query()->delete();
+    }
+
     private function opsUser(): User
     {
         return User::factory()->create(['role' => User::ROLE_ADMIN_INTERNAL]);

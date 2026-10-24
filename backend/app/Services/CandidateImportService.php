@@ -68,6 +68,8 @@ class CandidateImportService
             'phone' => $phone,
         ]);
 
+        app(IssuedCredentialVault::class)->keep($user, $plainPassword, 'import');
+
         return ['user' => $user, 'created' => true, 'plainPassword' => $plainPassword];
     }
 }

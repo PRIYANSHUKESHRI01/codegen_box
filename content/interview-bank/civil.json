@@ -1,0 +1,416 @@
+[
+ {
+  "question_text": "What is the difference between dead load, live load and wind load, and why do we apply load factors?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Dead load is permanent self-weight; live load is occupancy and movable load; wind load is lateral environmental load. Load factors cover uncertainty in loads and the consequence of failure; the structure is checked for the worst combinations under limit-state design.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the role of steel reinforcement in concrete?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Concrete is strong in compression and weak in tension, so steel carries tensile forces (and some shear) and improves ductility. Bond between steel and concrete and adequate cover for protection against corrosion are important.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Explain the difference between working stress design and limit state design.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Working stress keeps stresses within permissible elastic limits using a factor of safety; limit state design uses partial safety factors on loads and materials and checks ultimate strength and serviceability (deflection, cracking). Limit state is more rational and is the basis of current codes.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the difference between a one-way and a two-way slab, and how do you decide?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "A slab supported on two opposite edges (or with a long to short span ratio above about two) bends mainly in one direction; a slab supported on all four edges with ratio under two bends in both and needs reinforcement both ways. Affects load path, bending moments and steel.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Why do reinforced-concrete beams fail by diagonal cracking, and how do stirrups help?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Shear produces diagonal tension, which concrete resists poorly, causing diagonal cracks near supports. Stirrups carry the shear, tie the longitudinal steel and confine concrete; their spacing is closer where shear is high.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "How does a building resist lateral loads from wind or earthquakes, and what systems are used?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Through a lateral load-resisting system: shear walls, braced frames or moment-resisting frames, with floor diaphragms transferring force to them and foundations. Earthquake design adds ductility, regular layout, and detailing so that failure is gradual; mention drift limits.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Why do we do a soil investigation before designing a foundation?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "geotechnical"
+  ],
+  "notes_for_reviewer": "To know soil type, strength, compressibility, groundwater and bearing capacity so the foundation type and depth are safe and economical. Mentions boreholes, SPT, laboratory tests and what could go wrong if skipped (excessive or differential settlement).",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the difference between shallow and deep foundations, and when would you use piles?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "geotechnical"
+  ],
+  "notes_for_reviewer": "Shallow foundations (footings, rafts) spread load near the surface when good soil is shallow; deep foundations (piles, piers) transfer load to deeper strong strata or by friction when upper soil is weak, compressible or scour-prone, or loads are heavy.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Explain consolidation settlement in clay and why it takes a long time.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "geotechnical"
+  ],
+  "notes_for_reviewer": "Applied load first raises pore-water pressure; water drains slowly out of low-permeability clay, transferring load to the soil skeleton and causing gradual settlement. Time depends on drainage path and permeability; sand settles quickly. Mentions preloading or drains to speed it up.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the difference between effective stress and total stress, and why does effective stress control soil behaviour?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "geotechnical"
+  ],
+  "notes_for_reviewer": "Effective stress is total stress minus pore pressure; it is the stress carried by the soil skeleton and controls strength and volume change. Rising water table or pore pressure reduces effective stress and strength (liquefaction, slope failure).",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "A retaining wall shows signs of tilting. What could be the causes and what would you check?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "geotechnical"
+  ],
+  "notes_for_reviewer": "Insufficient base width or bearing capacity, poor drainage building up water pressure behind the wall, overloaded backfill, weak foundation soil, or inadequate stability against sliding and overturning. Check drainage (weep holes), backfill, surcharge, settlement and measure movement; remedies include drainage, anchors or strengthening.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What are the main components of a flexible pavement, and what does each layer do?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "transportation"
+  ],
+  "notes_for_reviewer": "Subgrade, sub-base, base course, binder and wearing course. Layers spread the wheel load so stresses on the weaker lower layers are small; the surface resists wear and seals against water. Drainage is essential for pavement life.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is superelevation on a road curve, and why is it provided?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "transportation"
+  ],
+  "notes_for_reviewer": "Banking of the road cross-section on a curve so a component of the vehicle's weight balances part of the centrifugal force, improving safety and comfort and reducing side friction demand. Limited by slow vehicles and weather conditions.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "How is the capacity of a road related to speed and density, and what happens as traffic increases?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "transportation"
+  ],
+  "notes_for_reviewer": "Flow equals speed times density; at low density vehicles travel at free speed, flow rises with density up to capacity, beyond which speed and flow drop and congestion forms. Design aims to keep demand below capacity at peak.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "How would you decide between a signalised intersection and a roundabout?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "transportation"
+  ],
+  "notes_for_reviewer": "Consider traffic volumes and turning movements, safety (conflict points), land availability, pedestrian needs, delay, speed and cost. Roundabouts reduce severe crashes and idling at moderate volumes; signals manage heavy or highly unbalanced flows and pedestrian crossings.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the difference between cement, mortar and concrete?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "construction_management",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Cement is the binder; mortar is cement, sand and water used for bonding and plaster; concrete is cement, sand, coarse aggregate and water used as a structural material. Mention grade, mix proportions and curing.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Why is curing important for concrete, and what happens if it is neglected?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "construction_management",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Hydration needs moisture and suitable temperature; poor curing causes surface drying, shrinkage cracks, lower strength and durability. Curing by ponding, wet covers or curing compound for at least the specified period.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the critical path in a project schedule, and how do you use it?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "construction_management",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "The longest sequence of dependent activities that determines the project duration; any delay on it delays the project. Use it to focus attention and resources, find float on other activities, and evaluate the effect of changes.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What are the main hazards on a construction site and how are they controlled?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "construction_management",
+   "editorial-v1",
+   "safety"
+  ],
+  "notes_for_reviewer": "Falls from height, struck-by or falling objects, excavation collapse, electrical contact, machinery and lifting accidents. Control through planning, PPE, barriers and edge protection, shoring, permits to work, training, supervision and toolbox talks.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Describe the main stages of treating surface water to make it safe to drink.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "environmental"
+  ],
+  "notes_for_reviewer": "Screening, coagulation and flocculation, sedimentation, filtration and disinfection (chlorination); then storage and distribution with a residual disinfectant. Each stage targets a type of impurity; quality is monitored.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "What is the difference between BOD and COD, and what do they tell you about wastewater?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "environmental"
+  ],
+  "notes_for_reviewer": "BOD is the oxygen consumed by microorganisms to break down biodegradable organic matter (usually five days); COD is the oxygen needed to chemically oxidise nearly all organic matter. COD is at least BOD; the ratio shows how biodegradable the waste is.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Explain how a level is used to find the height difference between two points.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "planning_surveying"
+  ],
+  "notes_for_reviewer": "Set up between the points, take a backsight on a point of known level and a foresight on the new point; the difference gives the rise or fall. Mentions booking, closing the loop to check error and keeping sight lengths balanced to cancel errors.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "How do GPS and total stations differ, and when would you use each?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "planning_surveying"
+  ],
+  "notes_for_reviewer": "A total station measures angles and distances to a prism for high local accuracy and works where the sky is blocked; GNSS gives coordinates from satellites over large areas without line of sight but needs sky view and corrections for survey accuracy. Choose by accuracy, area and site conditions.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "You see workers at height without harnesses on site. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "construction_management",
+   "editorial-v1",
+   "safety"
+  ],
+  "notes_for_reviewer": "Stop the work at once, make the area safe, speak to the workers and supervisor, make sure proper fall protection is provided before work resumes, and report according to the site procedure. Safety is not negotiable.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "The concrete cube test results for a slab come back lower than the specified strength. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "construction_management",
+   "editorial-v1",
+   "quality"
+  ],
+  "notes_for_reviewer": "Inform the engineer, check test procedure and sampling, review mix, curing and batch records, consider further tests (core, non-destructive), and decide on remedial action with the designer. Do not hide or ignore the result.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "The client asks for a change that delays your schedule. How do you respond?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "communication",
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "Understand the change, assess impact on time, cost and quality, communicate it clearly in writing with options and a revised programme, and follow the variation procedure to get approval before proceeding.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Your survey readings do not close within tolerance. What do you do?",
+  "category": "situational",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "planning_surveying"
+  ],
+  "notes_for_reviewer": "Check for blunders (booking and arithmetic), re-observe suspect legs, and only distribute small errors if within tolerance; if outside tolerance, repeat the survey. Do not force closure.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Rain is forecast and the trench you excavated is open overnight. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "environmental"
+  ],
+  "notes_for_reviewer": "Protect the trench from water and collapse (cover, bunding, pump arrangements, shoring), barricade and signpost the area, and inspect it again before work resumes. Think of both safety and quality.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Tell me about your final-year project or an internship site visit. What was your contribution and what did you learn?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "projects"
+  ],
+  "notes_for_reviewer": "A clear description of the problem or site task, personal contribution, an actual difficulty and how it was handled, a result, and a lesson. Look for ownership and practical detail.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Tell me about a time you learned something from a site visit or an experienced person.",
+  "category": "behavioral",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "learning"
+  ],
+  "notes_for_reviewer": "What they observed or were taught, why it mattered, how they applied it, and what it changed. Shows humility and curiosity.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Describe a time you worked in a team under a tight deadline.",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "The situation, their role, how the work was divided and communicated, how problems were handled, and the outcome. Shows reliability and communication.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Describe a time a calculation or drawing you prepared had an error. How did you find and correct it?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "debugging",
+   "editorial-v1",
+   "structural"
+  ],
+  "notes_for_reviewer": "Honesty about the error, how it was found (check, review), how it was fixed and communicated, and what checking habit they adopted afterwards.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "Why civil engineering, and where do you see yourself in three years?",
+  "category": "hr",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "career",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "A real reason for the branch, interest in a particular area (structures, geotechnical, roads, construction), willingness to work at site, and realistic plans such as becoming responsible for a package of work.",
+  "discipline": "civil"
+ },
+ {
+  "question_text": "How would you reduce the environmental impact of a construction site?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "construction_management",
+   "editorial-v1",
+   "environmental"
+  ],
+  "notes_for_reviewer": "Control dust and noise, manage runoff and sediment, store and dispose of waste properly, reduce and recycle materials, protect trees and water, choose lower-carbon materials, and plan to reduce transport and idle machinery. Compliance and monitoring.",
+  "discipline": "civil"
+ }
+]

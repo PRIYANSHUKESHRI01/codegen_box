@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ImagePlus, Info, Loader2, Lock, Plus, Rocket, Save, Trash2, X } from "lucide-react";
+import { ImagePlus, Info, Loader2, Lock, Plus, Rocket, Save, Trash2, X } from "lucide-react";
 import { CoverArt } from "@/components/arena/primitives";
 import { AudiencePicker } from "@/components/hackathons/host/AudiencePicker";
 import { HostShell, useHostAccess } from "@/components/hackathons/host/hostKit";
@@ -211,7 +211,7 @@ export function HackathonForm({ scope, hackathonId }: { scope: HostScope; hackat
 
   if (status === "ready" && hasAccess && loading) {
     return (
-      <HostShell scope={scope} status={status} hasAccess={hasAccess} title={title}>
+      <HostShell scope={scope} status={status} hasAccess={hasAccess} back={{ href: existing ? paths.manage(existing.id) : paths.list, label: existing ? "This hackathon" : "All hackathons" }} title={title}>
         <div className="space-y-4" aria-busy="true">
           {[0, 1, 2].map((i) => (
             <HpSkeleton key={i} className="h-48 rounded-[20px]" />
@@ -223,10 +223,6 @@ export function HackathonForm({ scope, hackathonId }: { scope: HostScope; hackat
 
   return (
     <HostShell scope={scope} status={status} hasAccess={hasAccess} title={title} subtitle={existing ? existing.title : "Describe the challenge, set the schedule and prizes, then publish when you're ready."}>
-      <Link href={existing ? paths.manage(existing.id) : paths.list} className="-mb-2 inline-flex w-fit items-center gap-2 text-xs font-semibold text-text-secondary hover:text-primary">
-        <ArrowLeft className="h-3.5 w-3.5" /> {existing ? "Back to this hackathon" : "All hackathons"}
-      </Link>
-
       {loadError && (
         <div role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-200">
           {loadError}

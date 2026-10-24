@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\College;
+use App\Models\Department;
 use App\Models\StudentImport;
+use App\Services\CollegeDepartmentService;
 use App\Services\StudentImportService;
+use App\Support\BranchCatalog;
+use App\Support\StudentImportSheets;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
@@ -19,7 +23,7 @@ use Illuminate\Http\Response;
  */
 class StudentImportController extends Controller
 {
-    public function __construct(private readonly StudentImportService $service) {}
+    public function __construct(private readonly StudentImportService $service, private readonly CollegeDepartmentService $departments) {}
 
     // ---- TPO: acts on the caller's own college ----
 
@@ -66,14 +70,43 @@ class StudentImportController extends Controller
      * names — the only thing standing between "no way to add 1,890
      * students" and a working import.
      */
-    public function template(): Response
+    public function template(Request $request, BranchCatalog $catalog): Response
     {
+        // ?department=commerce: the department's own branch list and example row. Without it, the engineering template this
+        // endpoint has always served (a college that runs only one department never needs to ask).
+        $requested = $request->query('department');
+        $department = is_string($requested) && $catalog->department($requested) !== null ? $requested : null;
+        $departmentName = $department === null ? null : $catalog->department($department)['name'];
+
+        $disciplines = collect($catalog->disciplines($department ?? Department::ENGINEERING))->keyBy('code');
+        $inDepartment = array_values(array_filter($catalog->branches(), fn (array $b) => isset($disciplines[$b['discipline_code']])));
+        $first = $inDepartment[0] ?? null;
+
+        // Engineering keeps the examples it always had; every other department shows a programme of its own.
+        $ownSample = $department !== null && $department !== Department::ENGINEERING && $first !== null;
+        $suffix = $department ? "-{$department}" : '';
+
+        // ?format=xlsx: an Excel workbook with a Branches sheet and a drop-down on the branch column.
+        if ($request->query('format') === 'xlsx') {
+            $branches = array_map(fn (array $b) => [
+                'name' => $b['name'],
+                'discipline' => $disciplines[$b['discipline_code']]['name'] ?? '',
+            ], $inDepartment);
+
+            return response(StudentImportSheets::template($branches, $departmentName, $ownSample ? [$first['name'], '24'.strtoupper(substr($first['code'], 0, 3)).'1042'] : null), 200, [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => "attachment; filename=\"student-import-template{$suffix}.xlsx\"",
+            ]);
+        }
+
         $csv = "name,email,roll_number,branch,section,cgpa,backlogs,phone,parent_phone\n"
-            ."Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000\n";
+            .($ownSample
+                ? 'Alex Chen,alex.chen@student.example.edu,24'.strtoupper(substr($first['code'], 0, 3)).'1042,"'.$first['name'].'",A,8.4,0,+91-9876543210,+91-9876500000'."\n"
+                : "Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000\n");
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="student-import-template.csv"',
+            'Content-Disposition' => "attachment; filename=\"student-import-template{$suffix}.csv\"",
         ]);
     }
 
@@ -92,10 +125,14 @@ class StudentImportController extends Controller
     private function storeFor(Request $request, College $college)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:5120'],
+            'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
+            'department' => ['nullable', 'string', 'max:30'],
         ]);
 
-        $studentImport = $this->service->import($college, $request->file('file'), $request->user());
+        // Which department this roster is for. A college running one department needs no answer; one running several must give it.
+        $department = $this->departments->requested($college, $request->input('department'));
+
+        $studentImport = $this->service->import($college, $request->file('file'), $request->user(), $department);
 
         return response()->json(['import' => $studentImport], 201);
     }

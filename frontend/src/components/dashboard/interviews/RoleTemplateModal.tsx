@@ -34,6 +34,7 @@ export function RoleTemplateModal({ basePath, template, onClose, onSaved, onToas
   const [description, setDescription] = useState(template?.description ?? "");
   const [techStackTags, setTechStackTags] = useState((template?.tech_stack_tags ?? []).join(", "));
   const [rounds, setRounds] = useState<RoundConfig[]>(template?.rounds_config ?? DEFAULT_ROUNDS);
+  const [discipline, setDiscipline] = useState(template?.discipline ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +60,8 @@ export function RoleTemplateModal({ basePath, template, onClose, onSaved, onToas
           .map((t) => t.trim())
           .filter(Boolean),
         rounds_config: rounds,
+        // null = every branch (also how a template is switched back to general); a core family writes and scores its interviews for that branch.
+        discipline: discipline || null,
       };
       if (template) {
         await api.post(`${basePath}/${template.id}`, payload);
@@ -129,6 +132,23 @@ export function RoleTemplateModal({ basePath, template, onClose, onSaved, onToas
                 className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="role-discipline" className="block font-semibold text-text-secondary mb-1">Built for</label>
+            <select
+              id="role-discipline"
+              value={discipline}
+              onChange={(e) => setDiscipline(e.target.value)}
+              className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
+            >
+              <option value="">Every branch (software and general roles)</option>
+              <option value="ece">Electronics &amp; Communication</option>
+              <option value="eee">Electrical &amp; Electronics</option>
+              <option value="mech">Mechanical</option>
+              <option value="civil">Civil</option>
+            </select>
+            <p className="mt-1 text-3xs text-text-muted">A core branch writes this role&apos;s AI questions and scores its spoken answers as engineering, not software, interviews.</p>
           </div>
 
           <div>

@@ -11,6 +11,18 @@ import type { CohortLanguage } from "./languageInsights";
  */
 export type Engagement = "pending_activation" | "not_started" | "active" | "slipping" | "dormant";
 
+/** What a row says about Core Prep — present only for a student of a branch whose Core Prep is live (null for everyone else, CSE included). */
+export interface CohortCore {
+  /** The weighting their readiness score used: software · core · balanced. */
+  profile: "software" | "core" | "balanced" | "general";
+  /** The core component of their readiness (0–100); null if their profile has none. */
+  readiness: number | null;
+  /** Core questions answered in the last 180 days (practice + tests). */
+  answered_30d: number;
+  weakest_subject: string | null;
+  weakest_accuracy: number | null;
+}
+
 /**
  * A student row shaped by StudentCohortService on the backend — shared by
  * every surface that renders a cohort table (the TPO's full Student Cohort
@@ -23,12 +35,26 @@ export interface CohortStudent {
   email: string;
   roll_number: string | null;
   branch: string | null;
+  /** What the college's branch text was recognised as ("mech", "ece"…) — null until recognised. Filters and reports run on these; `branch` stays the college's own wording. */
+  branch_code?: string | null;
+  /** The branch family: cse / ece / eee / mech / civil / other. */
+  discipline?: string | null;
+  /** 'college' = imported or edited by staff (authoritative); 'self' = the student said so. */
+  branch_source?: "college" | "self" | null;
+  /** The department the student belongs to (engineering · management · commerce · arts …); null = not classified yet, read as engineering. */
+  department?: string | null;
+  /** Non-CS students' chosen weighting: core_first / balanced / it_first. */
+  track_focus?: "core_first" | "balanced" | "it_first" | null;
+  /** Core Prep standing — null unless their branch's Core Prep is live. */
+  core?: CohortCore | null;
   section: string | null;
   phone: string | null;
   parent_phone: string | null;
   cgpa: string | null;
   backlogs: number | null;
   is_blocked: boolean;
+  /** Why and by whom the account was blocked; null while it is active. `by_coordinator`: a Section Coordinator did it (not Mellow staff). */
+  blocked?: { reason: string | null; at: string | null; by_coordinator: boolean } | null;
   readiness_score: number;
   readiness_tier: "Placement Ready" | "In Progress" | "Needs Training";
   practice_score: number;

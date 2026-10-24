@@ -19,6 +19,7 @@ class InterviewRoleTemplate extends Model
         'description',
         'tech_stack_tags',
         'rounds_config',
+        'discipline',
         'owning_college_id',
         'owning_company_id',
         'is_active',

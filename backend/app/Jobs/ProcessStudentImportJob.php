@@ -2,6 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Services\CollegeDepartmentService;
+use App\Services\IssuedCredentialVault;
+use App\Support\BranchCatalog;
 use App\Models\College;
 use App\Models\StudentImport;
 use App\Models\User;
@@ -96,6 +99,12 @@ class ProcessStudentImportJob implements ShouldQueue
         $remaining = $limit === null ? null : max(0, $limit - ($college?->studentCount() ?? 0));
         $planName = $college?->activePlan()?->name;
 
+        // The department this whole roster belongs to (null on an import queued before departments existed: then nothing is enforced
+        // and each student's department follows their branch, falling back to engineering).
+        $departments = app(CollegeDepartmentService::class);
+        $department = $import->department_code;
+        $departmentName = $department !== null ? (BranchCatalog::instance()->department($department)['name'] ?? $department) : null;
+
         while (($row = fgetcsv($handle)) !== false) {
             $rowNumber++;
 
@@ -143,9 +152,26 @@ class ProcessStudentImportJob implements ShouldQueue
                 'parent_phone' => trim((string) ($data['parent_phone'] ?? '')) ?: null,
             ];
 
+            if ($department !== null && $college !== null) {
+                // A branch that clearly names another department's programme is a mistake worth stopping at the door.
+                if (($conflict = $departments->labelConflict($college, $academicFields['branch'], $department)) !== null) {
+                    $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => $conflict];
+
+                    continue;
+                }
+
+                if ($existing && $existing->department !== null && $existing->department !== $department) {
+                    $theirs = BranchCatalog::instance()->department($existing->department)['name'] ?? $existing->department;
+                    $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => "This student is already registered in the {$theirs} department; it cannot be re-imported under {$departmentName}."];
+
+                    continue;
+                }
+            }
+
             if ($existing) {
                 // Idempotent re-upload: refresh their academic data, but never
                 // touch their password or re-send the welcome email.
+                $existing->departmentHint = $department;
                 $existing->update(array_filter([
                     'name' => $name,
                     'college_id' => $import->college_id,
@@ -167,7 +193,7 @@ class ProcessStudentImportJob implements ShouldQueue
 
                 $plainPassword = Str::password(12);
 
-                $user = User::create([
+                $user = new User([
                     'name' => $name,
                     'email' => $email,
                     'handle' => Str::slug($name).'-'.Str::lower(Str::random(4)),
@@ -177,6 +203,11 @@ class ProcessStudentImportJob implements ShouldQueue
                     'college_id' => $import->college_id,
                     ...$academicFields,
                 ]);
+                // Not an attribute: tells the saving hook which department this row is being filed under.
+                $user->departmentHint = $department;
+                $user->save();
+
+                app(IssuedCredentialVault::class)->keep($user, $plainPassword, 'import');
 
                 $emailJobs[] = new SendAccountCredentialsEmail($user->id, $plainPassword);
                 $successCount++;

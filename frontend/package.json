@@ -11,9 +11,14 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "integrity:assets": "node scripts/copy-integrity-assets.mjs",
+    "predev": "node scripts/copy-integrity-assets.mjs",
+    "prebuild": "node scripts/copy-integrity-assets.mjs",
+    "postinstall": "node scripts/copy-integrity-assets.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "0.10.21",
     "@monaco-editor/react": "^4.7.0",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
@@ -22,6 +27,7 @@
     "gsap": "^3.12.5",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "katex": "0.16.11",
     "lucide-react": "^0.468.0",
     "next": "^14.2.21",
     "nextjs-toploader": "^3.9.17",
@@ -30,7 +36,9 @@
     "react-markdown": "^10.1.0",
     "react-resizable-panels": "^4.12.4",
     "react-syntax-highlighter": "^16.1.1",
+    "rehype-katex": "7.0.1",
     "remark-gfm": "^4.0.1",
+    "remark-math": "6.0.0",
     "tailwind-merge": "^2.5.5"
   },
   "devDependencies": {

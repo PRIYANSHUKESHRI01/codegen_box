@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SoftSkillProctoringSession;
 use App\Models\SoftSkillProctoringViolation;
 use App\Models\SoftSkillSession;
+use App\Services\Integrity\IntegrityService;
 use App\Services\SoftSkillProctoringService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,7 @@ use Illuminate\Validation\Rule;
  */
 class SoftSkillProctoringController extends Controller
 {
-    public function __construct(private readonly SoftSkillProctoringService $proctoring) {}
+    public function __construct(private readonly SoftSkillProctoringService $proctoring, private readonly IntegrityService $integrity) {}
 
     public function start(Request $request, SoftSkillSession $softSkillSession)
     {
@@ -34,11 +35,18 @@ class SoftSkillProctoringController extends Controller
 
         $validated = $request->validate([
             'device_info' => ['nullable', 'array'],
+            'integrity' => ['nullable', 'array'],
         ]);
+
+        // Before anything is created (this call restarts the attempt's clock): may it begin from here, on this machine?
+        $this->integrity->preflight($request->user(), 'soft_skill', $request);
 
         $proctoringSession = $this->proctoring->startOrResume($softSkillSession, $validated['device_info'] ?? []);
 
-        return response()->json(['session' => $this->sessionPayload($proctoringSession)]);
+        // The integrity layer (heartbeat, evidence, device/address binding). Null when it is switched off.
+        $integrity = $this->integrity->attach($request->user(), 'soft_skill', $proctoringSession, $validated['integrity'] ?? [], $request);
+
+        return response()->json(['session' => $this->sessionPayload($proctoringSession), 'integrity' => $integrity]);
     }
 
     public function reportViolation(Request $request, SoftSkillSession $softSkillSession)

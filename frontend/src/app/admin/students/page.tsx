@@ -1,9 +1,9 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
   Download,
@@ -24,9 +24,7 @@ import {
   X,
   GitBranch,
   LayoutGrid,
-  Check,
   Minus,
-  AlertTriangle,
   UserRound,
   ChevronRight,
   RefreshCw,
@@ -34,15 +32,35 @@ import {
   Activity,
   ArrowUpDown,
   LifeBuoy,
-  type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
 import { BulkImportStudentsPanel } from "@/components/dashboard/tpo/BulkImportStudentsPanel";
 import { AddStudentModal } from "@/components/dashboard/tpo/AddStudentModal";
+import { BranchMappingModal } from "@/components/dashboard/tpo/BranchMappingModal";
+import { departmentShort, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
+import { departmentCan, useDepartmentScope } from "@/lib/departments";
 import { BulkNotifyModal } from "@/components/dashboard/tpo/BulkNotifyModal";
+import { NotesPanel } from "@/components/coordinator/NotesPanel";
 import { CohortEngagementCard, CohortLanguagesCard, CohortPagination, SortHeader } from "@/components/dashboard/tpo/cohortPanels";
-import { EngagementPill, LanguageChips, SolvedCount, lastPracticeText } from "@/components/dashboard/tpo/cohortProgress";
+import { CoreCell, LanguageChips } from "@/components/dashboard/tpo/cohortProgress";
+import {
+  BranchChip,
+  CgpaCell,
+  EligibilityCell,
+  FilterChip,
+  MeterBar,
+  PracticeCell,
+  ReadinessCell,
+  RosterSkeleton,
+  ScoreRing,
+  SectionChip,
+  SelectBox,
+  StatusCell,
+  StudentIdentity,
+  TIER_TONE,
+  scoreTone,
+} from "@/components/dashboard/tpo/cohortCells";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -56,7 +74,7 @@ import {
   DEFAULT_SORT,
   PAGE_SIZES,
   SORT_OPTIONS,
-  branchOptions,
+  branchFilterGroups,
   engagementCounts,
   hasActiveFilters,
   matchesFilters,
@@ -77,31 +95,19 @@ import {
   HpEmptyState,
   HpIconTile,
   HpItem,
-  HpPill,
   HpSearch,
   HpSectionHeader,
-  HpSkeleton,
   HpStagger,
   HpStatCard,
   HpToast,
   hpBtn,
   hpEase,
   hpTh,
-  type HpTone,
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 
 const TIERS = ["ALL", "Placement Ready", "In Progress", "Needs Training"] as const;
 
-/** Tier → tone: emerald only for the positive outcome, sky (the TPO identity) for in-flight, amber for attention. */
-const TIER_TONE: Record<CohortStudent["readiness_tier"], HpTone> = {
-  "Placement Ready": "emerald",
-  "In Progress": "sky",
-  "Needs Training": "amber",
-};
-
-/** Same 75 / 45 cut-offs the roster's readiness bar has always used. */
-const scoreTone = (score: number): HpTone => (score >= 75 ? "emerald" : score >= 45 ? "sky" : "amber");
 
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
@@ -115,6 +121,15 @@ function timeAgo(timestamp: number | null, now: number): string {
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes} min ago`;
   return `${Math.floor(minutes / 60)} h ago`;
+}
+
+/** A small tag naming the department a student belongs to — shown only when the roster mixes departments. */
+function DepartmentTag({ department, catalog }: { department?: string | null; catalog: ReturnType<typeof useBranchCatalog> }) {
+  return (
+    <span className="inline-flex items-center rounded-md bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle" title="Department">
+      {departmentShort(catalog, department ?? "engineering")}
+    </span>
+  );
 }
 
 export default function StudentCohortPage() {
@@ -147,6 +162,13 @@ export default function StudentCohortPage() {
   );
   const [exporting, setExporting] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
+  const [showBranches, setShowBranches] = useState(false);
+  const catalog = useBranchCatalog();
+  // Which department the TPO is looking at (the switcher under the page title). The roster is that department's students, and the
+  // coding columns and filters only exist where the department codes at all.
+  const { scope: deptScope, multiple: hasDepartments } = useDepartmentScope();
+  const showCoding = departmentCan(catalog, deptScope, "coding_practice");
+  const showDepartmentChip = hasDepartments && deptScope === SCOPE_ALL;
 
   const AT_RISK_THRESHOLD = 60;
 
@@ -167,7 +189,7 @@ export default function StudentCohortPage() {
     setLoadError(null);
     try {
       const [studentsRes, coordinatorsRes] = await Promise.all([
-        api.get<{ students: CohortStudent[] }>("/tpo/students/cohort"),
+        api.get<{ students: CohortStudent[] }>(deptScope === SCOPE_ALL ? "/tpo/students/cohort" : `/tpo/students/cohort?department=${encodeURIComponent(deptScope)}`),
         api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
       ]);
       setStudents(studentsRes.students);
@@ -182,7 +204,7 @@ export default function StudentCohortPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [deptScope]);
 
   useEffect(() => {
     if (status === "ready") loadStudents();
@@ -224,7 +246,13 @@ export default function StudentCohortPage() {
   // "AIDS"…) — so both filters' option lists are derived from whatever the
   // cohort actually has on file, never hardcoded.
   const sections = useMemo(() => Array.from(new Set(students.map((s) => s.section).filter((s): s is string => !!s))).sort(), [students]);
-  const branches = useMemo(() => branchOptions(students), [students]);
+  const branchGroups = useMemo(() => branchFilterGroups(students, catalog), [students, catalog]);
+  // Labels the platform does not recognise yet: students who cannot be matched to branch-specific drives.
+  const unrecognised = useMemo(() => {
+    const labels = new Map<string, number>();
+    for (const s of students) if (!s.branch_code && s.branch?.trim()) labels.set(s.branch.trim(), (labels.get(s.branch.trim()) ?? 0) + 1);
+    return { labels: labels.size, students: Array.from(labels.values()).reduce((a, b) => a + b, 0) };
+  }, [students]);
   const languageRollup = useMemo(() => rollupLanguages(students), [students]);
 
   // A restored filter pointing at something that's gone (a branch nobody is in any more) would silently show an empty roster.
@@ -232,12 +260,12 @@ export default function StudentCohortPage() {
     if (loading || students.length === 0) return;
     setFilters((prev) => {
       const next = { ...prev };
-      if (next.branch !== ALL && !branches.includes(next.branch)) next.branch = ALL;
+      if (next.branch !== ALL && !branchGroups.some((g) => g.options.some((o) => o.value === next.branch)) && !students.some((s) => s.branch === next.branch)) next.branch = ALL;
       if (next.section !== ALL && !sections.includes(next.section)) next.section = ALL;
       if (next.language !== ALL && !languageRollup.some((l) => l.language === next.language)) next.language = ALL;
       return next.branch === prev.branch && next.section === prev.section && next.language === prev.language ? prev : next;
     });
-  }, [loading, students.length, branches, sections, languageRollup]);
+  }, [loading, students, branchGroups, sections, languageRollup]);
 
   const filtered = useMemo(
     () => sortStudents(students.filter((s) => matchesFilters(s, effectiveFilters)), sort),
@@ -280,7 +308,7 @@ export default function StudentCohortPage() {
   // narrowed the table down to one section can immediately see (and
   // contact) whoever manages it, without a separate trip to Coordinators.
   const sectionFilter = filters.section;
-  const activeSectionCoordinator = sectionFilter !== ALL ? coordinators.find((c) => c.section === sectionFilter) ?? null : null;
+  const activeSectionCoordinator = sectionFilter !== ALL ? coordinators.find((c) => c.section.trim().toLowerCase() === sectionFilter.trim().toLowerCase()) ?? null : null;
 
   const filtersActive = hasActiveFilters(filters);
 
@@ -663,14 +691,16 @@ export default function StudentCohortPage() {
         {showInsights && (
           <HpItem>
             <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-              <CohortEngagementCard students={students} active={filters.engagement} onSelect={(e) => setFilter("engagement", e)} />
-              <CohortLanguagesCard
-                students={students}
-                activeLanguage={filters.language}
-                onSelectLanguage={(language) => setFilter("language", language)}
-                needsHelpActive={filters.needsLanguageHelp}
-                onToggleNeedsHelp={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
-              />
+              <CohortEngagementCard students={students} active={filters.engagement} onSelect={(e) => setFilter("engagement", e)} codes={showCoding} />
+              {showCoding && (
+                <CohortLanguagesCard
+                  students={students}
+                  activeLanguage={filters.language}
+                  onSelectLanguage={(language) => setFilter("language", language)}
+                  needsHelpActive={filters.needsLanguageHelp}
+                  onToggleNeedsHelp={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
+                />
+              )}
             </div>
           </HpItem>
         )}
@@ -726,11 +756,35 @@ export default function StudentCohortPage() {
                 >
                   Download Excel <span className="tabular opacity-70">({filtered.length})</span>
                 </HpButton>
+                <HpButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setShowBranches(true)}
+                  title="See what each branch label in your roster means"
+                  leftIcon={<GitBranch className="h-3.5 w-3.5" />}
+                >
+                  Branches
+                  {unrecognised.students > 0 && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-amber-500" aria-label="Some branches are not recognised" />}
+                </HpButton>
                 <HpButton size="sm" onClick={() => setShowAddStudent(true)} leftIcon={<UserPlus className="h-3.5 w-3.5" />}>
                   Add Student
                 </HpButton>
               </div>
             </div>
+
+            {unrecognised.students > 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-amber-500/20 bg-amber-500/5 px-4 py-2.5 sm:px-5">
+                <p className="text-2xs text-text-secondary">
+                  <strong className="text-primary">
+                    {unrecognised.students} student{unrecognised.students === 1 ? "" : "s"}
+                  </strong>{" "}
+                  ha{unrecognised.students === 1 ? "s" : "ve"} {unrecognised.labels === 1 ? "a branch" : `${unrecognised.labels} branches`} we don&apos;t recognise yet, so they can&apos;t be matched to branch-specific drives.
+                </p>
+                <button type="button" onClick={() => setShowBranches(true)} className="text-2xs font-bold text-accent-primary hover:underline">
+                  Map them →
+                </button>
+              </div>
+            )}
 
             {/* Filter bar */}
             <div className="space-y-3 border-y border-border-subtle bg-elevated/30 px-4 py-3.5 sm:px-5">
@@ -751,10 +805,14 @@ export default function StudentCohortPage() {
                     wrapperClassName="xl:w-40"
                   >
                     <option value={ALL}>All Branches</option>
-                    {branches.map((b) => (
-                      <option key={b} value={b}>
-                        {b}
-                      </option>
+                    {branchGroups.map((g) => (
+                      <optgroup key={g.label} label={g.label}>
+                        {g.options.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label} ({o.count})
+                          </option>
+                        ))}
+                      </optgroup>
                     ))}
                   </HpSelect>
                   <HpSelect
@@ -791,20 +849,22 @@ export default function StudentCohortPage() {
                       </option>
                     ))}
                   </HpSelect>
-                  <HpSelect
-                    aria-label="Filter by coding language"
-                    value={filters.language}
-                    onChange={(e) => setFilter("language", e.target.value)}
-                    leading={<Code2 className="h-3.5 w-3.5 text-text-muted" />}
-                    wrapperClassName="xl:w-44"
-                  >
-                    <option value={ALL}>All Languages</option>
-                    {languageRollup.map((l) => (
-                      <option key={l.language} value={l.language}>
-                        {languageLabel(l.language)} ({l.students})
-                      </option>
-                    ))}
-                  </HpSelect>
+                  {showCoding && (
+                    <HpSelect
+                      aria-label="Filter by coding language"
+                      value={filters.language}
+                      onChange={(e) => setFilter("language", e.target.value)}
+                      leading={<Code2 className="h-3.5 w-3.5 text-text-muted" />}
+                      wrapperClassName="xl:w-44"
+                    >
+                      <option value={ALL}>All Languages</option>
+                      {languageRollup.map((l) => (
+                        <option key={l.language} value={l.language}>
+                          {languageLabel(l.language)} ({l.students})
+                        </option>
+                      ))}
+                    </HpSelect>
+                  )}
                   <HpSelect
                     aria-label="Filter by practice engagement"
                     value={filters.engagement}
@@ -858,15 +918,17 @@ export default function StudentCohortPage() {
                 >
                   At Risk (&lt;{AT_RISK_THRESHOLD}%)
                 </FilterChip>
-                <FilterChip
-                  active={filters.needsLanguageHelp}
-                  tone="amber"
-                  icon={LifeBuoy}
-                  onClick={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
-                  title="Students with enough submissions in a language to show it's going badly (low acceptance, many compile or runtime errors)"
-                >
-                  Struggling in a language
-                </FilterChip>
+                {showCoding && (
+                  <FilterChip
+                    active={filters.needsLanguageHelp}
+                    tone="amber"
+                    icon={LifeBuoy}
+                    onClick={() => setFilter("needsLanguageHelp", !filters.needsLanguageHelp)}
+                    title="Students with enough submissions in a language to show it's going badly (low acceptance, many compile or runtime errors)"
+                  >
+                    Struggling in a language
+                  </FilterChip>
+                )}
 
                 {/* Readiness score range filter — the TPO sets their own threshold */}
                 <div
@@ -1001,7 +1063,7 @@ export default function StudentCohortPage() {
                         <SortHeader label="Readiness" sortKey="readiness" firstDir="desc" sort={sort} onSort={handleSort} />
                         <SortHeader label="Practice" sortKey="inactivity" firstDir="desc" sort={sort} onSort={handleSort} />
                         <th scope="col" className={cn(hpTh, "px-4")}>
-                          Languages
+                          {showCoding ? "Languages" : "Domain Prep"}
                         </th>
                         <th scope="col" className={cn(hpTh, "px-4")}>
                           Status · Eligibility
@@ -1032,6 +1094,7 @@ export default function StudentCohortPage() {
                               <div className="flex flex-col items-start gap-1">
                                 <div className="flex flex-wrap items-center gap-1">
                                   <BranchChip branch={s.branch} className="max-w-[10rem]" />
+                                  {showDepartmentChip && <DepartmentTag department={s.department} catalog={catalog} />}
                                   <SectionChip section={s.section} />
                                 </div>
                                 <CgpaCell student={s} />
@@ -1044,7 +1107,10 @@ export default function StudentCohortPage() {
                               <PracticeCell student={s} />
                             </td>
                             <td className="max-w-[14rem] px-4 py-3">
-                              <LanguageChips coding={s.coding} />
+                              <div className="flex flex-col items-start gap-1.5">
+                                <CoreCell student={s} />
+                                {showCoding && <LanguageChips coding={s.coding} />}
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col items-start gap-1.5">
@@ -1091,6 +1157,7 @@ export default function StudentCohortPage() {
                             </div>
                             <div className="mt-3 flex flex-wrap items-center gap-1.5">
                               <BranchChip branch={s.branch} />
+                              {showDepartmentChip && <DepartmentTag department={s.department} catalog={catalog} />}
                               <SectionChip section={s.section} />
                               <span className="tabular inline-flex items-center gap-1 rounded-md bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
                                 <GraduationCap className="h-3 w-3" aria-hidden />
@@ -1103,7 +1170,8 @@ export default function StudentCohortPage() {
                             </div>
                             <div className="mt-3 space-y-2 rounded-xl bg-elevated/40 p-2.5">
                               <PracticeCell student={s} inline />
-                              <LanguageChips coding={s.coding} />
+                              <CoreCell student={s} />
+                              {showCoding && <LanguageChips coding={s.coding} />}
                             </div>
                             <div className="mt-3">
                               <RowActions student={s} onProfile={() => setActiveStudent(s)} align="start" />
@@ -1199,6 +1267,8 @@ export default function StudentCohortPage() {
         }}
       />
 
+      {showBranches && <BranchMappingModal onClose={() => setShowBranches(false)} onChanged={() => void loadStudents(true)} />}
+
       {/* Bulk-notify confirmation modal */}
       {notifyConfirm && (
         <BulkNotifyModal target={notifyConfirm} onClose={() => setNotifyConfirm(null)} onSent={handleNotifySent} variant="premium" />
@@ -1210,6 +1280,14 @@ export default function StudentCohortPage() {
         onClose={() => setActiveStudent(null)}
         collegeName={user?.college?.name ?? "your college"}
         variant="premium"
+        extra={
+          activeStudent && (
+            <section className="space-y-2.5" aria-label="Coordinator follow-up log">
+              <h3 className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Coordinator follow-up log</h3>
+              <NotesPanel key={activeStudent.id} listPath={`/tpo/students/${activeStudent.id}/notes`} readOnly />
+            </section>
+          )
+        }
       />
     </DashboardShell>
   );
@@ -1218,265 +1296,6 @@ export default function StudentCohortPage() {
 /* ── Local presentation pieces ──────────────────────────────────────────── */
 
 /** Thin bar that fills in on mount (instant under reduced motion). `value` is 0–100. */
-function MeterBar({ value, tone, className }: { value: number; tone: HpTone; className?: string }) {
-  const reduce = useReducedMotion();
-  const width = `${Math.max(0, Math.min(100, value))}%`;
-  return (
-    <span className={cn("block h-1.5 w-full overflow-hidden rounded-full bg-elevated", className)} aria-hidden>
-      <motion.span
-        className={cn("block h-full rounded-full", HP_TONES[tone].bar)}
-        initial={reduce ? false : { width: 0 }}
-        animate={{ width }}
-        transition={{ duration: 0.8, ease: hpEase }}
-      />
-    </span>
-  );
-}
-
-/**
- * Static SVG readiness ring for roster rows. Deliberately not the animated
- * HpRing — a cohort can run to four figures, and one motion value per row
- * isn't worth the cost in a table.
- */
-function ScoreRing({ value, size = 40 }: { value: number; size?: number }) {
-  const stroke = 4;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const v = Math.max(0, Math.min(100, value));
-  const tone = scoreTone(v);
-  return (
-    <span className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }} title={`Readiness score ${v}/100`}>
-      <svg width={size} height={size} className="-rotate-90" aria-hidden>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-border-subtle" />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          stroke={HP_TONES[tone].hex}
-          strokeDasharray={c}
-          strokeDashoffset={c - (c * v) / 100}
-        />
-      </svg>
-      <span className="tabular absolute inset-0 flex items-center justify-center text-2xs font-extrabold text-primary">
-        <span className="sr-only">Readiness </span>
-        {v}
-      </span>
-    </span>
-  );
-}
-
-/** A real (visually hidden) checkbox with the kit's painted box — keeps keyboard + screen-reader semantics. */
-function SelectBox({
-  checked,
-  indeterminate = false,
-  onChange,
-  label,
-  visibleLabel,
-}: {
-  checked: boolean;
-  indeterminate?: boolean;
-  onChange: () => void;
-  label: string;
-  visibleLabel?: string;
-}) {
-  const on = checked || indeterminate;
-  return (
-    <label className="group/check inline-flex cursor-pointer items-center gap-2.5">
-      <input
-        type="checkbox"
-        className="peer sr-only"
-        checked={checked}
-        onChange={onChange}
-        aria-label={label}
-        aria-checked={indeterminate ? "mixed" : checked}
-      />
-      <span
-        aria-hidden
-        className={cn(
-          "flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-500 peer-focus-visible:ring-offset-1 peer-focus-visible:ring-offset-[rgb(var(--bg-surface-rgb))]",
-          on
-            ? "border-transparent bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_4px_10px_-4px_rgba(79,70,229,0.7)]"
-            : "border-border-strong bg-[rgb(var(--bg-surface-rgb))] group-hover/check:border-indigo-500/50"
-        )}
-      >
-        {indeterminate ? (
-          <Minus className="h-3 w-3" strokeWidth={3.2} />
-        ) : (
-          <Check className={cn("h-3 w-3 transition-transform duration-200", checked ? "scale-100" : "scale-0")} strokeWidth={3.2} />
-        )}
-      </span>
-      {visibleLabel && <span className="text-2xs font-semibold text-text-secondary">{visibleLabel}</span>}
-    </label>
-  );
-}
-
-function FilterChip({
-  active,
-  tone,
-  icon: Icon,
-  onClick,
-  title,
-  children,
-}: {
-  active: boolean;
-  tone: "emerald" | "rose" | "amber";
-  icon: LucideIcon;
-  onClick: () => void;
-  title?: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
-      title={title}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-2xs font-semibold ring-1 ring-inset transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
-        active
-          ? tone === "emerald"
-            ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/30 shadow-[0_4px_12px_-6px_rgba(16,185,129,0.6)] dark:text-emerald-300"
-            : tone === "amber"
-              ? "bg-amber-500/10 text-amber-700 ring-amber-500/30 shadow-[0_4px_12px_-6px_rgba(245,158,11,0.6)] dark:text-amber-300"
-              : "bg-rose-500/10 text-rose-700 ring-rose-500/30 shadow-[0_4px_12px_-6px_rgba(244,63,94,0.6)] dark:text-rose-300"
-          : "bg-[rgb(var(--bg-surface-rgb))] text-text-secondary ring-border-subtle hover:bg-elevated hover:text-primary hover:ring-border-strong"
-      )}
-    >
-      <Icon className="h-3.5 w-3.5" />
-      {children}
-    </button>
-  );
-}
-
-function StudentIdentity({ student: s, onOpen }: { student: CohortStudent; onOpen: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="group/name flex min-w-0 items-center gap-3 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg-surface-rgb))]"
-    >
-      <HpAvatar name={s.name} size="md" />
-      <span className="min-w-0">
-        <span className="block truncate text-13 font-bold text-primary transition-colors group-hover/name:text-indigo-600 dark:group-hover/name:text-indigo-300">
-          {s.name}
-        </span>
-        <span className="block truncate font-mono text-3xs text-text-muted">{s.roll_number ?? s.email}</span>
-      </span>
-    </button>
-  );
-}
-
-function BranchChip({ branch, className }: { branch: string | null; className?: string }) {
-  if (!branch) {
-    return <span className="text-3xs font-semibold italic text-text-muted">No branch on file</span>;
-  }
-  return (
-    <span
-      title={branch}
-      className={cn(
-        "inline-flex max-w-[13rem] items-center rounded-md bg-sky-500/[0.08] px-1.5 py-px text-3xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/20 dark:text-sky-300",
-        className
-      )}
-    >
-      <span className="truncate">{branch}</span>
-    </span>
-  );
-}
-
-function SectionChip({ section }: { section: string | null }) {
-  return (
-    <span className="inline-flex items-center rounded-md bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
-      {section ? `Sec ${section}` : "No section"}
-    </span>
-  );
-}
-
-function CgpaCell({ student: s }: { student: CohortStudent }) {
-  return (
-    <div className="min-w-[4.5rem]">
-      <div className="tabular text-13 font-extrabold text-primary">
-        {s.cgpa ?? <span className="font-semibold text-text-muted">—</span>}
-      </div>
-      {(s.backlogs ?? 0) > 0 && (
-        <div className="mt-0.5 inline-flex items-center gap-1 text-3xs font-semibold text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="h-2.5 w-2.5" aria-hidden />
-          {s.backlogs} {s.backlogs === 1 ? "backlog" : "backlogs"}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ReadinessCell({ score, practice }: { score: number; practice: number }) {
-  return (
-    <div className="flex items-center gap-3">
-      <ScoreRing value={score} />
-      <div className="hidden min-w-[5.5rem] 2xl:block">
-        <div className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">7-day practice</div>
-        <div className="mt-1 flex items-center gap-2">
-          <MeterBar value={practice} tone="violet" className="w-14" />
-          <span className="tabular text-3xs font-bold text-text-secondary">{practice}%</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** How actively a student practises: the engagement pill, when they last did, and how many problems they've solved. */
-function PracticeCell({ student: s, inline = false }: { student: CohortStudent; inline?: boolean }) {
-  return (
-    <div className={cn("flex min-w-[8.5rem] gap-1", inline ? "flex-row flex-wrap items-center gap-x-2.5" : "flex-col items-start")}>
-      <EngagementPill engagement={s.activity.engagement} />
-      <span className="text-3xs font-medium text-text-muted">{lastPracticeText(s)}</span>
-      <SolvedCount solved={s.solved} />
-    </div>
-  );
-}
-
-function EligibilityCell({ student: s }: { student: CohortStudent }) {
-  if (s.eligible_for_active_drive === null) {
-    return (
-      <HpPill tone="slate" size="sm">
-        No Active Drives
-      </HpPill>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <HpPill tone={s.eligible_for_active_drive ? "emerald" : "rose"} icon={s.eligible_for_active_drive ? CheckCircle2 : AlertTriangle} size="sm">
-        {s.eligible_for_active_drive ? "Eligible" : "Not eligible"}
-      </HpPill>
-      {s.active_drive_count > 1 && (
-        <span
-          className="tabular text-3xs font-semibold text-text-muted"
-          title={`Eligible for ${s.eligible_drive_count} of ${s.active_drive_count} currently active drives mapped to your college`}
-        >
-          {s.eligible_drive_count}/{s.active_drive_count}
-          <span className="sr-only"> active drives</span>
-        </span>
-      )}
-    </span>
-  );
-}
-
-function StatusCell({ student: s }: { student: CohortStudent }) {
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <HpPill tone={TIER_TONE[s.readiness_tier]} dot size="sm">
-        {s.readiness_tier}
-      </HpPill>
-      {s.is_blocked && (
-        <HpPill tone="rose" icon={ShieldAlert} size="sm">
-          Blocked
-        </HpPill>
-      )}
-    </span>
-  );
-}
-
 function RowActions({ student: s, onProfile, align = "end" }: { student: CohortStudent; onProfile: () => void; align?: "start" | "end" }) {
   return (
     <div className={cn("flex items-center gap-2", align === "end" ? "justify-end" : "justify-start")}>
@@ -1501,23 +1320,3 @@ function RowActions({ student: s, onProfile, align = "end" }: { student: CohortS
   );
 }
 
-function RosterSkeleton() {
-  return (
-    <div className="divide-y divide-border-subtle" role="status" aria-label="Loading cohort">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="flex items-center gap-4 px-4 py-4 sm:px-5">
-          <HpSkeleton className="h-[18px] w-[18px] rounded-[6px]" />
-          <HpSkeleton className="h-10 w-10 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <HpSkeleton className="h-3.5 w-1/3 max-w-[12rem]" />
-            <HpSkeleton className="h-3 w-1/4 max-w-[8rem]" />
-          </div>
-          <HpSkeleton className="hidden h-6 w-24 rounded-md md:block" />
-          <HpSkeleton className="h-10 w-10 rounded-full" />
-          <HpSkeleton className="hidden h-6 w-24 rounded-full sm:block" />
-          <HpSkeleton className="hidden h-8 w-36 rounded-[10px] lg:block" />
-        </div>
-      ))}
-    </div>
-  );
-}

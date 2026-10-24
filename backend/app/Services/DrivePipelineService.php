@@ -7,6 +7,8 @@ use App\Models\DriveApplication;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Models\User;
+use App\Services\Notifications\DriveNotifier;
+use Throwable;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -60,7 +62,16 @@ class DrivePipelineService
             );
         }
 
-        return $application->fresh();
+        $application = $application->fresh();
+
+        // Tell the student their application moved — never allowed to fail the TPO's click.
+        try {
+            app(DriveNotifier::class)->applicationMoved($application);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $application;
     }
 
     /**
@@ -90,6 +101,7 @@ class DrivePipelineService
             ->get();
 
         $registered = 0;
+        $registeredIds = [];
 
         foreach ($students as $student) {
             $verdict = EligibilityService::evaluate($student, $eligibility);
@@ -108,6 +120,13 @@ class DrivePipelineService
             ]);
 
             $registered++;
+            $registeredIds[] = $student->id;
+        }
+
+        try {
+            app(DriveNotifier::class)->registered($drive, $registeredIds, $actor);
+        } catch (Throwable $e) {
+            report($e);
         }
 
         return $registered;

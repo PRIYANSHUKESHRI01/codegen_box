@@ -8,6 +8,8 @@ use App\Models\LifecycleEmailLog;
 use App\Models\PaymentOrder;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Enums\NotificationType;
+use App\Services\Notifications\PlanNotifier;
 use App\Support\SingleMail;
 use Throwable;
 
@@ -27,6 +29,16 @@ use Throwable;
  */
 class LifecycleMailService
 {
+    /** The in-app twin of a mail: same fire-and-forget rule — telling them must never be the reason the thing itself fails. */
+    private function notifyInApp(\Closure $work): void
+    {
+        try {
+            $work();
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
     /**
      * The first time anyone who was ADDED by someone else (a college, a TPO, Mellow staff) — a student, section coordinator, TPO, company hiring-team member or Mellow staff, never a superadmin — sets their own password:
      * the moment the account actually becomes theirs. Once ever — a later superadmin-issued temporary password and a
@@ -56,6 +68,12 @@ class LifecycleMailService
     {
         $now = now();
 
+        // The security notice, in-app as well as by e-mail: if it was not them, the bell is where they will see it first.
+        $this->notifyInApp(fn () => app(NotificationService::class)->notify($user, NotificationType::PasswordChanged, 'Your password was changed', match ($via) {
+            'reset' => 'You reset your password. If this was not you, contact support right away.',
+            default => 'Your password was changed from Settings. If this was not you, reset it and contact support right away.',
+        }, ['url' => '/settings?tab=security', 'group_key' => 'password.changed:'.$user->id.':'.$now->format('YmdHis'), 'data' => ['via' => $via]]));
+
         $this->send($user->id, LifecycleEmail::PasswordChanged, ['via' => $via, 'at' => $now->toIso8601String()], 'at'.$now->format('YmdHis'));
     }
 
@@ -64,6 +82,8 @@ class LifecycleMailService
         if ($order->user_id === null) {
             return;
         }
+
+        $this->notifyInApp(fn () => app(PlanNotifier::class)->paymentFailed($order));
 
         // One mail per order: a student who retries three times gets told once, not three times.
         $this->send($order->user_id, LifecycleEmail::PaymentFailed, [
@@ -79,6 +99,8 @@ class LifecycleMailService
         if ($order->user_id === null) {
             return;
         }
+
+        $this->notifyInApp(fn () => app(PlanNotifier::class)->refunded($order, $refundedPaise, $full));
 
         $this->send($order->user_id, LifecycleEmail::RefundProcessed, [
             'order' => $order->public_id,

@@ -15,6 +15,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewSummary, InterviewType } from "@/types/interview";
 import { Modal } from "@/components/ui/Modal";
+import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 
 const BASE_PATH = "/admin/interviews";
 
@@ -41,6 +42,7 @@ const TYPE_LABEL: Record<InterviewType, string> = {
   company: "Company",
   tpo_mock: "TPO Mock",
   company_hiring: "Company Hiring",
+  practice: "Student practice", // never listed here: a student's own practice interview is private to them
 };
 
 const TYPE_BADGE: Record<InterviewType, string> = {
@@ -48,6 +50,7 @@ const TYPE_BADGE: Record<InterviewType, string> = {
   company: "bg-accent-secondary/15 text-accent-secondary",
   tpo_mock: "bg-cyan-500/15 text-cyan-400",
   company_hiring: "bg-teal-500/15 text-teal-500",
+  practice: "bg-amber-500/15 text-amber-500",
 };
 
 /**
@@ -168,6 +171,7 @@ export default function AdminInterviewsPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-primary">{interview.title}</span>
+                    <AudienceChip audience={interview.branch_audience} />
                     <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", TYPE_BADGE[interview.interview_type])}>
                       {TYPE_LABEL[interview.interview_type]}
                     </span>
@@ -371,6 +375,7 @@ function CreateInterviewModal({
   const [isMock, setIsMock] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -418,6 +423,7 @@ function CreateInterviewModal({
         placement_drive_id: interviewType === "company" ? Number(selectedDriveId) : undefined,
         college_ids: interviewType === "company" ? selectedCollegeIds : undefined,
         is_mock: interviewType === "company" ? isMock : undefined,
+        branch_audience: interviewType === "general" ? audienceForRequest(audience) : undefined,
       });
       const slug = res.interview.slug;
       for (const bankId of acceptedIds) {
@@ -578,6 +584,8 @@ function CreateInterviewModal({
               className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
             />
           </div>
+
+          {interviewType === "general" && <BranchAudienceField value={audience} onChange={setAudience} />}
 
           {(interviewType === "general" || (interviewType === "company" && selectedDriveId)) && (
             <GenerateQuestionsPanel

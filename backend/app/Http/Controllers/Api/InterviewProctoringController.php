@@ -7,6 +7,7 @@ use App\Models\Interview;
 use App\Models\InterviewProctoringViolation;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewSession;
+use App\Services\Integrity\IntegrityService;
 use App\Services\InterviewProctoringService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,7 +24,7 @@ use Illuminate\Validation\Rule;
  */
 class InterviewProctoringController extends Controller
 {
-    public function __construct(private readonly InterviewProctoringService $proctoring) {}
+    public function __construct(private readonly InterviewProctoringService $proctoring, private readonly IntegrityService $integrity) {}
 
     public function start(Request $request, Interview $interview)
     {
@@ -33,11 +34,24 @@ class InterviewProctoringController extends Controller
 
         $validated = $request->validate([
             'device_info' => ['nullable', 'array'],
+            'integrity' => ['nullable', 'array'],
         ]);
+
+        // Before anything is created: may this attempt begin from here, on this machine?
+        $this->integrity->preflight($request->user(), 'interview', $request);
 
         $proctoringSession = $this->proctoring->startOrResume($session, $validated['device_info'] ?? []);
 
-        return response()->json(['session' => $this->sessionPayload($proctoringSession)]);
+        // The integrity layer (heartbeat, evidence, device/address binding). Null when it is switched off.
+        $integrity = $this->integrity->attach(
+            $request->user(),
+            'interview',
+            $proctoringSession,
+            ($validated['integrity'] ?? []) + ['context' => ['interview_id' => $interview->id]],
+            $request,
+        );
+
+        return response()->json(['session' => $this->sessionPayload($proctoringSession), 'integrity' => $integrity]);
     }
 
     public function reportViolation(Request $request, Interview $interview)

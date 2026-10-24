@@ -5,7 +5,7 @@
  * Mellow dashboards themselves can show/hide the right things without
  * duplicating the list from memory in three different components.
  */
-export const INTERNAL_PERMISSIONS = ["colleges", "platform_users", "problem_bank", "placements", "contests", "interviews", "customers", "articles", "vault", "project_lab", "hackathons"] as const;
+export const INTERNAL_PERMISSIONS = ["colleges", "platform_users", "problem_bank", "placements", "contests", "interviews", "customers", "articles", "vault", "project_lab", "hackathons", "core_prep"] as const;
 export const MARKETING_PERMISSIONS = ["leads", "lead_outreach"] as const;
 
 export type InternalPermission = (typeof INTERNAL_PERMISSIONS)[number];
@@ -24,6 +24,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   vault: "Vault",
   project_lab: "Project Lab",
   hackathons: "Hackathons",
+  core_prep: "Core Prep (ECE · EEE · Mech · Civil)",
   leads: "View & Manage Leads",
   lead_outreach: "Send Bulk Lead Emails",
 };
@@ -40,6 +41,7 @@ export const PERMISSION_DESCRIPTIONS: Record<Permission, string> = {
   vault: "Oversee the Vault — students ready to be hired — and its hand-off to Mellow Vault.",
   project_lab: "Write Project Lab topics and SOWs, and review student project submissions.",
   hackathons: "Host hackathons in the Hack Arena, judge projects and publish results.",
+  core_prep: "Write, review and bulk-import the technical questions branch students practise and are tested on.",
   leads: "View assigned leads, update their status, and log notes.",
   lead_outreach: "Send bulk check-in emails to leads.",
 };

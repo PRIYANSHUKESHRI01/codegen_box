@@ -159,6 +159,8 @@ class PlacementSeeder extends Seeder
                 'status' => PlacementDrive::STATUS_PUBLISHED,
             ]
         );
+
+        $this->call(AccenturePlacementSeeder::class);
     }
 
     private function seedPrepQuestions(Company $company): void

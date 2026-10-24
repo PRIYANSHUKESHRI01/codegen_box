@@ -6,7 +6,9 @@ use App\Jobs\ProcessStudentImportJob;
 use App\Models\College;
 use App\Models\StudentImport;
 use App\Models\User;
+use App\Support\StudentImportSheets;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -18,7 +20,7 @@ use Illuminate\Validation\ValidationException;
  */
 class StudentImportService
 {
-    public function import(College $college, UploadedFile $file, ?User $uploadedBy): StudentImport
+    public function import(College $college, UploadedFile $file, ?User $uploadedBy, ?string $department = null): StudentImport
     {
         // A college with no active subscription at all (never had one, or
         // it expired/was canceled) must be blocked outright here — without
@@ -47,14 +49,32 @@ class StudentImportService
             ]);
         }
 
+        // An Excel roster is converted to the CSV the import job has always read, before anything is
+        // created, so an unreadable workbook is refused up front instead of failing in the queue.
+        $csv = null;
+
+        if (StudentImportSheets::isSpreadsheet($file)) {
+            try {
+                $csv = StudentImportSheets::toCsv($file);
+            } catch (\Throwable) {
+                throw ValidationException::withMessages([
+                    'file' => ["We couldn't read that spreadsheet. Use the template (or save the first sheet as .xlsx or .csv) and try again."],
+                ]);
+            }
+        }
+
         $studentImport = StudentImport::create([
             'college_id' => $college->id,
+            // The department the whole file is for (null only for an import queued by code that predates departments).
+            'department_code' => $department,
             'uploaded_by' => $uploadedBy?->id,
             'original_filename' => $file->getClientOriginalName(),
             'status' => StudentImport::STATUS_PENDING,
         ]);
 
-        $file->storeAs('student-imports', "{$studentImport->id}.csv", 'local');
+        $csv !== null
+            ? Storage::disk('local')->put("student-imports/{$studentImport->id}.csv", $csv)
+            : $file->storeAs('student-imports', "{$studentImport->id}.csv", 'local');
 
         ProcessStudentImportJob::dispatch($studentImport->id);
 

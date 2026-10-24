@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CompanyRecommendedInterviewQuestion;
 use App\Models\InterviewQuestionBank;
 use App\Services\GeminiQuestionGeneratorService;
+use App\Support\InterviewDiscipline;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use RuntimeException;
@@ -32,6 +33,8 @@ class InterviewQuestionGenerationController extends Controller
             'categories.*' => [Rule::in(InterviewQuestionBank::CATEGORIES)],
             'count' => ['required', 'integer', 'min:1', 'max:10'],
             'skills' => ['nullable', 'string', 'max:500'],
+            // A core branch (ece / eee / mech / civil): the questions are written for it and saved against it. Absent = software, as ever.
+            'discipline' => ['nullable', Rule::in(InterviewDiscipline::families())],
             // Only meaningful when Ops is generating questions for a
             // `company`-type interview — see the note below on why this
             // needs to also pre-tag the generated rows for that company.
@@ -52,6 +55,7 @@ class InterviewQuestionGenerationController extends Controller
                 $validated['count'],
                 $validated['skills'] ?? null,
                 $avoidQuestionTexts,
+                $validated['discipline'] ?? null,
             );
         } catch (RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
@@ -60,6 +64,7 @@ class InterviewQuestionGenerationController extends Controller
         $questions = collect($generated)->map(function (array $item) use ($request, $validated) {
             $question = InterviewQuestionBank::create([
                 ...$item,
+                'discipline' => $validated['discipline'] ?? null,
                 'is_active' => true,
                 'created_by' => $request->user()->id,
             ]);

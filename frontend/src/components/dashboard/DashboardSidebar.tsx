@@ -43,9 +43,14 @@ import {
   CreditCard,
   BadgeCheck,
   KeyRound,
+  CircuitBoard,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { departmentShort, loadBranchCatalog, useBranchCatalog } from "@/lib/branches";
+import { codesAtAll, useDomainPrepLabel } from "@/lib/departments";
+import { buildStudentNav } from "./studentNav";
 import { getStoredUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
@@ -86,7 +91,7 @@ export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "adm
  */
 type BadgeTone = "count" | "new" | "live" | "ok";
 
-interface NavItem {
+export interface NavItem {
   label: string;
   href: string;
   icon: any;
@@ -103,7 +108,7 @@ interface NavItem {
   matchPrefix?: boolean;
 }
 
-interface NavSection {
+export interface NavSection {
   title?: string;
   items: NavItem[];
 }
@@ -184,7 +189,11 @@ export function DashboardSidebar({
   // while browsing.
   const storedUser = getStoredUser();
 
-  const { stats: myStats } = useMyStats(currentRole === "user");
+  const catalog = useBranchCatalog();
+  const domainPrepLabel = useDomainPrepLabel();
+  // A programme with no coding has no rating or solved-score to show under its name — its department takes that line instead.
+  const studentCodes = codesAtAll(storedUser);
+  const { stats: myStats } = useMyStats(currentRole === "user" && studentCodes);
 
   // Plan shown in the footer, ChatGPT-style ("<plan> · Upgrade" under the
   // name instead of the email). A student sees their own personal plan with
@@ -200,6 +209,31 @@ export function DashboardSidebar({
     coverage?.source === "individual" && !!coverage.plan && coverage.plan.code !== "coder" && coverage.days_remaining !== null && coverage.days_remaining <= 0;
   const [projectLabEnabled, setProjectLabEnabled] = useState<boolean | null>(null);
   const [vaultEnabled, setVaultEnabled] = useState<boolean | null>(null);
+  // Core Prep (branch technical practice) is in the rail only when the server says it exists for this student.
+  const [coreAvailable, setCoreAvailable] = useState(false);
+  // A TPO sees "Core Tests" (or "Domain Tests" for a college with other departments) only once Mellow has switched at least one
+  // branch family of THEIR departments live — never an empty console.
+  const [tpoCoreLive, setTpoCoreLive] = useState(false);
+  const tpoDepartments = (storedUser?.college?.departments ?? null) as string[] | null;
+  const tpoRunsOnlyEngineering = !tpoDepartments || (tpoDepartments.length === 1 && tpoDepartments[0] === "engineering");
+  useEffect(() => {
+    if (currentRole !== "admin_tpo") return;
+    let cancelled = false;
+    loadBranchCatalog()
+      .then(
+        (c) =>
+          !cancelled &&
+          setTpoCoreLive(
+            c.disciplines.some(
+              (d) => !!d.is_live && d.code !== "cse" && d.code !== "other" && (!tpoDepartments || tpoDepartments.includes(d.department ?? "engineering"))
+            )
+          )
+      )
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
   useEffect(() => {
     if (currentRole !== "user" && currentRole !== "admin_tpo") return;
     let cancelled = false;
@@ -212,6 +246,7 @@ export function DashboardSidebar({
           setCoverage(res.coverage);
           setProjectLabEnabled(res.project_lab ? res.project_lab.enabled : null);
           setVaultEnabled(res.entitlements ? res.entitlements.vault_access : null);
+          setCoreAvailable(!!res.entitlements?.core_prep?.available);
         })
         .catch(() => {});
 
@@ -363,6 +398,13 @@ export function DashboardSidebar({
             badgeTone: "new",
           },
           {
+            label: "Domain Prep",
+            href: "/admin/core-prep",
+            icon: CircuitBoard,
+            badge: "New",
+            badgeTone: "new",
+          },
+          {
             label: "Project Lab",
             href: "/admin/projects",
             icon: FlaskConical,
@@ -454,6 +496,7 @@ export function DashboardSidebar({
           items: [
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
+            { label: "Departments", href: "/superadmin?tab=departments", icon: Layers },
             { label: "Plans & Pricing", href: "/superadmin?tab=plans", icon: Wallet },
             { label: "Payments", href: "/superadmin?tab=payments", icon: CreditCard },
             { label: "Subscriptions", href: "/superadmin?tab=subscriptions", icon: BadgeCheck },
@@ -532,6 +575,7 @@ export function DashboardSidebar({
               badge: "New",
               badgeTone: "new",
             },
+            ...(tpoCoreLive ? [{ label: tpoRunsOnlyEngineering ? "Core Tests" : "Domain Tests", href: "/admin/mock-core-tests", icon: CircuitBoard }] : []),
           ],
         },
         {
@@ -622,64 +666,14 @@ export function DashboardSidebar({
     }
 
     // Default: User / Student
-    return [
-      {
-        title: "Your Arena",
-        items: [
-          { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-          {
-            label: "Practice Arena",
-            href: "/dashboard/practice",
-            icon: BookOpen,
-          },
-          {
-            label: "Performance Report",
-            href: "/dashboard/reports",
-            icon: LineChart,
-          },
-          {
-            label: "Learning Centre",
-            href: "/dashboard/learning-centre",
-            icon: Sparkles,
-            badge: "AI",
-            badgeTone: "new",
-          },
-          // Visible to every student. Without Expert it wears a lock and its
-          // page is the upgrade screen — see ProjectLabPage.
-          {
-            label: "Project Lab",
-            href: "/dashboard/projects",
-            icon: FlaskConical,
-            matchPrefix: true,
-            ...(projectLabEnabled === false ? { locked: true } : { badge: "New", badgeTone: "new" as const }),
-          },
-        ],
-      },
-      {
-        title: "Competition",
-        items: [
-          {
-            label: "Upcoming & Drives",
-            href: "/dashboard#placement-drives",
-            icon: Briefcase,
-          },
-          { label: "Contests", href: "/dashboard/contests", icon: Swords },
-          { label: "AI Interviews", href: "/dashboard/interviews", icon: Mic },
-          { label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain },
-          // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their
-          // readiness score and how to raise it are there), so the item wears a lock rather than hiding —
-          // see StudentVaultPage, which shows the upgrade panel in place of the consent button.
-          {
-            label: "Vault",
-            href: "/dashboard/vault",
-            icon: Award,
-            ...(vaultEnabled === false ? { locked: true } : { badge: "New", badgeTone: "new" as const }),
-          },
-          { label: "Submissions", href: "/dashboard#submissions", icon: Activity },
-          { label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Swords },
-        ],
-      },
-    ];
+    return buildStudentNav({
+      projectLabEnabled,
+      vaultEnabled,
+      coreAvailable,
+      trackFocus: getStoredUser()?.track_focus ?? null,
+      capabilities: getStoredUser()?.capabilities ?? null,
+      domainPrepLabel,
+    });
   };
 
   // Every role gets the same account section — profile settings live at one
@@ -862,7 +856,12 @@ export function DashboardSidebar({
   // showed is lost, because both things it carried (the role label, and a
   // student's rating tier) resolve here.
   const accountMeta =
-    currentRole === "user" && myStats ? (
+    currentRole === "user" && !studentCodes ? (
+      <>
+        <span className="font-bold text-sidebar-dim">{departmentShort(catalog, storedUser?.department) ?? "Student"}</span>
+        {storedUser?.college?.short_code && <span className="text-sidebar-faint">{storedUser.college.short_code}</span>}
+      </>
+    ) : currentRole === "user" && myStats ? (
       studentTier ? (
         <>
           <span className={cn("font-extrabold", studentTier.text)}>{studentTier.label}</span>

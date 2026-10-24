@@ -50,6 +50,11 @@ export interface Entitlements {
   hackathon_access: boolean;
   /** Being listed in the Vault and hired through Mellow Vault (earning the readiness score is open to everyone). */
   vault_access: boolean;
+  /** Core Prep: practice answered per day (null = unlimited), timed tests, and whether Core Prep exists for this student at all. */
+  max_core_practice_per_day?: number | null;
+  core_practice_used_today?: number;
+  core_tests_access?: boolean;
+  core_prep?: { available: boolean; discipline: string | null; family: boolean; live: boolean; pilot?: boolean; has_content: boolean };
   feature_trial: FeatureTrial | null;
 }
 

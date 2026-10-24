@@ -8,6 +8,7 @@ use App\Models\ContestParticipant;
 use App\Models\ContestProblem;
 use App\Models\ProctoringSession;
 use App\Models\ProctoringViolation;
+use App\Services\Integrity\IntegrityService;
 use App\Services\JudgeService;
 use App\Services\ProctoringService;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ use Illuminate\Validation\Rule;
  */
 class ContestProctoringController extends Controller
 {
-    public function __construct(private readonly ProctoringService $proctoring) {}
+    public function __construct(private readonly ProctoringService $proctoring, private readonly IntegrityService $integrity) {}
 
     public function start(Request $request, Contest $contest, ContestProblem $contestProblem)
     {
@@ -38,11 +39,24 @@ class ContestProctoringController extends Controller
 
         $validated = $request->validate([
             'device_info' => ['nullable', 'array'],
+            'integrity' => ['nullable', 'array'],
         ]);
+
+        // Before anything is created: may this attempt begin from here, on this machine?
+        $this->integrity->preflight($request->user(), 'contest', $request);
 
         $session = $this->proctoring->startOrResume($participant, $validated['device_info'] ?? []);
 
-        return response()->json(['session' => $this->sessionPayload($session)]);
+        // The integrity layer (heartbeat, evidence, device/address binding). Null when it is switched off.
+        $integrity = $this->integrity->attach(
+            $request->user(),
+            'contest',
+            $session,
+            ($validated['integrity'] ?? []) + ['context' => ['contest_id' => $contest->id, 'contest_problem_id' => $contestProblem->id]],
+            $request,
+        );
+
+        return response()->json(['session' => $this->sessionPayload($session), 'integrity' => $integrity]);
     }
 
     public function reportViolation(Request $request, Contest $contest, ContestProblem $contestProblem)

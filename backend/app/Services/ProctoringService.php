@@ -8,6 +8,7 @@ use App\Models\ContestProblem;
 use App\Models\ProctoringSession;
 use App\Models\ProctoringViolation;
 use App\Models\User;
+use App\Services\Integrity\StrikeMath;
 use App\Services\Judge\JudgeQueue;
 use App\Services\Judge\JudgeRequest;
 use App\Support\SingleMail;
@@ -72,6 +73,7 @@ class ProctoringService
         array $meta,
         ?string $currentCode,
         ?string $language,
+        ?int $strikes = null,
     ): array {
         if ($session->isLocked()) {
             $this->logViolation($session, $type, $contestProblem, $ip, $meta, false);
@@ -79,9 +81,10 @@ class ProctoringService
             return ['session' => $session, 'locked' => true, 'already_locked' => true];
         }
 
-        $isStrike = ProctoringViolation::isStrikeType($type);
+        // `$strikes` is set only by the integrity layer (which has already decided what a finding is worth); null = the original rule.
+        $isStrike = $strikes === null ? ProctoringViolation::isStrikeType($type) : $strikes > 0;
 
-        return DB::transaction(function () use ($session, $type, $contestProblem, $ip, $meta, $isStrike, $currentCode, $language) {
+        return DB::transaction(function () use ($session, $type, $contestProblem, $ip, $meta, $isStrike, $currentCode, $language, $strikes) {
             /** @var ProctoringSession $locked */
             $locked = ProctoringSession::whereKey($session->id)->lockForUpdate()->first();
 
@@ -91,7 +94,7 @@ class ProctoringService
                 return ['session' => $locked->fresh(), 'locked' => $locked->isLocked(), 'already_locked' => $locked->isLocked()];
             }
 
-            $locked->increment('violation_count');
+            $locked->increment('violation_count', StrikeMath::toAdd($strikes, (int) $locked->violation_count));
             $locked->refresh();
 
             $threshold = (int) config('proctoring.max_violations_before_lock', 3);
@@ -178,6 +181,23 @@ class ProctoringService
                     $q->where('section', $section);
                 }
             })
+            ->where('violation_count', '>', 0)
+            ->with([
+                'contestParticipant.user:id,name,email,section,roll_number',
+                'contestParticipant.contest:id,title,slug',
+            ])
+            ->latest('updated_at');
+    }
+
+    /**
+     * Flagged sessions of the students one Section Coordinator looks after (their section, narrowed to their branches),
+     * built on the same User::scopeCoordinatedBy() the roster uses — a student the coordinator cannot see on the roster can
+     * never turn up here.
+     */
+    public function flaggedSessionsForCoordinator(User $coordinator)
+    {
+        return ProctoringSession::query()
+            ->whereHas('contestParticipant.user', fn ($q) => $q->coordinatedBy($coordinator))
             ->where('violation_count', '>', 0)
             ->with([
                 'contestParticipant.user:id,name,email,section,roll_number',

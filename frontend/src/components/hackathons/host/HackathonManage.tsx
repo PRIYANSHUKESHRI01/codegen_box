@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
-  ArrowLeft,
   Ban,
   CheckCircle2,
   ClipboardCheck,
@@ -93,11 +92,7 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
   };
 
   return (
-    <HostShell scope={scope} status={status} hasAccess={hasAccess} title="Manage hackathon" subtitle={h?.title}>
-      <Link href={paths.list} className="-mb-2 inline-flex w-fit items-center gap-2 text-xs font-semibold text-text-secondary hover:text-primary">
-        <ArrowLeft className="h-3.5 w-3.5" /> All hackathons
-      </Link>
-
+    <HostShell scope={scope} status={status} hasAccess={hasAccess} back={{ href: paths.list, label: "All hackathons" }} title="Manage hackathon" subtitle={h?.title}>
       {error && (
         <div role="alert" className="rounded-2xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-700 dark:text-rose-200">
           {error}

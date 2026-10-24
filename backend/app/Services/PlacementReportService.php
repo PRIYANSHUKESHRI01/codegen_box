@@ -7,6 +7,7 @@ use App\Models\DriveApplication;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Models\User;
+use App\Support\BranchCatalog;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,14 +23,18 @@ class PlacementReportService
     /** How long an application can sit in an interview-stage without an update before it's flagged as stale. */
     private const STALE_DAYS = 5;
 
-    public function forCollege(College $college): array
+    /**
+     * @param  string|null  $department  narrow every figure to one department's students ("what did Commerce place?"); null = the whole college
+     */
+    public function forCollege(College $college, ?string $department = null): array
     {
         $applications = DriveApplication::where('college_id', $college->id)
             ->with(['user', 'placementDrive.company'])
+            ->when($department !== null, fn ($q) => $q->whereHas('user', fn ($u) => $u->inDepartment($department)))
             ->get();
 
         return [
-            'funnel' => $this->funnel($college->id, $applications),
+            'funnel' => $this->funnel($college->id, $applications, $department),
             'recent_placements' => $this->recentPlacements($applications),
             'package_distribution' => $this->packageDistribution($applications),
             'company_summary' => $this->companySummary($applications),
@@ -37,9 +42,9 @@ class PlacementReportService
             'target' => [
                 'target_percent' => $college->placement_target_percent,
                 'target_deadline' => $college->placement_target_deadline,
-                'current_percent' => $this->currentPlacementPercent($college->id, $applications),
+                'current_percent' => $this->currentPlacementPercent($college->id, $applications, $department),
             ],
-            'action_items' => $this->actionItems($college),
+            'action_items' => $this->actionItems($college, $department),
         ];
     }
 
@@ -53,9 +58,9 @@ class PlacementReportService
         return $college->fresh();
     }
 
-    private function funnel(int $collegeId, $applications): array
+    private function funnel(int $collegeId, $applications, ?string $department = null): array
     {
-        $cohortSize = User::where('college_id', $collegeId)->where('role', User::ROLE_USER)->count();
+        $cohortSize = User::where('college_id', $collegeId)->where('role', User::ROLE_USER)->inDepartment($department)->count();
 
         return [
             'batch_enrolled' => $cohortSize,
@@ -146,16 +151,24 @@ class PlacementReportService
      */
     private function branchTrend($applications): array
     {
+        $catalog = BranchCatalog::instance();
+
+        // Colleges write one branch six ways ("Mech", "Mechanical", "ME"): group by what it MEANS when we
+        // know, by the college's own wording when we don't, and show the canonical name.
+        $groupKey = fn (DriveApplication $a) => $a->user->branch_code ?? $a->user->branch;
+
         return $applications
-            ->filter(fn (DriveApplication $a) => $a->user->branch !== null)
-            ->groupBy(fn (DriveApplication $a) => $a->placementDrive->drive_date->year.'|'.$a->user->branch)
-            ->map(function ($group) {
+            ->filter(fn (DriveApplication $a) => $groupKey($a) !== null)
+            ->groupBy(fn (DriveApplication $a) => $a->placementDrive->drive_date->year.'|'.$groupKey($a))
+            ->map(function ($group) use ($catalog) {
                 $first = $group->first();
                 $accepted = $group->where('stage', DriveApplication::STAGE_OFFER_ACCEPTED)->count();
 
                 return [
                     'year' => $first->placementDrive->drive_date->year,
-                    'branch' => $first->user->branch,
+                    'branch' => $catalog->labelOf($first->user->branch_code) ?? $first->user->branch,
+                    'branch_code' => $first->user->branch_code,
+                    'discipline' => $first->user->discipline,
                     'applications' => $group->count(),
                     'offers_accepted' => $accepted,
                     'placement_rate' => $group->count() > 0 ? round(($accepted / $group->count()) * 100, 1) : 0,
@@ -166,9 +179,9 @@ class PlacementReportService
             ->all();
     }
 
-    private function currentPlacementPercent(int $collegeId, $applications): float
+    private function currentPlacementPercent(int $collegeId, $applications, ?string $department = null): float
     {
-        $cohortSize = User::where('college_id', $collegeId)->where('role', User::ROLE_USER)->count();
+        $cohortSize = User::where('college_id', $collegeId)->where('role', User::ROLE_USER)->inDepartment($department)->count();
 
         if ($cohortSize === 0) {
             return 0.0;
@@ -183,12 +196,13 @@ class PlacementReportService
      * A small, fixed set of genuinely real/derived items — not a free-form
      * fake task table.
      */
-    private function actionItems(College $college): array
+    private function actionItems(College $college, ?string $department = null): array
     {
         $items = [];
+        $inDepartment = fn ($q) => $department === null ? $q : $q->whereHas('user', fn ($u) => $u->inDepartment($department));
 
         $staleCutoff = now()->subDays(self::STALE_DAYS);
-        $staleCount = DriveApplication::where('college_id', $college->id)
+        $staleCount = $inDepartment(DriveApplication::where('college_id', $college->id))
             ->whereIn('stage', [DriveApplication::STAGE_ONLINE_TEST, DriveApplication::STAGE_TECHNICAL_INTERVIEW, DriveApplication::STAGE_HR_ROUND])
             ->where('stage_updated_at', '<', $staleCutoff)
             ->count();
@@ -200,7 +214,7 @@ class PlacementReportService
             ];
         }
 
-        $pendingOfferCount = DriveApplication::where('college_id', $college->id)
+        $pendingOfferCount = $inDepartment(DriveApplication::where('college_id', $college->id))
             ->where('stage', DriveApplication::STAGE_OFFER_EXTENDED)
             ->where('stage_updated_at', '<', $staleCutoff)
             ->count();
@@ -212,7 +226,7 @@ class PlacementReportService
             ];
         }
 
-        $eligibleNotRegistered = $this->eligibleButNotRegisteredCount($college);
+        $eligibleNotRegistered = $this->eligibleButNotRegisteredCount($college, $department);
         if ($eligibleNotRegistered > 0) {
             $items[] = [
                 'type' => 'unregistered_eligible',
@@ -223,7 +237,7 @@ class PlacementReportService
         return $items;
     }
 
-    private function eligibleButNotRegisteredCount(College $college): int
+    private function eligibleButNotRegisteredCount(College $college, ?string $department = null): int
     {
         $mappings = DriveCollegeMapping::with('placementDrive')
             ->where('college_id', $college->id)
@@ -235,7 +249,7 @@ class PlacementReportService
             return 0;
         }
 
-        $students = User::where('college_id', $college->id)->where('role', User::ROLE_USER)->get();
+        $students = User::where('college_id', $college->id)->where('role', User::ROLE_USER)->inDepartment($department)->get();
         $notYetRegisteredIds = [];
 
         foreach ($mappings as $mapping) {

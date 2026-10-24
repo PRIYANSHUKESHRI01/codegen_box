@@ -34,3 +34,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# exam integrity: the MediaPipe runtime is copied from node_modules by scripts/copy-integrity-assets.mjs
+/public/integrity/wasm/

@@ -13,6 +13,7 @@ use App\Models\InterviewSession;
 use App\Models\PlacementDrive;
 use App\Services\InterviewProctoringService;
 use App\Services\InterviewTrackAdvancementService;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,7 @@ class AdminInterviewController extends Controller
         // rather than the plain "AI Interviews" list — a standalone interview
         // always has interview_track_id null, so this excludes nothing today.
         $interviews = Interview::whereNull('interview_track_id')
+            ->excludingPractice()
             ->withCount('sessions')
             ->with(['company:id,name,logo', 'placementDrive:id,title', 'owningCollege:id,name,short_code'])
             ->latest('created_at')
@@ -53,6 +55,7 @@ class AdminInterviewController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             // `talent_pool` is retired (see AdminContestController::store()); existing ones keep working as ordinary interviews.
@@ -85,6 +88,7 @@ class AdminInterviewController extends Controller
             'company_id' => $companyId,
             'placement_drive_id' => $placementDriveId,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ]);
 
         if ($interviewType === Interview::INTERVIEW_TYPE_COMPANY) {
@@ -133,6 +137,7 @@ class AdminInterviewController extends Controller
         $this->guardManagedElsewhere($interview);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(Interview::STATUSES)],
@@ -144,6 +149,10 @@ class AdminInterviewController extends Controller
         // above already keeps this method scoped to general/company only.
         if (isset($validated['is_mock']) && $interview->interview_type !== Interview::INTERVIEW_TYPE_COMPANY) {
             unset($validated['is_mock']);
+        }
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
         }
 
         $interview->update($validated);

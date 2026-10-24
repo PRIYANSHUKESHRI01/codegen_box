@@ -199,6 +199,8 @@ const LIMITS: PlanLimits = {
   project_lab_access: false,
   max_workspace_hours_per_month: null,
   max_active_projects: null,
+  max_core_practice_per_day: null,
+  core_tests_access: false,
 };
 
 const PLAN = (over: Partial<AdminPlan> = {}): AdminPlan =>

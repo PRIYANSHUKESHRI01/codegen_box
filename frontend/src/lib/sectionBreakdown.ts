@@ -12,8 +12,14 @@ export interface SectionStat {
   avgCgpa: number | null;
   avgBacklogs: number | null;
   avgReadiness: number;
+  /** The first coordinator on the section (kept for the screens that show one). */
   coordinator: SectionCoordinatorInfo | null;
+  /** Every coordinator on it — a section can have one per branch. */
+  coordinators: SectionCoordinatorInfo[];
 }
+
+/** Sections are compared trimmed and case-insensitively, exactly as the server does (User::scopeCoordinatedBy). */
+const sectionKey = (section: string | null | undefined): string => (section ?? "").trim().toLowerCase();
 
 function avg(nums: number[]): number {
   if (nums.length === 0) return 0;
@@ -45,7 +51,8 @@ export function computeSectionStats<
       const cohort = students.filter((s) => sectionLabel(s.section) === section);
       const cgpas = cohort.filter((s) => s.cgpa !== null).map((s) => Number(s.cgpa));
       const backlogs = cohort.filter((s) => s.backlogs !== null).map((s) => Number(s.backlogs));
-      const coordinator = coordinators.find((c) => c.section === section) ?? null;
+      const matching = coordinators.filter((c) => sectionKey(c.section) === sectionKey(section));
+      const coordinator = matching[0] ?? null;
 
       return {
         section,
@@ -56,6 +63,7 @@ export function computeSectionStats<
         coordinator: coordinator
           ? { id: coordinator.id, name: coordinator.name, email: coordinator.email, phone: coordinator.phone }
           : null,
+        coordinators: matching.map((c) => ({ id: c.id, name: c.name, email: c.email, phone: c.phone })),
       };
     })
     .sort((a, b) => b.avgReadiness - a.avgReadiness);

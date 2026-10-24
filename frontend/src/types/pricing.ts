@@ -86,4 +86,8 @@ export interface PlanLimits {
   project_lab_access: boolean;
   max_workspace_hours_per_month: number | null;
   max_active_projects: number | null;
+  /** Core Prep topic-practice questions per day for a non-CS student; null = unlimited. */
+  max_core_practice_per_day?: number | null;
+  /** Timed Core tests (the free plan gets its one-time trial instead when this is off). */
+  core_tests_access?: boolean;
 }

@@ -1,17 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog, FilterX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { formatDateTime, type ApiPage, type ApiPlatformUser, type ApiCollege } from "./types";
+import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
 import { PLAN_FILTERS, ROLE_FILTERS, roleInfo } from "./accountRoles";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { UserManageDrawer } from "./UserManageDrawer";
+import { CredentialLockBar, PasswordReveal } from "./CredentialUi";
+import { ROLES_WITHOUT_UNIVERSITY, RoleChips, UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
 
 interface AccountsPanelProps {
   triggerToast: (msg: string) => void;
 }
+
+/** How often the table quietly re-reads what is on screen, so a password the owner just changed stops looking viewable. */
+const REFRESH_EVERY_MS = 20_000;
+/** Silent refresh only re-reads this many pages (50 rows each); the rest update the next time they are loaded. */
+const REFRESH_MAX_PAGES = 2;
 
 /** What the Plan column says for one account: its plan, and whether that plan is its own or its college's. */
 function planCell(account: ApiPlatformUser) {
@@ -30,18 +37,14 @@ function planCell(account: ApiPlatformUser) {
 }
 
 /**
- * The login directory for the whole platform: who can sign in, as what, which plan
- * they hold, and whether they are still on the temporary password they were issued.
- * "Manage" opens the full account drawer (details, plan, sign-in tools, activity).
+ * The login directory for the whole platform: who can sign in, as what, which university and plan they
+ * belong to, and what state their password is in. "Manage" opens the full account drawer.
  *
- * It cannot show anyone's current password and never will: passwords are stored
- * as one-way hashes, and a user replaces their temporary password the first time
- * they sign in, so no copy of it exists to read. What a superadmin can do —
- * and what this panel is for — is issue a fresh temporary password and see it
- * once (ResetPasswordModal), e.g. when a college says it never got the email or
- * the toast showing the original password was missed — or open the account with
- * "View as" from the drawer, which shows what the user sees without touching
- * their password.
+ * Passwords are stored as one-way hashes, so a password an owner CHOSE can never be shown. What can be
+ * shown — after the superadmin re-enters their own password — is the temporary password an account was
+ * issued, until its owner replaces it (PasswordReveal). Anything else is handled by "Change password":
+ * generate a fresh one, or type one, and see it. The table refreshes itself every few seconds, so the
+ * state shown follows what the account owners are doing.
  */
 export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const [accounts, setAccounts] = useState<ApiPlatformUser[]>([]);
@@ -55,21 +58,15 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const [roleFilter, setRoleFilter] = useState("");
   const [planFilter, setPlanFilter] = useState("");
   const [collegeId, setCollegeId] = useState("");
-  const [colleges, setColleges] = useState<{ id: number; name: string }[]>([]);
   const [resetTarget, setResetTarget] = useState<ApiPlatformUser | null>(null);
   const [managedId, setManagedId] = useState<number | null>(null);
+
+  const facets = useDirectoryFacets({ role: roleFilter, collegeId, search: searchDebounced });
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 350);
     return () => clearTimeout(t);
   }, [search]);
-
-  useEffect(() => {
-    api
-      .get<{ colleges: ApiCollege[] }>("/admin/colleges")
-      .then((res) => setColleges(res.colleges.map((c) => ({ id: c.id, name: c.name }))))
-      .catch(() => {});
-  }, []);
 
   const buildParams = useCallback(
     (extra: Record<string, string> = {}) => {
@@ -88,11 +85,18 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
     [roleFilter, planFilter, collegeId, searchDebounced]
   );
 
+  // Which filter set the rows on screen belong to — an answer for an older one must never land on a newer one.
+  const filterKey = buildParams().toString();
+  const currentFilterKey = useRef(filterKey);
+  currentFilterKey.current = filterKey;
+
   const load = useCallback(() => {
     setLoading(true);
+    const requestedFor = buildParams().toString();
     api
-      .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${buildParams().toString()}`)
+      .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${requestedFor}`)
       .then((res) => {
+        if (requestedFor !== currentFilterKey.current) return;
         setAccounts(res.data);
         setPage(res.current_page);
         setHasMore(res.current_page < res.last_page);
@@ -108,9 +112,11 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
 
   const loadMore = () => {
     setLoadingMore(true);
+    const requestedFor = buildParams().toString();
     api
       .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${buildParams({ page: String(page + 1) }).toString()}`)
       .then((res) => {
+        if (requestedFor !== currentFilterKey.current) return;
         setAccounts((prev) => [...prev, ...res.data]);
         setPage(res.current_page);
         setHasMore(res.current_page < res.last_page);
@@ -119,53 +125,78 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
       .finally(() => setLoadingMore(false));
   };
 
+  // Keep the rows on screen true: re-read the loaded pages and update matching rows in place (no spinner, no scroll jump).
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const refreshQuietly = useCallback(() => {
+    const requestedFor = buildParams().toString();
+    const pages = Array.from({ length: Math.min(pageRef.current, REFRESH_MAX_PAGES) }, (_, i) => i + 1);
+    Promise.all(pages.map((p) => api.get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${buildParams({ page: String(p) }).toString()}`)))
+      .then((results) => {
+        if (requestedFor !== currentFilterKey.current) return;
+        const fresh = new Map(results.flatMap((r) => r.data).map((row) => [row.id, row]));
+        setAccounts((prev) => prev.map((row) => fresh.get(row.id) ?? row));
+        setTotal(results[0].total);
+      })
+      .catch(() => {
+        // A missed refresh is invisible; the next one catches up.
+      });
+  }, [buildParams]);
+
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === "visible") refreshQuietly();
+    };
+    const timer = setInterval(tick, REFRESH_EVERY_MS);
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [refreshQuietly]);
+
+  const chooseRole = (value: string) => {
+    setRoleFilter(value);
+    // Staff, hiring companies and superadmins never belong to a university: keeping one chosen would only show an empty list.
+    if (collegeId && ROLES_WITHOUT_UNIVERSITY.includes(value)) setCollegeId("");
+    // A plan only exists for students.
+    if (value && value !== "user") setPlanFilter("");
+  };
+
   const filtered = !!(searchDebounced || roleFilter || collegeId || planFilter);
+  const clearFilters = () => {
+    setSearch("");
+    setSearchDebounced("");
+    setRoleFilter("");
+    setPlanFilter("");
+    setCollegeId("");
+  };
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-primary">Accounts &amp; Logins</h2>
           <p className="text-xs text-text-muted max-w-2xl">
-            {total.toLocaleString()} account(s). Passwords are stored as one-way hashes, so a current password can&apos;t be read back — reset an account
-            to issue a new temporary password and see it once, or open it with <strong className="text-text-secondary">Manage → View as</strong> to see what its owner sees.
+            {total.toLocaleString()} account(s){filtered ? " match" : ""}. Unlock to see the temporary password an account was issued — it&apos;s available until the owner chooses their own, which then
+            stays private. <strong className="text-text-secondary">Change password</strong> sets a new one you can read. This list refreshes by itself.
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            aria-label="Filter by account type"
-            className="px-2.5 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
-          >
-            {ROLE_FILTERS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
-          </select>
+          <UniversityPicker value={collegeId} onChange={setCollegeId} facets={facets} />
           <select
             value={planFilter}
             onChange={(e) => setPlanFilter(e.target.value)}
             aria-label="Filter by plan"
-            className="px-2.5 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+            disabled={!!roleFilter && roleFilter !== "user"}
+            title={roleFilter && roleFilter !== "user" ? "Plans belong to students" : undefined}
+            className="px-2.5 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary disabled:opacity-50"
           >
             {PLAN_FILTERS.map((p) => (
               <option key={p.value} value={p.value}>
                 {p.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={collegeId}
-            onChange={(e) => setCollegeId(e.target.value)}
-            aria-label="Filter by college"
-            className="px-2.5 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
-          >
-            <option value="">All Colleges</option>
-            {colleges.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
               </option>
             ))}
           </select>
@@ -179,8 +210,21 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
               className="pl-8 pr-3 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary placeholder-text-muted outline-none focus:border-accent-primary"
             />
           </div>
+          {filtered && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-control border border-border-subtle bg-elevated text-xs font-semibold text-text-secondary hover:text-primary"
+            >
+              <FilterX className="w-3.5 h-3.5" /> Clear
+            </button>
+          )}
         </div>
       </div>
+
+      <RoleChips choices={ROLE_FILTERS} value={roleFilter} onChange={chooseRole} facets={facets} />
+
+      <CredentialLockBar />
 
       {loading ? (
         <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">Loading accounts...</div>
@@ -196,7 +240,7 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
                 <tr>
                   <th className="px-4 py-3">Account</th>
                   <th className="px-4 py-3">Login ID</th>
-                  <th className="px-4 py-3">College</th>
+                  <th className="px-4 py-3">University</th>
                   <th className="px-4 py-3">Plan</th>
                   <th className="px-4 py-3">Password</th>
                   <th className="px-4 py-3">Login email sent</th>
@@ -219,28 +263,33 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
                       <td className="px-4 py-3 text-text-secondary font-medium">{a.college?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-text-secondary">{planCell(a)}</td>
                       <td className="px-4 py-3">
-                        {a.is_blocked ? (
-                          <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-danger/15 text-status-danger">
-                            <Ban className="w-3 h-3" />
-                            <span>Blocked</span>
-                          </span>
-                        ) : a.must_change_password ? (
-                          <span
-                            title="Still the temporary password it was issued. The account has not chosen its own yet."
-                            className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-warning/15 text-status-warning"
-                          >
-                            <Clock className="w-3 h-3" />
-                            <span>Temporary — not changed yet</span>
-                          </span>
-                        ) : (
-                          <span
-                            title="The user has set their own password."
-                            className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-success/15 text-status-success"
-                          >
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Set by user</span>
-                          </span>
-                        )}
+                        <div className="space-y-1.5">
+                          {a.is_blocked ? (
+                            <span className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-danger/15 text-status-danger">
+                              <Ban className="w-3 h-3" />
+                              <span>Blocked</span>
+                            </span>
+                          ) : a.must_change_password ? (
+                            <span
+                              title="Still the temporary password it was issued. The account has not chosen its own yet."
+                              className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-warning/15 text-status-warning"
+                            >
+                              <Clock className="w-3 h-3" />
+                              <span>Temporary — not changed yet</span>
+                            </span>
+                          ) : (
+                            <span
+                              title="The user has set their own password."
+                              className="inline-flex items-center gap-1 text-3xs font-bold px-2 py-0.5 rounded-full bg-status-success/15 text-status-success"
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>Set by user</span>
+                            </span>
+                          )}
+                          <div>
+                            <PasswordReveal userId={a.id} userName={a.name} state={a.credential_state} onStale={refreshQuietly} />
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-text-muted">{a.credentials_email_sent_at ? formatDateTime(a.credentials_email_sent_at) : "—"}</td>
                       <td className="px-4 py-3 text-right">
@@ -263,7 +312,7 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-border-subtle bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary text-xs font-bold transition-all"
                             >
                               <KeyRound className="w-3.5 h-3.5" />
-                              Reset password
+                              Change password
                             </button>
                           )}
                         </div>

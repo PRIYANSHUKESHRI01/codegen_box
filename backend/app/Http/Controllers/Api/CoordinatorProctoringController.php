@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ProctoringSession;
 use App\Models\ProctoringViolation;
 use App\Services\ProctoringService;
+use App\Services\SectionCoordinatorService;
 use Illuminate\Http\Request;
 
 /**
@@ -17,17 +18,13 @@ use Illuminate\Http\Request;
  */
 class CoordinatorProctoringController extends Controller
 {
-    public function __construct(private readonly ProctoringService $proctoring) {}
+    public function __construct(private readonly ProctoringService $proctoring, private readonly SectionCoordinatorService $coordinators) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
 
-        if (! $user->college_id || ! $user->section) {
-            return response()->json(['sessions' => []]);
-        }
-
-        $sessions = $this->proctoring->flaggedSessionsForCollege($user->college_id, $user->section)->get();
+        $sessions = $this->proctoring->flaggedSessionsForCoordinator($user)->get();
 
         return response()->json(['sessions' => $sessions->map(fn (ProctoringSession $s) => $this->summary($s))]);
     }
@@ -65,16 +62,13 @@ class CoordinatorProctoringController extends Controller
         return response()->json(['session' => $this->summary($proctoringSession->fresh())]);
     }
 
-    /** A coordinator may only ever act on a session belonging to their own college AND their own section. */
+    /** A coordinator may only ever act on a session belonging to a student they look after — the same query the roster uses. */
     private function authorizeSection(Request $request, ProctoringSession $session): void
     {
         $session->loadMissing('contestParticipant.user');
         $student = $session->contestParticipant->user;
 
-        abort_unless(
-            $student->college_id === $request->user()->college_id && $student->section === $request->user()->section,
-            404
-        );
+        abort_unless($student !== null && $this->coordinators->covers($request->user(), $student), 404);
     }
 
     private function summary(ProctoringSession $s): array

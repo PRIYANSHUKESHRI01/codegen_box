@@ -18,7 +18,7 @@ staff account gets 403); every change is written to **Audit Log** with who did i
 | Change what a plan costs | **Plans & Pricing** | Live the moment it is saved |
 | Change what a plan includes | Plans & Pricing → **Edit limits** | Daily limits, free tries, Arena / Pool / Lab switches |
 | Look at / fix / control one account | Students, Leads, Mellow Staff, **Accounts & Logins** (or a Subscriptions row) → **Manage** | The same drawer everywhere |
-| Get into an account | Manage → **Sign-in & access** → **Reset password & show it**, or **View as this user** | See §4 — passwords cannot be read |
+| Get into an account | Accounts & Logins → **Unlock** → **Show password** (issued logins), **Change password**, or **View as this user** | See §4 — a password the owner chose cannot be read |
 
 The **Manage** drawer has four sections: *Overview* (details, correct them, a student's progress), *Plan & billing*
 (what they hold, history, give/extend/end, their payments), *Sign-in & access* (login, reset password, sign out of all
@@ -68,16 +68,51 @@ path handles "signed out of all devices" and an expired token (401).
 
 ## 4. Passwords, credentials and "view as"
 
-**A password cannot be shown.** Passwords are stored as one-way (bcrypt) hashes and a user replaces their temporary one
-at first login, so no copy exists to read; storing recoverable passwords would make one database leak a leak of every
-account on the platform. Instead, in **Manage → Sign-in & access** the superadmin can:
+**A password an owner chose cannot be shown.** Passwords are stored as one-way (bcrypt) hashes, so once a user sets their
+own there is nothing to read, and keeping recoverable copies of everyone's real password would turn one database leak into
+a leak of every account (and of whatever else they reuse it on). What a superadmin **can** see is the **temporary password
+an account was issued**, for as long as its owner has not replaced it — and they can set a new password for anyone.
+
+**Looking up an issued login** (Superadmin → Accounts & Logins, and Manage → Sign-in & access):
+
+1. Press **Unlock** and re-enter *your own* password. The unlock lasts 10 minutes, on that browser session only, and
+   **Lock now** closes it at once. (`POST /api/superadmin/credentials/unlock`, `…/lock`, `GET …/status`.)
+2. **Show password** on a row fetches that one account's login (`POST /api/superadmin/users/{id}/credentials`) and shows
+   it for 30 seconds, with Copy. The list itself never carries a password — only a state: *viewable*, *private — user chose
+   it*, *not on file — reset to issue one*, or *protected* (superadmins: never shown).
+3. The table re-reads itself every 20 s (and on focus), so a row flips to *Private* soon after its owner changes their
+   password — and the lookup re-checks the stored value against the account's current hash anyway, so a stale copy is
+   never shown even if you click first.
+
+How the issued password is kept (`IssuedCredentialVault`, table `issued_credentials`): encrypted with `APP_KEY` (a leaked
+DB dump alone reveals nothing); one row per account; written wherever the platform issues a password (account creation by
+superadmin / Mellow staff / TPO / coordinator, bulk student import, candidate import, reset, set-by-superadmin); deleted the
+moment the owner sets their own (change-password and forgot-password flows) and on sight if it no longer matches the hash;
+expires after 30 days; superadmins are never stored; if `APP_KEY` is ever rotated those rows simply become unreadable
+(treated as "not on file"). Accounts issued **before this feature** have no copy — reset them once to get a viewable one.
+
+Protection layers: superadmin role only (a "view as" token belongs to the viewed user and can't reach it) → password
+re-entry unlock → `superadmin-credentials` limiter (40/min; unlock itself uses `superadmin-sensitive`, 10/min) → every
+lookup written to the audit log (who, whom, state — never the password) → `Cache-Control: no-store` on every response.
+
+**Changing a password** — *Change password* on a row or in the drawer: let the server generate a strong one, or type one
+(8–72 characters; **Suggest** fills a random one). It replaces the old password at once, signs the account out everywhere,
+and (optionally) e-mails it. By default the new password is temporary — the owner must choose their own at next sign-in and
+you can look it up again until they do. Untick *Ask them to choose their own* to set a permanent password; **no copy is
+kept** for that. Needs your own password; superadmins can't be targeted (they change their own from Settings).
+
+The rest of what you can do without touching a password:
 
 - see the **login ID** (email), whether the password is still the temporary one, when the login email was sent, last
   seen, and how many sessions are open;
-- **Reset password & show it** — issues a fresh temporary password, shown once (optionally emailed); the old password
-  stops working and every session is signed out. Needs your own password; superadmin accounts are excluded.
 - **View as this user** — see exactly what they see, without knowing or changing their password and without signing them
   out. This is the right tool for "I want to see their dashboard/plan/locks".
+
+**Directory filters** (Accounts & Logins, Students): account-type chips with live counts (scoped to the chosen university
+and search), a type-to-search **university picker** with per-university counts for the chosen type and a *No university*
+choice (staff, hiring companies, individual coders — `college_id=none`), plan filter (students only), and *Clear*.
+Choosing a type that never belongs to a university (hiring companies, Mellow staff, superadmins) drops the university
+filter. Counts come from `GET /api/superadmin/users/facets` (two grouped counts, no row data).
 
 **View as** (`SuperAdminAccountController::impersonate`): needs your password; a Sanctum token with the single ability
 `impersonated` and a 60-minute expiry; **read-only** — `RejectWritesWhileImpersonating` refuses every non-GET request except
@@ -97,13 +132,14 @@ and also revokes the parked token.
 | Delete one account | `GET …/deletion-preview`, `DELETE /api/superadmin/users/{id}` | Students and section coordinators only (`UserPurgeService`). Needs your password **and** the account's exact email. Removes the account, tokens, plans, files and everything that cascades; **payment records are kept** (user nulled, payer name/email snapshotted). Staff/TPO/company accounts are refused — block them, or delete the college. |
 | Block / unblock | existing `POST …/toggle-block` | now effective on the very next request |
 
-Throttles: password-confirming actions (view as, sign-out, delete, reset, ending a college's plan) share
+Throttles: password-confirming actions (view as, sign-out, delete, reset, unlock, ending a college's plan) share
 `superadmin-sensitive` — 10/min per superadmin.
 
 ## 6. Deploying this
 
-- **No database migration** — every column it uses already exists (it deliberately avoids a schema change so it can't
-  break a deploy that hasn't migrated yet).
+- **One migration** (`2026_10_26_100000_create_issued_credentials_table`, additive — a new table only): run
+  `php artisan migrate`. Until it runs, creating an account still works (keeping the lookup copy never throws) but
+  *Show password* has nothing to show.
 - Run `php artisan route:cache` (and `config:cache`) on the server: cached routes hide new endpoints and the new
   rate-limit names are registered in `AppServiceProvider`.
 - Behaviour change to know about: **blocked students are now cut off immediately**, not at their next login.

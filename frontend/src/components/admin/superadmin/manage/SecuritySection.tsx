@@ -8,16 +8,17 @@ import { formatDateTime } from "../types";
 import { DeleteAccountModal } from "../DeleteAccountModal";
 import { ResetPasswordModal } from "../ResetPasswordModal";
 import { ViewAsModal } from "../ViewAsModal";
+import { CredentialLockBar, LoginDetailsRow } from "../CredentialUi";
 import { Card, Row, SectionTitle, dangerButton, ghostButton, inputClass, primaryButton, timeAgo, type SectionProps } from "./shared";
 
 /**
  * Sign-in, access and the destructive tools for one account.
  *
- * Passwords can't be read back — they are stored as one-way hashes, and a user
- * replaces their temporary one at first login, so there is nothing to show. The two
- * honest ways to deal with "I need to get into / see this account" are here:
- * issue a fresh temporary password (shown once), or "View as" — see exactly what
- * they see, read-only, without touching their password at all.
+ * A password the owner chose can't be read back — it is a one-way hash. What can be
+ * shown (after the superadmin re-enters their own password) is the temporary password
+ * the account was issued, until its owner replaces it. For anything else: change the
+ * password to one you can read, or "View as" — see exactly what they see, read-only,
+ * without touching their password at all.
  */
 export function SecuritySection({ data, reload, triggerToast, onDeleted }: SectionProps & { onDeleted: () => void }) {
   const { user, login, capabilities } = data;
@@ -78,18 +79,19 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
         <SectionTitle>Sign-in</SectionTitle>
         <Card>
           <dl>
-            <Row label="Login ID" mono>
-              {login.login_id}
-            </Row>
-            <Row label="Password">{passwordBadge}</Row>
+            <Row label="Password state">{passwordBadge}</Row>
             <Row label="Login email sent">{login.credentials_email_sent_at ? formatDateTime(login.credentials_email_sent_at) : "—"}</Row>
             <Row label="Last seen">{login.last_seen_at ? timeAgo(login.last_seen_at) : "—"}</Row>
             <Row label="Open sessions">{login.active_sessions}</Row>
           </dl>
-          <p className="mt-3 border-t border-border-subtle pt-3 text-2xs leading-relaxed text-text-muted">
-            A password can&apos;t be read back: it&apos;s stored as a one-way hash, and a user replaces a temporary one the first time they sign in. To get into or see an account, reset it to a fresh temporary
-            password, or use <strong className="text-text-secondary">View as</strong> to see what they see without touching their password.
-          </p>
+          <div className="mt-3 space-y-3 border-t border-border-subtle pt-3">
+            <CredentialLockBar />
+            <LoginDetailsRow email={login.login_id} userId={user.id} userName={user.name} state={login.credential_state} onStale={() => void reload()} />
+            <p className="text-2xs leading-relaxed text-text-muted">
+              Once a user chooses their own password it is private and can&apos;t be shown. To get into an account anyway, change its password below, or use{" "}
+              <strong className="text-text-secondary">View as</strong> to see what they see without touching their password.
+            </p>
+          </div>
         </Card>
       </div>
 
@@ -103,7 +105,7 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
           )}
           {capabilities.reset_password && (
             <button type="button" onClick={() => setResetting(true)} className={cn(ghostButton, "justify-start py-2.5")}>
-              <KeyRound className="h-3.5 w-3.5" /> Reset password &amp; show it
+              <KeyRound className="h-3.5 w-3.5" /> Change password
             </button>
           )}
           {capabilities.revoke_sessions && (

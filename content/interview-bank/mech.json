@@ -1,0 +1,417 @@
+[
+ {
+  "question_text": "What is the difference between stress and strain, and what does the stress-strain curve of mild steel tell you?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Stress is force per unit area; strain is the relative deformation. The curve shows the elastic region (Hooke's law, Young's modulus), yield point, plastic region with strain hardening, ultimate strength and fracture. Mentions that design stays within the elastic region with a factor of safety.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What is a factor of safety, and how would you decide how much to use?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Ratio of the strength to the working load/stress. Depends on uncertainty in loads and material, consequence of failure, type of loading (fatigue, shock), quality control and standards; higher for safety-critical or uncertain situations, but too much adds weight and cost.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Why do shafts and springs usually fail from fatigue and not from a single overload? How do you design against it?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Repeated or fluctuating stresses below the yield strength initiate and grow cracks over many cycles, often from stress concentrations. Design with endurance limits, avoid sharp corners (fillets), improve surface finish, shot peening, keep stress amplitude low and use appropriate safety factors.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "How do you decide between using a bolted joint, a welded joint and a riveted joint?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Bolts allow disassembly and replacement but concentrate stress at holes; welding gives a continuous, strong and sealed joint but cannot be taken apart and creates heat-affected zones; rivets suit thin sheets and fatigue-prone structures. Consider loading, maintenance, cost, materials and inspection.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "A shaft fails at a shoulder after some months. Walk me through how you would investigate and fix it.",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Inspect the fracture surface (beach marks indicate fatigue), check stress concentration at the shoulder, loads and misalignment, material and heat treatment, surface finish, keyway or fillet radius. Fixes: larger fillet radius, relief grooves, stronger material or surface treatment, reduced load. A structured failure analysis.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What does a CAD model give you that a drawing alone does not, and how do you check a design before manufacture?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "design_cad",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "3D visualisation, mass and inertia properties, interference checks, assemblies, simulation (FEA), and a single source for drawings. Before manufacture: tolerance stack-up, clash check, manufacturability review and sometimes a prototype.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "State the first and second laws of thermodynamics in plain words and give one practical implication of each.",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "First: energy is conserved - heat added equals change in internal energy plus work done. Second: heat flows spontaneously from hot to cold and no engine can convert all heat to work (entropy increases). Implications: you cannot get free energy; efficiency limits such as Carnot.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "How does a vapour-compression refrigeration cycle work?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "Compressor raises refrigerant pressure and temperature, condenser rejects heat and liquefies it, expansion valve drops pressure and temperature, evaporator absorbs heat from the space as the refrigerant boils. COP is the cooling effect divided by compressor work. Mention refrigerant choice and superheat/sub-cooling.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What are the three modes of heat transfer, and how would you reduce heat loss from a hot pipe?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "Conduction, convection and radiation. Reduce loss with insulation (low conductivity), a reflective outer layer to cut radiation, and avoiding air movement; mention insulation thickness and that too little insulation on small pipes can even increase loss (critical radius).",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Why is the efficiency of a real engine lower than the Carnot efficiency?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "Carnot is the ideal limit between two temperatures with reversible processes. Real engines have friction, heat losses, finite-rate heat transfer, incomplete combustion and mechanical losses. Raising the hot-side temperature or reducing the cold-side temperature improves the limit.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "How would you size the cooling load for a small air-conditioned room, and what factors do you need to include?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "Add sensible and latent loads: heat through walls, roof and windows (with solar gain), people, lighting, equipment, ventilation air and infiltration; apply a safety margin and consider peak conditions. Convert to tonnage and then choose equipment with some reserve.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What is the difference between casting, forging and machining, and when would you use each?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "manufacturing"
+  ],
+  "notes_for_reviewer": "Casting pours molten metal into a mould - complex shapes, good for large or intricate parts; forging shapes metal by compressive force - better strength and grain flow; machining removes material - precise dimensions and finish. Selection depends on shape, strength, quantity, tolerance and cost.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Why do cutting tools wear, and what can you do to extend tool life?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "manufacturing"
+  ],
+  "notes_for_reviewer": "Abrasion, adhesion, diffusion and thermal softening at high temperature and pressure. Reduce speed, use coolant, correct feed and depth, choose a suitable tool material and coating, and keep the machine rigid. Mentions Taylor's tool-life relation that tool life falls rapidly with speed.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What are tolerances and fits, and why do they matter in assemblies?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "manufacturing",
+   "quality_production"
+  ],
+  "notes_for_reviewer": "A tolerance is the permitted variation in a dimension; a fit describes the relationship between a shaft and a hole (clearance, transition, interference). They ensure parts made separately assemble and function, and affect cost - tighter tolerances cost more.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What is statistical process control, and what does a control chart tell you?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "quality_production"
+  ],
+  "notes_for_reviewer": "Monitoring a process with samples over time to separate normal variation from special causes; points outside limits or patterns signal that something has changed, so you can act before defects occur. Mentions process capability and why limits are not the same as specification limits.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "A batch of machined parts is out of tolerance. How do you find the cause?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "manufacturing",
+   "quality_production"
+  ],
+  "notes_for_reviewer": "Check measurement first (gauge calibration), then the process variables: tool wear, setup/fixturing, machine condition, temperature, material variation and operator procedure. Sample and measure over time, find where drift starts, fix the root cause, and decide what to do with the batch (sort, rework, scrap).",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Explain the idea of lean manufacturing and name two forms of waste.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "quality_production"
+  ],
+  "notes_for_reviewer": "Maximise value by eliminating waste: overproduction, waiting, transport, over-processing, inventory, motion and defects. Tools include 5S, kaizen and just-in-time. Good answers link each waste to something on a shop floor.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "How does a four-stroke petrol engine work? Explain the four strokes.",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "automotive_ev",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Intake (air-fuel enters), compression, power (spark ignites, expansion pushes the piston) and exhaust. One power stroke every two crankshaft revolutions; mention valves and spark timing.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What is the difference between a petrol and a diesel engine?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "automotive_ev",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Petrol uses spark ignition with a premixed charge and lower compression ratio; diesel uses compression ignition with fuel injected into hot compressed air at a higher compression ratio, giving better efficiency and torque but higher NOx and particulate emissions.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What are the main differences between an electric vehicle and an internal-combustion vehicle from a mechanical engineer's point of view?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "automotive_ev",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Fewer moving parts (no gearbox/multi-speed in many EVs), battery pack mass and packaging, thermal management of battery and motor, different NVH, regenerative braking, lower maintenance, and chassis design around the pack.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Why is battery thermal management important in an EV, and how can it be done?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "automotive_ev",
+   "editorial-v1",
+   "thermal"
+  ],
+  "notes_for_reviewer": "Cell life, safety and charging speed depend on temperature; too hot degrades and risks thermal runaway, too cold limits power. Methods: air cooling, liquid cooling plates, refrigerant or phase-change materials, with heaters in cold climates and sensors for control.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What are degrees of freedom in a robot arm, and why does the number matter?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "robotics"
+  ],
+  "notes_for_reviewer": "The independent motions available; six are needed to place a tool at any position and orientation in space. More joints increase flexibility and reach but add complexity, cost and control difficulty; fewer suit simple tasks.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "A machine operator tells you a part will be late because a tool is worn. Production wants it shipped anyway. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "quality_production",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "Weigh quality and delivery: confirm what is out of tolerance, get a quick replacement or alternative route, inform the customer or supervisor with a realistic time, and do not ship non-conforming parts without a documented decision.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "You notice a guard missing from a machine on the shop floor. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "manufacturing",
+   "safety"
+  ],
+  "notes_for_reviewer": "Stop or tag out the machine if it is safe to do so, report it immediately to the supervisor, get it fixed before use, and record the incident. Safety is not left for later.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Your design is rejected in a review. How do you respond?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "design_cad",
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "Listen to the reasons, separate the technical points from personal feelings, ask for specifics, test the objections with calculation or data, revise and re-present; accept valid points and justify the rest with evidence.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "You have two urgent tasks from two different managers. What do you do?",
+  "category": "situational",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "time_management"
+  ],
+  "notes_for_reviewer": "Clarify the real deadlines and impact, tell both managers the conflict honestly, propose an order and ask them to agree priority, and keep both informed of progress.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "A supplier's material fails your incoming inspection. What is your next step?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "quality_production"
+  ],
+  "notes_for_reviewer": "Quarantine the lot, verify the test, inform the supplier and quality team with data, decide on return, rework or concession, check material already in use, and ask for corrective action. Keeps production informed.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Tell me about your best project. What was your contribution, what went wrong and what would you change?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "projects"
+  ],
+  "notes_for_reviewer": "A clear problem and design approach, personal contribution, a real difficulty with the cause and fix, a measured outcome, and an honest lesson. Look for ownership and specifics.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Describe something you learned on the job or in a workshop that was not in your syllabus.",
+  "category": "behavioral",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "learning"
+  ],
+  "notes_for_reviewer": "What they learned, how (watching, asking, trying), how they applied it and what it changed. Shows curiosity and practical learning.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Tell me about a time you had to work with someone difficult.",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "A specific situation, understanding their viewpoint, communicating clearly, staying professional, and a constructive result. Avoids blame.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Tell me about a time something you built or made did not work as intended. What did you do?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "debugging",
+   "editorial-v1",
+   "manufacturing"
+  ],
+  "notes_for_reviewer": "Defined the problem, found the cause by observation and measurement rather than guessing, fixed it, and noted what to do differently next time. Names the actual root cause.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "Why mechanical engineering, and where do you see yourself in three years?",
+  "category": "hr",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "career",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "A genuine reason, interest in a specific area (design, thermal, manufacturing, automotive), willingness to work on the shop floor or at site, and realistic growth goals.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "What sensors would you use for a mobile robot to avoid obstacles, and why?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "robotics"
+  ],
+  "notes_for_reviewer": "Ultrasonic, infrared or LiDAR for distance, cameras for rich perception, bumpers as backup, plus encoders and an IMU for motion. Discuss range, accuracy, cost, lighting and surfaces, and combining sensors for reliability.",
+  "discipline": "mech"
+ },
+ {
+  "question_text": "In simple terms, what is the difference between forward and inverse kinematics for a robot arm?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "robotics"
+  ],
+  "notes_for_reviewer": "Forward kinematics calculates the end-effector position from the joint angles - a direct calculation. Inverse kinematics finds the joint angles needed to reach a desired position - often several solutions, or none, and harder to compute. Needed for planning motion.",
+  "discipline": "mech"
+ }
+]

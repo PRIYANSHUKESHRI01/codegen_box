@@ -4,9 +4,12 @@ import ExcelJS from "exceljs";
 import { pdfSafe } from "@/lib/pdfTextSafe";
 import type { PlacementReportData } from "@/types/placement";
 import type { CohortStudent } from "@/types/cohort";
+import { api } from "@/lib/api";
+import type { CoreProficiencyResponse } from "@/types/core";
 import { computeSectionStats, sectionLabel } from "@/lib/sectionBreakdown";
 import { ENGAGEMENT_LABEL, rollupLanguages } from "@/lib/cohortInsights";
 import { languageLabel } from "@/lib/judgeLanguages";
+import { describeEligibleBranches, getCachedBranchCatalog } from "@/lib/branches";
 
 export interface TpoReportStudent {
   id: number;
@@ -14,6 +17,13 @@ export interface TpoReportStudent {
   email: string;
   roll_number: string | null;
   branch: string | null;
+  /** What the branch text was recognised as (null = not recognised yet) — group and filter on this. */
+  branch_code?: string | null;
+  discipline?: string | null;
+  branch_source?: "college" | "self" | null;
+  track_focus?: "core_first" | "balanced" | "it_first" | null;
+  /** Core Prep standing — null unless the student's branch has Core Prep live. */
+  core?: CohortStudent["core"];
   section: string | null;
   cgpa: string | null;
   backlogs: number | null;
@@ -295,7 +305,7 @@ export function driveDirectoryRows(data: TpoReportsData): ReportPreview {
       d.status,
       d.eligibility.min_cgpa ?? "Open",
       d.eligibility.max_backlogs ?? "Open",
-      d.eligibility.eligible_branches?.join(", ") || "All branches",
+      describeEligibleBranches(d.eligibility.eligible_branches, getCachedBranchCatalog()),
       d.funnel.fully_eligible,
       d.funnel.total,
     ]),
@@ -436,6 +446,87 @@ export async function generateLanguageProgressReport(data: TpoReportsData, secti
   return {
     blob: new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
     filename: `${fileSafe(data.college.name)}-coding-languages-progress-report${suffix}.xlsx`,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Core Subject Proficiency (Excel) — one sheet per live core branch family
+// ---------------------------------------------------------------------------
+
+const TRACK_WORDS: Record<string, string> = { core_first: "Core first", balanced: "Balanced", it_first: "IT first" };
+const PROFILE_WORDS: Record<string, string> = { core: "Core profile", balanced: "Balanced profile", software: "Software profile", general: "Programme profile (no coding)" };
+
+/** The "View" table for the Core Subject Proficiency report: one line per student across all live core branches. */
+export async function coreProficiencyRows(): Promise<ReportPreview> {
+  const { disciplines } = await api.get<CoreProficiencyResponse>("/tpo/core-insights/proficiency");
+
+  return {
+    headers: ["Name", "Roll Number", "Branch", "Track", "Readiness", "Core Readiness", "Questions Answered", "Topics Mastered", "Tests Taken", "Avg Test %", "Weakest Subject"],
+    rows: disciplines.flatMap((d) =>
+      d.students.map((s) => {
+        const measured = d.subjects.map((sub) => ({ name: sub.name, cell: s.subjects[String(sub.id)] })).filter((x) => x.cell && x.cell.attempts >= 3 && x.cell.accuracy !== null);
+        const weakest = measured.sort((a, b) => (a.cell!.accuracy as number) - (b.cell!.accuracy as number))[0]?.name ?? "—";
+
+        return [s.name, s.roll_number ?? "—", s.branch ?? "—", s.track_focus ? TRACK_WORDS[s.track_focus] : "Not chosen", s.readiness_score, s.core_readiness ?? "—", s.answered, s.topics_mastered, s.tests_taken, s.avg_test_percent ?? "—", weakest];
+      })
+    ),
+  };
+}
+
+/** The students of live core branches with their accuracy in every subject — from /tpo/core-insights/proficiency, not the roster, so each subject has a column. */
+export async function generateCoreProficiencyReport(data: TpoReportsData): Promise<GeneratedReport> {
+  const { disciplines } = await api.get<CoreProficiencyResponse>("/tpo/core-insights/proficiency");
+
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "AptRun";
+  workbook.created = new Date();
+
+  for (const d of disciplines) {
+    const sheet = workbook.addWorksheet(d.name.slice(0, 31).replace(/[\/?*[\]:]/g, " "));
+    const fixed = ["Name", "Roll Number", "Branch", "Section", "Track", "Readiness", "Scored By", "Core Readiness", "Questions Answered", "Topics Mastered", "Tests Taken", "Avg Test %"];
+    const headers = [...fixed, ...d.subjects.map((s) => `${s.name} %`), "Weakest Subject"];
+
+    sheet.addRow(headers);
+    sheet.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
+    sheet.views = [{ state: "frozen", ySplit: 1, xSplit: 1 }];
+    sheet.columns.forEach((col, i) => (col.width = i === 0 ? 26 : i < fixed.length ? 16 : 18));
+
+    for (const s of d.students) {
+      // Weakest = lowest accuracy among subjects with a few answers behind them (3+), as the roster says it.
+      const measured = d.subjects.map((sub) => ({ name: sub.name, cell: s.subjects[String(sub.id)] })).filter((x) => x.cell && x.cell.attempts >= 3 && x.cell.accuracy !== null);
+      const weakest = measured.sort((a, b) => (a.cell!.accuracy as number) - (b.cell!.accuracy as number))[0]?.name ?? "—";
+
+      sheet.addRow([
+        s.name,
+        s.roll_number ?? "—",
+        s.branch ?? "—",
+        s.section ?? "—",
+        s.track_focus ? TRACK_WORDS[s.track_focus] : "Not chosen",
+        s.readiness_score,
+        PROFILE_WORDS[s.profile] ?? s.profile,
+        s.core_readiness ?? "—",
+        s.answered,
+        s.topics_mastered,
+        s.tests_taken,
+        s.avg_test_percent ?? "—",
+        ...d.subjects.map((sub) => s.subjects[String(sub.id)]?.accuracy ?? "—"),
+        weakest,
+      ]);
+    }
+
+    if (d.students.length === 0) sheet.addRow(["No students yet"]);
+    sheet.autoFilter = { from: "A1", to: { row: 1, column: headers.length } };
+  }
+
+  if (disciplines.length === 0) {
+    workbook.addWorksheet("Core Proficiency").addRow(["No core-branch students with Core Prep live yet"]);
+  }
+
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    blob: new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+    filename: `${fileSafe(data.college.name)}-core-subject-proficiency-report.xlsx`,
   };
 }
 
@@ -803,6 +894,35 @@ export function generateIndividualStudentReport(student: CohortStudent, collegeN
 
   // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
   y = doc.lastAutoTable.finalY + (student.coding.stated_language ? 40 : 24);
+
+  // A student of a core branch whose Core Prep is live: where they stand in it. Nothing is printed for anyone else.
+  if (student.core) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.text("Core Prep", margin, y);
+    y += 10;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Track", "Scored By", "Core Readiness", "Questions Answered", "Weakest Subject"]],
+      body: [
+        [
+          student.track_focus === "core_first" ? "Core first" : student.track_focus === "balanced" ? "Balanced" : student.track_focus === "it_first" ? "IT first" : "Not chosen",
+          PROFILE_WORDS[student.core.profile] ?? "Software profile",
+          student.core.readiness === null ? "—" : `${student.core.readiness}%`,
+          String(student.core.answered_30d),
+          student.core.weakest_subject ? pdfSafe(`${student.core.weakest_subject}${student.core.weakest_accuracy !== null ? ` (${student.core.weakest_accuracy}%)` : ""}`) : "—",
+        ],
+      ],
+      headStyles: { fillColor: ACCENT, fontSize: 8 },
+      bodyStyles: { fontSize: 9 },
+      theme: "grid",
+    });
+
+    // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
+    y = doc.lastAutoTable.finalY + 24;
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);

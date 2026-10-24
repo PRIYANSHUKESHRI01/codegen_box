@@ -2,8 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { BookOpen, Plus, Loader2, ArrowLeft, EyeOff, Eye } from "lucide-react";
-import Link from "next/link";
+import { BookOpen, Plus, Loader2, EyeOff, Eye } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -100,11 +99,6 @@ export default function InterviewQuestionBankPage() {
           {toastMessage}
         </div>
       )}
-
-      <Link href="/admin/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to AI Interviews
-      </Link>
 
       <div className="flex items-center gap-2 flex-wrap">
         <button

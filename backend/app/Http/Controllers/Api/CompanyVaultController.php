@@ -11,6 +11,7 @@ use App\Models\VaultInquiry;
 use App\Models\VaultMessage;
 use App\Models\VaultProfile;
 use App\Services\Vault\VaultService;
+use App\Support\BranchCatalog;
 use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -54,7 +55,7 @@ class CompanyVaultController extends Controller
         'legacy_score_percent',
     ];
 
-    private const USER_LIST_COLUMNS = 'user:id,name,college_id,branch,cgpa,current_rating,rated_contests_count,bio,linkedin_url,github_url,skills,resume_path,profile_completion_percent';
+    private const USER_LIST_COLUMNS = 'user:id,name,college_id,branch,branch_code,discipline,department,cgpa,current_rating,rated_contests_count,bio,linkedin_url,github_url,skills,resume_path,profile_completion_percent';
 
     public function index(Request $request)
     {
@@ -74,8 +75,33 @@ class CompanyVaultController extends Controller
             $query->where('users.college_id', $request->integer('college_id'));
         }
 
+        // A discipline ("mech") covers every branch in that family; a branch matches the canonical
+        // code when the text is one we know ("Mechanical", "ECE") and the college's own wording otherwise.
+        if ($request->filled('discipline')) {
+            $query->where('users.discipline', (string) $request->string('discipline'));
+        }
+
+        // A department (Engineering, Commerce, Arts …) covers every family and branch inside it. A student never classified counts as
+        // engineering, like everywhere else.
+        if ($request->filled('department')) {
+            $department = (string) $request->string('department');
+
+            $query->where(function ($q) use ($department) {
+                $q->where('users.department', $department);
+
+                if ($department === (string) config('departments.fallback', 'engineering')) {
+                    $q->orWhereNull('users.department');
+                }
+            });
+        }
+
         if ($request->filled('branch')) {
-            $query->where('users.branch', $request->string('branch'));
+            $branch = trim((string) $request->string('branch'));
+            $code = BranchCatalog::instance()->canonical($branch);
+
+            $code !== null
+                ? $query->where('users.branch_code', $code)
+                : $query->where('users.branch', $branch);
         }
 
         if ($request->filled('search')) {
@@ -127,7 +153,7 @@ class CompanyVaultController extends Controller
         $this->authorizeVisible($profile, $companyId);
 
         $profile->load([
-            'user:id,name,college_id,branch,cgpa,backlogs,current_rating,rated_contests_count,bio,linkedin_url,github_url,skills,resume_path,profile_completion_percent',
+            'user:id,name,college_id,branch,branch_code,discipline,department,cgpa,backlogs,current_rating,rated_contests_count,bio,linkedin_url,github_url,skills,resume_path,profile_completion_percent',
             'user.college:id,name,short_code,city,state',
         ]);
 
@@ -167,7 +193,7 @@ class CompanyVaultController extends Controller
     public function myInquiries(Request $request)
     {
         $inquiries = VaultInquiry::where('company_id', $request->user()->company_id)
-            ->with(['profile:id,user_id,readiness_score,readiness_tier', 'profile.user:id,name,college_id,branch', 'profile.user.college:id,name,short_code'])
+            ->with(['profile:id,user_id,readiness_score,readiness_tier', 'profile.user:id,name,college_id,branch,branch_code,discipline,department', 'profile.user.college:id,name,short_code'])
             ->latest('updated_at')
             ->get();
 

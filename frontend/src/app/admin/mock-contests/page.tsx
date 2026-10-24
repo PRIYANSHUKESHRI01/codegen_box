@@ -62,6 +62,7 @@ import {
   formatRelative,
   formatSpan,
 } from "@/components/portal/screeningKit";
+import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 
 interface TpoContest {
   id: number;
@@ -73,6 +74,7 @@ interface TpoContest {
   status: "draft" | "published" | "cancelled";
   finalized_at: string | null;
   participants_count: number;
+  branch_audience?: Partial<BranchAudience> | null;
 }
 
 interface TpoContestProblem {
@@ -410,6 +412,7 @@ function MockContestCard({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
               <h3 className="min-w-0 line-clamp-2 text-15 font-bold leading-snug tracking-tight text-primary">{contest.title}</h3>
+              <AudienceChip audience={contest.branch_audience} className="shrink-0" />
               <HpPill tone={meta.tone} dot={meta.dot} pulse={meta.pulse} icon={meta.icon} className="shrink-0">
                 {meta.label}
               </HpPill>
@@ -516,6 +519,7 @@ function CreateMockContestModal({ onClose, onCreated }: { onClose: () => void; o
   const [description, setDescription] = useState("");
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -529,6 +533,7 @@ function CreateMockContestModal({ onClose, onCreated }: { onClose: () => void; o
         description: description || undefined,
         start_at: localDatetimeInputToUtcIso(startAt),
         end_at: localDatetimeInputToUtcIso(endAt),
+        branch_audience: audienceForRequest(audience),
       });
       onCreated();
     } catch (err) {
@@ -606,6 +611,8 @@ function CreateMockContestModal({ onClose, onCreated }: { onClose: () => void; o
             <span>Students can start any time inside this window.</span>
           </div>
         )}
+
+        <BranchAudienceField value={audience} onChange={setAudience} />
 
         {error && <ScNotice tone="rose">{error}</ScNotice>}
       </form>

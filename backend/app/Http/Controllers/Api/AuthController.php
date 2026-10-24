@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendWelcomeEmail;
 use App\Models\ActivityLog;
 use App\Models\User;
+use App\Services\IssuedCredentialVault;
 use App\Services\LifecycleMailService;
 use App\Support\SingleMail;
 use Illuminate\Database\QueryException;
@@ -54,7 +55,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth')->plainTextToken;
 
         return response()->json([
-            'user' => $user->load(['college', 'company']),
+            'user' => $user->load(['college.collegeDepartments', 'company']),
             'token' => $token,
         ], 201);
     }
@@ -101,7 +102,7 @@ class AuthController extends Controller
         $this->touchLastSeen($user, force: true);
 
         return response()->json([
-            'user' => $user->load(['college', 'company']),
+            'user' => $user->load(['college.collegeDepartments', 'company']),
             'token' => $token,
         ]);
     }
@@ -129,7 +130,7 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'user' => $request->user()->load(['college', 'company']),
+            'user' => $request->user()->load(['college.collegeDepartments', 'company']),
         ]);
     }
 
@@ -209,7 +210,7 @@ class AuthController extends Controller
             }
         }
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     /**
@@ -235,7 +236,7 @@ class AuthController extends Controller
 
         $user->forceFill(['avatar_path' => $path])->save();
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     public function deleteAvatar(Request $request)
@@ -247,7 +248,7 @@ class AuthController extends Controller
             $user->forceFill(['avatar_path' => null])->save();
         }
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     public function updatePassword(Request $request)
@@ -269,6 +270,9 @@ class AuthController extends Controller
             'password' => Hash::make($validated['password']),
             'must_change_password' => false,
         ])->save();
+
+        // The owner now has their own password: whatever temporary one was kept for a superadmin to look up is obsolete.
+        app(IssuedCredentialVault::class)->forget($user);
 
         app(LifecycleMailService::class)->passwordChanged($user, 'settings');
 

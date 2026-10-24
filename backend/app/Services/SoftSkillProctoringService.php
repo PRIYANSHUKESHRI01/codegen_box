@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\SoftSkillProctoringSession;
 use App\Models\SoftSkillProctoringViolation;
 use App\Models\SoftSkillSession;
+use App\Services\Integrity\StrikeMath;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -72,7 +73,7 @@ class SoftSkillProctoringService
      *
      * @return array{session: SoftSkillProctoringSession, locked: bool, already_locked: bool}
      */
-    public function recordViolation(SoftSkillProctoringSession $session, string $type, ?string $ip, array $meta): array
+    public function recordViolation(SoftSkillProctoringSession $session, string $type, ?string $ip, array $meta, ?int $strikes = null): array
     {
         if ($session->isLocked()) {
             $this->logViolation($session, $type, $ip, $meta, false);
@@ -90,9 +91,10 @@ class SoftSkillProctoringService
             return ['session' => $session, 'locked' => false, 'already_locked' => false];
         }
 
-        $isStrike = SoftSkillProctoringViolation::isStrikeType($type);
+        // `$strikes` is set only by the integrity layer; null = the original rule.
+        $isStrike = $strikes === null ? SoftSkillProctoringViolation::isStrikeType($type) : $strikes > 0;
 
-        return DB::transaction(function () use ($session, $type, $ip, $meta, $isStrike) {
+        return DB::transaction(function () use ($session, $type, $ip, $meta, $isStrike, $strikes) {
             /** @var SoftSkillProctoringSession $locked */
             $locked = SoftSkillProctoringSession::whereKey($session->id)->lockForUpdate()->first();
 
@@ -102,7 +104,7 @@ class SoftSkillProctoringService
                 return ['session' => $locked->fresh(), 'locked' => $locked->isLocked(), 'already_locked' => $locked->isLocked()];
             }
 
-            $locked->increment('violation_count');
+            $locked->increment('violation_count', StrikeMath::toAdd($strikes, (int) $locked->violation_count));
             $locked->refresh();
 
             $threshold = (int) config('proctoring.max_violations_before_lock', 3);

@@ -1,0 +1,297 @@
+[
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Subarray with Given Sum (Handling Negative Integers)\nGiven an integer array nums of size N and an integer target, return the starting and ending indices (0-based) of the first contiguous subarray that adds up to target. If no such subarray exists, return [-1, -1].\nNote: The array can contain both positive and negative integers.\n\nInput Example 1:\nnums = [10, 2, -2, -20, 10], target = -10\nOutput: [0, 3] (Explanation: 10 + 2 + (-2) + (-20) = -10)\n\nInput Example 2:\nnums = [1, 4, 20, 3, 10, 5], target = 33\nOutput: [2, 4] (Explanation: 20 + 3 + 10 = 33)\n\nProvide an optimal O(N) time and O(N) auxiliary space solution in C++ and Python using prefix sums and a hash map.",
+    "answer_notes": "Optimal Solution (Prefix Sum with Hash Map):\n\nKey Concept:\nIf current prefix sum is `curr_sum` and there was a previous prefix sum `curr_sum - target` at index `j`, then the subarray from index `j + 1` to `i` sums to `target`.\n\nPython Implementation:\n```python\ndef find_subarray_sum(nums: list[int], target: int) -> list[int]:\n    prefix_map = {0: -1}  # prefix_sum -> first seen index\n    curr_sum = 0\n    \n    for i, x in enumerate(nums):\n        curr_sum += x\n        if (curr_sum - target) in prefix_map:\n            return [prefix_map[curr_sum - target] + 1, i]\n        if curr_sum not in prefix_map:\n            prefix_map[curr_sum] = i\n            \n    return [-1, -1]\n\nprint(find_subarray_sum([10, 2, -2, -20, 10], -10)) # Output: [0, 3]\nprint(find_subarray_sum([1, 4, 20, 3, 10, 5], 33))    # Output: [2, 4]\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <unordered_map>\n#include <iostream>\nusing namespace std;\n\nvector<int> subarraySum(const vector<int>& nums, int target) {\n    unordered_map<long long, int> prefixMap;\n    prefixMap[0] = -1;\n    long long currSum = 0;\n    \n    for (int i = 0; i < (int)nums.size(); ++i) {\n        currSum += nums[i];\n        long long complement = currSum - target;\n        if (prefixMap.find(complement) != prefixMap.end()) {\n            return {prefixMap[complement] + 1, i};\n        }\n        if (prefixMap.find(currSum) == prefixMap.end()) {\n            prefixMap[currSum] = i;\n        }\n    }\n    return {-1, -1};\n}\n```\nTime Complexity: O(N) single pass.\nAuxiliary Space: O(N) hash map storage."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Divisible Pair Sum (TCS NQT Digital)\nGiven an array of integers nums and an integer k, count the total number of valid pairs (i, j) such that 0 <= i < j < len(nums) and (nums[i] + nums[j]) is divisible by k.\n\nConstraints: 1 <= nums.length <= 10^5, 1 <= k <= 10^4, 0 <= nums[i] <= 10^9.\n\nInput Example:\nnums = [1, 2, 3, 4, 5, 6], k = 5\nValid Pairs: (1, 4), (2, 3), (4, 6) -> Sums: 5, 5, 10.\nOutput: 3\n\nProvide an optimal O(N + K) solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Remainder Frequency Bucketing):\n\nKey Insight:\n`(a + b) % k == 0` implies `(a % k + b % k) % k == 0`.\n- If `rem == 0`, pair with another number having `rem == 0`: count = `C(freq[0], 2)`.\n- If `rem * 2 == k`, pair with another number having the same remainder: count = `C(freq[rem], 2)`.\n- Otherwise, numbers with remainder `r` pair with numbers with remainder `k - r`: count = `freq[r] * freq[k - r]`.\n\nPython Implementation:\n```python\ndef count_divisible_pairs(nums: list[int], k: int) -> int:\n    from collections import defaultdict\n    freq = defaultdict(int)\n    count = 0\n    \n    for num in nums:\n        rem = num % k\n        complement = (k - rem) % k\n        count += freq[complement]\n        freq[rem] += 1\n        \n    return count\n\nprint(count_divisible_pairs([1, 2, 3, 4, 5, 6], 5)) # Output: 3\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <iostream>\nusing namespace std;\n\nlong long countDivisiblePairs(const vector<int>& nums, int k) {\n    vector<long long> freq(k, 0);\n    long long count = 0;\n    for (int num : nums) {\n        int rem = ((num % k) + k) % k;\n        int complement = (k - rem) % k;\n        count += freq[complement];\n        freq[rem]++;\n    }\n    return count;\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(K)"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Work and Wages (TCS NQT Advanced Quantitative):\nA alone can complete a project in 16 days, while B alone can complete the same project in 24 days. With the assistance of C, they finish the entire project in 8 days. If the total contract remuneration for the project is ₹7,200, what is C's rightful wage share?\n\nOptions:\nA) ₹1,200\nB) ₹1,500\nC) ₹1,800\nD) ₹2,400",
+    "answer_notes": "Correct Option: A (₹1,200)\n\nStep-by-step LCM Derivation:\n1. Total Work = LCM(16, 24, 8) = 48 units.\n\n2. Daily efficiencies:\n   - Efficiency of A = 48 / 16 = 3 units/day\n   - Efficiency of B = 48 / 24 = 2 units/day\n   - Combined efficiency (A + B + C) = 48 / 8 = 6 units/day\n\n3. Efficiency of C:\n   - Efficiency of C = Combined - (A + B) = 6 - (3 + 2) = 1 unit/day.\n\n4. Ratio of work done in 8 days:\n   - Ratio of efficiencies = A : B : C = 3 : 2 : 1.\n   - Total ratio parts = 3 + 2 + 1 = 6 parts.\n\n5. C's Share of Wages:\n   - C's Wage = (1 / 6) * ₹7,200 = ₹1,200.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Circular Track Race (Speed and Relative Motion):\nTwo runners, Aryan and Kabir, start running simultaneously from the same starting point on a circular track of circumference 600 meters. Aryan runs at a constant speed of 15 m/s, and Kabir runs at a speed of 25 m/s in the same direction. How many seconds will elapse before they meet for the first time at the starting point?\n\nOptions:\nA) 60 seconds\nB) 120 seconds\nC) 150 seconds\nD) 240 seconds",
+    "answer_notes": "Correct Option: B (120 seconds)\n\nCalculation Method:\n1. Time taken by Aryan to complete one full round:\n   T_Aryan = Distance / Speed = 600 / 15 = 40 seconds.\n\n2. Time taken by Kabir to complete one full round:\n   T_Kabir = Distance / Speed = 600 / 25 = 24 seconds.\n\n3. Meeting at the Starting Point:\n   Both runners meet at the starting point at times that are common multiples of their individual round completion times.\n   Earliest time to meet at starting point = LCM(T_Aryan, T_Kabir)\n                                         = LCM(40, 24).\n\n4. Compute LCM(40, 24):\n   - 40 = 2^3 * 5\n   - 24 = 2^3 * 3\n   - LCM = 2^3 * 3 * 5 = 8 * 15 = 120 seconds.\n\nNote: They meet on the track elsewhere after 600 / (25 - 15) = 60 seconds, but they meet AT THE STARTING POINT after 120 seconds.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Sentence Correction & Grammatical Conjunctions:\nIdentify the error segment in the following sentence:\n'Neither the software architect nor the lead developers (A) / was willing to deploy the hotfix (B) / until all automated integration test suites (C) / had passed without a single failure. (D)'\n\nOptions:\nA) Neither the software architect nor the lead developers\nB) was willing to deploy the hotfix\nC) until all automated integration test suites\nD) had passed without a single failure",
+    "answer_notes": "Correct Option: B ('was willing to deploy the hotfix')\n\nGrammar Rule (Rule of Proximity for Correlative Conjunctions):\n- When subjects are joined by 'Neither... nor' or 'Either... or', the verb must agree in number with the closer subject.\n- In this sentence, the closer subject to the verb is 'the lead developers' (plural noun).\n- Therefore, the singular verb 'was' is incorrect; it must be replaced with the plural verb 'were'.\n- Correct sentence: 'Neither the software architect nor the lead developers were willing to deploy the hotfix until...'\n\nTherefore, Option B contains the error."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "SQL Query Challenge: Employees Earning More than Their Direct Managers\nGiven an Employee table schema:\n- id (INT, Primary Key)\n- name (VARCHAR)\n- salary (DECIMAL)\n- manager_id (INT, Foreign Key referencing Employee.id)\n\nWrite an optimal ANSI SQL query using a Self-Join to find the names of all employees who earn a strictly higher salary than their direct managers.",
+    "answer_notes": "Optimal ANSI SQL Query using Self-Join:\n\n```sql\nSELECT \n    e.name AS Employee\nFROM Employee e\nJOIN Employee m ON e.manager_id = m.id\nWHERE e.salary > m.salary;\n```\n\nExplanation:\n1. `Employee e` acts as the employee instance, and `Employee m` acts as the manager instance of the same table.\n2. The join condition `e.manager_id = m.id` links each employee record directly to their supervisor.\n3. The `WHERE e.salary > m.salary` clause filters only those records where the employee's compensation exceeds their supervisor's compensation.\n4. An `INNER JOIN` automatically excludes top executives who have no manager (`manager_id IS NULL`)."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Object-Oriented Design: The Diamond Problem in Multiple Inheritance\nExplain the 'Diamond Problem' in object-oriented programming. How does C++ resolve it using virtual base classes, and how does Java avoid it architecturally through interfaces and default method resolution rules?",
+    "answer_notes": "The Diamond Problem in OOP:\n\n1. Definition:\n   Occurs when class B and class C both inherit from base class A, and class D inherits from both B and C. If A has a method `display()`, and B and C override it differently, class D inherits conflicting implementations, creating ambiguity regarding which method to invoke.\n\n2. C++ Virtual Inheritance Solution:\n   - C++ uses `virtual` base classes: `class B : virtual public A` and `class C : virtual public A`.\n   - This instructs the compiler to create only ONE shared instance of class A sub-object in memory, resolving ambiguity via the vtable.\n\n3. Java Architecture Solution:\n   - Java does NOT support multiple class inheritance (`extends` allows only one class).\n   - Multiple interface inheritance is supported. If two interfaces declare the same `default` method, the Java compiler forces class D to explicitly override and disambiguate: `InterfaceB.super.display();`."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems: Thrashing and Working Set Model\nWhat is 'thrashing' in virtual memory systems? How does page fault frequency lead to CPU underutilization, and how does the Working Set Model prevent thrashing?",
+    "answer_notes": "Operating Systems - Thrashing:\n\n1. Definition of Thrashing:\n   A state where a computer spends significantly more time swapping virtual memory pages between RAM and disk than executing actual CPU instructions.\n\n2. The Vicious Cycle:\n   - As degree of multiprogramming increases, physical memory frames per process decrease.\n   - High page fault rate occurs. Processes enter wait queue for disk I/O.\n   - CPU scheduler detects low CPU utilization and mistakenly loads even more processes into memory.\n   - System collapses into total thrashing where CPU throughput drops to near zero.\n\n3. Working Set Model Prevention:\n   - Proposed by Peter Denning: Defines `W(t, Δ)` as the set of pages referenced by a process during the most recent time window `Δ`.\n   - If the sum of working set sizes across all active processes exceeds total available physical frames, the OS suspends one or more processes, swapping their pages entirely to disk until memory pressure stabilizes."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Tata Code of Conduct (TCoC) and Ethical Dilemmas:\n'Imagine your project lead asks you to deploy an emergency build to production with known security vulnerabilities to meet a contractual deadline with a major banking client. How would you handle this situation in alignment with the Tata Code of Conduct?'",
+    "answer_notes": "Exemplary Ethical Response (Tata Code of Conduct Alignment):\n\n1. Uncompromising Commitment to Quality & Integrity:\n   'Under the Tata Code of Conduct (TCoC), unyielding integrity and customer trust precede all commercial expediency. Deploying unpatched vulnerabilities into a banking production environment risks customer financial assets, regulatory penalties, and reputational destruction for both TCS and the client.'\n\n2. Constructive Problem-Solving Steps:\n   - 'I would respectfully voice my technical concerns to my project lead in a private meeting, presenting a clear vulnerability assessment report outlining the specific severity (CVSS score) and exploit vectors.'\n   - 'I would propose a phased mitigation strategy: deploying the safe non-vulnerable components while isolating the affected module behind a feature flag or applying an immediate emergency firewall rule.'\n   - 'If pressured to bypass compliance protocols, I would consult the project quality assurance lead or utilize TCS's internal ethics whistleblower channel to ensure client security is never compromised.'"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Trapping Rain Water (TCS Digital / Prime)\nGiven n non-negative integers representing an elevation map where the width of each bar is 1, compute how much water it can trap after raining.\n\nInput Example 1:\nheight = [0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]\nOutput: 6\n\nInput Example 2:\nheight = [4, 2, 0, 3, 2, 5]\nOutput: 9\n\nProvide an optimal O(N) time and O(1) auxiliary space two-pointer solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two Pointers Technique):\n\nApproach:\n- Use `left` pointer at 0 and `right` pointer at N - 1.\n- Track `left_max` and `right_max`.\n- If `height[left] < height[right]`: water trapped at `left` depends strictly on `left_max`. If `height[left] >= left_max`, update `left_max`; else add `left_max - height[left]` to water. Advance `left`.\n- Otherwise: symmetric logic for `right`. Decrement `right`.\n\nPython Implementation:\n```python\ndef trap_rain_water(height: list[int]) -> int:\n    if not height: return 0\n    left, right = 0, len(height) - 1\n    left_max, right_max = 0, 0\n    water = 0\n    \n    while left < right:\n        if height[left] < height[right]:\n            if height[left] >= left_max:\n                left_max = height[left]\n            else:\n                water += left_max - height[left]\n            left += 1\n        else:\n            if height[right] >= right_max:\n                right_max = height[right]\n            else:\n                water += right_max - height[right]\n            right -= 1\n            \n    return water\n\nprint(trap_rain_water([0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1])) # Output: 6\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nint trap(const vector<int>& height) {\n    int n = height.size();\n    int left = 0, right = n - 1;\n    int leftMax = 0, rightMax = 0, water = 0;\n    \n    while (left < right) {\n        if (height[left] < height[right]) {\n            if (height[left] >= leftMax) leftMax = height[left];\n            else water += leftMax - height[left];\n            left++;\n        } else {\n            if (height[right] >= rightMax) rightMax = height[right];\n            else water += rightMax - height[right];\n            right--;\n        }\n    }\n    return water;\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Rotate Matrix 90 Degrees Clockwise In-Place\nGiven an N x N 2D matrix representing an image, rotate the image by 90 degrees (clockwise) in-place without allocating another 2D matrix.\n\nInput Example:\nmatrix = [\n  [1, 2, 3],\n  [4, 5, 6],\n  [7, 8, 9]\n]\nOutput:\n[\n  [7, 4, 1],\n  [8, 5, 2],\n  [9, 6, 3]\n]\n\nWrite an optimal solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Transpose Matrix then Reverse Each Row):\n\nKey Mathematical Steps:\n1. Transpose the matrix: Swap `matrix[i][j]` with `matrix[j][i]` for all `j > i`.\n2. Reverse each row: Flip elements of each row horizontally.\n\nPython Implementation:\n```python\ndef rotate_matrix(matrix: list[list[int]]) -> None:\n    n = len(matrix)\n    # Step 1: Transpose\n    for i in range(n):\n        for j in range(i + 1, n):\n            matrix[i][j], matrix[j][i] = matrix[j][i], matrix[i][j]\n            \n    # Step 2: Reverse each row\n    for row in matrix:\n        row.reverse()\n\nmat = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nrotate_matrix(mat)\nprint(mat) # Output: [[7, 4, 1], [8, 5, 2], [9, 6, 3]]\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nvoid rotate(vector<vector<int>>& matrix) {\n    int n = matrix.size();\n    for (int i = 0; i < n; ++i) {\n        for (int j = i + 1; j < n; ++j) {\n            swap(matrix[i][j], matrix[j][i]);\n        }\n    }\n    for (int i = 0; i < n; ++i) {\n        std::reverse(matrix[i].begin(), matrix[i].end());\n    }\n}\n```\nTime Complexity: O(N^2)\nAuxiliary Space: O(1) in-place"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Permutations with Restrictions (Vowels Together):\nIn how many distinct ways can the letters of the word 'CORPORATION' be arranged such that all the vowels always remain together?\n\nOptions:\nA) 50,400\nB) 25,200\nC) 12,600\nD) 40,320",
+    "answer_notes": "Correct Option: A (50,400)\n\nStep-by-step Permutation Calculation:\n1. Analyze the word 'CORPORATION':\n   - Total letters = 11.\n   - Consonants: C, R, P, R, T, N (6 consonants: R appears 2 times).\n   - Vowels: O, O, A, I, O (5 vowels: O appears 3 times, A appears 1, I appears 1).\n\n2. Group all vowels into a single composite entity [Vowels]:\n   - Total entities to arrange = 6 consonants + 1 vowel-block = 7 entities.\n   - Among these 7 entities, 'R' repeats 2 times.\n   - Ways to arrange 7 entities = 7! / 2! = 5040 / 2 = 2,520 ways.\n\n3. Internal arrangements of vowels within the block [O, O, A, I, O]:\n   - Total 5 vowels with 'O' repeating 3 times.\n   - Ways to arrange vowels = 5! / 3! = 120 / 6 = 20 ways.\n\n4. Total unique permutations:\n   - Total Ways = 2,520 * 20 = 50,400 ways.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Syllogisms with 'Only a Few' Logic:\nStatements:\n1. Only a few clouds are rain.\n2. All rain is water.\n3. No water is ice.\n\nConclusions:\nI. Some clouds are not rain.\nII. Some rain can never be ice.\nIII. All water being clouds is a possibility.\n\nWhich of the conclusions logically follows?\n\nOptions:\nA) Only I and II follow\nB) Only II and III follow\nC) All I, II, and III follow\nD) Only I follows",
+    "answer_notes": "Correct Option: C (All I, II, and III follow)\n\nDetailed Syllogism Analysis:\n1. Statement 1: 'Only a few clouds are rain'.\n   - This is a dual-meaning quantifier in modern competitive tests: It strictly means 'Some clouds are rain' AND 'Some clouds are NOT rain'.\n   - Therefore, Conclusion I ('Some clouds are not rain') directly and strictly follows!\n\n2. Statement 2 & 3: 'All rain is water' and 'No water is ice'.\n   - Since all rain is completely inside water, and water has zero intersection with ice, rain can NEVER intersect with ice.\n   - Hence, Conclusion II ('Some rain can never be ice') is definitely true.\n\n3. Conclusion III: 'All water being clouds is a possibility'.\n   - While only a few clouds can be rain, clouds can easily contain all water without violating any premise.\n   - Hence, Conclusion III is a valid possibility.\n\nTherefore, Option C (All I, II, and III follow) is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Harmonic Speed and Average Speed:\nA field engineer drives from Pune to Mumbai at a speed of 60 km/h, and returns from Mumbai to Pune along the exact same expressway at a speed of 90 km/h. What is his average speed for the entire round trip in km/h?\n\nOptions:\nA) 75.0 km/h\nB) 72.0 km/h\nC) 70.0 km/h\nD) 78.5 km/h",
+    "answer_notes": "Correct Option: B (72.0 km/h)\n\nFormula & Calculation:\n1. When the distance traveled in both directions is equal (D), average speed is the Harmonic Mean of the speeds:\n   Average Speed = (2 * S1 * S2) / (S1 + S2)\n\n2. Substitute S1 = 60 km/h and S2 = 90 km/h:\n   Average Speed = (2 * 60 * 90) / (60 + 90)\n                 = 10,800 / 150\n                 = 72 km/h.\n\nCommon Trap:\nTaking the simple arithmetic mean (60 + 90) / 2 = 75 km/h is wrong because more time is spent traveling at the slower speed (60 km/h) than at the faster speed (90 km/h).\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Automata Fix / Debugging (Binary Search Integer Overflow Bug):\nIdentify the critical vulnerability in the standard binary search calculation `int mid = (low + high) / 2;`. Under what conditions does it fail, and what is the standard fix in production C++ and Java codebases?",
+    "answer_notes": "Binary Search Integer Overflow Vulnerability:\n\n1. Bug Explanation:\n   If `low` and `high` are both large positive integers (e.g., in arrays with sizes approaching 2^30), their sum `(low + high)` can exceed `INT_MAX` (2,147,483,647 in 32-bit signed integers).\n   The addition overflows into negative numbers, yielding a negative `mid` index and resulting in an out-of-bounds memory access or `ArrayIndexOutOfBoundsException`.\n\n2. Famous Context:\n   This bug existed undetected in Java's standard library `java.util.Arrays.binarySearch` for over 9 years until highlighted by Joshua Bloch in 2006.\n\n3. Correct Production Fixes:\n   - Subtraction method: `int mid = low + (high - low) / 2;`\n   - Bitwise unsigned shift: `int mid = (low + high) >>> 1;` (Java) or `(unsigned)(low + high) >> 1;` (C/C++)."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Database Clustered vs Non-Clustered Indexes:\nWhat is the fundamental storage difference between a clustered index and a non-clustered index in a relational database? Why can a database table have only one clustered index but multiple non-clustered indexes?",
+    "answer_notes": "Clustered vs Non-Clustered Index Architecture:\n\n1. Clustered Index:\n   - Dictates the physical order in which actual table row data is stored on disk pages.\n   - The leaf nodes of a clustered index contain the actual data rows.\n   - Because data rows can physically be sorted in only ONE sequence on disk, a table can have ONLY ONE clustered index (typically the Primary Key).\n\n2. Non-Clustered Index:\n   - A separate indexing structure completely decoupled from physical row storage.\n   - The leaf nodes of a non-clustered index contain index keys and a pointer (either the physical Row ID or the Clustered Key) pointing to where the actual row data resides.\n   - Because it does not alter physical data storage, a table can maintain multiple non-clustered indexes (e.g., on `email`, `created_at`, `status`)."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Computer Networks: IP Subnetting and CIDR Calculation\nGiven an IP address block 192.168.10.0/26:\n1. What is the subnet mask in dotted decimal format?\n2. What is the total number of IP addresses in this subnet?\n3. How many usable host IP addresses are available for allocation?\n4. What is the network ID and the broadcast address?",
+    "answer_notes": "Subnetting / CIDR Derivation for 192.168.10.0/26:\n\n1. Subnet Mask:\n   - /26 means 26 network bits followed by 6 host bits (32 - 26 = 6).\n   - Binary: 11111111.11111111.11111111.11000000\n   - Dotted Decimal: 255.255.255.192.\n\n2. Total IP Addresses:\n   - 2^(host bits) = 2^6 = 64 IP addresses.\n\n3. Usable Host IP Addresses:\n   - Formula = 2^(host bits) - 2 (subtracting Network ID and Broadcast address)\n   - Usable = 64 - 2 = 62 host addresses (ranging from 192.168.10.1 to 192.168.10.62).\n\n4. Network and Broadcast Identifiers:\n   - Network ID = 192.168.10.0\n   - Broadcast Address = 192.168.10.63."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Agile Scrum Methodology in Enterprise Delivery:\nExplain the four core Scrum ceremonies in Agile software delivery. What is the definition of 'Sprint Velocity', and how does a Scrum Master handle scope creep during an active 2-week sprint?",
+    "answer_notes": "Agile Scrum Framework in Enterprise IT:\n\n1. Four Scrum Ceremonies:\n   - Sprint Planning: Team reviews product backlog items, estimates story points, and defines the Sprint Goal.\n   - Daily Standup (15 mins): Each member shares: 1) What they accomplished yesterday, 2) What they will do today, 3) Any blockers impeding progress.\n   - Sprint Review: Live demonstration of the completed increment to product owners and stakeholders.\n   - Sprint Retrospective: Team reflects on what went well, what could be improved, and action items for next sprint.\n\n2. Sprint Velocity:\n   - The average number of story points completed and accepted by the team per sprint over recent iterations.\n\n3. Managing Scope Creep:\n   - During an active sprint, the scope is frozen. If stakeholders propose urgent new requirements, the Scrum Master works with the Product Owner to place the item in the Product Backlog for future sprint prioritization or perform a 1:1 trade-off removing equivalent story points."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "TCS Digital vs Ninja Track Aspirations:\n'You are being considered for the TCS Digital / Prime track. How have you prepared beyond your academic syllabus to qualify for this elevated engineering role?'",
+    "answer_notes": "Ideal Digital Track Candidate Response:\n\n1. Hands-on Advanced Problem Solving:\n   'To qualify for TCS Digital, I went beyond textbook coursework by actively solving over 250 algorithmic problems on platforms like LeetCode and AptRun, mastering dynamic programming, graph traversals, and monotonic stacks.'\n\n2. Enterprise Stack & Microservices:\n   'I built end-to-end full-stack applications with containerized Docker deployments, relational schema optimization with indexing, and JWT authentication.'\n\n3. Continuous Upskilling & Cloud Exposure:\n   'I completed foundational certifications in AWS and explored Generative AI tooling, demonstrating that I possess the learning agility and technical depth needed to contribute immediately to TCS's high-value digital transformation engagements.'"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Longest Substring Without Repeating Characters\nGiven a string s, find the length of the longest substring without repeating characters.\n\nInput Example 1:\ns = \"abcabcbb\"\nOutput: 3 (Explanation: The answer is \"abc\", with the length of 3)\n\nInput Example 2:\ns = \"bbbbb\"\nOutput: 1 (Explanation: The answer is \"b\", with the length of 1)\n\nInput Example 3:\ns = \"pwwkew\"\nOutput: 3 (Explanation: The answer is \"wke\", with the length of 3)\n\nProvide the optimal O(N) sliding window solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Sliding Window with Hash Map Indexing):\n\nApproach:\n- Maintain a hash map storing the most recent index where each character was seen.\n- Expand window right pointer `r`. If character `s[r]` was seen at index `j >= l`, jump `l` directly to `j + 1`.\n- Update `max_len = max(max_len, r - l + 1)`.\n\nPython Implementation:\n```python\ndef length_of_longest_substring(s: str) -> int:\n    char_map = {}\n    left = 0\n    max_len = 0\n    \n    for right, ch in enumerate(s):\n        if ch in char_map and char_map[ch] >= left:\n            left = char_map[ch] + 1\n        char_map[ch] = right\n        max_len = max(max_len, right - left + 1)\n        \n    return max_len\n\nprint(length_of_longest_substring(\"abcabcbb\")) # Output: 3\nprint(length_of_longest_substring(\"bbbbb\"))    # Output: 1\n```\n\nC++ Implementation:\n```cpp\n#include <string>\n#include <vector>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nint lengthOfLongestSubstring(const string& s) {\n    vector<int> lastIndex(256, -1);\n    int left = 0, maxLen = 0;\n    \n    for (int right = 0; right < (int)s.length(); ++right) {\n        unsigned char ch = s[right];\n        if (lastIndex[ch] >= left) {\n            left = lastIndex[ch] + 1;\n        }\n        lastIndex[ch] = right;\n        maxLen = max(maxLen, right - left + 1);\n    }\n    return maxLen;\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(min(N, Alphabet Size))"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Majority Element (Boyer-Moore Voting Algorithm)\nGiven an array nums of size n, return the majority element. The majority element is the element that appears more than floor(n / 2) times. You may assume that the majority element always exists in the array.\n\nInput Example 1:\nnums = [3, 2, 3]\nOutput: 3\n\nInput Example 2:\nnums = [2, 2, 1, 1, 1, 2, 2]\nOutput: 2\n\nSolve in O(N) time and O(1) auxiliary space.",
+    "answer_notes": "Optimal Solution (Boyer-Moore Voting Algorithm):\n\nKey Concept:\nIf we pair up different elements, the majority element will still remain because it appears more than N / 2 times.\n\nPython Implementation:\n```python\ndef majority_element(nums: list[int]) -> int:\n    candidate = None\n    count = 0\n    \n    for num in nums:\n        if count == 0:\n            candidate = num\n        count += (1 if num == candidate else -1)\n        \n    return candidate\n\nprint(majority_element([3, 2, 3]))             # Output: 3\nprint(majority_element([2, 2, 1, 1, 1, 2, 2])) # Output: 2\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <iostream>\nusing namespace std;\n\nint majorityElement(const vector<int>& nums) {\n    int candidate = 0, count = 0;\n    for (int num : nums) {\n        if (count == 0) {\n            candidate = num;\n        }\n        count += (num == candidate) ? 1 : -1;\n    }\n    return candidate;\n}\n```\nTime Complexity: O(N) single pass.\nAuxiliary Space: O(1) strictly constant space."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Two Dice Probability (Sum is a Prime Number):\nTwo unbiased six-faced dice are tossed together. What is the probability that the sum of the numbers appearing on the two dice is a prime number?\n\nOptions:\nA) 5/12\nB) 7/18\nC) 1/2\nD) 13/36",
+    "answer_notes": "Correct Option: A (5/12)\n\nCalculation Steps:\n1. Total possible outcomes when rolling 2 dice = 6 * 6 = 36.\n\n2. Minimum possible sum = 1 + 1 = 2; Maximum sum = 6 + 6 = 12.\n   Prime numbers between 2 and 12 are: 2, 3, 5, 7, 11.\n\n3. Enumerate favorable pairs for each prime sum:\n   - Sum = 2: (1, 1) -> 1 outcome\n   - Sum = 3: (1, 2), (2, 1) -> 2 outcomes\n   - Sum = 5: (1, 4), (2, 3), (3, 2), (4, 1) -> 4 outcomes\n   - Sum = 7: (1, 6), (2, 5), (3, 4), (4, 3), (5, 2), (6, 1) -> 6 outcomes\n   - Sum = 11: (5, 6), (6, 5) -> 2 outcomes\n\n4. Total favorable outcomes = 1 + 2 + 4 + 6 + 2 = 15.\n\n5. Probability = Favorable / Total = 15 / 36 = 5 / 12.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Alternating Linear Seating Arrangement:\nSix engineers—P, Q, R, S, T, and U—are seated in a straight row. Some face North and some face South:\n1. P sits at one of the extreme ends and faces North.\n2. Q sits second to the right of P.\n3. R sits adjacent to Q and faces South.\n4. S sits third to the left of R.\n5. T and U face opposite directions to each other.\n\nWho sits to the immediate right of S?\n\nOptions:\nA) Q\nB) R\nC) T\nD) U",
+    "answer_notes": "Correct Option: A (Q)\n\nStep-by-step Linear Deduction (Positions 1 to 6 from left to right):\n1. P is at an extreme end facing North. If P is at Position 1 facing North:\n   - Right of P is towards increasing positions (to the right).\n   - Q sits second to right of P => Q is at Position 3.\n2. R sits adjacent to Q and faces South => R can be at Position 2 or 4.\n3. S sits third to left of R. Since R faces South, left of R is towards decreasing index (to the right if facing South is left, i.e., towards increasing index).\n   - If R is at Position 2 facing South, 3rd to left is Position 5. Thus S is at Position 5.\n4. Row layout: 1: P(N), 2: R(S), 3: Q, 4: T/U, 5: S, 6: U/T.\n5. Checking relations: Position 3 (Q) is immediate left/right depending on orientation. S faces North => immediate left is 4, right is 6, or S faces South => immediate right is towards decreasing indices (Q at 3 relative to gap or adjacent position).\n   Deduction yields Q sits next in sequence relative to direction.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Para Jumbles / Sentence Rearrangement:\nArrange the following four sentences in a logical, coherent paragraph sequence:\n(P) Consequently, enterprise software architectures are rapidly migrating towards microservices and event-driven patterns.\n(Q) Traditional monolithic systems struggle to scale efficiently under unprecedented surges in mobile user traffic.\n(R) This architectural decoupling allows independent engineering teams to deploy resilient features with minimal blast radius.\n(S) Modern digital enterprises demand continuous 99.999% system availability and millisecond response times.\n\nOptions:\nA) S - Q - P - R\nB) Q - S - P - R\nC) S - P - Q - R\nD) P - R - S - Q",
+    "answer_notes": "Correct Option: A (S - Q - P - R)\n\nLogical Coherence Breakdown:\n1. Sentence S introduces the broad, universal premise: modern enterprises require ultra-high availability.\n2. Sentence Q highlights the obstacle: traditional monolithic systems fail to meet this demand.\n3. Sentence P provides the consequence ('Consequently, enterprise software architectures are migrating...').\n4. Sentence R elaborates on the specific benefit ('This architectural decoupling allows...').\n\nTherefore, S - Q - P - R forms the logical narrative. Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "SQL HAVING vs WHERE Clause:\nExplain the distinction between the WHERE clause and the HAVING clause in SQL. Can a HAVING clause be used without a GROUP BY clause in ANSI SQL? Write a query showing both used simultaneously.",
+    "answer_notes": "SQL WHERE vs HAVING Clauses:\n\n1. Key Differences:\n   - `WHERE` filters individual rows BEFORE any aggregation takes place. It cannot contain aggregate functions (`SUM`, `AVG`, `COUNT`).\n   - `HAVING` filters aggregated groups AFTER `GROUP BY` has collapsed rows into summary sets. It operates on aggregate functions.\n\n2. Can HAVING be used without GROUP BY?\n   - YES. In ANSI SQL, if `HAVING` is used without `GROUP BY`, the entire table is treated as a single aggregate group.\n\n3. Combined Query Example:\n```sql\nSELECT \n    department_id,\n    AVG(salary) AS avg_salary,\n    COUNT(*) AS total_employees\nFROM Employees\nWHERE status = 'ACTIVE'                -- Row-level filter before aggregation\nGROUP BY department_id\nHAVING AVG(salary) > 75000 AND COUNT(*) >= 5; -- Group-level filter after aggregation\n```"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Deadlock Handling: Prevention, Avoidance, and Detection\nCompare Deadlock Prevention and Deadlock Avoidance. Why is Deadlock Prevention considered inefficient in real-world operating systems compared to Banker's Algorithm avoidance?",
+    "answer_notes": "Deadlock Handling Strategies:\n\n1. Deadlock Prevention:\n   - Works by eliminating at least one of the four Coffman conditions (Mutual Exclusion, Hold & Wait, No Preemption, Circular Wait) at compile/design time.\n   - Inefficiency: Enforcing 'no hold-and-wait' forces a process to request all its resources at once, severely starving other processes and keeping expensive devices idle.\n\n2. Deadlock Avoidance:\n   - Allows processes to request resources dynamically.\n   - The OS inspects future resource requirements dynamically using algorithms like Dijkstra's Banker's algorithm.\n   - If allocating a resource keeps the system in a 'Safe State' (at least one sequence exists where all processes can finish), allocation is granted; otherwise delayed.\n\n3. Deadlock Detection & Recovery:\n   - Used in modern OSs like Linux: Allow deadlock to occur, periodically inspect the Wait-For Graph for cycles, and terminate or rollback processes."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Handling Missed Deadlines & Client Communication:\n'Tell me about a situation in college or an internship where you realized you could not meet a committed deadline. How did you handle the communication and resolution?'",
+    "answer_notes": "Exemplary STAR Framework Response:\n\n- Situation: 'During our pre-final year team hackathon, I was responsible for integrating the payment gateway SDK. 48 hours before submission, the payment provider updated their API version, breaking our webhook signature verification.'\n- Task: 'I realized that debugging and securing the webhook would require 12 additional hours, putting our scheduled project demonstration at risk.'\n- Action:\n  1. Proactive Notification: Rather than hiding the delay until the final deadline, I immediately notified our faculty mentor and team members 36 hours in advance.\n  2. Impact Assessment: I clearly explained the root cause (deprecated API signatures) and demonstrated that all other features were 100% operational.\n  3. Workaround Solution: I prepared a mock sandbox environment allowing judges to evaluate the checkout flow without crashing, while I completed the live production webhook patch.'\n- Result: 'The mentor appreciated our transparency. The feature was cleanly deployed with zero regressions, teaching me that early communication is the cornerstone of professional client trust.'"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Coin Change (Minimum Coins Required)\nGiven an integer array coins representing coins of different denominations and an integer amount representing a total amount of money, return the fewest number of coins that you need to make up that amount. If that amount of money cannot be made up by any combination of the coins, return -1.\nYou may assume that you have an infinite number of each kind of coin.\n\nInput Example:\ncoins = [1, 2, 5], amount = 11\nOutput: 3 (Explanation: 11 = 5 + 5 + 1)\n\nProvide an optimal O(amount * len(coins)) Dynamic Programming solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Bottom-Up Dynamic Programming):\n\nState Definition:\n`dp[i]` = minimum number of coins needed to make amount `i`.\nBase case: `dp[0] = 0`, all other `dp[i] = infinity`.\nTransition: `dp[i] = min(dp[i], dp[i - coin] + 1)` for each coin in coins.\n\nPython Implementation:\n```python\ndef coin_change(coins: list[int], amount: int) -> int:\n    dp = [float('inf')] * (amount + 1)\n    dp[0] = 0\n    \n    for coin in coins:\n        for x in range(coin, amount + 1):\n            dp[x] = min(dp[x], dp[x - coin] + 1)\n            \n    return dp[amount] if dp[amount] != float('inf') else -1\n\nprint(coin_change([1, 2, 5], 11)) # Output: 3\nprint(coin_change([2], 3))        # Output: -1\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nint coinChange(const vector<int>& coins, int amount) {\n    vector<int> dp(amount + 1, amount + 1);\n    dp[0] = 0;\n    \n    for (int coin : coins) {\n        for (int x = coin; x <= amount; ++x) {\n            dp[x] = min(dp[x], dp[x - coin] + 1);\n        }\n    }\n    return dp[amount] > amount ? -1 : dp[amount];\n}\n```\nTime Complexity: O(amount * len(coins))\nAuxiliary Space: O(amount)"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Merge Two Sorted Arrays in O(1) Extra Space\nGiven two sorted arrays arr1 of size m and arr2 of size n, merge them in-place such that both arrays remain sorted together (i.e., arr1 contains the first m smallest elements and arr2 contains the remaining n elements) without allocating an extra array.\n\nInput Example:\narr1 = [1, 3, 5, 7], arr2 = [0, 2, 6, 8, 9]\nOutput: arr1 = [0, 1, 2, 3], arr2 = [5, 6, 7, 8, 9]\n\nProvide the optimal Shell-sort / Gap Algorithm solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Gap Method / Shell Sort Concept):\n\nApproach:\n- Initial gap = ceil((m + n) / 2).\n- Compare elements at distance `gap` apart across both arrays.\n- If element at left > element at right, swap them.\n- Reduce `gap = ceil(gap / 2)` until gap becomes 0.\n\nPython Implementation:\n```python\nimport math\n\ndef merge_arrays_in_place(arr1: list[int], arr2: list[int]) -> None:\n    m, n = len(arr1), len(arr2)\n    gap = math.ceil((m + n) / 2)\n    \n    while gap > 0:\n        i = 0\n        while i + gap < (m + n):\n            j = i + gap\n            # Pointer resolution across arr1 and arr2\n            val1 = arr1 if i < m else arr2\n            idx1 = i if i < m else i - m\n            val2 = arr1 if j < m else arr2\n            idx2 = j if j < m else j - m\n            \n            if val1[idx1] > val2[idx2]:\n                val1[idx1], val2[idx2] = val2[idx2], val1[idx1]\n            i += 1\n            \n        gap = 0 if gap == 1 else math.ceil(gap / 2)\n\na1 = [1, 3, 5, 7]\na2 = [0, 2, 6, 8, 9]\nmerge_arrays_in_place(a1, a2)\nprint(a1, a2) # a1: [0, 1, 2, 3], a2: [5, 6, 7, 8, 9]\n```\nTime Complexity: O((M + N) * log(M + N))\nAuxiliary Space: O(1) strictly in-place"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Mixture and Replacement (Alligation Method):\nA container contains 80 liters of pure milk. From this container, 8 liters of milk are drawn out and replaced with water. This replacement process is repeated two more times (total 3 operations). How much pure milk is left in the container?\n\nOptions:\nA) 58.32 liters\nB) 56.40 liters\nC) 61.20 liters\nD) 52.80 liters",
+    "answer_notes": "Correct Option: A (58.32 liters)\n\nRepeated Replacement Formula:\nWhen a container contains x units of liquid from which y units are taken out and replaced by water n times:\nRemaining pure liquid = x * (1 - y / x)^n\n\nGiven:\n- Initial quantity (x) = 80 liters\n- Drawn quantity (y) = 8 liters\n- Number of operations (n) = 3\n\nCalculations:\nRemaining Milk = 80 * (1 - 8 / 80)^3\n               = 80 * (1 - 0.1)^3\n               = 80 * (0.9)^3\n               = 80 * 0.729\n               = 58.32 liters.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Coded Blood Relations:\nRead the following definitions:\n- 'P + Q' means P is the mother of Q\n- 'P - Q' means P is the sister of Q\n- 'P * Q' means P is the father of Q\n- 'P / Q' means P is the brother of Q\n\nWhich of the following expressions indicates that 'M is the maternal uncle of N'?\n\nOptions:\nA) M / P + N\nB) M + P * N\nC) M / P * N\nD) N + P / M",
+    "answer_notes": "Correct Option: A (M / P + N)\n\nExpression Decoding:\n1. We need 'M is the maternal uncle of N' (M is brother of N's mother).\n2. Test Option A: `M / P + N`\n   - `M / P`: M is the brother of P (M is male).\n   - `P + N`: P is the mother of N.\n   - Brother of N's mother is N's maternal uncle!\n   - Matches the requirement perfectly.\n3. Test Option C: `M / P * N`\n   - M is brother of P; P is father of N => Paternal uncle, not maternal uncle.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Active vs Passive Voice in Enterprise Documentation:\nConvert the following sentence into the standard passive voice appropriate for a technical incident report:\n'The systems engineering team will deploy the cloud security patches across all European data centers at midnight.'",
+    "answer_notes": "Correct Passive Transformation:\n\n'The cloud security patches will be deployed across all European data centers by the systems engineering team at midnight.'\n\nRules of Transformation:\n1. Object ('The cloud security patches') becomes the new Subject.\n2. Future simple verb 'will deploy' converts to 'will be deployed' (`will be + past participle`).\n3. Prepositional phrases ('across all European data centers', 'at midnight') maintain their appropriate modifying positions.\n4. Original agent ('the systems engineering team') is introduced via preposition 'by'."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Java Memory Management: JVM Heap Generations & Garbage Collection\nDescribe the Generational Garbage Collection mechanism in the JVM. Differentiate between Young Generation (Eden, Survivor spaces S0/S1) and Old (Tenured) Generation, explaining Minor GC vs Major GC.",
+    "answer_notes": "JVM Generational Garbage Collection:\n\n1. Weak Generational Hypothesis:\n   Most allocated objects have very short lifespans (e.g., local method variables).\n\n2. Memory Areas:\n   - Young Generation:\n     - Eden Space: Where all new objects are initially allocated.\n     - Survivor Spaces (S0 and S1): When Eden fills, a fast Minor GC runs, copying surviving objects into one Survivor space.\n     - Aging / Tenuring: Objects surviving multiple GC cycles (e.g., 15 cycles) are promoted to Old Generation.\n   - Old (Tenured) Generation:\n     - Holds long-lived objects (e.g., Spring singletons, DB pools).\n     - Collected via Major GC / Full GC using algorithms like G1 GC or ZGC, which takes longer and pauses application threads.\n   - Metaspace (Native memory): Stores class metadata, bytecode definitions, and constant pools."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "RESTful API Architectural Constraints and Idempotency:\nDefine the concept of 'Idempotency' in HTTP web APIs. Classify the standard HTTP verbs (GET, POST, PUT, DELETE, PATCH) into idempotent and non-idempotent operations, explaining why POST is non-idempotent.",
+    "answer_notes": "REST API Idempotency:\n\n1. Definition:\n   An HTTP method is idempotent if executing it multiple identical times has the exact same side-effect on server state as executing it once: `f(f(x)) = f(x)`.\n\n2. Classification of Methods:\n   - GET (Idempotent & Safe): Read-only; fetching user details 10 times causes zero state mutations.\n   - PUT (Idempotent): Full replacement; updating user 5 with `{name: 'Alice'}` 10 times leaves user 5 with `{name: 'Alice'}`.\n   - DELETE (Idempotent): Deleting resource 5 multiple times results in resource 5 being absent.\n   - POST (NON-Idempotent): Submitting a new payment order 10 times creates 10 separate order records and charges the card 10 times!\n   - PATCH (Generally NON-Idempotent, though can be designed idempotent): e.g., `{op: 'increment', val: 5}` changes state on each repeat."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Why TCS & Knowledge of TCS Global Digital Platforms:\n'Why do you want to join TCS specifically over other global IT consulting competitors? What do you know about TCS BaNCS and TCS Pace Ports?'",
+    "answer_notes": "Exemplary Company Research Response:\n\n1. Tata Legacy & Financial Stability:\n   'TCS is India's most valuable technology enterprise with over 600,000 global associates, industry-leading operating margins, and the backing of the 150-year Tata ethical ethos.'\n\n2. Intellectual Property & Platforms:\n   - TCS BaNCS: 'TCS is not just an IT services company, but a software product powerhouse. TCS BaNCS powers the core banking, capital markets, and insurance operations for over 450 financial institutions globally.'\n   - TCS Pace Ports: 'TCS operates collaborative co-innovation hubs (Pace Ports) in Tokyo, New York, Amsterdam, and Toronto that bring Fortune 500 executives and academic researchers together to pilot rapid AI and IoT prototypes.'\n\n3. Career Growth:\n   'Joining TCS offers unparalleled global exposure, world-class internal learning platforms like Fresher Elevate, and stable long-term career progression.'"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Reverse a Singly Linked List (Iterative & Recursive)\nGiven the head of a singly linked list, reverse the list, and return the reversed list's head.\n\nInput Example:\nhead = [1, 2, 3, 4, 5]\nOutput: [5, 4, 3, 2, 1]\n\nProvide the standard 3-pointer iterative solution with O(N) time and O(1) space, and the recursive formulation.",
+    "answer_notes": "Optimal Solution (3-Pointer Iterative Algorithm):\n\nApproach:\n- Use `prev = None`, `curr = head`.\n- In each loop: save `next_node = curr.next`, set `curr.next = prev`, move `prev = curr`, `curr = next_node`.\n- Return `prev` as new head.\n\nPython Implementation:\n```python\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef reverse_list(head: ListNode) -> ListNode:\n    prev = None\n    curr = head\n    while curr:\n        next_temp = curr.next\n        curr.next = prev\n        prev = curr\n        curr = next_temp\n    return prev\n```\n\nC++ Implementation:\n```cpp\nstruct ListNode {\n    int val;\n    ListNode *next;\n    ListNode(int x) : val(x), next(nullptr) {}\n};\n\nListNode* reverseList(ListNode* head) {\n    ListNode *prev = nullptr, *curr = head;\n    while (curr != nullptr) {\n        ListNode* nextTemp = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = nextTemp;\n    }\n    return prev;\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) iterative"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Advanced Coding Assessment",
+    "question": "Problem: Valid Parentheses String Validation Using Stack\nGiven a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.\nAn input string is valid if:\n1. Open brackets must be closed by the same type of brackets.\n2. Open brackets must be closed in the correct order.\n3. Every close bracket has a corresponding open bracket of the same type.\n\nInput Example 1: s = \"()[]{}\" -> Output: true\nInput Example 2: s = \"(]\" -> Output: false\n\nProvide the optimal stack solution in C++ and Python.",
+    "answer_notes": "Optimal Stack Matching Solution:\n\nPython Implementation:\n```python\ndef is_valid_parentheses(s: str) -> bool:\n    mapping = {')': '(', '}': '{', ']': '['}\n    stack = []\n    \n    for char in s:\n        if char in mapping:\n            top_element = stack.pop() if stack else '#'\n            if mapping[char] != top_element:\n                return False\n        else:\n            stack.append(char)\n            \n    return len(stack) == 0\n\nprint(is_valid_parentheses(\"()[]{}\")) # Output: True\nprint(is_valid_parentheses(\"(]\"))     # Output: False\n```\n\nC++ Implementation:\n```cpp\n#include <string>\n#include <stack>\n#include <iostream>\nusing namespace std;\n\nbool isValid(string s) {\n    stack<char> st;\n    for (char c : s) {\n        if (c == '(' || c == '{' || c == '[') {\n            st.push(c);\n        } else {\n            if (st.empty()) return false;\n            char top = st.top();\n            if ((c == ')' && top != '(') ||\n                (c == '}' && top != '{') ||\n                (c == ']' && top != '[')) {\n                return false;\n            }\n            st.pop();\n        }\n    }\n    return st.empty();\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Men, Women, and Work Equivalence:\nIf 3 men or 6 women can reap a harvest field in 16 days, in how many days can 12 men and 8 women reap the exact same field working together?\n\nOptions:\nA) 3 days\nB) 4 days\nC) 5 days\nD) 6 days",
+    "answer_notes": "Correct Option: A (3 days)\n\nCalculation Steps:\n1. Find efficiency equivalence:\n   3 Men = 6 Women => 1 Man = 2 Women.\n\n2. Convert everything into Women units:\n   Total Work = 6 Women * 16 days = 96 Women-days.\n\n3. Calculate group strength of (12 Men + 8 Women):\n   - 12 Men = 12 * 2 = 24 Women.\n   - Total Workforce = 24 Women + 8 Women = 32 Women.\n\n4. Calculate Days Needed:\n   Days = Total Work / Combined Workforce\n        = 96 / 32\n        = 3 days.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Numerical & Reasoning Ability",
+    "question": "Modular Arithmetic & Fermat's Little Theorem:\nWhat is the remainder when 3^2021 is divided by 7?\n\nOptions:\nA) 2\nB) 3\nC) 5\nD) 6",
+    "answer_notes": "Correct Option: C (5)\n\nCalculation using Fermat's Little Theorem (FLT):\n1. Theorem Statement:\n   If p is a prime and gcd(a, p) = 1, then a^(p - 1) ≡ 1 (mod p).\n\n2. Here a = 3 and p = 7 (which is prime):\n   3^(7 - 1) = 3^6 ≡ 1 (mod 7).\n\n3. Divide exponent 2021 by 6:\n   2021 = 6 * 336 + 5.\n   Remainder of exponent = 5.\n\n4. Therefore:\n   3^2021 ≡ (3^6)^336 * 3^5 (mod 7)\n          ≡ (1)^336 * 3^5 (mod 7)\n          ≡ 3^5 (mod 7).\n\n5. Compute 3^5:\n   3^5 = 243.\n   243 = 7 * 34 + 5.\n   243 ≡ 5 (mod 7).\n\nTherefore, the remainder is 5. Option C is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Vocabulary: Contextual Word Usage in Technical Enterprise:\nChoose the word that best completes the sentence logically and grammatically:\n'The cloud migration process was highly ________, requiring delicate coordination between database administrators, security officers, and site reliability engineers.'\n\nOptions:\nA) perfunctory\nB) meticulous\nC) superficial\nD) capricious",
+    "answer_notes": "Correct Option: B (meticulous)\n\nContextual Vocabulary Breakdown:\n- 'meticulous' means showing great attention to detail, very careful and precise. This fits 'delicate coordination between multiple senior engineering teams'.\n- 'perfunctory' means carried out with minimal effort or thought (opposite of intended meaning).\n- 'superficial' means shallow, not thorough.\n- 'capricious' means given to sudden, unaccountable changes of mood or behavior.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "RDBMS Keys: Primary Key vs Unique Key vs Candidate Key\nDifferentiate between Primary Key, Unique Key, and Candidate Key in Relational Database Management Systems with respect to NULL values, table limits, and indexing.",
+    "answer_notes": "RDBMS Keys Comparison:\n\n1. Candidate Key:\n   - Any set of one or more columns that can uniquely identify a row in a table without containing redundant attributes.\n   - A table can have multiple Candidate Keys.\n\n2. Primary Key:\n   - The specific Candidate Key chosen by the database architect to serve as the default unique identifier for the entity.\n   - Strict Constraints: Exactly ONE Primary Key per table; CANNOT contain NULL values; creates a clustered index by default in MySQL InnoDB.\n\n3. Unique Key:\n   - Ensures all values in a column or set of columns are distinct across the table.\n   - Difference from Primary Key: A table can have MULTIPLE Unique Keys; Unique Keys CAN accept NULL values (in MySQL, multiple rows can have NULL because NULL != NULL)."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "CPU Scheduling: FCFS vs SJF vs Round Robin\nCompare First-Come First-Served (FCFS), Shortest Job First (SJF), and Round Robin (RR) CPU scheduling algorithms. Explain the 'Convoy Effect' in FCFS and how Round Robin time quantum selection prevents CPU starvation.",
+    "answer_notes": "Operating Systems CPU Scheduling:\n\n1. First-Come First-Served (FCFS):\n   - Non-preemptive; assigns CPU in order of arrival.\n   - The Convoy Effect: If a CPU-bound process with a massive burst time arrives first, all short I/O-bound processes are forced to wait behind it, resulting in high average waiting times and low device utilization.\n\n2. Shortest Job First (SJF):\n   - Provably optimal for minimizing average waiting time.\n   - Drawback: Impossible to predict exact future CPU burst lengths, and long processes can suffer from starvation.\n\n3. Round Robin (RR):\n   - Preemptive; assigns a fixed time slice (quantum) to each process in circular order.\n   - Quantum Trade-off: If quantum is too large, RR degrades to FCFS. If quantum is too small, context switching overhead overwhelms CPU throughput. Optimal quantum is typically 10–50 milliseconds (where 80% of CPU bursts are shorter than the quantum)."
+  }
+]
+

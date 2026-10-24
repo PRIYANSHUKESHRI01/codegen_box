@@ -9,6 +9,7 @@ import { HpButton, hpInput, hpLabel } from "@/components/portal/kit";
 import { ScNotice } from "@/components/portal/screeningKit";
 import type { QuestionSetItem } from "@/types/softSkill";
 import { QuestionSetPicker } from "./QuestionSetPicker";
+import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 
 export interface SoftSkillCreatedResult {
   title: string;
@@ -25,6 +26,8 @@ interface CreateSoftSkillAssessmentModalProps {
   onCreated: (result: SoftSkillCreatedResult) => void;
   /** "premium" is the hiring-portal look. Default leaves Ops/TPO markup exactly as before. */
   variant?: "default" | "premium";
+  /** Offer "Who is this for?" (a branch audience). Mellow and TPO tests can be aimed at branches; a hiring partner's cannot. */
+  allowAudience?: boolean;
 }
 
 /** One button for both looks, so the two variants share the same wiring. A real component (not defined inside the modal), so it keeps its identity — and its focus — across renders. */
@@ -82,13 +85,14 @@ function Btn({
  * The test, its questions and its published state are created by ONE request, so a refused set never leaves a
  * half-built draft behind.
  */
-export function CreateSoftSkillAssessmentModal({ basePath, setsPath, onClose, onCreated, variant = "default" }: CreateSoftSkillAssessmentModalProps) {
+export function CreateSoftSkillAssessmentModal({ basePath, setsPath, onClose, onCreated, variant = "default", allowAudience = false }: CreateSoftSkillAssessmentModalProps) {
   const premium = variant === "premium";
   const [step, setStep] = useState<1 | 2>(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [passPercentage, setPassPercentage] = useState(60);
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [chosen, setChosen] = useState<QuestionSetItem | null>(null);
   const [saving, setSaving] = useState<"draft" | "publish" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +108,7 @@ export function CreateSoftSkillAssessmentModal({ basePath, setsPath, onClose, on
         description: description.trim() || undefined,
         duration_minutes: durationMinutes,
         pass_percentage: passPercentage,
+        ...(allowAudience ? { branch_audience: audienceForRequest(audience) } : {}),
         question_set_id: chosen?.id,
         publish: chosen ? publish : undefined,
       });
@@ -200,6 +205,7 @@ export function CreateSoftSkillAssessmentModal({ basePath, setsPath, onClose, on
                 <input id="css-pass" type="number" min={1} max={100} value={passPercentage} onChange={(e) => setPassPercentage(Number(e.target.value))} className={cn(input, "tabular")} />
               </div>
             </div>
+            {allowAudience && <BranchAudienceField value={audience} onChange={setAudience} />}
             {error && (premium ? <ScNotice tone="rose">{error}</ScNotice> : <p className="text-2xs text-status-danger">{error}</p>)}
           </form>
         </>

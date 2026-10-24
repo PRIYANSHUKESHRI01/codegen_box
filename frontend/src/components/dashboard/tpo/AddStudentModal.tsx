@@ -9,6 +9,9 @@ import { Modal } from "@/components/ui/Modal";
 import { HpAvatar, HpButton, hpInput, hpLabel } from "@/components/portal/kit";
 import { HpCallout, HpFormError } from "@/components/portal/pipeline-kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
+import { DepartmentPicker, useCollegeDepartments } from "@/components/branches/DepartmentPicker";
+import { disciplinesOfDepartment, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
+import { useDepartmentScope } from "@/lib/departments";
 
 interface AddStudentModalProps {
   open: boolean;
@@ -63,6 +66,17 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const catalog = useBranchCatalog();
+  // Which department the student joins: the one being looked at on the portal, or the college's only one; otherwise the TPO chooses.
+  const { scope } = useDepartmentScope();
+  const { departments } = useCollegeDepartments();
+  const [picked, setPicked] = useState<string>("");
+  const department = departments.length === 1 ? departments[0].code : picked || (scope !== SCOPE_ALL ? scope : "");
+  const needsDepartment = departments.length > 1;
+  // The branches of that department, offered as suggestions on the branch field (a college's own wording is still accepted).
+  const branchSuggestions = catalog && department
+    ? disciplinesOfDepartment(catalog, department).flatMap((d) => catalog.branches.filter((b) => b.discipline === d.code))
+    : [];
 
   const set = (field: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -80,6 +94,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
     setError(null);
     try {
       const res = await api.post<{ student: CohortStudent }>("/tpo/students", {
+        ...(department ? { department } : {}),
         name: form.name,
         email: form.email,
         roll_number: form.roll_number || undefined,
@@ -121,7 +136,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
             <HpButton
               type="submit"
               form="add-student-form"
-              disabled={saving || !form.name || !form.email}
+              disabled={saving || !form.name || !form.email || (needsDepartment && !department)}
               isLoading={saving}
               leftIcon={<Mail className="h-4 w-4" />}
             >
@@ -160,6 +175,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
             <fieldset className="space-y-3.5">
               <legend className="sr-only">Identity</legend>
               <GroupLabel>Identity</GroupLabel>
+              <DepartmentPicker options={departments} value={department} onChange={setPicked} label="Department" />
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <div>
                   <label htmlFor="add-student-name" className={hpLabel}>
@@ -218,7 +234,12 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
                     Branch <Optional />
                   </label>
                   <IconField icon={BookOpen}>
-                    <input id="add-student-branch" value={form.branch} onChange={set("branch")} placeholder="Optional" className={cn(hpInput, "pl-10")} />
+                    <input id="add-student-branch" list="add-student-branches" value={form.branch} onChange={set("branch")} placeholder="Optional" className={cn(hpInput, "pl-10")} />
+                    <datalist id="add-student-branches">
+                      {branchSuggestions.map((b) => (
+                        <option key={b.code} value={b.name} />
+                      ))}
+                    </datalist>
                   </IconField>
                 </div>
                 <div>

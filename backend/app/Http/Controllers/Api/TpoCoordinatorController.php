@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\User;
 use App\Services\SectionCoordinatorService;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 
 /**
@@ -58,6 +59,8 @@ class TpoCoordinatorController extends Controller
             'email' => ['required', 'string', 'email', 'max:255'],
             'section' => ['required', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            // Which branches of the section this coordinator looks after; omitted/empty = all of it.
+            ...BranchAudience::rules('branch_scope'),
         ]);
 
         $coordinator = $this->coordinators->create($collegeId, $validated, $request->user());
@@ -75,9 +78,10 @@ class TpoCoordinatorController extends Controller
         $validated = $request->validate([
             'section' => ['required', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
+            ...BranchAudience::rules('branch_scope'),
         ]);
 
-        $coordinator = $this->coordinators->updateSection($user, $validated);
+        $coordinator = $this->coordinators->updateSection($user, $validated, $request->user());
 
         return response()->json(['coordinator' => $this->coordinators->payload($coordinator, $coordinator->college_id)]);
     }

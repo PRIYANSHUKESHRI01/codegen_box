@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\HasSubscription;
+use App\Support\BranchCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,7 +22,14 @@ class College extends Model
         'is_active',
         'placement_target_percent',
         'placement_target_deadline',
+        'exam_networks',
     ];
+
+    /** The relation is exposed through the `departments` codes below, never as raw rows. */
+    protected $hidden = ['collegeDepartments'];
+
+    /** Null unless `collegeDepartments` was eager loaded (see departments()): serialising a list of colleges must not cost a query each. */
+    protected $appends = ['departments'];
 
     protected function casts(): array
     {
@@ -30,12 +38,52 @@ class College extends Model
             'is_active' => 'boolean',
             'placement_target_percent' => 'decimal:2',
             'placement_target_deadline' => 'date',
+            'exam_networks' => 'array',
         ];
     }
 
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function collegeDepartments(): HasMany
+    {
+        return $this->hasMany(CollegeDepartment::class);
+    }
+
+    /**
+     * The departments this college runs, in catalogue order. A college with no rows (created before departments existed,
+     * or by code that never enabled one) is engineering-only — the product it has always been — so nothing depends on
+     * every college having been backfilled.
+     *
+     * @return list<string>
+     */
+    public function departmentCodes(): array
+    {
+        $enabled = $this->relationLoaded('collegeDepartments')
+            ? $this->collegeDepartments->pluck('department_code')->all()
+            : $this->collegeDepartments()->pluck('department_code')->all();
+
+        if ($enabled === []) {
+            return [config('departments.fallback', Department::ENGINEERING)];
+        }
+
+        $order = array_flip(array_column(BranchCatalog::instance()->departments(activeOnly: false), 'code'));
+        usort($enabled, fn (string $a, string $b) => ($order[$a] ?? 999) <=> ($order[$b] ?? 999));
+
+        return array_values($enabled);
+    }
+
+    /** Serialized as `departments`: the codes this college runs, or null when the relation was not loaded (callers then assume engineering). */
+    protected function getDepartmentsAttribute(): ?array
+    {
+        return $this->relationLoaded('collegeDepartments') ? $this->departmentCodes() : null;
+    }
+
+    public function runsDepartment(?string $code): bool
+    {
+        return $code !== null && in_array($code, $this->departmentCodes(), true);
     }
 
     public function tpoAdmins(): HasMany

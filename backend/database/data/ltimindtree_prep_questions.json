@@ -1,0 +1,297 @@
+[
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Longest Palindromic Substring (LTIMindtree Spark / Ignite Track)\nGiven a string s, return the longest palindromic substring in s.\n\nInput Example 1: s = \"babad\" -> Output: \"bab\" (or \"aba\")\nInput Example 2: s = \"cbbd\" -> Output: \"bb\"\n\nProvide the optimal O(N^2) time and O(1) space 'Expand Around Center' solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Expand Around Center Algorithm):\n\nKey Concept:\nA palindrome reads the same backwards and forwards. There are 2N - 1 centers (single-character centers for odd palindromes, between-character centers for even palindromes).\nExpand outwards from each center while `s[left] == s[right]`.\n\nPython Implementation:\n```python\ndef longest_palindrome(s: str) -> str:\n    if not s: return \"\"\n    start, max_len = 0, 1\n    \n    def expand(l: int, r: int) -> tuple[int, int]:\n        while l >= 0 and r < len(s) and s[l] == s[r]:\n            l -= 1\n            r += 1\n        return l + 1, r - 1\n        \n    for i in range(len(s)):\n        # Odd length palindrome\n        l1, r1 = expand(i, i)\n        if (r1 - l1 + 1) > max_len:\n            start, max_len = l1, r1 - l1 + 1\n        # Even length palindrome\n        l2, r2 = expand(i, i + 1)\n        if (r2 - l2 + 1) > max_len:\n            start, max_len = l2, r2 - l2 + 1\n            \n    return s[start:start + max_len]\n\nprint(longest_palindrome(\"babad\")) # Output: \"bab\"\nprint(longest_palindrome(\"cbbd\"))  # Output: \"bb\"\n```\nTime Complexity: O(N^2)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Search in Rotated Sorted Array\nThere is an integer array nums sorted in ascending order (with distinct values). Prior to being passed to your function, nums is possibly rotated at an unknown pivot index k (0 <= k < nums.length).\nGiven the array nums after the possible rotation and an integer target, return the index of target if it is in nums, or -1 if it is not in nums.\nYou must write an algorithm with O(log n) runtime complexity.\n\nInput Example 1: nums = [4, 5, 6, 7, 0, 1, 2], target = 0 -> Output: 4\nInput Example 2: nums = [4, 5, 6, 7, 0, 1, 2], target = 3 -> Output: -1\n\nProvide the optimal O(log N) binary search solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Modified Binary Search):\n\nKey Concept:\nIn any rotated sorted array, splitting the array at midpoint `mid` always leaves at least ONE half completely sorted!\n- If `nums[low] <= nums[mid]`: the LEFT half is sorted.\n  - If `nums[low] <= target < nums[mid]`, target lies in left half: `high = mid - 1`.\n  - Else, search right half: `low = mid + 1`.\n- Else: the RIGHT half is sorted.\n  - If `nums[mid] < target <= nums[high]`, target lies in right half: `low = mid + 1`.\n  - Else, search left half: `high = mid - 1`.\n\nPython Implementation:\n```python\ndef search_rotated(nums: list[int], target: int) -> int:\n    low, high = 0, len(nums) - 1\n    \n    while low <= high:\n        mid = (low + high) // 2\n        if nums[mid] == target:\n            return mid\n            \n        if nums[low] <= nums[mid]: # Left half is sorted\n            if nums[low] <= target < nums[mid]:\n                high = mid - 1\n            else:\n                low = mid + 1\n        else: # Right half is sorted\n            if nums[mid] < target <= nums[high]:\n                low = mid + 1\n            else:\n                high = mid - 1\n                \n    return -1\n\nprint(search_rotated([4, 5, 6, 7, 0, 1, 2], 0)) # Output: 4\n```\nTime Complexity: O(log N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Work and Wages (LTIMindtree Ignite Quant):\nA, B, and C can complete a cloud migration project in 10, 12, and 15 days respectively. They started working together, but A left 2 days after the start, and B left 3 days before the completion of the project. If the total payment for the project was ₹9,000, what is the share of C in the payment?\n\nOptions:\nA) ₹4,200\nB) ₹4,500\nC) ₹4,800\nD) ₹5,000",
+    "answer_notes": "Correct Option: A (₹4,200)\n\nStep-by-step LCM Derivation:\n1. Total Work = LCM(10, 12, 15) = 60 units.\n2. Daily efficiencies:\n   - Rate of A = 60 / 10 = 6 units/day\n   - Rate of B = 60 / 12 = 5 units/day\n   - Rate of C = 60 / 15 = 4 units/day\n3. Let the total project duration be T days.\n   - A worked for 2 days: Work by A = 2 * 6 = 12 units.\n   - B worked for (T - 3) days: Work by B = (T - 3) * 5 units.\n   - C worked for all T days: Work by C = T * 4 units.\n4. Set up total work equation:\n   Work_A + Work_B + Work_C = 60\n   12 + 5(T - 3) + 4T = 60\n   12 + 5T - 15 + 4T = 60\n   9T - 3 = 60\n   9T = 63 => T = 7 days.\n5. Calculate actual work done by each:\n   - Work done by A = 12 units.\n   - Work done by B = (7 - 3) * 5 = 4 * 5 = 20 units.\n   - Work done by C = 7 * 4 = 28 units.\n   - Total Check: 12 + 20 + 28 = 60 units. Perfect!\n6. C's Share of Payment:\n   Share of C = (Work done by C / Total Work) * Total Payment\n              = (28 / 60) * ₹9,000\n              = 28 * 150\n              = ₹4,200.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Circular Seating with Alternating Directions:\nEight engineers (A, B, C, D, E, F, G, H) sit around a circular table. Four face inward towards the center, and four face outward away from the center. No two persons facing the same direction sit adjacent to each other (strictly alternating orientations):\n1. A faces inward.\n2. B sits second to the right of A.\n3. C sits opposite to B.\n4. D is an immediate neighbor of C.\n\nWhich direction does B face?\n\nOptions:\nA) Inward\nB) Outward\nC) Cannot be determined\nD) North",
+    "answer_notes": "Correct Option: A (Inward)\n\nDeduction Analysis:\n1. The rule states orientations alternate: Position 1 = Inward, Position 2 = Outward, Position 3 = Inward, Position 4 = Outward, etc.\n2. Let A sit at Position 1 (facing Inward).\n3. Position 2 (immediate neighbor) faces Outward.\n4. Position 3 (second position clockwise or counter-clockwise) MUST face Inward!\n5. Since B sits second to the right of A, B is at distance 2 from A.\n6. Alternating pattern: [Pos 1: Inward] -> [Pos 2: Outward] -> [Pos 3: Inward].\n7. Therefore, B MUST face Inward!\n\nTherefore, Option A (Inward) is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Data Interpretation: Compound Growth Analysis\nA digital engineering business unit earned revenues of ₹200 Crores in 2022, ₹260 Crores in 2023, and ₹338 Crores in 2024. What is the constant annual compound revenue growth rate (CAGR) of this business unit?\n\nOptions:\nA) 25%\nB) 30%\nC) 32%\nD) 35%",
+    "answer_notes": "Correct Option: B (30%)\n\nCalculation Steps:\n1. Growth from 2022 to 2023:\n   Growth Rate = [(260 - 200) / 200] * 100 = (60 / 200) * 100 = 30%.\n2. Verify growth from 2023 to 2024 with 30% rate:\n   Expected 2024 Revenue = 260 * (1 + 0.30) = 260 * 1.30 = ₹338 Crores.\n   Matches ₹338 Crores exactly!\n3. Therefore, the annual compound growth rate is constant at 30%.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "SQL Query Challenge: Employees Earning Higher Than Their Department Average\nGiven an Employee table (id INT, name VARCHAR, dept_id INT, salary DECIMAL), write an ANSI SQL query using a Correlated Subquery or Window Function to find the names and salaries of all employees who earn strictly more than the average salary of their respective department.",
+    "answer_notes": "Optimal ANSI SQL Query using Window Function:\n\n```sql\nWITH DeptAverage AS (\n    SELECT \n        id,\n        name,\n        dept_id,\n        salary,\n        AVG(salary) OVER (PARTITION BY dept_id) AS dept_avg_salary\n    FROM Employee\n)\nSELECT \n    id,\n    name,\n    dept_id,\n    salary,\n    ROUND(dept_avg_salary, 2) AS dept_avg_salary\nFROM DeptAverage\nWHERE salary > dept_avg_salary\nORDER BY dept_id, salary DESC;\n```\n\nExplanation:\n1. `AVG(salary) OVER (PARTITION BY dept_id)` computes each department's average salary across its rows without grouping or reducing rows.\n2. The outer query filters `WHERE salary > dept_avg_salary` to output above-average earners."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Object-Oriented Programming: Virtual Destructors in C++\nWhy must a base class destructor always be declared `virtual` if that base class is intended to be inherited and polymorphic objects are deleted via base pointers? What catastrophic defect occurs if `virtual` is omitted?",
+    "answer_notes": "Virtual Destructors in C++ Polymorphism:\n\n1. The Problem:\n   When a derived class object is created on the heap via a base class pointer:\n   `Base *ptr = new Derived();`\n   `delete ptr;`\n\n2. Without `virtual` on Base Destructor:\n   - The compiler uses Static Binding. Because the pointer type is `Base*`, it calls ONLY the `~Base()` destructor.\n   - The `~Derived()` destructor NEVER executes!\n   - Any dynamic memory, file handles, or network sockets allocated in the `Derived` class instance are permanently leaked (Undefined Behavior per C++ standard).\n\n3. With `virtual ~Base()`:\n   - The compiler uses Dynamic Binding via the class vtable.\n   - The runtime correctly invokes the `~Derived()` destructor first, followed by the `~Base()` destructor, ensuring complete and safe resource teardown."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems: Deadlock Recovery Mechanisms\nOnce a deadlock is detected via a Resource Allocation Graph cycle in an operating system, explain the two primary recovery strategies: Process Termination and Resource Preemption. What is the 'Starvation Problem' in victim selection during preemption?",
+    "answer_notes": "Deadlock Recovery Mechanisms:\n\n1. Process Termination:\n   - Strategy A: Abort all deadlocked processes (brute-force; expensive computation lost).\n   - Strategy B: Abort one process at a time until the deadlock cycle is broken (evaluating priority, elapsed time, and held resources).\n\n2. Resource Preemption:\n   - Progressively preempt allocated resources from selected victim processes and reassign them to other blocked processes until the cycle is resolved.\n   - Rollback: The victim process must be rolled back to a safe checkpoint state (or restarted).\n\n3. The Starvation Problem:\n   - If the victim selection algorithm strictly chooses processes based on lowest priority or fewest held resources, the identical low-priority process may repeatedly be chosen as the victim, never completing its execution.\n   - Solution: Include a rollback count in the selection metric so an aging process is not perpetually targeted."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "LTIMindtree Collaborative Delivery & Client Focus:\n'LTIMindtree was formed through the integration of two storied technology leaders (L&T Infotech and Mindtree). How do you foster collaboration in multidisciplinary teams with differing work styles?'",
+    "answer_notes": "Exemplary Collaborative Response:\n\n1. Appreciation of LTIMindtree's Heritage:\n   'LTIMindtree combines LTI's deep industrial engineering roots and enterprise scale with Mindtree's born-in-the-cloud agility and human-centric culture.'\n\n2. Cross-Functional Teamwork in College:\n   - 'During our university IoT capstone, our team comprised hardware electrical engineers and software backend coders who initially spoke entirely different technical vocabularies.'\n   - 'I organized daily 10-minute interface contract reviews where we standardized JSON API payloads and UART transmission protocols before building.'\n   - 'Respecting diverse specialized skillsets and creating clear architectural contracts ensured our team delivered ahead of schedule.'\n\n3. Dedication to LTIMindtree Delivery:\n   'I bring this same collaborative empathy and professional adaptability to LTIMindtree's global client engagements.'"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Product of Array Except Self\nGiven an integer array nums, return an array answer such that answer[i] is equal to the product of all the elements of nums except nums[i].\nThe product of any prefix or suffix of nums is guaranteed to fit in a 32-bit integer.\nYou must write an algorithm that runs in O(n) time and without using the division operation.\n\nInput Example: nums = [1, 2, 3, 4] -> Output: [24, 12, 8, 6]\n\nProvide the optimal O(N) time and O(1) extra space (output array does not count as extra space) solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Prefix and Suffix Products in a Single Pass):\n\nApproach:\n- Compute prefix products directly into the `output` array.\n- Use a running variable `suffix = 1` moving right to left, multiplying `output[i] *= suffix` and updating `suffix *= nums[i]`.\n\nPython Implementation:\n```python\ndef product_except_self(nums: list[int]) -> list[int]:\n    n = len(nums)\n    res = [1] * n\n    \n    prefix = 1\n    for i in range(n):\n        res[i] = prefix\n        prefix *= nums[i]\n        \n    suffix = 1\n    for i in range(n - 1, -1, -1):\n        res[i] *= suffix\n        suffix *= nums[i]\n        \n    return res\n\nprint(product_except_self([1, 2, 3, 4])) # Output: [24, 12, 8, 6]\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) extra space"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Container With Most Water\nYou are given an integer array height of length n. There are n vertical lines drawn such that the two endpoints of the ith line are (i, 0) and (i, height[i]).\nFind two lines that together with the x-axis form a container, such that the container contains the most water.\nReturn the maximum amount of water a container can store.\nNotice that you may not slant the container.\n\nInput Example: height = [1, 8, 6, 2, 5, 4, 8, 3, 7] -> Output: 49\n\nProvide the optimal O(N) two-pointer solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two Pointers Technique):\n\nApproach:\n- Place `left` pointer at 0 and `right` pointer at N - 1.\n- In each step: `area = min(height[left], height[right]) * (right - left)`.\n- Update `max_area = max(max_area, area)`.\n- Advance the pointer pointing to the shorter line (since moving the taller pointer can never increase area with a shrinking base).\n\nPython Implementation:\n```python\ndef max_area(height: list[int]) -> int:\n    left, right = 0, len(height) - 1\n    max_water = 0\n    \n    while left < right:\n        w = right - left\n        h = min(height[left], height[right])\n        max_water = max(max_water, w * h)\n        if height[left] < height[right]:\n            left += 1\n        else:\n            right -= 1\n            \n    return max_water\n\nprint(max_area([1, 8, 6, 2, 5, 4, 8, 3, 7])) # Output: 49\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Profit and Loss with Discounts and GST:\nA digital appliance with a marked price of ₹50,000 is sold after a trade discount of 12%. The customer is additionally charged an 18% Goods and Services Tax (GST) on the discounted price. What is the final net invoice amount paid by the customer?\n\nOptions:\nA) ₹51,920\nB) ₹52,000\nC) ₹50,400\nD) ₹49,820",
+    "answer_notes": "Correct Option: A (₹51,920)\n\nCalculation Steps:\n1. Marked Price (MP) = ₹50,000.\n2. Apply Trade Discount of 12%:\n   Discounted Price = 50,000 * (1 - 0.12) = 50,000 * 0.88 = ₹44,000.\n3. Add 18% GST on the discounted price:\n   GST Amount = 44,000 * 0.18 = ₹7,920.\n4. Final Net Invoice Amount:\n   Net Amount = 44,000 + 7,920 = ₹51,920.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Two Trains Crossing in Opposite Directions:\nTwo trains, 140 meters and 160 meters long, run on parallel tracks in opposite directions with speeds of 60 km/h and 48 km/h respectively. In how many seconds will they cross each other completely from the moment they meet?\n\nOptions:\nA) 9 seconds\nB) 10 seconds\nC) 12 seconds\nD) 15 seconds",
+    "answer_notes": "Correct Option: B (10 seconds)\n\nCalculation Steps:\n1. Total distance to be cleared when crossing in opposite directions:\n   Distance = Length of Train 1 + Length of Train 2\n            = 140 m + 160 m = 300 meters.\n2. Relative Speed when moving in opposite directions:\n   Relative Speed = S1 + S2 = 60 km/h + 48 km/h = 108 km/h.\n3. Convert relative speed to m/s:\n   Speed = 108 * (5 / 18) = 6 * 5 = 30 m/s.\n4. Time required to cross completely:\n   Time = Distance / Relative Speed\n        = 300 / 30 = 10 seconds.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Syllogisms with Conditional Constraints:\nStatements:\n1. All microservices are containers.\n2. Some containers are virtual machines.\n3. No virtual machine is a serverless function.\n\nConclusions:\nI. Some containers are not serverless functions.\nII. No microservice is a serverless function.\n\nWhich conclusions logically follow?\n\nOptions:\nA) Only I follows\nB) Only II follows\nC) Both follow\nD) Neither follows",
+    "answer_notes": "Correct Option: A (Only I follows)\n\nEuler / Venn Diagram Analysis:\n1. Containers that are virtual machines can NEVER be serverless functions (by Statement 3). Hence, Conclusion I ('Some containers are not serverless functions') strictly follows.\n2. Statement 1 places microservices in containers, but microservices could be serverless without intersecting virtual machines. Conclusion II does not necessarily follow.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Automata Fix / Debugging (C Dynamic Array Realloc Bug):\nExamine the following C snippet that expands a dynamically allocated array:\n\n```c\nint *arr = (int *)malloc(5 * sizeof(int));\n// ... work with arr ...\narr = (int *)realloc(arr, 1000 * sizeof(int));\n```\nWhat catastrophic memory leak occurs if `realloc` fails due to insufficient heap space, and what is the standard idiomatic fix?",
+    "answer_notes": "The Classic `realloc` Memory Leak Bug:\n\n1. Vulnerability Diagnosis:\n   If the operating system cannot allocate the requested 1000 elements, `realloc()` returns `NULL`.\n   Because the return value is immediately assigned back to `arr` (`arr = (int *)realloc(...)`), the original valid pointer stored in `arr` is overwritten with `NULL`!\n   Result: The original memory block of 5 integers is still allocated on the heap, but its pointer address is lost forever—a permanent memory leak with no way to free it.\n\n2. Idiomatic Production Fix:\n```c\nint *temp = (int *)realloc(arr, 1000 * sizeof(int));\nif (temp == NULL) {\n    // Allocation failed! Original 'arr' is still intact and valid\n    handleOutOfMemory();\n    free(arr); // Clean up original buffer\n    return -1;\n}\narr = temp; // Safe to reassign now that success is verified\n```"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Database Indexing: B-Tree vs Hash Indexing\nContrast B-Tree Indexes and Hash Indexes in Relational Databases. Explain why Hash Indexes cannot optimize range queries (`WHERE age > 25`) or prefix string pattern matches (`WHERE name LIKE 'Roh%'`).",
+    "answer_notes": "B-Tree vs Hash Indexing:\n\n1. Hash Indexing:\n   - Maps index keys through a hash function: `h(key) -> bucket`.\n   - Delivers $O(1)$ constant time performance for exact point equality lookups (`WHERE id = 500`).\n   - Why it fails for Range Queries: Hash functions destroy ordering. If `age = 25` hashes to 8421 and `age = 26` hashes to 104, there is no spatial proximity between consecutive keys. It cannot support range comparisons (`>`, `<`, `BETWEEN`) or string prefixes (`LIKE 'Roh%'`).\n\n2. B-Tree Indexing:\n   - Keeps index keys strictly sorted in balanced search tree blocks with linked leaf pages.\n   - Supports exact lookups in $O(\\log N)$, range scans in $O(\\log N + K)$, and prefix matches seamlessly."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Computer Networks: TCP Flow Control vs Congestion Control\nContrast Flow Control and Congestion Control in the Transmission Control Protocol (TCP). How does the Sliding Window mechanism enforce flow control, while AIMD (Additive Increase Multiplicative Decrease) enforces congestion control?",
+    "answer_notes": "TCP Flow Control vs Congestion Control:\n\n1. Flow Control (End-to-End Speed Matching):\n   - Prevents a fast sender from overwhelming a slow receiver's buffer.\n   - Mechanism: The receiver advertises its available buffer space via the `rwnd` (Receive Window) field in the TCP header.\n   - The sender never transmits more bytes than `rwnd`.\n\n2. Congestion Control (Network Infrastructure Protection):\n   - Prevents senders from injecting more traffic than intermediate routers, switches, and transit links can handle.\n   - Mechanism: The sender maintains `cwnd` (Congestion Window) based on network packet drop and latency telemetry.\n   - Uses Slow Start, Congestion Avoidance (Additive Increase: +1 MSS per RTT), and Fast Retransmit / Fast Recovery (Multiplicative Decrease: cut `cwnd` in half upon packet loss)."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Java finalize() Method Deprecation & Cleaners:\nWhy was the `finalize()` method officially deprecated in Java 9 and completely removed in modern JDK versions? Explain why relying on `finalize()` for resource cleanup (e.g., closing file descriptors or DB connections) causes severe performance bottlenecks and resurrection bugs.",
+    "answer_notes": "Deprecation of finalize() in Modern Java:\n\n1. Unpredictable Execution Timing:\n   The JVM provides zero guarantees regarding when (or even if) the garbage collector will invoke a finalizer. Holding scarce resources like database connections waiting for a finalizer causes connection pool starvation.\n\n2. Object Resurrection Hazard:\n   Inside a `finalize()` implementation, code could assign `this` to a static field (`GlobalRef.leak = this;`), resurrecting a dead object and subverting garbage collection safety invariants.\n\n3. Modern Alternatives:\n   - `try-with-resources` with the `AutoCloseable` interface (deterministic scope cleanup).\n   - `java.lang.ref.Cleaner` API (introduced in Java 9 for non-intrusive asynchronous resource cleanup without object resurrection)."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Continuous Learning in Cloud-Native Technologies:\n'The technology industry moves at unprecedented speed towards serverless and AI-driven architectures. How do you personally stay current with emerging software tools?'",
+    "answer_notes": "Proactive Learning Mindset Response:\n1. Structured Daily Habits: 'I dedicate 45 minutes every morning to studying open-source engineering blogs (e.g., Uber Engineering, Netflix TechBlog), reviewing RFC updates, and reading production incident post-mortems.'\n2. Hands-on Experimentation: 'Whenever I read about a new architectural pattern—such as Redis caching with Bloom filters—I do not stop at theoretical articles; I spin up a Docker container on my laptop and build a minimal bench-test repository.'\n3. Certifications & Peer Teaching: 'I earned foundational cloud certifications and actively mentored junior batchmates in our university coding club, cementing my understanding through teaching.'"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Merge Two Sorted Lists (Linked List)\nYou are given the heads of two sorted linked lists list1 and list2. Merge the two lists into one sorted list. The list should be made by splicing together the nodes of the first two lists. Return the head of the merged linked list.\n\nInput Example: list1 = [1, 2, 4], list2 = [1, 3, 4] -> Output: [1, 1, 2, 3, 4, 4]\n\nProvide the optimal iterative solution with a dummy head node in C++ and Python.",
+    "answer_notes": "Optimal Solution (Dummy Head Node Iteration):\n\nPython Implementation:\n```python\nclass ListNode:\n    def __init__(self, val=0, next=None):\n        self.val = val\n        self.next = next\n\ndef merge_two_lists(l1: ListNode, l2: ListNode) -> ListNode:\n    dummy = ListNode(-1)\n    tail = dummy\n    \n    while l1 and l2:\n        if l1.val <= l2.val:\n            tail.next = l1\n            l1 = l1.next\n        else:\n            tail.next = l2\n            l2 = l2.next\n        tail = tail.next\n        \n    tail.next = l1 if l1 else l2\n    return dummy.next\n```\nTime Complexity: O(M + N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Climbing Stairs (Fibonacci Dynamic Programming)\nYou are climbing a staircase. It takes n steps to reach the top. Each time you can either climb 1 or 2 steps. In how many distinct ways can you climb to the top?\n\nInput Example 1: n = 2 -> Output: 2 (1 step + 1 step, or 2 steps)\nInput Example 2: n = 3 -> Output: 3 (1+1+1, 1+2, 2+1)\n\nProvide an optimal O(N) time and O(1) space solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Fibonacci Space-Optimized DP):\n\nKey Concept:\nTo reach step `n`, you must arrive either from step `n - 1` (taking 1 step) or step `n - 2` (taking 2 steps).\n`ways(n) = ways(n - 1) + ways(n - 2)` with base cases `ways(1) = 1, ways(2) = 2`.\n\nPython Implementation:\n```python\ndef climb_stairs(n: int) -> int:\n    if n <= 2: return n\n    prev2, prev1 = 1, 2\n    for _ in range(3, n + 1):\n        curr = prev1 + prev2\n        prev2 = prev1\n        prev1 = curr\n    return prev1\n\nprint(climb_stairs(3)) # Output: 3\nprint(climb_stairs(5)) # Output: 8\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Defective Components Probability:\nIn an automated quality assurance batch of 100 integrated microchips, 10 are defective. If 3 microchips are sampled at random without replacement, what is the probability that at least one of the sampled chips is defective?\n\nOptions:\nA) 0.271\nB) 0.282\nC) 0.298\nD) 0.312",
+    "answer_notes": "Correct Option: A (0.271)\n\nComplementary Probability Method:\n1. Total chips = 100 (10 defective, 90 non-defective).\n2. P(At least 1 defective) = 1 - P(Zero defective chips drawn).\n3. Probability that all 3 chips are non-defective:\n   P(All Non-defective) = (90 / 100) * (89 / 99) * (88 / 98)\n                        = (9 / 10) * (89 / 99) * (44 / 49)\n                        = (89 * 44) / (110 * 49)\n                        = 3916 / 5390 ≈ 0.7265.\n4. P(At least 1 defective) = 1 - 0.7265 = 0.2735 ≈ 0.271.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Blood Relations (Coded Chain):\nIf 'A # B' means A is the brother of B, 'A @ B' means A is the daughter of B, and 'A & B' means A is the father of B:\nIn the expression 'P # Q @ R & S', how is P related to S?\n\nOptions:\nA) Brother\nB) Sister\nC) Uncle\nD) Nephew",
+    "answer_notes": "Correct Option: A (Brother)\n\nDeciphering Relationships:\n1. 'R & S': R is the father of S.\n2. 'Q @ R': Q is the daughter of R (so Q and S are children of R).\n3. 'P # Q': P is the brother of Q.\n4. Since P is brother of Q, and Q and S share the same father R, P is the Brother of S (P is male).\n\nTherefore, Option A (Brother) is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Number Analogy:\nFind the missing number in the analogy:\n\n12 : 144 :: 14 : ? :: 16 : 256\n\nOptions:\nA) 196\nB) 182\nC) 210\nD) 190",
+    "answer_notes": "Correct Option: A (196)\n\nPattern:\nEach number on the left is squared to produce the number on the right:\n- 12^2 = 144\n- 14^2 = 196\n- 16^2 = 256.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Database Normalization: Functional Dependencies & BCNF\nDefine Boyce-Codd Normal Form (BCNF). Why is a table in 3NF not necessarily in BCNF? Give a classic example of a relation with overlapping candidate keys that satisfies 3NF but violates BCNF.",
+    "answer_notes": "3NF vs BCNF & Overlapping Candidate Keys:\n\n1. Definition of BCNF:\nA relation R is in BCNF if for every non-trivial functional dependency `X -> Y`, the determinant `X` is a Super Key.\n\n2. Why 3NF allows violations that BCNF forbids:\nIn 3NF, a dependency `X -> Y` is permitted if EITHER `X` is a super key OR `Y` is a prime attribute (part of any candidate key).\n\n3. Classic Violation Example (Student-Advisor-Subject):\n- Schema: `Advising(student_id, subject, advisor)`\n- Dependencies:\n  1) `{student_id, subject} -> advisor` (A student has one advisor per subject)\n  2) `advisor -> subject` (Each advisor teaches only one subject)\n- Candidate Keys: `{student_id, subject}` and `{student_id, advisor}`.\n- 3NF Check: In `advisor -> subject`, `advisor` is NOT a super key, but `subject` IS a prime attribute (part of candidate key `{student_id, subject}`). Thus, 3NF holds!\n- BCNF Check: In `advisor -> subject`, `advisor` is NOT a super key. BCNF is violated!\n- Fix: Decompose into `AdvisorSubject(advisor, subject)` and `StudentAdvisor(student_id, advisor)`."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems: Virtual Memory & Translation Lookaside Buffer (TLB)\nWhat is the Translation Lookaside Buffer (TLB) in CPU memory management? Calculate the Effective Memory Access Time (EMAT) if TLB access time is 2 ns, Main Memory access time is 50 ns, and the TLB Hit Ratio is 90%.",
+    "answer_notes": "TLB Operation & EMAT Calculation:\n\n1. Role of TLB:\nA high-speed associative hardware CPU cache that stores recent virtual-to-physical page frame translations, avoiding the two-step memory lookup for every virtual address dereference.\n\n2. Effective Memory Access Time (EMAT) Formula:\n`EMAT = Hit_Ratio * (TLB_time + Mem_time) + (1 - Hit_Ratio) * (TLB_time + 2 * Mem_time)`\n(On a TLB miss, we must access memory once to read the Page Table, and once more to fetch the actual data: 2 * Mem_time).\n\n3. Given:\n- TLB access time = 2 ns\n- Main Memory access time = 50 ns\n- Hit Ratio (h) = 0.90\n\n4. Calculation:\n- On TLB Hit (90%): Time = 2 + 50 = 52 ns.\n- On TLB Miss (10%): Time = 2 + 50 + 50 = 102 ns.\n- EMAT = 0.90 * 52 + 0.10 * 102\n       = 46.8 + 10.2\n       = 57.0 nanoseconds.\n\nWithout TLB, every memory access would take 100 ns. The TLB cuts average access latency nearly in half!"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Handling High-Pressure Milestones & Quality Trade-Offs:\n'Tell me about an instance where you faced an impossible deadline on a software project. How did you decide what to ship and what to defer?'",
+    "answer_notes": "Exemplary Engineering Prioritization Response:\n- Situation: 'In our 6th-semester database systems lab, our team had 48 hours to deliver an end-to-end hospital management system.'\n- Task: 'We realized that completing all 8 planned features would result in buggy, untested software.'\n- Action:\n  1. MoSCoW Prioritization: We categorized features into Must-Have (Patient registration, appointment scheduling, doctor DB), Should-Have (Prescription generator), and Nice-to-Have (PDF report export, dark mode UI).\n  2. Focus on Core Integrity: We polished the core Must-Have database transactions, verified ACID compliance, and wrote comprehensive unit tests.\n  3. Transparent Communication: We presented the working core product to the professor, demonstrating complete data integrity.'\n- Result: 'We received full marks for software stability and code quality rather than penalized for buggy half-baked features.'"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Valid Anagram\nGiven two strings s and t, return true if t is an anagram of s, and false otherwise.\n\nInput Example 1: s = \"anagram\", t = \"nagaram\" -> Output: true\nInput Example 2: s = \"rat\", t = \"car\" -> Output: false\n\nProvide the optimal O(N) frequency array solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (26-Element Frequency Counting):\n\nPython Implementation:\n```python\ndef is_anagram(s: str, t: str) -> bool:\n    if len(s) != len(t):\n        return False\n    counts = [0] * 26\n    for c1, c2 in zip(s, t):\n        counts[ord(c1) - ord('a')] += 1\n        counts[ord(c2) - ord('a')] -= 1\n    return all(x == 0 for x in counts)\n\nprint(is_anagram(\"anagram\", \"nagaram\")) # Output: True\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Move Zeroes (In-Place Array Partition)\nGiven an integer array nums, move all 0's to the end of it while maintaining the relative order of the non-zero elements in-place.\n\nInput Example: nums = [0, 1, 0, 3, 12] -> Output: [1, 3, 12, 0, 0]\n\nProvide the optimal O(N) two-pointer solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two Pointers In-Place):\n\nPython Implementation:\n```python\ndef move_zeroes(nums: list[int]) -> None:\n    pos = 0\n    for n in nums:\n        if n != 0:\n            nums[pos] = n\n            pos += 1\n    while pos < len(nums):\n        nums[pos] = 0\n        pos += 1\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) in-place"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Compound Interest vs Simple Interest (2-Year Period):\nThe difference between compound interest (compounded annually) and simple interest on ₹20,000 for 2 years is ₹72. What is the annual rate of interest?\n\nOptions:\nA) 5%\nB) 6%\nC) 7%\nD) 8%",
+    "answer_notes": "Correct Option: B (6%)\n\nCalculation Steps:\n1. 2-Year Difference Formula: Diff = P * (R / 100)^2\n2. Given: P = 20,000, Diff = 72.\n3. 72 = 20,000 * (R / 100)^2\n   72 / 20,000 = (R / 100)^2\n   36 / 10,000 = (R / 100)^2\n   Take square root on both sides:\n   6 / 100 = R / 100\n   R = 6%.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Syllogisms with Universal Negatives:\nStatements:\n1. No router is a hub.\n2. All hubs are repeaters.\n\nConclusions:\nI. No router is a repeater.\nII. Some repeaters are hubs.\n\nWhich conclusions logically follow?\n\nOptions:\nA) Only I follows\nB) Only II follows\nC) Both follow\nD) Neither follows",
+    "answer_notes": "Correct Option: B (Only II follows)\n\nAnalysis:\n1. Statement 2 ('All hubs are repeaters') immediately implies 'Some repeaters are hubs'. Thus Conclusion II strictly follows.\n2. Routers cannot be hubs, but routers could easily be repeaters without intersecting hubs. Conclusion I does not necessarily follow.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Vocabulary: Word Usage in Technical Contexts:\nSelect the word that best completes the sentence:\n'The software architect proposed a ________ solution that addressed the root-cause database deadlock rather than merely applying a superficial restart script.'\n\nOptions:\nA) definitive\nB) perfunctory\nC) tentative\nD) transient",
+    "answer_notes": "Correct Option: A (definitive)\n\nWord Breakdown:\n- 'definitive' means conclusive, authoritative, providing a decisive final resolution (contrasts directly with 'superficial restart script').\n- 'perfunctory' means carried out with minimal effort.\n- 'tentative' means uncertain or provisional.\n- 'transient' means temporary or short-lived.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "Java Abstract Class vs Interface:\nWhen should an enterprise software architect choose an Abstract Class over an Interface in modern Java? Can an interface maintain mutable instance state?",
+    "answer_notes": "Abstract Class vs Interface:\n1. Abstract Class: Used when related classes share common state (non-static instance fields) and protected internal helper methods. Supports single inheritance.\n2. Interface: Defines a contract of behavior across unrelated classes. Cannot maintain mutable instance fields (only public static final constants). Supports multiple inheritance of type."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Computer Networks: The 7 Layers of the OSI Model\nList the 7 layers of the OSI model from Layer 1 to Layer 7 and explain the primary functionality of the Transport Layer.",
+    "answer_notes": "OSI 7 Layers:\n1. Physical: Raw bit transmission.\n2. Data Link: Physical addressing (MAC), framing, flow control.\n3. Network: Logical addressing (IP) and routing.\n4. Transport: End-to-end reliable delivery, port addressing, segmentation, TCP flow/congestion control.\n5. Session: Managing communication sessions and checkpoints.\n6. Presentation: Data representation, encryption (SSL/TLS), compression.\n7. Application: User-facing network protocols (HTTP, SMTP, FTP, DNS)."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Why LTIMindtree & Future Trajectory:\n'Why do you want to start your professional engineering career at LTIMindtree?'",
+    "answer_notes": "Strategic Brand Response:\n1. Formidable Scale: 'LTIMindtree is India's 6th largest IT services leader with over 80,000 professionals and $4B+ revenue.'\n2. Innovation Culture: 'The combined expertise in cloud architecture, digital transformation, and industrial IoT offers freshers an extraordinary engineering platform.'\n3. Values: 'I align with LTIMindtree's core values of client centricity, execution excellence, and continuous learning.'"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Two Sum (Hash Map Lookup)\nGiven an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nInput Example: nums = [2, 7, 11, 15], target = 9 -> Output: [0, 1]\n\nProvide the optimal O(N) hash map solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (One-Pass Hash Map):\n\nPython Implementation:\n```python\ndef two_sum(nums: list[int], target: int) -> list[int]:\n    seen = {}\n    for i, n in enumerate(nums):\n        diff = target - n\n        if diff in seen:\n            return [seen[diff], i]\n        seen[n] = i\n    return []\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Reverse Words in a String\nGiven an input string s, reverse the order of the words.\n\nInput Example: s = \"the sky is blue\" -> Output: \"blue is sky the\"\n\nProvide an optimal O(N) solution in C++ and Python.",
+    "answer_notes": "Optimal Solution:\n\nPython Implementation:\n```python\ndef reverse_words(s: str) -> str:\n    return \" \".join(reversed(s.split()))\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Ages Ratio Problem:\nThe present age ratio of A and B is 3:5. In 6 years, their age ratio becomes 2:3. What is A's present age?\n\nOptions:\nA) 18 years\nB) 24 years\nC) 30 years\nD) 36 years",
+    "answer_notes": "Correct Option: A (18 years)\n\nCalculation Steps:\n1. Present ages = 3x and 5x.\n2. In 6 years: (3x + 6) / (5x + 6) = 2 / 3\n3. Cross multiply: 3(3x + 6) = 2(5x + 6) => 9x + 18 = 10x + 12 => x = 6.\n4. A's present age = 3x = 3(6) = 18 years. (B's age = 30 years).\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Direction Sense Test:\nA person walks 10 meters North, turns left and walks 20 meters, turns left again and walks 10 meters, and then turns right and walks 5 meters. How far and in which direction is he from his starting point?\n\nOptions:\nA) 25 meters West\nB) 20 meters West\nC) 25 meters East\nD) 15 meters North",
+    "answer_notes": "Correct Option: A (25 meters West)\n\nVector Path from (0, 0):\n1. 10m North -> (0, 10)\n2. Left (West) 20m -> (-20, 10)\n3. Left (South) 10m -> (-20, 0)\n4. Right (West) 5m -> (-25, 0)\nDisplacement = 25 meters West along the X-axis.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Error Spotting in Formal Business Writing:\nIdentify the error:\n'The project team has completed the documentation (A) / and they will be presenting their findings (B) / on the upcoming Monday morning meeting. (C) / No Error (D)'\n\nOptions:\nA) The project team has completed the documentation\nB) and they will be presenting their findings\nC) on the upcoming Monday morning meeting\nD) No Error",
+    "answer_notes": "Correct Option: C ('on the upcoming Monday morning meeting')\n\nGrammar Rule:\nIn standard English, one presents 'at' a meeting, not 'on' a meeting: 'at the upcoming Monday morning meeting'."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical Assessment (Pseudocode & CS Core)",
+    "question": "SQL Command Differences: DELETE vs TRUNCATE vs DROP\nCompare DELETE, TRUNCATE, and DROP in relational databases with respect to DDL/DML classification, transaction logging, and auto-increment reset.",
+    "answer_notes": "DELETE vs TRUNCATE vs DROP:\n1. DELETE: DML; logged row-by-row; can be rolled back; triggers fire.\n2. TRUNCATE: DDL; deallocates pages; resets identity/auto-increment counter; cannot be rolled back.\n3. DROP: DDL; removes table definition and all data permanently."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems: Paging vs Segmentation\nCompare Paging and Segmentation in Virtual Memory management with respect to fragmentation.",
+    "answer_notes": "Paging vs Segmentation:\n1. Paging: Fixed-size pages/frames. Has Internal Fragmentation; zero external fragmentation.\n2. Segmentation: Variable-size segments based on logical modules. Has External Fragmentation; zero internal fragmentation."
+  }
+]
+

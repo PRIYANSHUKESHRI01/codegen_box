@@ -50,6 +50,7 @@ class InterviewQuestionBank extends Model
         'expected_duration_seconds',
         'tags',
         'notes_for_reviewer',
+        'discipline',
         'is_active',
         'created_by',
     ];

@@ -7,14 +7,15 @@ import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
 import type { AdminPlan, PlanLimits } from "@/types/pricing";
 
-type NumericKey = "max_practice_problems_per_day" | "max_mock_interviews_per_day" | "max_learning_centre_ai_attempts_per_day" | "feature_trial_uses" | "max_workspace_hours_per_month" | "max_active_projects";
-type SwitchKey = "drive_access" | "hackathon_access" | "vault_access" | "project_lab_access";
+type NumericKey = "max_practice_problems_per_day" | "max_mock_interviews_per_day" | "max_learning_centre_ai_attempts_per_day" | "feature_trial_uses" | "max_workspace_hours_per_month" | "max_active_projects" | "max_core_practice_per_day";
+type SwitchKey = "drive_access" | "hackathon_access" | "vault_access" | "project_lab_access" | "core_tests_access";
 
 /** Ranges mirror SuperAdminPlanController::updateEntitlements() — the server checks them again. */
 const NUMERIC: { key: NumericKey; label: string; hint: string; min: number; max: number; unlimitedLabel: string }[] = [
   { key: "max_practice_problems_per_day", label: "Coding problems per day", hint: "Distinct practice problems a student may submit in a day.", min: 1, max: 1000, unlimitedLabel: "Unlimited" },
   { key: "max_mock_interviews_per_day", label: "AI mock interviews per day", hint: "Practice interviews started in a day.", min: 0, max: 100, unlimitedLabel: "Unlimited" },
   { key: "max_learning_centre_ai_attempts_per_day", label: "Learning Centre AI uses per day", hint: "Speaking, listening and vocabulary AI features, per day.", min: 0, max: 500, unlimitedLabel: "Unlimited" },
+  { key: "max_core_practice_per_day", label: "Core Prep questions per day", hint: "Branch technical practice (ECE, EEE, Mechanical, Civil) — distinct questions a student may answer in a day.", min: 1, max: 1000, unlimitedLabel: "Unlimited" },
   {
     key: "feature_trial_uses",
     label: "Free tries of each AI feature (ever)",
@@ -35,6 +36,7 @@ const SWITCHES: { key: SwitchKey; label: string; hint: string }[] = [
   { key: "hackathon_access", label: "Hack Arena", hint: "Register for and submit to hackathons. Browsing stays open to everyone." },
   { key: "vault_access", label: "The Vault", hint: "Be listed to employers on Mellow Vault and hired directly. Earning the readiness score stays open to everyone." },
   { key: "project_lab_access", label: "Project Lab", hint: "Build guided projects in a cloud workspace." },
+  { key: "core_tests_access", label: "Core Prep tests", hint: "Timed, proctored technical tests for non-CS branches. When off, the free plan gets its one-time trial instead." },
 ];
 
 interface Draft {
@@ -45,7 +47,7 @@ interface Draft {
 function toDraft(limits: PlanLimits): Draft {
   const numbers = {} as Draft["numbers"];
   for (const { key } of [...NUMERIC, ...LAB_NUMERIC]) {
-    const value = limits[key];
+    const value = limits[key] ?? null;
     numbers[key] = { unlimited: value === null, value: value === null ? "" : String(value) };
   }
 
@@ -56,6 +58,7 @@ function toDraft(limits: PlanLimits): Draft {
       hackathon_access: limits.hackathon_access,
       vault_access: limits.vault_access,
       project_lab_access: limits.project_lab_access,
+      core_tests_access: limits.core_tests_access ?? false,
     },
   };
 }
@@ -115,7 +118,7 @@ export function PlanLimitsModal({ plan, onClose, onSaved }: PlanLimitsModalProps
   const [error, setError] = useState<string | null>(null);
 
   const { limits, errors } = useMemo(() => evaluate(draft), [draft]);
-  const changed = useMemo(() => limits !== null && (Object.keys(limits) as (keyof PlanLimits)[]).some((key) => limits[key] !== plan.limits[key]), [limits, plan.limits]);
+  const changed = useMemo(() => limits !== null && (Object.keys(limits) as (keyof PlanLimits)[]).some((key) => limits[key] !== (plan.limits[key] ?? (typeof limits[key] === "boolean" ? false : null))), [limits, plan.limits]);
 
   // Things worth a second look before saving — not blocked, just named.
   const cautions = useMemo(() => {

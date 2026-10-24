@@ -19,6 +19,8 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
+import { ReadinessTrend } from "@/components/dashboard/student/ReadinessTrend";
+import { InactivityNotice } from "@/components/dashboard/student/InactivityNotice";
 import { UpgradePanel } from "@/components/billing/UpgradePanel";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -154,6 +156,8 @@ export default function StudentVaultPage() {
         <div className="space-y-6">
           <ReadinessCard data={data} />
 
+          {data.history && <ReadinessTrend history={data.history} exitThreshold={readiness.exit_threshold} />}
+
           {/* The Vault is an Expert feature: everyone sees their score and how to raise it, but only a plan that
               includes it gets the yes — everyone else gets what they would be buying, with the live price. */}
           {gated && <UpgradePanel feature="vault" />}
@@ -179,7 +183,7 @@ export default function StudentVaultPage() {
               <p className="mb-5 mt-1 text-xs text-text-muted">
                 One score for everything you do on AptRun — interviews, practice, the Learning Centre, soft skills, contests and the events your placement cell or Mellow schedules. Anything a hiring partner posted never counts.
               </p>
-              <ReadinessBreakdown components={readiness.components} nextSteps={readiness.next_steps} />
+              <ReadinessBreakdown components={readiness.components} nextSteps={readiness.next_steps} decay={readiness.decay} />
             </section>
           )}
 
@@ -248,6 +252,8 @@ function ReadinessCard({ data }: { data: StudentVaultResponse }) {
           </div>
         </div>
       </div>
+
+      <InactivityNotice decay={readiness.decay} score={readiness.score} baseScore={readiness.base_score} className="mt-5" />
     </section>
   );
 }

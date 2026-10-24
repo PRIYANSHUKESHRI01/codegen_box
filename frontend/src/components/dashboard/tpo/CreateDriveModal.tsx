@@ -9,6 +9,7 @@ import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import { Modal } from "@/components/ui/Modal";
 import { HpButton, HpCompanyLogo, hpEase, hpInput, hpLabel } from "@/components/portal/kit";
 import { HpCallout, HpCheckboxBox, HpFormError } from "@/components/portal/pipeline-kit";
+import { BranchPicker } from "@/components/branches/BranchPicker";
 
 interface CreateDriveModalProps {
   collegeName: string;
@@ -24,8 +25,6 @@ interface SearchCompany {
   industry: string | null;
   overview: string | null;
 }
-
-const BRANCH_OPTIONS = ["CSE", "IT", "ECE", "EE", "MECH"];
 
 /** Small numbered section heading inside the form. */
 function FormSection({ step, title, children }: { step: number; title: string; children: React.ReactNode }) {
@@ -126,9 +125,6 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
     setCompanyQuery("");
   };
 
-  const toggleBranch = (branch: string) => {
-    setBranches((prev) => (prev.includes(branch) ? prev.filter((b) => b !== branch) : [...prev, branch]));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -503,27 +499,8 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                   transition={{ duration: 0.25, ease: hpEase }}
                   className="overflow-hidden"
                 >
-                  <div role="group" aria-labelledby="cd-branches-label" className="flex flex-wrap gap-2 pt-3">
-                    {BRANCH_OPTIONS.map((b) => {
-                      const on = branches.includes(b);
-                      return (
-                        <button
-                          key={b}
-                          type="button"
-                          aria-pressed={on}
-                          onClick={() => toggleBranch(b)}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
-                            on
-                              ? "border-transparent bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_6px_14px_-6px_rgba(99,102,241,0.8)]"
-                              : "border-border-strong bg-[rgb(var(--bg-surface-rgb))] text-text-secondary hover:border-indigo-500/40 hover:text-primary"
-                          )}
-                        >
-                          {on && <Check className="h-3 w-3" strokeWidth={3} aria-hidden />}
-                          {b}
-                        </button>
-                      );
-                    })}
+                  <div className="pt-3">
+                    <BranchPicker value={branches} onChange={setBranches} variant="gradient" />
                   </div>
                   {branches.length === 0 && (
                     <p className="mt-2 text-3xs text-text-muted">Pick at least one branch, or switch back to all branches.</p>

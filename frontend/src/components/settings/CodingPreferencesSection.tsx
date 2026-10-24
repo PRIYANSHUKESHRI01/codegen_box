@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/Button";
 import { api, ApiError } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
-import { CAREER_GOALS, FOCUS_AREAS, SKILL_LEVELS, WEEKLY_PACES, type CareerGoal, type FocusArea, type SkillLevel, type WeeklyPace } from "@/lib/studentPreferences";
+import { codesAtAll } from "@/lib/departments";
+import { careerGoalsFor, focusAreasFor, paceHint, skillLevelsFor, WEEKLY_PACES, type CareerGoal, type FocusArea, type SkillLevel, type WeeklyPace } from "@/lib/studentPreferences";
 
 interface Form {
   primary: string | null;
@@ -50,6 +51,10 @@ function savedForm(user: AuthUser): Form {
  */
 export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; onToast: (message: string) => void }) {
   const { login } = useAuth();
+  // A programme without coding (Management, Commerce, Arts …) is not asked about languages; it may switch coding on for itself instead.
+  const codes = codesAtAll(user);
+  const nonEngineering = !!user.department && user.department !== "engineering";
+  const [optBusy, setOptBusy] = useState(false);
 
   const saved = useMemo(
     () => savedForm(user),
@@ -79,13 +84,28 @@ export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; on
   const selectPrimary = (id: string) =>
     setForm((current) => ({ ...current, primary: id, others: current.others.filter((l) => l !== id) }));
 
+  const toggleCoding = async () => {
+    setOptBusy(true);
+    setError(null);
+    try {
+      const res = await api.put<{ user: AuthUser }>("/me/preferences", { coding_opt_in: !user.coding_opt_in });
+      const token = getToken();
+      if (token) login(token, res.user);
+      onToast(user.coding_opt_in ? "Coding practice hidden." : "Coding practice added to your dashboard.");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't change that. Please try again.");
+    } finally {
+      setOptBusy(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setError(null);
     try {
       const res = await api.put<{ user: AuthUser }>("/me/preferences", {
-        ...(form.primary ? { primary_language: form.primary } : {}),
-        preferred_languages: form.others,
+        ...(codes && form.primary ? { primary_language: form.primary } : {}),
+        ...(codes ? { preferred_languages: form.others } : {}),
         ...(form.level ? { skill_level: form.level } : {}),
         ...(form.goal ? { career_goal: form.goal } : {}),
         focus_areas: form.focus,
@@ -105,10 +125,12 @@ export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; on
     <section className="space-y-6 rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6" aria-labelledby="coding-prefs-heading">
       <div>
         <h3 id="coding-prefs-heading" className="text-sm font-bold text-primary">
-          Coding Preferences
+          {codes ? "Coding Preferences" : "Practice Preferences"}
         </h3>
         <p className="mt-0.5 text-xs text-text-muted">
-          The code editor opens in your language, your weekly goal follows your pace, and your placement cell sees what you're aiming for.
+          {codes
+            ? "The code editor opens in your language, your weekly goal follows your pace, and your placement cell sees what you're aiming for."
+            : "Your weekly goal follows your pace, and your placement cell sees what you're aiming for."}
         </p>
       </div>
 
@@ -118,29 +140,55 @@ export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; on
         </p>
       )}
 
-      <div className="space-y-2">
-        <h4 className="text-xs font-bold text-primary">Main language</h4>
-        <PrimaryLanguageChoice value={form.primary} onChange={selectPrimary} />
-      </div>
+      {nonEngineering && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border-subtle bg-elevated/50 p-3.5">
+          <div className="min-w-0">
+            <h4 className="text-xs font-bold text-primary">Show coding practice</h4>
+            <p className="mt-0.5 text-2xs text-text-muted">
+              Your programme doesn&apos;t include coding, so the Practice Arena, contests and company questions are left out. Switch them on for your own account if you want them.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={!!user.coding_opt_in}
+            aria-label="Show coding practice"
+            disabled={optBusy}
+            onClick={() => void toggleCoding()}
+            className={`relative h-6 w-11 shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary disabled:opacity-60 ${user.coding_opt_in ? "bg-accent-primary" : "bg-border-strong"}`}
+          >
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${user.coding_opt_in ? "left-[22px]" : "left-0.5"}`} />
+          </button>
+        </div>
+      )}
+
+      {codes && (
+        <>
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-primary">Main language</h4>
+            <PrimaryLanguageChoice value={form.primary} onChange={selectPrimary} />
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-xs font-bold text-primary">Also comfortable with</h4>
+            <OtherLanguagesChoice primary={form.primary} value={form.others} onChange={(others) => patch({ others })} />
+          </div>
+        </>
+      )}
 
       <div className="space-y-2">
-        <h4 className="text-xs font-bold text-primary">Also comfortable with</h4>
-        <OtherLanguagesChoice primary={form.primary} value={form.others} onChange={(others) => patch({ others })} />
-      </div>
-
-      <div className="space-y-2">
-        <h4 className="text-xs font-bold text-primary">Coding level</h4>
-        <RadioCards label="Coding level" value={form.level} onChange={(level) => patch({ level })} choices={SKILL_LEVELS} />
+        <h4 className="text-xs font-bold text-primary">{codes ? "Coding level" : "Preparation level"}</h4>
+        <RadioCards label="Coding level" value={form.level} onChange={(level) => patch({ level })} choices={skillLevelsFor(codes)} />
       </div>
 
       <div className="space-y-2">
         <h4 className="text-xs font-bold text-primary">Preparing for</h4>
-        <RadioCards label="Main goal" value={form.goal} onChange={(goal) => patch({ goal })} choices={CAREER_GOALS} />
+        <RadioCards label="Main goal" value={form.goal} onChange={(goal) => patch({ goal })} choices={careerGoalsFor(user.discipline, user.department)} />
       </div>
 
       <div className="space-y-2">
         <h4 className="text-xs font-bold text-primary">Focus areas</h4>
-        <ChipMulti label="Focus areas" value={form.focus} onChange={(focus) => patch({ focus })} choices={FOCUS_AREAS} />
+        <ChipMulti label="Focus areas" value={form.focus} onChange={(focus) => patch({ focus })} choices={focusAreasFor(user.discipline, codes)} />
       </div>
 
       <div className="space-y-2">
@@ -149,14 +197,14 @@ export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; on
           label="Weekly pace"
           value={form.pace}
           onChange={(pace) => patch({ pace })}
-          choices={WEEKLY_PACES.map((p) => ({ ...p, hint: `${p.hint} · ${p.solved} problems a week` }))}
+          choices={WEEKLY_PACES.map((p) => ({ ...p, hint: paceHint(p, codes) }))}
         />
       </div>
 
       <div className="flex items-center justify-end gap-3 border-t border-border-subtle pt-4">
         {!dirty && <span className="text-2xs text-text-muted">All changes saved</span>}
         <Button size="sm" onClick={save} disabled={!dirty} isLoading={saving} leftIcon={<Save className="h-3.5 w-3.5" />}>
-          Save coding preferences
+          {codes ? "Save coding preferences" : "Save preferences"}
         </Button>
       </div>
     </section>

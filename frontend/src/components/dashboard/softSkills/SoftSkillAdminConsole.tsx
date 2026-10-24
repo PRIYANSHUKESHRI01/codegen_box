@@ -28,6 +28,9 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ASSESSMENT_TYPE_LABELS, type AdminSoftSkillAssessment } from "@/types/softSkill";
 import type { DashboardRole } from "@/components/dashboard/DashboardSidebar";
+import { AudienceChip } from "@/components/branches/BranchAudienceField";
+import { audienceTouchesDepartment, useBranchCatalog } from "@/lib/branches";
+import { useDepartmentScope } from "@/lib/departments";
 
 interface SoftSkillAdminConsoleProps {
   allowedRoles: DashboardRole[];
@@ -104,6 +107,8 @@ export function SoftSkillAdminConsole({
   libraryAdmin = false,
 }: SoftSkillAdminConsoleProps) {
   const { status } = useAuthGuard(allowedRoles);
+  const catalog = useBranchCatalog();
+  const { scope: deptScope } = useDepartmentScope();
   const [assessments, setAssessments] = useState<AdminSoftSkillAssessment[]>([]);
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -194,6 +199,7 @@ export function SoftSkillAdminConsole({
     const attemptsTotal = assessments.reduce((sum, a) => sum + a.sessions_count, 0);
     const q = query.trim().toLowerCase();
     const visible = assessments.filter((a) => {
+      if (!audienceTouchesDepartment(a.branch_audience, deptScope, catalog)) return false;
       if (filter !== "all" && a.status !== filter) return false;
       if (!q) return true;
       return a.title.toLowerCase().includes(q) || (a.description ?? "").toLowerCase().includes(q);
@@ -305,6 +311,7 @@ export function SoftSkillAdminConsole({
                               <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
                                   <h3 className="min-w-0 line-clamp-2 text-15 font-bold leading-snug tracking-tight text-primary">{assessment.title}</h3>
+                                  <AudienceChip audience={assessment.branch_audience} className="shrink-0" />
                                   <HpPill tone={meta.tone} dot={meta.dot} pulse={meta.pulse} icon={meta.icon} className="shrink-0">
                                     {meta.label}
                                   </HpPill>
@@ -373,7 +380,7 @@ export function SoftSkillAdminConsole({
         </HpStagger>
 
         {showCreate && (
-          <CreateSoftSkillAssessmentModal variant="premium" basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
+          <CreateSoftSkillAssessmentModal variant="premium" allowAudience={shellRole !== "admin_company"} basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
         )}
 
         {managing && (
@@ -459,6 +466,7 @@ export function SoftSkillAdminConsole({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-bold text-primary">{assessment.title}</span>
+                    <AudienceChip audience={assessment.branch_audience} className="ml-2" />
                     <span
                       className={cn(
                         "px-1.5 py-0.5 text-3xs font-bold uppercase rounded",
@@ -538,7 +546,7 @@ export function SoftSkillAdminConsole({
       )}
 
       {showCreate && (
-        <CreateSoftSkillAssessmentModal basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
+        <CreateSoftSkillAssessmentModal allowAudience={shellRole !== "admin_company"} basePath={basePath} setsPath={setsPath} onClose={() => setShowCreate(false)} onCreated={handleCreated} />
       )}
 
       {managing && (

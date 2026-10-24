@@ -239,7 +239,7 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       {
         icon: Timer,
         title: "A locked-down session",
-        body: "The attempt switches to fullscreen. Exiting it, switching tabs or opening developer tools is logged as a violation.",
+        body: "The attempt switches to fullscreen. Leaving it or the exam window, switching tabs, opening developer tools or stopping the camera or screen share is logged as a violation, and the server refuses answers if the proctoring signal stops.",
       },
       {
         icon: ListChecks,
@@ -249,7 +249,7 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       {
         icon: Camera,
         title: "Device check up front",
-        body: "Students confirm their camera and microphone before they start, and are told clearly what is monitored.",
+        body: "A pre-start system check confirms the camera, the screen share, a single screen and, where required, the AptRun Guardian, and tells students clearly what is monitored and for how long it is kept.",
       },
       {
         icon: Code2,
@@ -264,7 +264,7 @@ export const FEATURE_PAGES: FeaturePageData[] = [
       {
         icon: LayoutDashboard,
         title: "Proctoring dashboards",
-        body: "Placement cells, section coordinators and hiring partners each get a proctoring view for the attempts they are responsible for.",
+        body: "Placement cells, section coordinators and hiring partners each get a proctoring view for the attempts they are responsible for: a risk level, a tamper-evident activity log, the pictures taken, and the network each attempt ran on.",
       },
     ],
     steps: [
@@ -274,7 +274,7 @@ export const FEATURE_PAGES: FeaturePageData[] = [
     ],
     note: {
       title: "What is and isn't recorded",
-      body: "During a proctored contest the camera and microphone record for the student's own attempt only. The video stays in their browser and is never uploaded or stored. Proctoring applies to contests, not to practice.",
+      body: "During a proctored attempt, small still pictures from the camera (and, where required, the screen) are sent to AptRun, stored encrypted and shown only to the people responsible for the attempt. Video is never uploaded and the microphone only detects whether someone is speaking. Pictures are kept for 45 days, or longer if an attempt was flagged. Proctoring applies to contests, tests and interviews, and to proctored practice sittings.",
     },
     related: ["ai-interviews", "vault", "practice-arena"],
   },

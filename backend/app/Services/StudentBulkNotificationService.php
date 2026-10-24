@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SendStudentBulkNotification;
 use App\Jobs\SendWhatsAppNotification;
+use App\Enums\NotificationType;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
@@ -28,6 +29,19 @@ class StudentBulkNotificationService
      */
     public function send(Collection $recipients, string $channel, string $template, string $recipient, string $batchPrefix): array
     {
+        // The in-app twin of what goes out by e-mail/WhatsApp, so the student finds it in the bell as well. Only when the
+        // message is for the student themself — a note to their parent is not the student's notification.
+        if ($recipient !== 'parent') {
+            $termination = $template === SendStudentBulkNotification::TEMPLATE_TERMINATION;
+
+            app(NotificationService::class)->notifyMany($recipients, NotificationType::AnnouncementMessage, $termination ? 'Placement drive eligibility notice' : 'A message from your placement cell', $termination
+                ? 'Your placement cell sent you an eligibility notice by '.($channel === 'email' ? 'email' : 'WhatsApp').'. Please contact your TPO.'
+                : 'Your placement cell sent you an update by '.($channel === 'email' ? 'email' : 'WhatsApp').'. Check your '.($channel === 'email' ? 'inbox' : 'messages').'.', [
+                    'severity' => $termination ? 'warning' : 'info',
+                    'group_key' => "announce:{$batchPrefix}:".now()->format('YmdHis'),
+                ]);
+        }
+
         if ($channel === 'email') {
             Bus::batch(
                 $recipients->map(fn (User $u) => new SendStudentBulkNotification($u->id, $template))->all()
@@ -56,6 +70,22 @@ class StudentBulkNotificationService
         }
 
         return ['queued_count' => count($jobs), 'skipped_no_phone' => $skippedNoPhone];
+    }
+
+    /**
+     * A message the sender wrote, delivered straight to each student's notification bell — no e-mail, no WhatsApp, no
+     * provider and no cost. The title and message are the sender's own words, shown as text (never HTML).
+     *
+     * @param  Collection<int, User>  $recipients
+     * @return int how many students it reached (blocked accounts are skipped)
+     */
+    public function announce(Collection $recipients, string $title, string $message, string $batchPrefix, ?User $actor = null): int
+    {
+        return app(NotificationService::class)->notifyMany($recipients, NotificationType::AnnouncementMessage, $title, $message, [
+            'actor' => $actor,
+            'data' => ['from' => $actor?->name],
+            'group_key' => "announce:{$batchPrefix}:".now()->format('YmdHisv'),
+        ]);
     }
 
     private function whatsAppMessage(User $student, string $template): string

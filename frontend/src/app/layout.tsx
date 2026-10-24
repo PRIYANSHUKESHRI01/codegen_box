@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
+import { NotificationRuntime } from "@/components/notifications/NotificationRuntime";
 import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
 import "./globals.css";
 
@@ -120,6 +121,8 @@ export default function RootLayout({
           {children}
           {/* Present on every page while a superadmin is looking at the product as someone else. */}
           <ImpersonationBanner />
+          {/* The notification poll and the "it just happened" toasts, for whoever is signed in, on any page. */}
+          <NotificationRuntime />
         </AuthProvider>
       </body>
     </html>

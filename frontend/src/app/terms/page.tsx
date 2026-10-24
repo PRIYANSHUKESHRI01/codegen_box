@@ -41,7 +41,7 @@ const SECTIONS: LegalSection[] = [
     id: "assessments",
     title: "Assessments and proctoring",
     body: [
-      "Proctored contests and interviews ask for your consent before they start. Violations such as leaving fullscreen or switching tabs are logged, can end an attempt, and are reported to your placement cell, section coordinator or the hiring partner responsible.",
+      "Proctored contests, tests and interviews ask for your consent before they start and tell you exactly what is recorded. Violations such as leaving fullscreen or the exam window, opening developer tools, stopping your camera or screen share, running programs that are not allowed, or tampering with the proctoring software are logged, can end an attempt, and are reported to your placement cell, section coordinator or the hiring partner responsible, who can see the activity log and the pictures taken during your attempt. Attempting to disguise or switch off proctoring is itself a violation.",
       "Scores and AI feedback are tools to help people make decisions. A human reviewer can view and override a result, and nothing on the platform guarantees a particular outcome.",
     ],
   },

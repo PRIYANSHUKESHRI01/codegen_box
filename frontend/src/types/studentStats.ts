@@ -36,6 +36,53 @@ export interface ReadinessVault {
   points_needed: number;
 }
 
+/** What staying away has cost: score = base_score - points. Mirrors ReadinessScoreService::decayFor(). */
+export interface ReadinessDecay {
+  enabled: boolean;
+  /** False until the student has been tracked for a day — nothing is charged before that. */
+  tracking: boolean;
+  /** Points taken off the score today. */
+  points: number;
+  /** Complete days with no activity, inside the window. */
+  missed_days: number;
+  window_days: number;
+  per_day: number;
+  free_days: number;
+  practised_today: boolean;
+  last_active: string | null;
+  /** Complete days since they last did anything; null when nothing in the window. */
+  idle_days: number | null;
+  /** The most a student can lose to missed days. */
+  max_points: number;
+}
+
+/** One day on the readiness chart. `score` = `base_score` - `penalty`. */
+export interface ReadinessHistoryPoint {
+  date: string;
+  score: number;
+  base_score: number;
+  penalty: number;
+  /** Whether the student did anything that day. */
+  active: boolean;
+}
+
+/** GET /api/me/readiness/history — also embedded in GET /api/me/vault. */
+export interface ReadinessHistory {
+  points: ReadinessHistoryPoint[];
+  summary: {
+    score: number;
+    threshold: number;
+    tracking_since: string | null;
+    best: number;
+    /** The first day the score reached the Vault line (null if it never has). */
+    first_crossed_on: string | null;
+    /** Points gained (or lost) over the last 7 days; null with no earlier day to compare with. */
+    change_7d: number | null;
+    /** "At this pace" — null unless the trend is real. */
+    days_to_threshold: number | null;
+  };
+}
+
 export interface ReadinessStats {
   score: number;
   tier: "Placement Ready" | "In Progress" | "Needs Training";
@@ -43,6 +90,13 @@ export interface ReadinessStats {
   components: ReadinessComponent[];
   next_steps: string[];
   vault?: ReadinessVault;
+  /** Which weighting made the score. Absent from an older API, which is "software". */
+  profile?: "software" | "core" | "balanced" | "general";
+  /** While set and in the future, the better of the core-profile and software scores stands. */
+  grace_until?: string | null;
+  /** What the components add up to, before missed days are taken off. Absent from an older API. */
+  base_score?: number;
+  decay?: ReadinessDecay | null;
 }
 
 export interface RatingStats {

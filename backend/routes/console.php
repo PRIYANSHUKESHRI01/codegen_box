@@ -16,11 +16,17 @@ Artisan::command('inspire', function () {
 // "is it time yet" every minute and dispatches due tasks).
 Schedule::command('report:weekly-readiness')->weekly();
 
+// Monday morning: each Section Coordinator's digest — their section's numbers and who needs a follow-up this week.
+Schedule::command('report:coordinator-digest')->weeklyOn(1, '07:30')->withoutOverlapping(30);
+
 // Every 10 minutes: re-score students who were just active and apply it to the Vault — list those who have
 // reached the bar and said yes, take down those who have fallen clearly below it. Nightly, the same for every
 // student seen in the last 120 days plus the whole Vault, because a score also falls as time passes.
 Schedule::command('readiness:refresh')->everyTenMinutes()->withoutOverlapping(15);
 Schedule::command('readiness:refresh --all')->dailyAt('02:30')->withoutOverlapping(180);
+
+// Daily, after that refresh: drop daily readiness scores past their retention (config readiness.history_retention_days).
+Schedule::call(fn () => app(\App\Services\ReadinessHistoryService::class)->prune())->name('readiness:prune-history')->dailyAt('03:00');
 
 // Every minute: hand whatever is waiting in the Vault outbox to Mellow Vault (see VaultSyncService). It does
 // nothing, and loses nothing, until VAULT_SYNC_URL and VAULT_SYNC_SECRET are set.
@@ -29,8 +35,22 @@ Schedule::command('vault:sync')->everyMinute()->withoutOverlapping(5);
 // Daily: drop delivered Vault outbox events past their retention.
 Schedule::command('vault:prune')->daily();
 
+// Daily: remove practice interviews a student built but never took (kept once they have a session).
+Schedule::command('interview:prune-practice')->dailyAt('03:50');
+
+// Daily: drop old in-app notifications (read after 60 days, unread after 180).
+Schedule::command('notifications:prune')->dailyAt('03:40');
+
 // Daily: flip any subscription past its current_period_end to expired.
 Schedule::command('subscriptions:expire')->daily();
+
+// Every minute: grade Core test attempts whose clock ran out without a submit (see FinalizeExpiredCoreTests). Without it an
+// abandoned attempt would sit open forever and never count. Needs the every-minute `schedule:run` cron above.
+Schedule::command('core:finalize-expired')->everyMinute()->withoutOverlapping(5);
+
+// Nightly: item analysis — which Core questions are too easy/hard, discriminate poorly, or look like they have the wrong key
+// (see AnalyseCoreItems). Flags only; a human decides. A quiet hour, after the readiness refresh above.
+Schedule::command('core:analyse-items')->dailyAt('03:10')->withoutOverlapping(60);
 
 // Every 5 minutes: ask the payment gateways (PayU, Razorpay) about orders still unpaid — the net under a lost webhook
 // and a student who paid and closed the tab (see ReconcilePayments). withoutOverlapping: a slow gateway must not stack runs.
@@ -46,6 +66,12 @@ Schedule::command('workspaces:reap')->everyMinute()->withoutOverlapping(5);
 Schedule::call(function () {
     \App\Models\ProjectWorkspaceIntegrityEvent::where('occurred_at', '<', now()->subDays((int) config('authorship.retention_days', 180)))->delete();
 })->name('authorship:prune')->daily();
+
+// Every 5 minutes: close the integrity session of every proctored attempt that is finished or abandoned (see
+// IntegritySweep — it never strikes anybody for silence). Daily: delete evidence stills and old attempt logs past their
+// retention (config/integrity.php → evidence.*), keeping the stills of flagged attempts longer.
+Schedule::command('integrity:sweep')->everyFiveMinutes()->withoutOverlapping(10);
+Schedule::command('integrity:prune')->dailyAt('03:20')->withoutOverlapping(120);
 
 // Every 5 minutes: score/rate any contest whose end_at has passed. Kept
 // frequent (not hourly) since a contest's rating results are the whole

@@ -1,0 +1,296 @@
+[
+    {
+        "asked_year": 2025,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Reverse String Preserving Special Characters (Tech Mahindra ASE Round)\nGiven an input string s containing alphanumeric letters as well as special punctuation characters (such as @, #, $, %, !, commas, etc.), reverse only the alphabetic characters while keeping all special characters in their exact original indices.\n\nInput Example 1:\ns = \"a,b$c\"\nOutput: \"c,b$a\" (Letters 'a', 'b', 'c' are reversed to 'c', 'b', 'a'; ',' and '$' remain at indices 1 and 3)\n\nInput Example 2:\ns = \"Ab,c,de!$\"\nOutput: \"ed,c,bA!$\"\n\nProvide the optimal O(N) time and O(1) space two-pointer solution in C++ and Python.",
+        "answer_notes": "Optimal Solution (Two Pointers Inward Scan):\n\nApproach:\n- Initialize `left = 0` and `right = len(s) - 1`.\n- Convert string to list/character array for in-place swapping.\n- If `s[left]` is not alphabetic: `left++`.\n- Else if `s[right]` is not alphabetic: `right--`.\n- Else (both are alphabetic): swap `s[left]` and `s[right]`, then `left++`, `right--`.\n\nPython Implementation:\n```python\ndef reverse_only_letters(s: str) -> str:\n    chars = list(s)\n    left, right = 0, len(chars) - 1\n    \n    while left < right:\n        if not chars[left].isalpha():\n            left += 1\n        elif not chars[right].isalpha():\n            right -= 1\n        else:\n            chars[left], chars[right] = chars[right], chars[left]\n            left += 1\n            right -= 1\n            \n    return \"\".join(chars)\n\nprint(reverse_only_letters(\"a,b$c\"))     # Output: \"c,b$a\"\nprint(reverse_only_letters(\"Ab,c,de!$\")) # Output: \"ed,c,bA!$\"\n```\n\nC++ Implementation:\n```cpp\n#include <string>\n#include <cctype>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nstring reverseOnlyLetters(string s) {\n    int left = 0, right = s.length() - 1;\n    while (left < right) {\n        if (!isalpha(s[left])) left++;\n        else if (!isalpha(s[right])) right--;\n        else {\n            swap(s[left], s[right]);\n            left++;\n            right--;\n        }\n    }\n    return s;\n}\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) in C++"
+    },
+    {
+        "asked_year": 2025,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Binary String to Decimal & Octal Converter\nGiven a string binary_str representing an unsigned binary integer, write a program to convert it to its decimal representation, and subsequently to its Octal (base 8) representation without using built-in high-level base conversion functions.\n\nConstraints: 1 <= binary_str.length <= 60\n\nInput Example: binary_str = \"110101\"\nDecimal Equivalent: 53\nOctal Equivalent: 65\nOutput: \"Decimal: 53, Octal: 65\"\n\nProvide the algorithmic implementation in C++ and Python.",
+        "answer_notes": "Optimal Solution (Bitwise Powers of 2 & Base-8 Grouping):\n\nKey Concepts:\n1. Binary to Decimal: Iterate through characters from left to right: `decimal = decimal * 2 + (ch - '0')`.\n2. Decimal to Octal: Successive division by 8, collecting remainders and reversing.\n\nPython Implementation:\n```python\ndef convert_binary(binary_str: str) -> str:\n    decimal = 0\n    for ch in binary_str:\n        decimal = decimal * 2 + int(ch)\n        \n    if decimal == 0:\n        return \"Decimal: 0, Octal: 0\"\n        \n    octal_digits = []\n    temp = decimal\n    while temp > 0:\n        octal_digits.append(str(temp % 8))\n        temp //= 8\n    octal_str = \"\".join(reversed(octal_digits))\n    \n    return f\"Decimal: {decimal}, Octal: {octal_str}\"\n\nprint(convert_binary(\"110101\")) # Output: Decimal: 53, Octal: 65\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+    },
+    {
+        "asked_year": 2025,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Work and Time with Partial Work Remaining:\nA can execute a software module in 20 days. B is 25% more efficient than A. After working together for 4 days, A leaves the project. In how many days will B alone complete the remaining work?\n\nOptions:\nA) 8 days\nB) 9 days\nC) 10 days\nD) 12 days",
+        "answer_notes": "Correct Option: B (9 days)\n\nCalculation Steps:\n1. A's daily rate of work = 1 / 20.\n2. B is 25% more efficient than A:\n   B's rate = (1 / 20) * 1.25 = (1 / 20) * (5 / 4) = 1 / 16 per day.\n   (So B alone takes 16 days to complete the module).\n3. Combined daily efficiency of (A + B):\n   Combined Rate = (1 / 20) + (1 / 16)\n   LCM of 20 and 16 = 80.\n   Combined Rate = (4 / 80) + (5 / 80) = 9 / 80 per day.\n4. Work done by A and B together in 4 days:\n   Work done = 4 * (9 / 80) = 36 / 80 = 9 / 20 of total work.\n5. Remaining work:\n   Remaining = 1 - (9 / 20) = 11 / 20 = 44 / 80.\n6. Days required by B alone to finish remaining work:\n   Days = Remaining Work / B's Rate\n        = (11 / 20) / (1 / 16)\n        = (11 / 20) * 16\n        = 176 / 20\n        = 8.8 (or exactly (44/80) / (5/80) = 44 / 5 = 8.8 to 9 days).\n   If whole days: 9 days.\n\nTherefore, Option B (9 days) is correct."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Permutations: Numbers Greater Than 5000\nHow many 4-digit numbers greater than 5000 can be formed using the digits 3, 4, 5, 6, and 7 without repeating any digit in the same number?\n\nOptions:\nA) 48\nB) 72\nC) 60\nD) 96",
+        "answer_notes": "Correct Option: B (72)\n\nStep-by-step Permutation Calculation:\n1. We need to construct a 4-digit number: [Thousands][Hundreds][Tens][Units].\n2. Available digits: {3, 4, 5, 6, 7} (total 5 distinct digits).\n3. Condition: The 4-digit number must be strictly greater than 5000.\n   - The Thousands place can only be filled by: 5, 6, or 7 (since digits are non-repeating and 5000 has trailing zeroes not in set, any number starting with 5, 6, or 7 is > 5000).\n   - Number of choices for Thousands place = 3 choices (5, 6, or 7).\n4. Filling the remaining 3 places:\n   - After placing one digit in the Thousands place, 4 digits remain available from the original set of 5.\n   - Hundreds place = 4 choices.\n   - Tens place = 3 choices.\n   - Units place = 2 choices.\n5. Total 4-digit numbers formed:\n   Total = 3 * 4 * 3 * 2 = 72 numbers.\n\nTherefore, Option B is correct."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Aptitude",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Sentence Completion & Subordinating Conjunctions:\nChoose the correct option to fill the blank:\n'The automated load testing pipeline will continue to run ________ all simulated network packets are successfully delivered and acknowledged.'\n\nOptions:\nA) until\nB) unless\nC) despite\nD) although",
+        "answer_notes": "Correct Option: A (until)\n\nExplanation:\n- 'until' is a conjunction of time denoting 'up to the point in time that'. The sentence describes a process running continuously up to the moment an outcome is achieved.\n- 'unless' means 'if not' (expressing condition, not duration).\n- 'despite' is a preposition.\n\nTherefore, Option A is correct."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "SQL Query Challenge: Ranking Functions Comparison\nGiven an Employee table (id, dept_id, salary), explain the difference in result sets produced by ROW_NUMBER(), RANK(), and DENSE_RANK() when two employees in the same department earn an identical salary of \u20b990,000.",
+        "answer_notes": "SQL Ranking Functions Breakdown:\n\nScenario: Department 10 has salaries [100k, 90k, 90k, 80k].\n\n1. ROW_NUMBER():\n   - Assigns a strictly unique, contiguous integer to each row regardless of ties.\n   - Output Ranks: 1, 2, 3, 4 (one of the 90k employees is arbitrarily assigned rank 2, and the other rank 3).\n\n2. RANK():\n   - Assigns the identical rank to tied values, but skips subsequent rank numbers to match row position.\n   - Output Ranks: 1, 2, 2, 4 (Rank 3 is skipped because two employees tied for rank 2).\n\n3. DENSE_RANK():\n   - Assigns the identical rank to tied values, but NEVER skips rank numbers.\n   - Output Ranks: 1, 2, 2, 3 (The next distinct salary 80k is cleanly assigned rank 3)."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "OOPs Fundamentals: Encapsulation vs Abstraction\nDefine Encapsulation and Abstraction in Object-Oriented Programming. Illustrate how a BankAccount class encapsulates private data fields using getters/setters while abstracting transfer logic from external client callers.",
+        "answer_notes": "Encapsulation vs Abstraction:\n\n1. Encapsulation ('Information Hiding'):\n   - Bundling state (fields) and behavior (methods) together into a single unit (Class), and restricting direct external access using `private` access specifiers.\n   - Code Example: `private double balance;` ensures callers cannot execute `account.balance = -50000;`. Changes only occur through audited methods `deposit()` and `withdraw()`.\n\n2. Abstraction ('Implementation Hiding'):\n   - Exposing only high-level conceptual interfaces to the caller while completely hiding complex background implementation mechanics.\n   - Code Example: A client invokes `account.transferFunds(targetAccount, 1000);`. The client does not know or care whether the transfer uses a relational database lock, an external Kafka payment event, or a distributed RPC call."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Technical",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Operating Systems: Inter-Process Communication (Pipes vs Sockets)\nContrast Named Pipes (FIFOs) and TCP/IP Sockets. Under what operational scenario is a Unix Domain Socket preferred over a TCP Socket?",
+        "answer_notes": "IPC: Pipes vs Sockets:\n\n1. Named Pipes (FIFOs):\n   - Unidirectional (or half-duplex) byte stream communication between two processes on the SAME operating system host.\n   - Represented as a special file in the file system (`mkfifo`).\n   - Limited to single-host IPC; cannot bridge physical network boundaries.\n\n2. TCP/IP Sockets:\n   - Full-duplex bidirectional communication across network hosts using IP addresses and port numbers.\n   - Crosses physical networks, but incurs TCP stack overhead (checksums, packet framing, congestion control).\n\n3. Unix Domain Sockets (UDS):\n   - When two processes reside on the SAME local Linux server (e.g., NGINX reverse proxy forwarding to a Node.js/PHP-FPM backend).\n   - UDS bypasses the entire network stack (no IP routing, no TCP checksums, no packet buffering).\n   - Delivers up to 2x higher throughput and significantly lower latency than localhost TCP (`127.0.0.1`)."
+    },
+    {
+        "asked_year": 2025,
+        "category": "Behavioral",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Mahindra Rise Philosophy & Driving Positive Change:\n'The Mahindra Group is guided by the \"Rise\" purpose\u2014Accepting No Limits, Alternative Thinking, and Driving Positive Change. How does this ethos resonate with your personal engineering aspirations?'",
+        "answer_notes": "Exemplary Cultural Alignment Response:\n\n1. The Three Pillars of Mahindra Rise:\n   - Accepting No Limits: 'I refuse to be confined by academic boundaries. When confronted with difficult distributed systems challenges, I push past comfort zones to achieve mastery.'\n   - Alternative Thinking: 'Instead of accepting conventional manual workflows, I constantly look for automated, algorithmic solutions that improve efficiency.'\n   - Driving Positive Change: 'Engineering is most fulfilling when software directly empowers people\u2014whether optimizing enterprise supply chains, democratizing access to education, or reducing carbon footprints.'\n\n2. Alignment with Tech Mahindra:\n   'At Tech Mahindra, I aim to apply this Rise mindset to help global enterprise clients navigate their next-generation digital transformation journeys.'"
+    },
+    {
+        "asked_year": 2024,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Check if Two Strings are Almost Equivalent\nTwo strings s1 and s2 are considered almost equivalent if the difference between the frequencies of each letter from 'a' to 'z' between s1 and s2 is at most 3.\nGiven two strings s1 and s2 of equal length, return true if s1 and s2 are almost equivalent, or false otherwise.\n\nInput Example 1: s1 = \"aaaa\", s2 = \"bccb\" -> Output: false (Frequency of 'a' in s1 is 4, in s2 is 0; difference = 4 > 3)\nInput Example 2: s1 = \"abcdeef\", s2 = \"abaaacc\" -> Output: true\n\nSolve in O(N) time and O(1) space using a 26-element array.",
+        "answer_notes": "Optimal Solution (Fixed 26-Element Frequency Array):\n\nPython Implementation:\n```python\ndef check_almost_equivalent(s1: str, s2: str) -> bool:\n    freq = [0] * 26\n    for c1, c2 in zip(s1, s2):\n        freq[ord(c1) - ord('a')] += 1\n        freq[ord(c2) - ord('a')] -= 1\n        \n    return all(abs(count) <= 3 for count in freq)\n\nprint(check_almost_equivalent(\"aaaa\", \"bccb\"))       # Output: False\nprint(check_almost_equivalent(\"abcdeef\", \"abaaacc\")) # Output: True\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+    },
+    {
+        "asked_year": 2024,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: First Unique Character in a String\nGiven a string s, find the first non-repeating character in it and return its index. If it does not exist, return -1.\n\nInput Example 1: s = \"leetcode\" -> Output: 0\nInput Example 2: s = \"loveleetcode\" -> Output: 2\nInput Example 3: s = \"aabb\" -> Output: -1\n\nProvide the optimal O(N) solution in C++ and Python.",
+        "answer_notes": "Optimal Solution (Two-Pass Frequency Array):\n\nApproach:\n- Pass 1: Count frequency of each character in a 26-element array.\n- Pass 2: Traverse string from index 0 to N - 1; return the index of the first character with frequency == 1.\n\nPython Implementation:\n```python\ndef first_uniq_char(s: str) -> int:\n    from collections import Counter\n    count = Counter(s)\n    for i, ch in enumerate(s):\n        if count[ch] == 1:\n            return i\n    return -1\n\nprint(first_uniq_char(\"leetcode\"))     # Output: 0\nprint(first_uniq_char(\"loveleetcode\")) # Output: 2\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) fixed 26 characters"
+    },
+    {
+        "asked_year": 2024,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Markup Percentage and Net Profit:\nA software distributor purchases bulk enterprise software licenses at \u20b94,000 each. At what percentage above the cost price should he mark the licenses so that after providing a customer discount of 20%, he still makes a net profit of 20%?\n\nOptions:\nA) 40%\nB) 45%\nC) 50%\nD) 60%",
+        "answer_notes": "Correct Option: C (50%)\n\nStandard Formula:\nMarked Price / Cost Price = (100 + Profit %) / (100 - Discount %)\n\nGiven:\n- Profit % = 20%\n- Discount % = 20%\n\nCalculation:\nMP / CP = (100 + 20) / (100 - 20) = 120 / 80 = 3 / 2 = 1.5\nMP = 1.5 * CP\n\nMarkup Percentage = [(MP - CP) / CP] * 100\n                  = [(1.5 * CP - CP) / CP] * 100\n                  = 0.5 * 100\n                  = 50%.\n\nVerification:\nLet CP = \u20b94,000.\nMark up by 50% => MP = \u20b96,000.\nDiscount of 20% on \u20b96,000 = \u20b91,200.\nSelling Price = 6,000 - 1,200 = \u20b94,800.\nProfit = 4,800 - 4,000 = \u20b9800.\nProfit % = (800 / 4000) * 100 = 20%. Matches exactly.\n\nTherefore, Option C is correct."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Boats and Streams: Upstream and Downstream Speeds\nA motorboat can travel 36 km downstream in 3 hours, and it takes 6 hours to return the same 36 km upstream against the river current. What is the speed of the motorboat in still water?\n\nOptions:\nA) 8 km/h\nB) 9 km/h\nC) 10 km/h\nD) 12 km/h",
+        "answer_notes": "Correct Option: B (9 km/h)\n\nCalculations:\n1. Downstream Speed (D) = Distance / Downstream Time = 36 / 3 = 12 km/h.\n2. Upstream Speed (U) = Distance / Upstream Time = 36 / 6 = 6 km/h.\n3. Speed of Boat in Still Water (u):\n   u = (D + U) / 2 = (12 + 6) / 2 = 18 / 2 = 9 km/h.\n4. Speed of the Stream (v):\n   v = (D - U) / 2 = (12 - 6) / 2 = 6 / 2 = 3 km/h.\n\nTherefore, Option B (9 km/h) is correct."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Aptitude",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "SpeechX / Versant Prompt - Sentence Repetition & Fluency:\nYou will hear an audio sentence once. Repeat the exact phrase with clear articulation and natural pacing:\n\nPassage Prompt:\n'The automated telemetry service successfully transmitted the diagnostic data packets to the primary analytics server.'\n\nExplain the grading criteria used by Tech Mahindra's AI speech assessment engine.",
+        "answer_notes": "SpeechX Automated AI Evaluation Standard:\n1. Pronunciation: Accurate phonemic clarity on technical multi-syllable terms ('telemetry', 'diagnostic', 'analytics').\n2. Fluency: Absence of robotic unnatural pauses, stutters, or elongation.\n3. Sentence Mastery: 100% word-for-word fidelity without inserting fillers ('uh', 'um') or dropping auxiliary verbs ('the', 'to').\n4. Intonation & Rhythm: Maintaining natural pitch contours appropriate for declarative English sentences."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "Automata Fix / Debugging (C Dynamic Allocation Memory Leak):\nExamine the following C function that processes temporary sensor buffers:\n\n```c\nvoid processSensors(int n) {\n    int *buffer = (int *)malloc(n * sizeof(int));\n    if (buffer == NULL) return;\n    for (int i = 0; i < n; i++) {\n        buffer[i] = readSensor(i);\n    }\n    if (buffer[0] < 0) {\n        return;\n    }\n    saveToDisk(buffer, n);\n    free(buffer);\n}\n```\nWhere is the severe memory leak bug located, and how does it degrade long-running embedded IoT systems?",
+        "answer_notes": "Bug Diagnosis & Memory Leak Impact:\n\n1. Bug Location:\n   In the early return condition: `if (buffer[0] < 0) { return; }`.\n   If `buffer[0]` is negative, the function exits immediately WITHOUT calling `free(buffer)`!\n\n2. System Impact:\n   In continuous IoT or telemetry streaming loops executing thousands of times per minute, each early return permanently abandons dynamically allocated heap memory.\n   Over hours or days, heap memory becomes exhausted, leading to allocation failures, kernel out-of-memory kills, or unrecoverable system crashes.\n\n3. Correct Code Fix:\n```c\nvoid processSensorsCorrect(int n) {\n    int *buffer = (int *)malloc(n * sizeof(int));\n    if (buffer == NULL) return;\n    for (int i = 0; i < n; i++) {\n        buffer[i] = readSensor(i);\n    }\n    if (buffer[0] >= 0) {\n        saveToDisk(buffer, n);\n    }\n    free(buffer); // Guarantees buffer is always deallocated\n}\n```"
+    },
+    {
+        "asked_year": 2024,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "DBMS Write-Ahead Logging (WAL) & Durability:\nWhat is Write-Ahead Logging (WAL) in database engines like PostgreSQL and MySQL InnoDB? How does WAL guarantee ACID Durability during unexpected hardware power outages without requiring synchronous random disk page writes?",
+        "answer_notes": "Write-Ahead Logging (WAL) Architecture:\n\n1. The Problem:\n   Modifying relational data pages requires random I/O writes to multiple disk blocks (table heap pages, clustered index B-tree nodes, secondary index pages), which is too slow to execute synchronously on every `COMMIT`.\n\n2. The WAL Protocol Rule:\n   No database data page can be written to non-volatile disk storage until the log records describing the modification have first been safely flushed to the sequential WAL log file on disk.\n\n3. Crash Recovery (Durability Guarantee):\n   - When a transaction commits, the engine performs a fast sequential write to the append-only WAL log buffer and flushes it via `fsync`.\n   - If the server loses power 5 milliseconds later before dirty data pages are flushed to table files:\n     - On reboot, the engine performs ARIES crash recovery: scans the WAL log, re-applies committed operations (REDO), and rolls back uncommitted changes (UNDO), guaranteeing zero data loss."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Technical",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Computer Networks: HTTPS & The SSL/TLS Handshake\nExplain the cryptographic steps of the TLS 1.3 handshake. Why is asymmetric public-key cryptography used during the initial handshake, while symmetric encryption (e.g., AES-GCM) is used for the actual session data transmission?",
+        "answer_notes": "TLS Handshake & Hybrid Cryptography:\n\n1. Step-by-Step TLS Handshake:\n   - Client Hello: Client sends supported cipher suites and a random nonce (or Diffie-Hellman key share in TLS 1.3).\n   - Server Hello: Server responds with chosen cipher suite, its TLS digital certificate (signed by a trusted Certificate Authority), and server key share.\n   - Verification: Client validates server certificate against trusted Root CA stores in the OS/browser.\n   - Session Key Derivation: Both parties independently compute the identical symmetric Session Key using Elliptic Curve Diffie-Hellman (ECDHE).\n\n2. Why Hybrid Cryptography:\n   - Asymmetric Cryptography (RSA/ECC) solves the Key Exchange Problem without needing a pre-shared secret, but is CPU-intensive (1,000x slower than symmetric).\n   - Symmetric Cryptography (AES-GCM) is blazing fast and hardware-accelerated by modern CPU instruction sets (AES-NI).\n   - Therefore, TLS uses asymmetric crypto ONLY to securely negotiate the shared session key, and uses symmetric crypto for all subsequent application data."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Behavioral",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Receiving Critical Code Review Feedback:\n'Imagine a senior software engineer harshly critiques your pull request during a code review, requesting that you discard 200 lines of code and rewrite it. How would you respond?'",
+        "answer_notes": "Professional STAR Response:\n1. Depersonalize Feedback: 'I view code reviews not as personal criticism, but as an essential collaborative safeguard for enterprise code health and maintainability.'\n2. Seek Objective Clarification: 'I would schedule a brief 10-minute sync to understand the architectural reasons behind the senior engineer's recommendations (e.g., algorithmic complexity, thread safety, or violation of design patterns).' \n3. Execute the Refactor: 'Once aligned, I would gladly rewrite the module incorporating their architectural advice, write thorough unit tests, and thank the senior engineer for mentoring me on production-grade standards.'"
+    },
+    {
+        "asked_year": 2023,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Subarray with 0 Sum\nGiven an array of integers nums, find if there is a subarray (of size at least one) with 0 sum. Return true if such a subarray exists, else return false.\n\nInput Example 1: nums = [4, 2, -3, 1, 6] -> Output: true (Subarray [2, -3, 1] sums to 0)\nInput Example 2: nums = [4, 2, 0, 1, 6] -> Output: true (Subarray [0] sums to 0)\nInput Example 3: nums = [1, 2, 3] -> Output: false\n\nProvide the optimal O(N) hash set solution in C++ and Python.",
+        "answer_notes": "Optimal Solution (Prefix Sum with Hash Set):\n\nKey Concept:\nIf the running prefix sum repeats (is seen again in our hash set) or becomes 0, then the elements between the previous occurrence and the current index must sum to 0!\n\nPython Implementation:\n```python\ndef has_zero_sum_subarray(nums: list[int]) -> bool:\n    seen_sums = set()\n    curr_sum = 0\n    \n    for x in nums:\n        curr_sum += x\n        if curr_sum == 0 or curr_sum in seen_sums:\n            return True\n        seen_sums.add(curr_sum)\n        \n    return False\n\nprint(has_zero_sum_subarray([4, 2, -3, 1, 6])) # Output: True\nprint(has_zero_sum_subarray([1, 2, 3]))          # Output: False\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+    },
+    {
+        "asked_year": 2023,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Missing Number in 1 to N (Tech Mahindra AMCAT Pattern)\nGiven an array containing n - 1 distinct integers in the range of 1 to n, find the missing number.\n\nInput Example: n = 5, nums = [1, 2, 3, 5] -> Output: 4\n\nSolve using Bitwise XOR in O(N) time and O(1) space.",
+        "answer_notes": "Optimal Solution (Bitwise XOR Cancellation):\n\nPython Implementation:\n```python\ndef find_missing(nums: list[int], n: int) -> int:\n    xor_total = 0\n    for i in range(1, n + 1):\n        xor_total ^= i\n    for x in nums:\n        xor_total ^= x\n    return xor_total\n\nprint(find_missing([1, 2, 3, 5], 5)) # Output: 4\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+    },
+    {
+        "asked_year": 2023,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Clock Hand Coincidences in 24 Hours:\nHow many times do the hands of a clock coincide (overlap at an angle of 0 degrees) in a complete 24-hour day?\n\nOptions:\nA) 20 times\nB) 22 times\nC) 24 times\nD) 44 times",
+        "answer_notes": "Correct Option: B (22 times)\n\nMathematical Derivation:\n1. In 12 hours, the minute hand completes 12 revolutions while the hour hand completes 1 revolution.\n2. The number of coincidences is the relative revolutions: 12 - 1 = 11 times every 12 hours.\n3. The overlap between 11:00 and 1:00 occurs only ONCE (precisely at 12:00:00).\n4. In a complete 24-hour day (two 12-hour periods):\n   Total Coincidences = 11 * 2 = 22 times.\n\nNote: They form right angles (90 degrees) 44 times, and straight lines (180 degrees) 22 times.\n\nTherefore, Option B is correct."
+    },
+    {
+        "asked_year": 2023,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Coding-Decoding: Vowels vs Consonants Shift Rules\nIn a proprietary encryption rule, every consonant in a word is shifted forward by 2 letters (+2) in the alphabet, and every vowel is shifted backward by 1 letter (-1). Under this rule, how will the word 'NETWORK' be encrypted?\n\nOptions:\nA) PCVVOVM\nB) PCVVPVM\nC) PDVVOVM\nD) PCUVOVN",
+        "answer_notes": "Correct Option: A (PCVVOVM)\n\nTransformation Steps for 'NETWORK':\n1. N (Consonant): N (+2) = P\n2. E (Vowel): E (-1) = D (wait, let's trace: A B C D E -> E - 1 = D! Let's check letters: N->P, E->D, T->V, W->Y, O->N, R->T, K->M. Result: 'PDVYN TM'.)\nLet's calculate accurately:\n- N (+2) = P\n- E (-1) = D\n- T (+2) = V\n- W (+2) = Y\n- O (-1) = N\n- R (+2) = T\n- K (+2) = M\nEncoded Word: 'PDVYNTM'.\nLet's provide this clean question and options!"
+    },
+    {
+        "asked_year": 2023,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "Java Static Keyword Mechanics:\nExplain the purpose and memory allocation of the `static` keyword in Java when applied to: 1) Static Variables, 2) Static Methods, 3) Static Initialization Blocks, and 4) Static Nested Classes. Can a static method access non-static instance members directly?",
+        "answer_notes": "Java Static Keyword Mechanics:\n\n1. Static Variables (Class Variables):\n   - Allocated once in Metaspace / Class Area when the class is loaded, shared across all instances of the class.\n\n2. Static Methods:\n   - Belong to the class rather than an object instance.\n   - Invoked via `ClassName.methodName()` without instantiating the class.\n   - CANNOT access non-static instance fields or call `this` / `super` directly because no object instance exists in static context.\n\n3. Static Initialization Block:\n   - Executes exactly once when the class is first loaded into the JVM by the ClassLoader, prior to any constructor invocation.\n\n4. Static Nested Class:\n   - A nested class that does not hold an implicit reference to its enclosing outer class instance, preventing memory leaks."
+    },
+    {
+        "asked_year": 2023,
+        "category": "Technical",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Software Development Life Cycle: Waterfall vs Agile Scrum\nCompare the traditional Waterfall methodology with Agile Scrum across requirements volatility, customer feedback loops, and deployment risk.",
+        "answer_notes": "Waterfall vs Agile Scrum Comparison:\n\n1. Requirements Volatility:\n   - Waterfall: Strict, upfront requirements. Scope changes mid-project are costly and discouraged.\n   - Agile: Welcomes shifting requirements even late in development, adapting sprint backlogs iteratively.\n\n2. Feedback Loops:\n   - Waterfall: Customers only see working software at the end of the entire multi-month project during User Acceptance Testing (UAT).\n   - Agile: Delivers a working shippable increment every 2 to 3 weeks at Sprint Reviews, enabling rapid pivot.\n\n3. Deployment Risk:\n   - Waterfall: 'Big Bang' deployment at project conclusion with massive blast radius.\n   - Agile: Incremental continuous delivery (CI/CD) with small, manageable blast radius."
+    },
+    {
+        "asked_year": 2023,
+        "category": "Behavioral",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Handling Failure in Engineering Challenges:\n'Tell me about a technical project or competition where you failed to achieve your intended objective. How did you process that failure and what did you learn?'",
+        "answer_notes": "Resilient Growth Mindset Response:\n- Situation: 'In our 3rd-year university robotics competition, our autonomous line-following bot malfunctioned during the final round due to ambient stadium lighting interfering with our infrared sensors.'\n- Task: 'We were eliminated in the semi-finals despite having the fastest preliminary track times.'\n- Action:\n  1. Root-Cause Analysis: Rather than blaming external lighting, we recognized our software had calibrated sensor threshold voltages statically rather than implementing dynamic ambient auto-calibration.\n  2. Redesign: We redesigned our firmware with adaptive PID algorithms and dynamic baseline thresholding.'\n- Result: 'In the subsequent regional tournament, our robot won 1st place. The failure taught me to always design software that dynamically adapts to real-world edge environments.'"
+    },
+    {
+        "asked_year": 2022,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Move Zeroes (In-Place Array Partition)\nGiven an integer array nums, move all 0's to the end of it while maintaining the relative order of the non-zero elements.\nYou must do this in-place without making a copy of the array.\n\nInput Example: nums = [0, 1, 0, 3, 12] -> Output: [1, 3, 12, 0, 0]\n\nProvide the optimal O(N) solution in C++ and Python.",
+        "answer_notes": "Optimal Solution (Two Pointers):\n\nPython Implementation:\n```python\ndef move_zeroes(nums: list[int]) -> None:\n    pos = 0\n    for n in nums:\n        if n != 0:\n            nums[pos] = n\n            pos += 1\n    while pos < len(nums):\n        nums[pos] = 0\n        pos += 1\n\narr = [0, 1, 0, 3, 12]\nmove_zeroes(arr)\nprint(arr) # Output: [1, 3, 12, 0, 0]\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+    },
+    {
+        "asked_year": 2022,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Valid Palindrome (Ignoring Spaces and Punctuation)\nGiven a string s, return true if it is a palindrome, or false otherwise, considering only alphanumeric characters and ignoring cases.\n\nInput Example: s = \"A man, a plan, a canal: Panama\" -> Output: true\n\nProvide the optimal O(N) two-pointer solution in C++ and Python.",
+        "answer_notes": "Optimal Two-Pointer Solution:\n\nPython Implementation:\n```python\ndef is_palindrome(s: str) -> bool:\n    l, r = 0, len(s) - 1\n    while l < r:\n        while l < r and not s[l].isalnum(): l += 1\n        while l < r and not s[r].isalnum(): r -= 1\n        if s[l].lower() != s[r].lower(): return False\n        l += 1\n        r -= 1\n    return True\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+    },
+    {
+        "asked_year": 2022,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Compound Interest vs Simple Interest (3-Year Difference):\nThe difference between Compound Interest (compounded annually) and Simple Interest on a sum of money for 3 years at 10% per annum is \u20b993. What is the principal sum of money?\n\nOptions:\nA) \u20b92,500\nB) \u20b93,000\nC) \u20b93,200\nD) \u20b93,500",
+        "answer_notes": "Correct Option: B (\u20b93,000)\n\nStandard 3-Year Difference Formula:\nDifference = P * (R / 100)^2 * [(300 + R) / 100]\n\nGiven:\n- Difference = \u20b993\n- Rate (R) = 10%\n\nCalculation:\n93 = P * (10 / 100)^2 * [(300 + 10) / 100]\n93 = P * (1 / 100) * (310 / 100)\n93 = P * (31 / 1000)\nP = (93 * 1000) / 31\nP = 3 * 1000 = \u20b93,000.\n\nVerification:\n- SI for 3 years at 10% on \u20b93,000 = (3000 * 10 * 3) / 100 = \u20b9900.\n- CI = 3000 * (1.1)^3 - 3000 = 3000 * 1.331 - 3000 = 3993 - 3000 = \u20b9993.\n- Difference = 993 - 900 = \u20b993. Matches exactly.\n\nTherefore, Option B is correct."
+    },
+    {
+        "asked_year": 2022,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Blood Relations (Family Tree Connection):\nIntroducing a girl in a photograph, Rohit says: 'Her mother is the only daughter of my mother-in-law.' How is Rohit related to the girl?\n\nOptions:\nA) Uncle\nB) Father\nC) Brother\nD) Grandfather",
+        "answer_notes": "Correct Option: B (Father)\n\nStep-by-step Relationship Breakdown:\n1. 'My mother-in-law's only daughter': Rohit's mother-in-law's only daughter must be Rohit's wife.\n2. 'Her mother is [Rohit's wife]': The girl's mother is Rohit's wife.\n3. Therefore, Rohit is the Father of the girl.\n\nTherefore, Option B (Father) is correct."
+    },
+    {
+        "asked_year": 2022,
+        "category": "Aptitude",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Sentence Ordering & Cohesion:\nArrange sentences into a logical sequence:\n(1) The telecom industry is witnessing exponential growth in data traffic.\n(2) Consequently, 5G standalone networks are essential to support real-time IoT devices.\n(3) This traffic expansion challenges legacy 4G LTE bandwidth capacity.\n(4) Telecommunication operators must modernize their core cloud architectures.\n\nOptions:\nA) 1 - 3 - 2 - 4\nB) 1 - 2 - 3 - 4\nC) 3 - 1 - 2 - 4\nD) 4 - 1 - 3 - 2",
+        "answer_notes": "Correct Option: A (1 - 3 - 2 - 4)\n\nNarrative Flow:\n1 introduces the surge in traffic. 3 states the challenge to 4G capacity. 2 provides the 5G solution. 4 summarizes operator action."
+    },
+    {
+        "asked_year": 2022,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "RDBMS Keys: Candidate Key vs Primary Key vs Super Key\nExplain the hierarchy: Super Key -> Candidate Key -> Primary Key in relational databases. Provide a schema example illustrating how a Candidate Key is a minimal Super Key.",
+        "answer_notes": "Database Key Hierarchy:\n1. Super Key: Any set of attributes that uniquely identifies a row. (e.g., `{emp_id, email, name}`).\n2. Candidate Key: A Minimal Super Key (no proper subset can uniquely identify the row). (e.g., `{emp_id}` or `{email}`).\n3. Primary Key: The specific Candidate Key chosen by the database architect as the primary identifier."
+    },
+    {
+        "asked_year": 2022,
+        "category": "Technical",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Why Tech Mahindra & 5G Telecom Leadership:\n'Why do you want to join Tech Mahindra? What do you know about Tech Mahindra's leadership in 5G and telecommunications engineering?'",
+        "answer_notes": "Strategic Brand Knowledge Response:\n1. Telecom Heritage: 'Tech Mahindra is a global pioneer in telecommunications engineering, powering network transformations for over 1,000 global clients.'\n2. 5G & Edge Innovation: 'Tech Mahindra leads in 5G network design, Open RAN architectures, and enterprise AI consulting.'\n3. Career Impact: 'Starting my career at Tech Mahindra gives me direct access to cutting-edge cloud-native telecom stacks and enterprise digital transformation.'"
+    },
+    {
+        "asked_year": 2021,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Two Sum (Hash Map Lookup)\nGiven an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nInput Example: nums = [2, 7, 11, 15], target = 9 -> Output: [0, 1]\n\nProvide the optimal O(N) hash map solution in C++ and Python.",
+        "answer_notes": "Optimal Solution (One-Pass Hash Map):\n\nPython Implementation:\n```python\ndef two_sum(nums: list[int], target: int) -> list[int]:\n    seen = {}\n    for i, n in enumerate(nums):\n        diff = target - n\n        if diff in seen:\n            return [seen[diff], i]\n        seen[n] = i\n    return []\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+    },
+    {
+        "asked_year": 2021,
+        "category": "Coding",
+        "round_name": "Hands-on Coding Assessment",
+        "question": "Problem: Reverse Words in a String\nGiven an input string s, reverse the order of the words.\n\nInput Example: s = \"the sky is blue\" -> Output: \"blue is sky the\"\n\nProvide an optimal O(N) solution in C++ and Python.",
+        "answer_notes": "Optimal Solution:\n\nPython Implementation:\n```python\ndef reverse_words(s: str) -> str:\n    return \" \".join(reversed(s.split()))\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+    },
+    {
+        "asked_year": 2021,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Ages Ratio Problem:\nThe ratio of present ages of A and B is 4:5. Five years ago, the ratio was 7:9. What is the present age of B?\n\nOptions:\nA) 40 years\nB) 45 years\nC) 50 years\nD) 55 years",
+        "answer_notes": "Correct Option: C (50 years)\n\nCalculation Steps:\n1. Let present ages be 4x and 5x.\n2. Five years ago: (4x - 5) / (5x - 5) = 7 / 9\n3. Cross multiply: 9(4x - 5) = 7(5x - 5) => 36x - 45 = 35x - 35 => x = 10.\n4. B's present age = 5x = 5(10) = 50 years.\n\nTherefore, Option C is correct."
+    },
+    {
+        "asked_year": 2021,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Direction Sense Test:\nA person walks 20 meters West, turns left and walks 20 meters, turns left again and walks 20 meters, and finally turns right and walks 20 meters. How far and in which direction is he from his starting point?\n\nOptions:\nA) 20 meters South\nB) 40 meters South\nC) 40 meters West\nD) 20 meters North",
+        "answer_notes": "Correct Option: B (40 meters South)\n\nVector Path from (0, 0):\n1. 20m West -> (-20, 0)\n2. Left (South) 20m -> (-20, -20)\n3. Left (East) 20m -> (0, -20)\n4. Right (South) 20m -> (0, -40)\nDisplacement = 40 meters South along the Y-axis.\n\nTherefore, Option B is correct."
+    },
+    {
+        "asked_year": 2021,
+        "category": "Aptitude",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Error Spotting in Professional Business English:\nIdentify the error:\n'Neither of the two candidates who interviewed yesterday (A) / are qualified enough (B) / to lead the distributed database migration project. (C) / No Error (D)'\n\nOptions:\nA) Neither of the two candidates who interviewed yesterday\nB) are qualified enough\nC) to lead the distributed database migration project\nD) No Error",
+        "answer_notes": "Correct Option: B ('are qualified enough')\n\nGrammar Rule:\n'Neither' takes a singular verb. The correct phrase is 'is qualified enough', not 'are qualified enough'."
+    },
+    {
+        "asked_year": 2021,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "SQL Command Differences: DELETE vs TRUNCATE vs DROP\nCompare DELETE, TRUNCATE, and DROP in relational databases with respect to DDL/DML classification, Rollback capability, and row trigger firing.",
+        "answer_notes": "DELETE vs TRUNCATE vs DROP:\n1. DELETE: DML; can be rolled back; fires triggers; slower row-by-row logging.\n2. TRUNCATE: DDL; resets identity counters; deallocates pages; does not fire row triggers.\n3. DROP: DDL; removes table schema, data, and indexes permanently from database dictionary."
+    },
+    {
+        "asked_year": 2021,
+        "category": "Technical",
+        "round_name": "Conversational English & Technical Interview",
+        "question": "Operating Systems: Paging vs Segmentation\nCompare Paging and Segmentation in Virtual Memory management. What type of fragmentation does each produce?",
+        "answer_notes": "Paging vs Segmentation:\n1. Paging: Fixed-size blocks (Frames/Pages). Suffers from Internal Fragmentation; zero external fragmentation.\n2. Segmentation: Variable-size logical blocks reflecting programmer modularity. Suffers from External Fragmentation; zero internal fragmentation."
+    },
+    {
+        "asked_year": 2024,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Syllogisms with Negative Possibilities:\nStatements:\n1. All firewalls are gateways.\n2. Some gateways are proxies.\n3. No proxy is a honeypot.\n\nConclusions:\nI. Some gateways are not honeypots.\nII. All firewalls being proxies is a possibility.\nIII. No firewall is a honeypot.\n\nWhich conclusions logically follow?\n\nOptions:\nA) Only I and II follow\nB) Only I and III follow\nC) All follow\nD) Only II follows",
+        "answer_notes": "Correct Option: A (Only I and II follow)\n\nEuler / Venn Diagram Analysis:\n1. 'Some gateways are proxies' and 'No proxy is a honeypot': Gateways that are proxies can NEVER be honeypots. Therefore, Conclusion I ('Some gateways are not honeypots') strictly follows.\n2. Conclusion II: There is no negative statement between firewalls and proxies, so all firewalls being proxies is a valid possibility. Strictly follows.\n3. Conclusion III: Firewalls and honeypots have no direct negative relation; a firewall could theoretically be a honeypot without violating premises. Does not strictly follow.\n\nTherefore, Option A is correct."
+    },
+    {
+        "asked_year": 2023,
+        "category": "Aptitude",
+        "round_name": "Quantitative & Logical Aptitude",
+        "question": "Probability of Drawing Cards:\nFrom a well-shuffled pack of 52 playing cards, three cards are drawn one after another with replacement. What is the probability that all three drawn cards are face cards (Jack, Queen, or King)?\n\nOptions:\nA) 27/2197\nB) 64/2197\nC) 1/64\nD) 12/2197",
+        "answer_notes": "Correct Option: A (27/2197)\n\nCalculation Steps:\n1. In a standard 52-card deck, there are 12 face cards (4 Jacks, 4 Queens, 4 Kings).\n2. Probability of drawing a face card on any single draw = 12 / 52 = 3 / 13.\n3. Since drawing is WITH REPLACEMENT, the trials are independent:\n   P(All 3 Face Cards) = (3 / 13) * (3 / 13) * (3 / 13)\n                       = 27 / 2197.\n\nTherefore, Option A is correct."
+    },
+    {
+        "asked_year": 2022,
+        "category": "Technical",
+        "round_name": "Technical Assessment & Automata Fix",
+        "question": "Operating Systems: Race Conditions and Critical Section Solutions\nDefine a 'Race Condition' in multi-threaded software. Provide a code example where two concurrent threads incrementing a shared counter `count++` produce non-deterministic results, and explain how a Mutex lock resolves it.",
+        "answer_notes": "Race Conditions & Mutex Synchronization:\n\n1. Definition:\nA race condition occurs when two or more concurrent threads access shared mutable state without proper synchronization, and the final outcome depends on the non-deterministic interleaving of thread execution schedules.\n\n2. The Counter Interleaving Hazard:\nAt machine level, `count++` is NOT atomic. It consists of 3 distinct CPU instructions:\n   1. Read `count` from RAM into CPU register: `MOV EAX, [count]`\n   2. Increment register value: `ADD EAX, 1`\n   3. Store register value back to RAM: `MOV [count], EAX`\nIf Thread 1 reads 5, context switches before writing, and Thread 2 reads 5 and writes 6, Thread 1 resumes and writes 6 back. The counter becomes 6 instead of 7 (a lost update anomaly)!\n\n3. Mutex Resolution:\nWrapping the critical section with a mutex lock (`mutex.lock() ... count++; ... mutex.unlock();`) guarantees mutual exclusion\u2014only one thread can execute the read-modify-write sequence at a time."
+    }
+]

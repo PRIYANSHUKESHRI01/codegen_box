@@ -6,8 +6,9 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { localDatetimeInputToUtcIso, utcIsoToLocalDatetimeInput } from "@/lib/datetime";
-import { AdminCompanyRow, AdminDriveRow, BRANCH_OPTIONS, DRIVE_STATUSES, inputClass } from "./types";
+import { AdminCompanyRow, AdminDriveRow, DRIVE_STATUSES, inputClass } from "./types";
 import { MapCollegesModal } from "./MapCollegesModal";
+import { BranchPicker } from "@/components/branches/BranchPicker";
 
 interface DrivesPanelProps {
   companies: AdminCompanyRow[];
@@ -93,9 +94,6 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
     setShowForm(true);
   };
 
-  const toggleBranch = (branch: string) => {
-    setBranches((prev) => (prev.includes(branch) ? prev.filter((b) => b !== branch) : [...prev, branch]));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -390,25 +388,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                     All branches
                   </label>
                 </div>
-                {!allBranches && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {BRANCH_OPTIONS.map((b) => (
-                      <button
-                        key={b}
-                        type="button"
-                        onClick={() => toggleBranch(b)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-control font-bold border transition-colors",
-                          branches.includes(b)
-                            ? "bg-accent-primary text-white border-accent-primary"
-                            : "bg-elevated text-text-secondary border-border-subtle"
-                        )}
-                      >
-                        {b}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {!allBranches && <BranchPicker value={branches} onChange={setBranches} />}
               </div>
 
               <div>

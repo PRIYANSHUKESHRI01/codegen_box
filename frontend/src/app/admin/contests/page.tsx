@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
 import { Modal } from "@/components/ui/Modal";
+import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 
 type ContestType = "general" | "daily" | "company" | "tpo_mock";
 
@@ -29,6 +30,8 @@ interface AdminContest {
   finalized_at: string | null;
   participants_count: number;
   contest_type: ContestType;
+  /** Which branches this is for; null = everyone. */
+  branch_audience?: { disciplines?: string[]; branches?: string[] } | null;
   is_auto_generated: boolean;
   company: { id: number; name: string; logo: string | null } | null;
   placement_drive: { id: number; title: string } | null;
@@ -173,6 +176,7 @@ export default function AdminContestsPage() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-bold text-primary">{contest.title}</span>
+                      <AudienceChip audience={contest.branch_audience} />
                       <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded", CONTEST_TYPE_BADGE_COLOR[contest.contest_type])}>
                         {CONTEST_TYPE_LABEL[contest.contest_type]}
                       </span>
@@ -403,6 +407,7 @@ function CreateContestModal({
   const [startAt, setStartAt] = useState("");
   const [endAt, setEndAt] = useState("");
   const [isRated, setIsRated] = useState(true);
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -449,6 +454,8 @@ function CreateContestModal({
         contest_type: contestType,
         placement_drive_id: contestType === "company" ? Number(selectedDriveId) : undefined,
         college_ids: contestType === "company" ? selectedCollegeIds : undefined,
+        // Company contests are aimed by their drive (colleges + branch eligibility); only a general one takes an audience.
+        branch_audience: contestType === "general" ? audienceForRequest(audience) : undefined,
       });
       onCreated();
     } catch (err) {
@@ -607,6 +614,8 @@ function CreateContestModal({
             <input type="checkbox" checked={isRated} onChange={(e) => setIsRated(e.target.checked)} className="rounded border-border-subtle" />
             <span className="text-text-secondary">Rated — affects participants&apos; ratings when finalized</span>
           </label>
+
+          {contestType === "general" && <BranchAudienceField value={audience} onChange={setAudience} />}
 
           {error && <p className="text-2xs text-status-danger">{error}</p>}
       </form>

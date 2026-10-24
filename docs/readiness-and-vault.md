@@ -15,7 +15,7 @@ Everything below is the operator's and developer's reference. Code: `ReadinessSc
 
 ---
 
-## 1. The readiness score (v3)
+## 1. The readiness score (v5)
 
 `ReadinessScoreService` is the only place a score is computed. College students and independent students are
 scored by **exactly the same rules** — nothing depends on a college, a CGPA or a plan.
@@ -60,6 +60,89 @@ only through it:
 Academics (CGPA, backlogs) are **not** in the score. That is the main reason college students used to appear to be
 scored differently: they had a component an independent student could never earn. CGPA and backlogs still decide
 drive eligibility (`EligibilityService`) — only the readiness score ignores them.
+
+### Staying ready — the daily habit (v5), and the record of it
+
+The components above add up to the **earned** score. A student also has to *keep showing up*, so every day with no
+activity takes points off it:
+
+> **score = earned score − missed-day penalty** (never below 0)
+
+- Of the last **21 complete days** (yesterday and back — today is still theirs), every day with **no activity** on the
+  platform costs **1 point**. "Activity" is the same thing Consistency counts: practice, contests, interviews, soft
+  skills, the three Learning Centre labs, articles, Project Lab (minus anything a hiring partner posted).
+- A student who comes back stops losing points **that day**. The days already missed drop out of the count 21 days
+  after they happened, so a clean three weeks brings the penalty to zero. The most it can ever take is 21 points.
+- **Nobody is charged for days before they were tracked.** The penalty's clock starts the day *after* a student's
+  first row in `readiness_snapshots` (written by the first `readiness:refresh` that scores them), so shipping this
+  never punishes anyone for a gap nobody was watching. A brand-new student's first day is free.
+- Days are UTC calendar days, like every other date the score reads.
+- It goes through the same single code path, so the dashboard card, the Vault page, the TPO roster, the weekly report
+  and the Vault's enter/exit decision all see the same number.
+- The `decay` block on the breakdown carries `points`, `missed_days`, `window_days`, `practised_today`,
+  `last_active`, `idle_days` and `max_points`; `base_score` is the score before the penalty.
+
+Tuning lives in `config/readiness.php` → `decay`: `window_days` (21), `points_per_missed_day` (1), `free_days` (0 —
+raise it to allow rest days), `enabled` (`READINESS_DECAY_ENABLED=false` switches the whole thing off and scores go back
+to exactly the earned score).
+
+**The record.** `readiness_snapshots` keeps one row per student per day: `score`, `base_score`, `penalty`,
+`missed_days`, `active_today`, tier, profile, version and each component's score. `readiness:refresh` (every 10 min for
+students seen recently, nightly `--all` for everyone seen in 120 days and the whole Vault) writes today's row and only
+rewrites it when something changed. A student with no score at all has no rows; once they have one they keep getting
+one, even at 0, so the chart shows a fall rather than stopping. Rows older than `history_retention_days` (400) are
+removed daily (`readiness:prune-history`, 03:00).
+
+**What the student sees.** `GET /api/me/readiness/history?days=30` (and `history` inside `GET /api/me/vault`): the
+points to chart (today taken from the live score) and `summary` — `tracking_since`, `best`, `first_crossed_on` (the
+day they first reached 60), `change_7d`, and `days_to_threshold` ("at this pace"; only when there is a week of data and
+a real climb, otherwise `null`). The Vault page shows the chart, a missed-days notice and a "Missed days" row in the
+breakdown; the dashboard card shows the row; the Reports page shows the notice.
+
+**The nudge.** A student who *was* practising and then goes idle gets one in-app notification on their 1st, 3rd and 7th
+idle day ("Your readiness slipped to 41"), only while they have not yet practised that day and only if points were
+actually lost. Each milestone of each absence is raised once (`group_key` carries the day they were last active). It is
+its own mutable category, **Readiness & daily practice**. Longer absences are the win-back e-mail's job
+(`lifecycle:send`), not a daily bell.
+
+**The Vault effect.** Nothing special: the penalty simply lowers the score the Vault already acts on. A student at 60 who
+stops practising falls below the exit line (55) after about six missed days and is taken off (the existing "you left"
+mail fires); coming back and climbing to 60 puts them in again, automatically, if they have said yes.
+
+### Profiles (v4): ECE, EEE, Mechanical and Civil
+
+The table above is the **software** profile, and it is what every CSE student, every student who chose "IT first" or no
+track, and every student whose branch's Core Prep is not live is scored by — unchanged since v3 (a golden test pins that a
+CSE breakdown is the same as before; the only new key is `profile: "software"`).
+
+A student of a non-CS branch whose Core Prep is **live** (switched on by a superadmin and with published questions) and who chose
+"Core first" or "Balanced" at onboarding is scored by a different weighting, because a non-coder can never earn coding or
+contest points:
+
+| Component | software | balanced | core |
+|---|---:|---:|---:|
+| AI Interviews | 20 | 20 | 20 |
+| **Core Technical** | – | 20 | 30 |
+| Coding Practice | 15 | 10 | – |
+| Learning Centre | 15 | 10 | 15 |
+| Soft Skills | 10 | 10 | 10 |
+| Contests | 15 | 5 | – |
+| Events & Projects | 10 | 10 | 10 |
+| Consistency | 15 | 15 | 15 |
+
+*Core Technical* = 60% the student's recent timed Core test scores (same recent-form and depth scaling as every quality
+component; Mellow's and their college's tests count) + 40% the share of the branch's topics they have mastered (≥5 answers,
+≥75% right, over 180 days — practice and tests together). A branch with no published platform test yet is scored on coverage
+alone. Core practice and tests also count as activity for Consistency and Events & Projects, whatever the profile.
+
+**Master switch (2026-10-23).** `readiness.core.counts_towards_score` (env `READINESS_CORE_COUNTS`, default **false**): while off, `ReadinessScoreService::liveCoreDisciplines()` returns nothing, so no student is moved onto a core profile, Core practice/tests do not count as active days or participation, and `VaultPayloadBuilder` sends no `core` strengths. Everything below describes what happens when it is ON. Core Prep and Skill Drills are proctored (see `practice-and-drills.md`) before that is ever switched on.
+
+**Go-live grace.** For `readiness.core.grace_days` (30) after a branch goes live, a core-profile student is scored both ways from
+the same inputs and keeps the **better** score — nobody leaves the Vault, or is told they have, on go-live day. After that, the
+profile alone decides. The breakdown says which weighting stands (`profile`) and, during the grace, `grace_until`.
+
+Profiles live in `config/readiness.php` (`profiles`, `core`); each must add up to 100 and include `core_technical`, otherwise it is
+logged and ignored (those students fall back to the software weights) rather than failing every roster.
 
 **Tiers** (for the TPO roster and reports, unchanged): *Placement Ready* ≥ 75 · *In Progress* ≥ 45 · *Needs
 Training*. The weekly at-risk email still flags students under 60.
@@ -195,19 +278,26 @@ const ok = crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature))
     "id": "01J9ZQ…26-char ULID",
     "name": "Asha Rao", "email": "asha@example.com",
     "college": { "name": "Apex Institute", "short_code": "APEX", "city": "Pune", "state": "MH" },
-    "branch": "CSE", "cgpa": 8.4, "backlogs": 0,
+    "branch": "CSE", "branch_code": "cse", "discipline": "cse", "cgpa": 8.4, "backlogs": 0,
     "skills": ["Laravel", "React"], "bio": "…",
     "linkedin_url": "…", "github_url": "…", "primary_language": "python",
     "contest_rating": 1540, "profile_completion_percent": 90,
     "resume": { "available": true, "url": "https://<aptrun>/api/vault/v1/profiles/<id>/resume" },
     "readiness": {
-      "score": 72, "tier": "In Progress", "peak": 75, "version": 3, "computed_at": "…",
+      "score": 72, "tier": "In Progress", "peak": 75, "version": 4, "profile": "software", "computed_at": "…",
       "components": [ { "key": "interview_performance", "label": "AI Interviews", "score": 80, "weight_percent": 20 }, … ]
     },
+    "core": null,
     "qualified_at": "…"
   }
 }
 ```
+
+**v4 additions (all optional for a consumer that ignores them):** `branch_code` (the canonical branch) and `discipline`
+(`cse|ece|eee|mech|civil|other`); `readiness.profile` (`software|core|balanced` — the `components` list differs by profile, so
+treat it as variable, keyed by `key`); and `core`, which is `null` except for a student of a core branch with Core Prep live, where it is
+`{"subjects":[{"code","name","accuracy_percent"}]}` — subjects with ≥10 answers, accuracy rounded to the nearest 5, best first.
+The consent screen says this is shared. Every profile is re-sent **once** after deploy (the payload gained fields).
 
 **Body — `profile.withdraw`** (take a student down): `{"id","type":"profile.withdraw","sequence":4,"reason":"…","profile":{"id":"…"}}`
 where `reason` is `consent_withdrawn` · `below_threshold` · `hidden_by_staff` · `hired` · `plan_ended` · `account_closed`.
@@ -266,6 +356,16 @@ the Vault also hands the profile to Mellow Vault, which is a different thing to 
 lands on *awaiting consent* and is emailed once to confirm. A student who had opted **out** stays out. Hired and
 staff-hidden students keep their status; existing engagements with hiring partners stay reachable.
 
+### Deploy (readiness tracking and the daily penalty)
+
+1. `php artisan migrate --force` — creates `readiness_snapshots`. Until it has run, scores and the Vault page keep
+   working (the history is read fail-soft); the penalty just stays at 0 and no history is written.
+2. `php artisan route:cache` if routes are cached (`/api/me/readiness/history` 404s until then).
+3. The scheduler cron must be running (it drives the refresh, the nudge and the prune).
+4. Run `php artisan readiness:refresh --all` once so every student gets their first row **today** — that is the day
+   tracking starts for them, and the first penalty can only appear two days later. Nobody is charged retroactively.
+5. To turn the penalty off without a deploy: `READINESS_DECAY_ENABLED=false` then `php artisan config:cache`.
+
 ### Commands
 
 | Command | |
@@ -273,6 +373,7 @@ staff-hidden students keep their status; existing engagements with hiring partne
 | `readiness:refresh` | Re-score students seen in the last 45 min. `--all` (last 120 days + whole Vault), `--user=ID` (repeatable) |
 | `vault:sync` | Deliver what is due. `--retry-dead` first re-queues parked events |
 | `vault:prune` | Drop delivered outbox rows past 30 days (also daily from the scheduler) |
+| *(scheduled)* `readiness:prune-history` | Daily 03:00 — drop daily readiness rows past `history_retention_days` |
 
 ### Troubleshooting
 

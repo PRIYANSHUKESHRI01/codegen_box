@@ -5,11 +5,12 @@ import { AnimatePresence, motion } from "framer-motion";
 import { GraduationCap, Send, CheckCircle2, ChevronDown, SlidersHorizontal, MailCheck, SearchX } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { BRANCH_OPTIONS, type AdminDriveCollegeMapping } from "@/components/admin/placements/types";
+import { type AdminDriveCollegeMapping } from "@/components/admin/placements/types";
 import type { CompanyPartnerCollege } from "@/types/hiring";
 import { Modal } from "@/components/ui/Modal";
 import { HpButton, HpCompanyLogo, HpPill, HpSearch, HpSkeleton, hpEase, hpInput, hpLabel, type HpTone } from "@/components/portal/kit";
 import { HpCallout, HpCheckboxBox, HpFormError } from "@/components/portal/pipeline-kit";
+import { BranchPicker } from "@/components/branches/BranchPicker";
 
 interface DriveForPropose {
   id: number;
@@ -92,9 +93,6 @@ export function ProposeToCollegesModal({ drive, preselectedCollegeId, onClose, o
     });
   };
 
-  const toggleBranch = (branch: string) => {
-    setBranches((prev) => (prev.includes(branch) ? prev.filter((b) => b !== branch) : [...prev, branch]));
-  };
 
   const handleSubmit = async () => {
     if (selected.size === 0) return;
@@ -315,27 +313,8 @@ export function ProposeToCollegesModal({ drive, preselectedCollegeId, onClose, o
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
                           transition={{ duration: 0.2, ease: hpEase }}
-                          className="flex flex-wrap gap-1.5"
                         >
-                          {BRANCH_OPTIONS.map((b) => {
-                            const on = branches.includes(b);
-                            return (
-                              <button
-                                key={b}
-                                type="button"
-                                aria-pressed={on}
-                                onClick={() => toggleBranch(b)}
-                                className={cn(
-                                  "rounded-full px-3 py-1.5 text-2xs font-bold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 active:scale-95",
-                                  on
-                                    ? "bg-gradient-to-b from-indigo-500 to-violet-600 text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.6)]"
-                                    : "bg-[rgb(var(--bg-surface-rgb))] text-text-secondary ring-1 ring-inset ring-border-strong hover:text-primary hover:ring-indigo-500/30"
-                                )}
-                              >
-                                {b}
-                              </button>
-                            );
-                          })}
+                          <BranchPicker value={branches} onChange={setBranches} variant="gradient" />
                         </motion.div>
                       )}
                     </AnimatePresence>

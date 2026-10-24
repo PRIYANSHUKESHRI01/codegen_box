@@ -29,10 +29,12 @@ interface HostShellProps {
   actionButton?: { label: string; icon?: unknown; onClick?: () => void };
   hasAccess: boolean;
   status: "loading" | "ready" | "denied";
+  /** Where the header's back arrow leads when it is not simply the hackathon list (the edit form of an existing hackathon goes back to it). */
+  back?: { href: string; label: string };
   children: ReactNode;
 }
 
-export function HostShell({ scope, title, subtitle, actionButton, hasAccess, status, children }: HostShellProps) {
+export function HostShell({ scope, title, subtitle, actionButton, hasAccess, status, back, children }: HostShellProps) {
   if (status !== "ready") return <SessionLoader />;
 
   const role = scope === "admin" ? "admin_internal" : "admin_company";
@@ -46,7 +48,7 @@ export function HostShell({ scope, title, subtitle, actionButton, hasAccess, sta
   }
 
   return (
-    <DashboardShell role={role} title={title} subtitle={subtitle} actionButton={actionButton}>
+    <DashboardShell role={role} title={title} subtitle={subtitle} actionButton={actionButton} back={back}>
       {children}
     </DashboardShell>
   );

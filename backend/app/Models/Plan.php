@@ -62,6 +62,8 @@ class Plan extends Model
         'project_lab_access',
         'max_workspace_hours_per_month',
         'max_active_projects',
+        'max_core_practice_per_day',
+        'core_tests_access',
     ];
 
     protected function casts(): array
@@ -86,6 +88,8 @@ class Plan extends Model
             'project_lab_access' => 'boolean',
             'max_workspace_hours_per_month' => 'integer',
             'max_active_projects' => 'integer',
+            'max_core_practice_per_day' => 'integer',
+            'core_tests_access' => 'boolean',
         ];
     }
 
@@ -220,7 +224,7 @@ class Plan extends Model
      * page cannot promise something the plan does not do. null on a *_per_day /
      * *_per_month figure means unlimited.
      *
-     * @return array{practice_problems_per_day: ?int, mock_interviews_per_day: ?int, free_trial_uses: ?int, drive_access: bool, hackathon_access: bool, vault_access: bool, project_lab_access: bool, workspace_hours_per_month: ?int, active_projects: ?int}
+     * @return array{practice_problems_per_day: ?int, mock_interviews_per_day: ?int, free_trial_uses: ?int, drive_access: bool, hackathon_access: bool, vault_access: bool, project_lab_access: bool, workspace_hours_per_month: ?int, active_projects: ?int, core_practice_per_day: ?int, core_tests_access: bool}
      */
     public function entitlementSummary(): array
     {
@@ -234,6 +238,8 @@ class Plan extends Model
             'project_lab_access' => (bool) $this->project_lab_access,
             'workspace_hours_per_month' => $this->max_workspace_hours_per_month,
             'active_projects' => $this->max_active_projects,
+            'core_practice_per_day' => $this->max_core_practice_per_day,
+            'core_tests_access' => (bool) $this->core_tests_access,
         ];
     }
 

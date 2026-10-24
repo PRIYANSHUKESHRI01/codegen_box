@@ -189,19 +189,28 @@ describe("AccountsPanel", () => {
     { id: 3, name: "Riya", email: "riya@tulas.test", handle: "riya", role: "user", is_blocked: false, must_change_password: false, credentials_email_sent_at: "2026-10-01T10:00:00Z", college: { id: 9, name: "Tulas University" } },
   ];
 
-  const respond = () =>
-    get.mockImplementation((path: string) =>
-      path.startsWith("/admin/colleges")
-        ? Promise.resolve({ colleges: [] })
-        : Promise.resolve({ data: accounts, current_page: 1, last_page: 1, total: accounts.length })
-    );
+  const FACETS = {
+    roles: { superadmin: 1, admin_tpo: 1, user: 1 },
+    colleges: [
+      { id: 9, name: "Tulas University", short_code: "TUL", city: "Dehradun", accounts: 2 },
+      { id: 12, name: "Sharda University", short_code: "SHA", city: "Greater Noida", accounts: 0 },
+    ],
+    without_college: 1,
+  };
+
+  const respond = (rows: unknown[] = accounts) =>
+    get.mockImplementation((path: string) => {
+      if (path.startsWith("/superadmin/users/facets")) return Promise.resolve(FACETS);
+      if (path.startsWith("/superadmin/credentials/status")) return Promise.resolve({ unlocked: false });
+      return Promise.resolve({ data: rows, current_page: 1, last_page: 1, total: rows.length });
+    });
 
   const open = async () => {
     respond();
     render(<AccountsPanel triggerToast={toast} />);
     await screen.findByText("Dr. Arun Kumar");
   };
-  const resetButtons = () => screen.getAllByRole("button", { name: /reset password/i });
+  const resetButtons = () => screen.getAllByRole("button", { name: /^change password$/i });
 
   it("lists every account with its login ID and whether it is still on the temporary password", async () => {
     await open();

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, ShieldAlert } from "lucide-react";
+import { CheckCircle2, XCircle, Trophy, RotateCcw, ShieldAlert } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
@@ -62,11 +62,6 @@ export default function SoftSkillResultPage() {
   return (
     <DashboardShell role="user" title="Soft Skills" subtitle={result.assessment_title}>
       <div className="max-w-3xl mx-auto space-y-4">
-        <Link href="/dashboard/soft-skills" className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors">
-          <ArrowLeft className="w-3.5 h-3.5" />
-          All Soft Skills tests
-        </Link>
-
         <div className="rounded-panel bg-surface border border-border-subtle shadow-card p-6 space-y-5">
           <div className="flex flex-col items-center gap-3 text-center">
             <ReadinessRing value={Math.round(result.score_percent)} label={endedByProctoring ? "Ended" : result.passed ? "Passed" : "Below Target"} />

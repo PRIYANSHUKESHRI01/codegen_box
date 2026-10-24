@@ -54,7 +54,7 @@ class StudentProfileController extends Controller
         $user->forceFill(['profile_completion_percent' => $user->computeProfileCompletion()])->save();
         $this->vaultProfileChanged($vault, $user);
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     public function uploadResume(Request $request, VaultService $vault)
@@ -80,7 +80,7 @@ class StudentProfileController extends Controller
         $user->forceFill(['profile_completion_percent' => $user->computeProfileCompletion()])->save();
         $this->vaultProfileChanged($vault, $user);
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     public function deleteResume(Request $request, VaultService $vault)
@@ -99,7 +99,7 @@ class StudentProfileController extends Controller
             $this->vaultProfileChanged($vault, $user);
         }
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 
     /**

@@ -7,6 +7,7 @@ use App\Models\SoftSkillAssessment;
 use App\Models\SoftSkillResponse;
 use App\Models\SoftSkillSession;
 use App\Models\User;
+use App\Services\Integrity\IntegrityService;
 use App\Services\SoftSkillGradingService;
 use App\Services\SoftSkillQuestionSetService;
 use App\Services\StudentReportService;
@@ -241,6 +242,7 @@ class SoftSkillController extends Controller
         abort_unless($softSkillSession->user_id === $request->user()->id, 404);
         $this->assertNotLocked($softSkillSession);
         abort_if($softSkillSession->status === SoftSkillSession::STATUS_COMPLETED, 422, 'This assessment has already been submitted.');
+        $this->assertIntegrity($request, $softSkillSession);
 
         $validated = $request->validate([
             'response_id' => ['required', 'integer'],
@@ -265,6 +267,7 @@ class SoftSkillController extends Controller
         abort_unless($softSkillSession->user_id === $request->user()->id, 404);
         $this->assertNotLocked($softSkillSession);
         abort_if($softSkillSession->status === SoftSkillSession::STATUS_COMPLETED, 422, 'This assessment has already been submitted.');
+        $this->assertIntegrity($request, $softSkillSession);
 
         // Grading itself lives in SoftSkillGradingService so a proctoring
         // lock (SoftSkillProctoringService) scores an attempt identically.
@@ -299,6 +302,15 @@ class SoftSkillController extends Controller
         if ($session->proctoringSession?->isLocked()) {
             abort(403, 'This attempt was ended because of repeated proctoring violations. Your saved answers were submitted.');
         }
+    }
+
+    /**
+     * No live proctoring signal, no answers: a script that never opened the page (no camera, no heartbeat) gets nothing saved.
+     * See IntegrityService::gate().
+     */
+    private function assertIntegrity(Request $request, SoftSkillSession $session): void
+    {
+        app(IntegrityService::class)->gate('soft_skill', $session->proctoringSession, $request->user());
     }
 
     /**

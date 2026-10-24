@@ -1,7 +1,6 @@
 "use client";
 
-import { ArrowLeft, Clock, Ear, Lightbulb, Lock, Play, RotateCcw, Sparkles, Trophy } from "lucide-react";
-import Link from "next/link";
+import { Clock, Ear, Lightbulb, Lock, Play, RotateCcw, Sparkles, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DifficultyBadge, FORMAT_ICON, FormatChip, formatDuration } from "./listeningUi";
 import {
@@ -59,11 +58,6 @@ export function LessonBrief({
 
   return (
     <div className="space-y-5">
-      <Link href="/dashboard/learning-centre/listening" className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted transition-colors hover:text-primary">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        All lessons
-      </Link>
-
       <section className="space-y-5 rounded-panel border border-border-subtle bg-surface p-5 shadow-card sm:p-6">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-control border border-sky-500/25 bg-gradient-to-br from-sky-500/25 to-sky-500/5 bg-sky-500/10 text-sky-500">

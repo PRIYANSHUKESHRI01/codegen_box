@@ -363,6 +363,9 @@ class ReadinessScoreServiceTest extends TestCase
 
     public function test_a_whole_cohort_costs_a_fixed_number_of_queries(): void
     {
+        // The branch / department catalogue is read once and cached across requests: a fixed cost, not a per-student one.
+        \App\Support\BranchCatalog::instance()->departments();
+
         $count = function (int $students): int {
             $cohort = collect(range(1, $students))->map(fn () => $this->readinessStudent());
             $cohort->each(fn (User $s) => $this->scoredInterview($s, 70));

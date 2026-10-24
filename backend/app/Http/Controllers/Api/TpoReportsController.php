@@ -30,8 +30,12 @@ class TpoReportsController extends Controller
         $collegeId = $request->user()->college_id;
         $college = College::findOrFail($collegeId);
 
+        // ?department=commerce narrows every report to one department's students (the drive funnels included); omitted = the whole college.
+        $department = $request->query('department');
+
         $students = User::where('college_id', $collegeId)
             ->where('role', User::ROLE_USER)
+            ->inDepartment(is_string($department) ? $department : null)
             ->orderBy('name')
             ->get();
 
@@ -46,6 +50,12 @@ class TpoReportsController extends Controller
             'email' => $row['email'],
             'roll_number' => $row['roll_number'],
             'branch' => $row['branch'],
+            'branch_code' => $row['branch_code'],
+            'discipline' => $row['discipline'],
+            'department' => $row['department'],
+            'branch_source' => $row['branch_source'],
+            'track_focus' => $row['track_focus'],
+            'core' => $row['core'],
             'section' => $row['section'],
             'cgpa' => $row['cgpa'],
             'backlogs' => $row['backlogs'],
@@ -104,6 +114,7 @@ class TpoReportsController extends Controller
                     'name' => $v['student']->name,
                     'roll_number' => $v['student']->roll_number,
                     'branch' => $v['student']->branch,
+                    'branch_code' => $v['student']->branch_code,
                     'reasons' => $v['verdict']['reasons'],
                 ])->values()->all(),
             ];
@@ -120,7 +131,7 @@ class TpoReportsController extends Controller
             'drives' => $drivePayload,
             // Real placement pipeline — replaces the entirely-fictional
             // PLACEMENT_FUNNEL/RECENT_PLACEMENTS/etc mock data.
-            'placements' => $placementReportService->forCollege($college),
+            'placements' => $placementReportService->forCollege($college, is_string($department) ? $department : null),
         ]);
     }
 

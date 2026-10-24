@@ -4,6 +4,8 @@ import { Building2, CheckCircle2, Clock, Crown, Gift, Lock, Sparkles, TimerOff }
 import { cn } from "@/lib/utils";
 import { isPlanEnded } from "@/components/billing/PlanChip";
 import { ACADEMY_PLAN_CODE, isTopPlan } from "@/lib/pricing";
+import { getStoredUser } from "@/lib/auth";
+import { codesAtAll } from "@/lib/departments";
 import type { FeatureTrial, MySubscriptionResponse } from "@/types/subscription";
 
 const TRIAL_LABEL: Record<keyof FeatureTrial["used"], string> = {
@@ -171,7 +173,8 @@ export function PlanStatusCard({ subscription }: { subscription: MySubscriptionR
           <div className="space-y-4">
             <h3 className="text-2xs font-bold uppercase tracking-wider text-text-muted">{trial ? "Your free tries" : "Today"}</h3>
 
-            <Meter label="Coding problems today" used={ent.practice_problems_used_today} limit={ent.max_practice_problems_per_day} />
+            {/* A programme with no coding practice has no problem limit to watch. */}
+            {codesAtAll(getStoredUser()) && <Meter label="Coding problems today" used={ent.practice_problems_used_today} limit={ent.max_practice_problems_per_day} />}
 
             {trial ? (
               <>

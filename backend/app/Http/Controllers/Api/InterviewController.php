@@ -8,6 +8,7 @@ use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
+use App\Services\Integrity\IntegrityService;
 use App\Services\PlanGate;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
@@ -41,6 +42,9 @@ class InterviewController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->filter(fn (Interview $interview) => $interview->isVisibleToUser($request->user()))
+            // "For your branch" first (newest first within each group — the sort is stable): an ECE student sees the ECE
+            // interviews before the general ones; a CSE or unknown-branch student sees the list exactly as before.
+            ->sortByDesc(fn (Interview $interview) => (int) $interview->isForBranchOf($request->user()))
             ->values();
 
         $sessionsByInterviewId = InterviewSession::where('user_id', $request->user()->id)
@@ -51,6 +55,7 @@ class InterviewController extends Controller
         return response()->json([
             'interviews' => $interviews->map(
                 fn (Interview $interview) => $this->interviewSummary($interview, $sessionsByInterviewId->get($interview->id))
+                    + ['for_your_branch' => $interview->isForBranchOf($request->user())]
             ),
         ]);
     }
@@ -150,6 +155,9 @@ class InterviewController extends Controller
         abort_if($session->status === InterviewSession::STATUS_COMPLETED, 422, 'This interview is already complete.');
 
         $this->assertNotLocked($session);
+
+        // No live proctoring signal, no answers (a script that never opened the page gets nothing saved). See IntegrityService::gate().
+        app(IntegrityService::class)->gate('interview', $session->proctoringSession, $request->user());
 
         $validated = $request->validate([
             'interview_question_id' => ['required', 'integer'],
@@ -315,30 +323,7 @@ class InterviewController extends Controller
             return;
         }
 
-        // The free plan's one-time try (a no-op for every plan without a trial cap).
-        app(PlanGate::class)->assertTrialAvailable($request->user(), PlanGate::TRIAL_MOCK_INTERVIEW);
-
-        $limit = $request->user()->effectiveEntitlements()['max_mock_interviews_per_day'];
-
-        if ($limit === null) {
-            return;
-        }
-
-        $startedToday = InterviewSession::where('user_id', $request->user()->id)
-            ->whereDate('started_at', today())
-            ->whereHas('interview', function ($q) {
-                $q->whereNull('interview_track_id')
-                    ->where(function ($q2) {
-                        $q2->where('is_mock', true)->orWhere('interview_type', Interview::INTERVIEW_TYPE_TPO_MOCK);
-                    });
-            })
-            ->count();
-
-        abort_if(
-            $startedToday >= $limit,
-            402,
-            "You've reached today's mock interview limit ({$limit}) on your plan. Upgrade to practice more."
-        );
+        app(PlanGate::class)->assertMockInterviewAllowed($request->user());
     }
 
     /**
@@ -351,7 +336,12 @@ class InterviewController extends Controller
     private function assertNotLocked(?InterviewSession $session): void
     {
         if ($session?->proctoringSession?->isLocked()) {
-            abort(403, 'You have been locked out of this interview due to repeated proctoring violations. Contact whoever invited you to this interview to have it reinstated.');
+            // A practice interview has no one who invited the student — they built it — so there is no one to reinstate it either.
+            $own = $session->interview?->interview_type === Interview::INTERVIEW_TYPE_PRACTICE;
+
+            abort(403, $own
+                ? 'This practice round was closed after repeated proctoring violations. Build a new one from Practice interview whenever you like.'
+                : 'You have been locked out of this interview due to repeated proctoring violations. Contact whoever invited you to this interview to have it reinstated.');
         }
     }
 

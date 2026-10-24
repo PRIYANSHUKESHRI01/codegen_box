@@ -108,6 +108,8 @@ class PasswordResetService
 
         $user->forceFill(['password' => Hash::make($newPassword), 'must_change_password' => false])->save();
 
+        app(IssuedCredentialVault::class)->forget($user);
+
         $otp->forceFill(['consumed_at' => now()])->save();
 
         // A password reset should invalidate any session an attacker might

@@ -21,8 +21,8 @@ export function InterviewProctoringLockedScreen({ session, onBack }: { session: 
         </div>
         <h2 className="text-lg font-bold text-primary">You've been locked out of this interview</h2>
         <p className="text-sm text-text-secondary leading-relaxed">
-          Your session recorded {session?.violation_count ?? 3} proctoring strikes — exiting fullscreen, switching
-          tabs, or a detected developer-tools open.
+          Your session recorded {session?.violation_count ?? 3} proctoring strikes — leaving the exam window, exiting
+          fullscreen, opening developer tools, a stopped camera or screen share, or another proctoring finding.
         </p>
         <p className="text-xs text-text-muted">
           If you believe this was a mistake, contact whoever invited you to this interview — they can reinstate your

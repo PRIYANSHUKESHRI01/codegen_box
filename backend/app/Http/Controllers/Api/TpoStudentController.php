@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
+use App\Services\IssuedCredentialVault;
 use App\Models\User;
+use App\Services\CollegeDepartmentService;
 use App\Services\StudentBulkNotificationService;
 use App\Services\StudentCohortService;
 use App\Support\SingleMail;
@@ -22,7 +24,11 @@ use Illuminate\Validation\ValidationException;
  */
 class TpoStudentController extends Controller
 {
-    public function __construct(private readonly StudentCohortService $cohort, private readonly StudentBulkNotificationService $notifier) {}
+    public function __construct(
+        private readonly StudentCohortService $cohort,
+        private readonly StudentBulkNotificationService $notifier,
+        private readonly CollegeDepartmentService $departments,
+    ) {}
 
     /**
      * Real students + a real, computed readiness score/tier + real
@@ -38,8 +44,12 @@ class TpoStudentController extends Controller
             return response()->json(['students' => []]);
         }
 
+        // ?department=commerce narrows the roster to one department; without it the whole college, as always.
+        $department = $request->query('department');
+
         $students = User::where('college_id', $collegeId)
             ->where('role', User::ROLE_USER)
+            ->inDepartment(is_string($department) ? $department : null)
             ->orderBy('name')
             ->get();
 
@@ -69,6 +79,7 @@ class TpoStudentController extends Controller
             'email' => ['required', 'string', 'email', 'max:255'],
             'roll_number' => ['nullable', 'string', 'max:50'],
             'branch' => ['nullable', 'string', 'max:100'],
+            'department' => ['nullable', 'string', 'max:30'],
             'section' => ['nullable', 'string', 'max:20'],
             'cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'backlogs' => ['nullable', 'integer', 'min:0'],
@@ -107,9 +118,17 @@ class TpoStudentController extends Controller
             ]);
         }
 
+        // Which department the student joins. A college running one needs no answer; one running several must give it, and a
+        // branch that names another department's programme is refused rather than quietly filed under the wrong one.
+        $department = $this->departments->requested($college, $validated['department'] ?? null);
+
+        if (($conflict = $this->departments->labelConflict($college, $validated['branch'] ?? null, $department)) !== null) {
+            throw ValidationException::withMessages(['branch' => [$conflict]]);
+        }
+
         $plainPassword = Str::password(12);
 
-        $student = User::create([
+        $student = new User([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'handle' => $this->uniqueHandle($validated['name']),
@@ -125,6 +144,10 @@ class TpoStudentController extends Controller
             'phone' => $validated['phone'] ?? null,
             'parent_phone' => $validated['parent_phone'] ?? null,
         ]);
+        $student->departmentHint = $department;
+        $student->save();
+
+        app(IssuedCredentialVault::class)->keep($student, $plainPassword, 'created');
 
         SingleMail::afterResponse(new SendAccountCredentialsEmail($student->id, $plainPassword));
 
@@ -168,9 +191,12 @@ class TpoStudentController extends Controller
         $validated = $request->validate([
             'student_ids' => 'required|array|min:1|max:5000',
             'student_ids.*' => 'integer',
-            'channel' => 'required|in:email,whatsapp',
-            'template' => 'required|in:generic,termination',
-            'recipient' => 'required|in:student,parent',
+            'channel' => 'required|in:email,whatsapp,in_app',
+            'template' => 'required_unless:channel,in_app|in:generic,termination',
+            'recipient' => 'required_unless:channel,in_app|in:student,parent',
+            // An in-app announcement is the one channel with free text: it lands in each student's notification bell.
+            'title' => 'required_if:channel,in_app|nullable|string|max:120',
+            'message' => 'required_if:channel,in_app|nullable|string|max:500',
         ]);
 
         // Scoped to the caller's own college — a TPO id-guessing another
@@ -195,6 +221,16 @@ class TpoStudentController extends Controller
             return response()->json([
                 'message' => 'Parents don\'t have an email on file — choose WhatsApp to notify a parent, or Student to email.',
             ], 422);
+        }
+
+        if ($validated['channel'] === 'in_app') {
+            $reached = $this->notifier->announce($recipients, trim($validated['title']), trim($validated['message']), 'tpo-'.$collegeId, $request->user());
+
+            return response()->json([
+                'message' => "Sent to {$reached} student(s) — it is in their notification bell now.",
+                'queued_count' => $reached,
+                'skipped_no_phone' => 0,
+            ]);
         }
 
         $result = $this->notifier->send(

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\CorePracticeAnswer;
+use App\Models\CoreTestSession;
 use App\Models\Interview;
 use App\Models\InterviewSession;
 use App\Models\ListeningLesson;
@@ -40,6 +42,12 @@ class PlanGate
 
     public const FEATURE_PROJECT_LAB = 'project_lab';
 
+    public const FEATURE_CORE_PRACTICE = 'core_practice';
+
+    public const FEATURE_CORE_TESTS = 'core_tests';
+
+    public const TRIAL_CORE_TEST = 'core_test';
+
     public const TRIAL_MOCK_INTERVIEW = 'mock_interview';
 
     public const TRIAL_SPEAKING_TAKE = 'speaking_take';
@@ -57,6 +65,7 @@ class PlanGate
         self::TRIAL_SPEAKING_PROMPT => 'AI speaking passage',
         self::TRIAL_LISTENING_LESSON => 'AI listening lesson',
         self::TRIAL_VOCABULARY_QUIZ => 'AI vocabulary quiz',
+        self::TRIAL_CORE_TEST => 'Core test',
     ];
 
     /** @throws PlanRequiredException */
@@ -88,6 +97,60 @@ class PlanGate
     }
 
     /**
+     * Timed Core tests (the branch technical papers) are a plan feature. A plan without `core_tests_access` — the
+     * free one — still gets its one-time free try (feature_trial_uses), counted from the sessions already
+     * written, so there is no separate counter to drift.
+     *
+     * @throws PlanRequiredException
+     */
+    public function requireCoreTestAccess(User $user): void
+    {
+        $entitlements = $user->effectiveEntitlements();
+
+        if ($entitlements['core_tests_access']) {
+            return;
+        }
+
+        $uses = $entitlements['feature_trial_uses'];
+
+        if ($uses !== null && $this->used($user, self::TRIAL_CORE_TEST) < $uses) {
+            return;
+        }
+
+        throw new PlanRequiredException(
+            $uses !== null && $uses > 0
+                ? "You've used your free Core test. Timed Core tests are part of the Expert plan — upgrade to take as many as you like."
+                : 'Timed Core tests are part of the Expert plan. Upgrade to take them.',
+            self::FEATURE_CORE_TESTS,
+            $uses !== null && $uses > 0 ? PlanRequiredException::CODE_TRIAL_USED : PlanRequiredException::CODE_PLAN_REQUIRED,
+        );
+    }
+
+    /**
+     * Core practice questions answered per day, when the plan caps them (the free plan does).
+     *
+     * @throws PlanRequiredException
+     */
+    public function assertCorePracticeWithinLimit(User $user): void
+    {
+        $limit = $user->effectiveEntitlements()['max_core_practice_per_day'];
+
+        if ($limit === null || $this->corePracticeUsedToday($user) < $limit) {
+            return;
+        }
+
+        throw new PlanRequiredException(
+            "You've answered today's {$limit} Core practice questions on the Coder plan. Upgrade to Expert for unlimited practice — or come back tomorrow.",
+            self::FEATURE_CORE_PRACTICE,
+        );
+    }
+
+    public function corePracticeUsedToday(User $user): int
+    {
+        return CorePracticeAnswer::where('user_id', $user->id)->where('created_at', '>=', today())->count();
+    }
+
+    /**
      * Refuses when the student's plan caps trials and this feature's tries are
      * spent. A no-op for every plan without a trial cap — so it is safe to call
      * unconditionally in front of an AI feature.
@@ -109,6 +172,41 @@ class PlanGate
             "You've used your {$tries} of the {$label} on the Coder plan. Upgrade to Expert to keep practising.",
             $feature,
             PlanRequiredException::CODE_TRIAL_USED,
+        );
+    }
+
+    /**
+     * Whether this student may begin another practice (mock) interview: the free plan's one-time try, then the plan's
+     * daily limit. Counts genuine practice attempts only — `is_mock` and tpo_mock interviews, never a Final Interview
+     * track round. The one rule behind both "start an interview" and "create my own practice interview".
+     *
+     * @throws PlanRequiredException
+     */
+    public function assertMockInterviewAllowed(User $user): void
+    {
+        // The free plan's one-time try (a no-op for every plan without a trial cap).
+        $this->assertTrialAvailable($user, self::TRIAL_MOCK_INTERVIEW);
+
+        $limit = $user->effectiveEntitlements()['max_mock_interviews_per_day'];
+
+        if ($limit === null) {
+            return;
+        }
+
+        $startedToday = InterviewSession::where('user_id', $user->id)
+            ->whereDate('started_at', today())
+            ->whereHas('interview', function ($q) {
+                $q->whereNull('interview_track_id')
+                    ->where(function ($q2) {
+                        $q2->where('is_mock', true)->orWhere('interview_type', Interview::INTERVIEW_TYPE_TPO_MOCK);
+                    });
+            })
+            ->count();
+
+        abort_if(
+            $startedToday >= $limit,
+            402,
+            "You've reached today's mock interview limit ({$limit}) on your plan. Upgrade to practice more."
         );
     }
 
@@ -159,6 +257,8 @@ class PlanGate
             self::TRIAL_LISTENING_LESSON => ListeningLesson::where('user_id', $user->id)->where('source', ListeningLesson::SOURCE_AI)->count(),
             // Only the AI quiz costs a Gemini call; daily and deck sprints come from the word bank.
             self::TRIAL_VOCABULARY_QUIZ => VocabularyAttempt::where('user_id', $user->id)->where('kind', VocabularyAttempt::KIND_CUSTOM)->count(),
+            // Every started attempt spends it — a Core test is proctored and timed, so a half-taken one is a try.
+            self::TRIAL_CORE_TEST => CoreTestSession::where('user_id', $user->id)->count(),
         };
     }
 }

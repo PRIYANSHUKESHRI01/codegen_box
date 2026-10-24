@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ContestSubmission;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\SectionCoordinatorService;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
 
@@ -26,6 +27,8 @@ use Illuminate\Http\Request;
  */
 class CoordinatorStudentReportController extends Controller
 {
+    public function __construct(private readonly SectionCoordinatorService $coordinators) {}
+
     public function show(Request $request, User $student, StudentReportService $service)
     {
         $this->authorizeInSection($request, $student);
@@ -55,16 +58,9 @@ class CoordinatorStudentReportController extends Controller
         ]);
     }
 
-    /** Same 404-not-403 rule as CoordinatorStudentController::authorizeInSection() — never confirms an out-of-scope id exists. */
+    /** Same 404-not-403 rule, and the same query, as CoordinatorStudentController::authorizeInScope() — never confirms an out-of-scope id exists. */
     private function authorizeInSection(Request $request, User $student): void
     {
-        $coordinator = $request->user();
-
-        abort_unless(
-            $student->role === User::ROLE_USER
-                && $student->college_id === $coordinator->college_id
-                && $student->section === $coordinator->section,
-            404
-        );
+        abort_unless($this->coordinators->covers($request->user(), $student), 404);
     }
 }

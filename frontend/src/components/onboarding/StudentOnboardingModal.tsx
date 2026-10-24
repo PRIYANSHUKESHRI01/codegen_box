@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, ArrowRight, Code2, Rocket, Sparkles, Target } from "lucide-react";
+import { useRef, useState } from "react";
+import { ArrowLeft, ArrowRight, Code2, GitBranch, Rocket, Sparkles, Target } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { api, ApiError } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
+import { useBranchCatalog } from "@/lib/branches";
+import { capabilitiesOf, departmentCan } from "@/lib/departments";
 import {
-  CAREER_GOALS,
-  FOCUS_AREAS,
-  SKILL_LEVELS,
+  careerGoalsFor,
+  focusAreasFor,
+  paceHint,
+  skillLevelsFor,
   WEEKLY_PACES,
   type CareerGoal,
   type FocusArea,
@@ -18,13 +21,13 @@ import {
   type WeeklyPace,
 } from "@/lib/studentPreferences";
 import { ChipMulti, OtherLanguagesChoice, PrimaryLanguageChoice, RadioCards } from "./PreferenceFields";
+import { BranchFields, branchAnswersComplete, branchAsksTrack, initialBranchAnswers, type BranchAnswers } from "./BranchFields";
 import { cn } from "@/lib/utils";
 
-const STEPS = [
-  { title: "Your language", subtitle: "We'll open the code editor in it for you.", icon: Code2 },
-  { title: "About you", subtitle: "So we can tune practice to where you are.", icon: Target },
-  { title: "Your plan", subtitle: "Set a pace you can actually keep.", icon: Rocket },
-] as const;
+const BRANCH_STEP = { id: "branch", title: "Your branch", subtitle: "So your dashboard, drives and practice fit what you study.", icon: GitBranch } as const;
+const LANGUAGE_STEP = { id: "language", title: "Your language", subtitle: "We'll open the code editor in it for you.", icon: Code2 } as const;
+const ABOUT_STEP = { id: "about", title: "About you", subtitle: "So we can tune practice to where you are.", icon: Target } as const;
+const PLAN_STEP = { id: "plan", title: "Your plan", subtitle: "Set a pace you can actually keep.", icon: Rocket } as const;
 
 interface StudentOnboardingModalProps {
   /** Fired once the answers are saved (the account is already refreshed by then). */
@@ -34,19 +37,33 @@ interface StudentOnboardingModalProps {
 }
 
 /**
- * The first-login questions: which language they code in, how far along they
- * are and what they're aiming for, and how much they want to practise. Three
- * short steps; only the language, level and goal are required, and the whole
- * thing can be skipped (it comes back after a cool-off — see
- * User::needsOnboarding()). The answers feed the code editor's default
- * language, the weekly goal and what the student's TPO sees next to what they
- * actually write.
+ * The first-login questions: (when we don't know it yet) which branch they study, which language they code
+ * in, how far along they are and what they're aiming for, and how much they want to practise. Short steps;
+ * only the language, level and goal are required — and a student who leads with core prep for their branch
+ * can say they don't code yet. The whole thing can be skipped (it comes back after a cool-off — see
+ * User::needsOnboarding()). The answers feed the code editor's default language, the weekly goal, the
+ * dashboard they land on and what the student's TPO sees next to what they actually do.
+ *
+ * The branch step only appears when the server says it needs asking (`branch_pending`): a student whose
+ * college already gave a recognised CSE branch sees the same three steps as ever.
  */
 export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModalProps) {
-  const { login } = useAuth();
+  const { user, login } = useAuth();
+  const catalog = useBranchCatalog();
+  // Fixed as soon as we know who the student is (the gate only mounts this once they are loaded). Saving
+  // refreshes the account — branch_pending flips to false — and a list that reacted to that would shrink
+  // under the step the student is still on.
+  const stepsRef = useRef<(typeof BRANCH_STEP | typeof LANGUAGE_STEP | typeof ABOUT_STEP | typeof PLAN_STEP)[] | null>(null);
+  if (stepsRef.current === null && user) {
+    stepsRef.current = user.branch_pending ? [BRANCH_STEP, LANGUAGE_STEP, ABOUT_STEP, PLAN_STEP] : [LANGUAGE_STEP, ABOUT_STEP, PLAN_STEP];
+  }
+  const allSteps = stepsRef.current ?? [LANGUAGE_STEP, ABOUT_STEP, PLAN_STEP];
+
   const [step, setStep] = useState(0);
+  const [branch, setBranch] = useState<BranchAnswers>(() => initialBranchAnswers(user));
   const [primary, setPrimary] = useState<string | null>(null);
   const [others, setOthers] = useState<string[]>([]);
+  const [noCode, setNoCode] = useState(false);
   const [level, setLevel] = useState<SkillLevel | null>(null);
   const [goal, setGoal] = useState<CareerGoal | null>(null);
   const [focus, setFocus] = useState<FocusArea[]>([]);
@@ -54,24 +71,38 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canContinue = step === 0 ? !!primary : step === 1 ? !!level && !!goal : true;
-  const isLast = step === STEPS.length - 1;
-  const current = STEPS[step];
+  const asksTrack = branchAsksTrack(user, branch, catalog?.disciplines, catalog?.branches);
+  const discipline = catalog?.branches.find((b) => b.code === (branch.branchCode ?? user?.branch_code))?.discipline ?? user?.discipline ?? null;
+  // The department the student is in — or has just picked on the branch step — decides whether coding is part of their programme at all.
+  const department = catalog?.disciplines.find((d) => d.code === discipline)?.department ?? user?.department ?? null;
+  const codes = (user?.coding_opt_in ?? false) || (department ? departmentCan(catalog, department, "coding_practice") : capabilitiesOf(user).coding_practice);
+  // A programme without coding is never asked which language it codes in.
+  const steps = codes ? allSteps : allSteps.filter((s) => s.id !== "language");
+  const current = steps[Math.min(step, steps.length - 1)];
+  const isLast = step >= steps.length - 1;
+  // "I don't code yet" is only on offer to a student who is leading with their branch's core prep.
+  const coreFirst = branch.trackFocus === "core_first";
+  const languageOk = !codes || !!primary || (coreFirst && noCode);
+
+  const canContinue =
+    current.id === "branch" ? branchAnswersComplete(user, branch, asksTrack) : current.id === "language" ? languageOk : current.id === "about" ? !!level && !!goal : true;
 
   const selectPrimary = (id: string) => {
     setPrimary(id);
+    setNoCode(false);
     // Picking a language as the main one takes it out of the "also" list.
     setOthers((list) => list.filter((l) => l !== id));
   };
 
   const finish = async () => {
-    if (!primary || !level || !goal) return;
+    if (!languageOk || !level || !goal) return;
     setSaving(true);
     setError(null);
     try {
       const res = await api.post<{ user: AuthUser }>("/me/onboarding", {
-        primary_language: primary,
-        preferred_languages: others,
+        ...(branch.branchCode ? { branch_code: branch.branchCode } : {}),
+        ...(branch.trackFocus ? { track_focus: branch.trackFocus, core_interests: branch.interests } : {}),
+        ...(primary ? { primary_language: primary, preferred_languages: others } : {}),
         skill_level: level,
         career_goal: goal,
         focus_areas: focus,
@@ -97,7 +128,7 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
     <Modal
       onClose={onSkip}
       title="Let's set up your practice"
-      subtitle={`Step ${step + 1} of ${STEPS.length} · ${current.title}`}
+      subtitle={`Step ${step + 1} of ${steps.length} · ${current.title}`}
       icon={Sparkles}
       size="xl"
       closeOnBackdrop={false}
@@ -132,9 +163,9 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
     >
       <div className="space-y-5">
         {/* Progress */}
-        <div className="flex items-center gap-2" role="progressbar" aria-valuemin={1} aria-valuemax={STEPS.length} aria-valuenow={step + 1} aria-label="Onboarding progress">
-          {STEPS.map((s, i) => (
-            <span key={s.title} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= step ? "bg-accent-primary" : "bg-elevated")} />
+        <div className="flex items-center gap-2" role="progressbar" aria-valuemin={1} aria-valuemax={steps.length} aria-valuenow={step + 1} aria-label="Onboarding progress">
+          {steps.map((s, i) => (
+            <span key={s.id} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i <= step ? "bg-accent-primary" : "bg-elevated")} />
           ))}
         </div>
 
@@ -146,41 +177,66 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
           </p>
         )}
 
-        {step === 0 && (
+        {current.id === "branch" && (
+          <BranchFields user={user} value={branch} onChange={setBranch} onDisputed={(updated) => { const token = getToken(); if (token) login(token, updated); }} />
+        )}
+
+        {current.id === "language" && (
           <div className="space-y-5">
             <section className="space-y-2">
               <h3 className="text-xs font-bold text-primary">Which language do you code in most?</h3>
               <PrimaryLanguageChoice value={primary} onChange={selectPrimary} />
+              {coreFirst && (
+                <button
+                  type="button"
+                  role="checkbox"
+                  aria-checked={noCode}
+                  onClick={() => {
+                    setNoCode((v) => !v);
+                    setPrimary(null);
+                    setOthers([]);
+                  }}
+                  className={cn(
+                    "w-full rounded-xl border px-3 py-2.5 text-left text-xs font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
+                    noCode ? "border-accent-primary bg-accent-primary/10 text-accent-primary ring-1 ring-accent-primary/40" : "border-border-subtle bg-surface text-primary hover:border-border-strong hover:bg-elevated"
+                  )}
+                >
+                  I don&apos;t code yet
+                  <span className="mt-0.5 block text-2xs font-medium text-text-muted">That&apos;s fine — your dashboard leads with your branch. You can add a language any time.</span>
+                </button>
+              )}
             </section>
-            <section className="space-y-2">
-              <h3 className="text-xs font-bold text-primary">
-                Anything else you're comfortable with? <span className="font-medium text-text-muted">(optional)</span>
-              </h3>
-              <OtherLanguagesChoice primary={primary} value={others} onChange={setOthers} />
-            </section>
+            {!noCode && (
+              <section className="space-y-2">
+                <h3 className="text-xs font-bold text-primary">
+                  Anything else you&apos;re comfortable with? <span className="font-medium text-text-muted">(optional)</span>
+                </h3>
+                <OtherLanguagesChoice primary={primary} value={others} onChange={setOthers} />
+              </section>
+            )}
           </div>
         )}
 
-        {step === 1 && (
+        {current.id === "about" && (
           <div className="space-y-5">
             <section className="space-y-2">
-              <h3 className="text-xs font-bold text-primary">How would you rate your coding right now?</h3>
-              <RadioCards label="Coding level" value={level} onChange={setLevel} choices={SKILL_LEVELS} />
+              <h3 className="text-xs font-bold text-primary">{codes ? "How would you rate your coding right now?" : "How would you rate your preparation right now?"}</h3>
+              <RadioCards label={codes ? "Coding level" : "Preparation level"} value={level} onChange={setLevel} choices={skillLevelsFor(codes)} />
             </section>
             <section className="space-y-2">
               <h3 className="text-xs font-bold text-primary">What are you preparing for?</h3>
-              <RadioCards label="Main goal" value={goal} onChange={setGoal} choices={CAREER_GOALS} />
+              <RadioCards label="Main goal" value={goal} onChange={setGoal} choices={careerGoalsFor(discipline, department)} />
             </section>
           </div>
         )}
 
-        {step === 2 && (
+        {current.id === "plan" && (
           <div className="space-y-5">
             <section className="space-y-2">
               <h3 className="text-xs font-bold text-primary">
                 What do you want to spend time on? <span className="font-medium text-text-muted">(optional)</span>
               </h3>
-              <ChipMulti label="Focus areas" value={focus} onChange={setFocus} choices={FOCUS_AREAS} />
+              <ChipMulti label="Focus areas" value={focus} onChange={setFocus} choices={focusAreasFor(discipline, codes)} />
             </section>
             <section className="space-y-2">
               <h3 className="text-xs font-bold text-primary">How much do you want to practise?</h3>
@@ -188,7 +244,7 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
                 label="Weekly pace"
                 value={pace}
                 onChange={setPace}
-                choices={WEEKLY_PACES.map((p) => ({ ...p, hint: `${p.hint} · ${p.solved} problems a week` }))}
+                choices={WEEKLY_PACES.map((p) => ({ ...p, hint: paceHint(p, codes) }))}
               />
               <p className="text-2xs text-text-muted">This sets your weekly goal on the dashboard. You can change any of these answers later in Settings.</p>
             </section>

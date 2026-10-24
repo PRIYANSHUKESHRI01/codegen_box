@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CapabilityGate } from "@/components/dashboard/CapabilityGate";
 
 // The arena is a signed-in area: it should not be indexed, and its tab title says where you are.
 export const metadata: Metadata = {
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function ArenaLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <CapabilityGate capability="hackathons">{children}</CapabilityGate>;
 }

@@ -3,6 +3,9 @@
 import { Suspense, useState } from "react";
 import { DashboardSidebar, DashboardRole } from "./DashboardSidebar";
 import { DashboardHeader } from "./DashboardHeader";
+import { usePathname } from "next/navigation";
+import { DepartmentScopeBar } from "@/components/branches/DepartmentScopeBar";
+import { isDepartmentScopedRoute } from "@/lib/departments";
 import { StudentOnboardingGate } from "@/components/onboarding/StudentOnboardingGate";
 import { PlanSyncWatcher } from "@/components/billing/PlanSyncWatcher";
 import { motion } from "framer-motion";
@@ -60,6 +63,11 @@ interface DashboardShellProps {
    * page scroll as a safety net (see the note on hideChrome above).
    */
   fitViewport?: boolean;
+  /**
+   * The header's back arrow normally follows the page tree (lib/backNav.ts). A page whose way back depends on how it was
+   * opened — a student report reached from different lists — passes its own target; `false` hides the arrow.
+   */
+  back?: { href: string; label: string } | false;
 }
 
 export function DashboardShell({
@@ -74,7 +82,9 @@ export function DashboardShell({
   defaultSidebarCollapsed = false,
   hideChrome = false,
   fitViewport = false,
+  back,
 }: DashboardShellProps) {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultSidebarCollapsed);
   // Hiring partners and college TPOs get the premium surface system (aurora
@@ -150,6 +160,7 @@ export function DashboardShell({
             currentTpoView={currentTpoView}
             onOpenMobile={() => setMobileOpen(true)}
             actionButton={actionButton}
+            back={back}
           />
         )}
 
@@ -194,6 +205,10 @@ export function DashboardShell({
               )}
             </div>
           )}
+
+          {/* A college that runs several departments (Engineering, Management, Commerce, Arts …) switches between them here; every
+              roster, chart and report below follows it. Renders nothing for a college with one department. */}
+          {!fullBleed && portal === "tpo" && isDepartmentScopedRoute(pathname) && <DepartmentScopeBar home={pathname === "/admin" || pathname === "/admin/"} />}
 
           {children}
         </main>

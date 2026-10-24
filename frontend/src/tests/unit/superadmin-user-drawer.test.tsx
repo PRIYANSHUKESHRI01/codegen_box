@@ -65,7 +65,7 @@ const managed = (over: Partial<ManagedUserResponse> = {}): ManagedUserResponse =
     college: null, company: null, section: null, roll_number: "21CS001", branch: "CSE", cgpa: "8.40", backlogs: 0, permissions: null,
     is_blocked: false, blocked_reason: null, blocked_at: null, blocked_by: null, created_at: "2026-09-01T00:00:00Z", last_seen_at: null, lead_status: "new", is_lead: true,
   },
-  login: { login_id: "anika@example.com", password_state: "set_by_user", credentials_email_sent_at: null, last_seen_at: null, active_sessions: 2 },
+  login: { login_id: "anika@example.com", password_state: "set_by_user", credential_state: "owner_set", credentials_email_sent_at: null, last_seen_at: null, active_sessions: 2 },
   plan: {
     coverage: { source: "individual", days_remaining: 80, is_trial: false, status: "active", started_at: "2026-10-01T00:00:00Z", current_period_end: "2027-01-01T00:00:00Z", plan: { code: "grandmaster", name: "Grandmaster", audience: "individual" } },
     covered_by_college: false,
@@ -266,9 +266,12 @@ describe("Sign-in & access tab", () => {
   it("shows the login, never a password, and says why", async () => {
     await open(managed(), "security");
 
-    expect(screen.getByText("anika@example.com", { selector: "dd" })).toBeTruthy();
+    expect(screen.getByText("anika@example.com", { selector: "code" })).toBeTruthy();
     expect(screen.getByText("Set by user")).toBeTruthy();
-    expect(screen.getByText(/can't be read back/i)).toBeTruthy();
+    // A password the user chose is private: no way to look at it, and the page says why.
+    expect(screen.getByText(/private — user chose it/i)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /show .*password/i })).toBeNull();
+    expect(screen.getByText(/can't be shown/i)).toBeTruthy();
     expect(screen.queryByText(/hash/i, { selector: "code, input" })).toBeNull();
   });
 
@@ -320,7 +323,7 @@ describe("Sign-in & access tab", () => {
     post.mockResolvedValue({ temporary_password: "Temp-Pass-123!", credentials_email_sent: null });
     await open(managed(), "security");
 
-    fireEvent.click(screen.getByRole("button", { name: /reset password & show it/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^change password$/i }));
     const dialog = await screen.findAllByRole("dialog").then((all) => all.at(-1)!);
     fireEvent.change(within(dialog).getByLabelText(/your password/i), { target: { value: "my-password" } });
     fireEvent.click(within(dialog).getByRole("button", { name: /reset & show password/i }));
@@ -332,7 +335,7 @@ describe("Sign-in & access tab", () => {
   it("hides every tool the server says it won't allow", async () => {
     await open(managed({ capabilities: { edit: false, reset_password: false, revoke_sessions: false, view_as: false, delete: false, grant_plan: false, block: false } }), "security");
 
-    for (const name of [/view as this user/i, /reset password/i, /sign out of all devices/i, /block account/i, /delete…/i]) {
+    for (const name of [/view as this user/i, /change password/i, /sign out of all devices/i, /block account/i, /delete…/i]) {
       expect(screen.queryByRole("button", { name })).toBeNull();
     }
   });

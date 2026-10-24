@@ -42,6 +42,7 @@ class TpoInterviewRoleTemplateController extends Controller
             'description' => ['nullable', 'string'],
             'tech_stack_tags' => ['nullable', 'array'],
             'tech_stack_tags.*' => ['string'],
+            'discipline' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\InterviewDiscipline::families())],
             'rounds_config' => ['required', 'array'],
         ]);
 
@@ -49,6 +50,7 @@ class TpoInterviewRoleTemplateController extends Controller
             'name' => $validated['name'],
             'description' => $validated['description'] ?? null,
             'tech_stack_tags' => $validated['tech_stack_tags'] ?? [],
+            'discipline' => $validated['discipline'] ?? null,
             'rounds_config' => InterviewRoleTemplate::validateRoundsConfig($validated['rounds_config']),
             'owning_college_id' => $collegeId,
             'created_by' => $request->user()->id,
@@ -66,6 +68,7 @@ class TpoInterviewRoleTemplateController extends Controller
             'description' => ['nullable', 'string'],
             'tech_stack_tags' => ['nullable', 'array'],
             'tech_stack_tags.*' => ['string'],
+            'discipline' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\InterviewDiscipline::families())],
             'rounds_config' => ['sometimes', 'array'],
             'is_active' => ['sometimes', 'boolean'],
         ]);

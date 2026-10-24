@@ -1,4 +1,5 @@
-export type InterviewType = "general" | "company" | "tpo_mock" | "company_hiring";
+/** `practice` = built by the student themselves in the Practice interview studio; only they ever see it. */
+export type InterviewType = "general" | "company" | "tpo_mock" | "company_hiring" | "practice";
 export type InterviewStatus = "draft" | "published" | "cancelled";
 export type InterviewSessionStatus = "invited" | "in_progress" | "completed";
 export type QuestionCategory = "technical" | "behavioral" | "hr" | "situational" | "aptitude";
@@ -33,6 +34,8 @@ export interface InterviewSummary {
   placement_drive_id: number | null;
   owning_college_id: number | null;
   owning_company_id: number | null;
+  /** Which branches this is for; null = everyone. */
+  branch_audience?: { disciplines?: string[]; branches?: string[] } | null;
   sessions_count?: number;
   placement_drive?: { id: number; title: string; role_title: string } | null;
   company?: { id: number; name: string; logo: string | null } | null;
@@ -50,6 +53,8 @@ export interface StudentInterviewSummary {
   /** Sum of each question's expected_duration_seconds plus a flat prep allowance — null if the interview has no questions yet. */
   estimated_total_seconds: number | null;
   my_session_status: InterviewSessionStatus | null;
+  /** Made for the student's branch (not merely open to it); these are listed first. Absent from an older API. */
+  for_your_branch?: boolean;
 }
 
 export interface InterviewProctoringSummary {

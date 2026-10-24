@@ -3,8 +3,11 @@
 import { useEffect, useState } from "react";
 import { UserCog, Users, Send, MailCheck, Check, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import type { Coordinator, SectionOption } from "@/app/admin/coordinators/page";
+import type { Coordinator } from "@/app/admin/coordinators/page";
+import { sectionIsOpen, type SectionOption } from "@/lib/coordinatorSections";
 import { Modal } from "@/components/ui/Modal";
+import { audienceForRequest, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { ScopePicker } from "@/components/coordinator/ScopePicker";
 import { HpButton, hpInput, hpLabel } from "@/components/portal/kit";
 import { HpFormError, HpSelect } from "@/components/portal/pipeline-kit";
 import { ScNotice } from "@/components/portal/screeningKit";
@@ -12,7 +15,7 @@ import { ScNotice } from "@/components/portal/screeningKit";
 interface AddCoordinatorModalProps {
   open: boolean;
   onClose: () => void;
-  /** Every real section at this college — see SectionCoordinatorService::sectionsFor(). Filtered here to the ones with no coordinator yet. */
+  /** Every real section at this college — see SectionCoordinatorService::sectionsFor(). Any can be chosen: a section may have a coordinator per branch. */
   sections: SectionOption[];
   /** Fired with the newly created coordinator so the caller can prepend it without a full reload. */
   onAdded: (coordinator: Coordinator) => void;
@@ -21,8 +24,8 @@ interface AddCoordinatorModalProps {
 const EMPTY_FORM = { name: "", email: "", section: "", phone: "" };
 
 /** What a coordinator can and can't do — restates the access rules described in this modal's docblock. */
-const CAN = ["View full profiles in their section", "Download section reports", "Block / unblock student accounts"];
-const CANNOT = ["Edit a student's record", "Add or import new students"];
+const CAN = ["View full profiles of the students they look after", "Keep a follow-up log, notify students and download reports", "Block an account (with a reason you can read) and unblock their own"];
+const CANNOT = ["Edit a student's record", "Add or import new students", "Lift a block you or Mellow placed"];
 
 /**
  * TPO-only account creation for a Section Coordinator — same
@@ -41,12 +44,15 @@ const CANNOT = ["Edit a student's record", "Add or import new students"];
  */
 export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoordinatorModalProps) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [scope, setScope] = useState<BranchAudience>(EVERYONE);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const availableSections = sections.filter((s) => s.coordinator_name === null);
+  // Sections that still have students nobody covers come first — that is what a TPO is usually here to fix.
+  const availableSections = [...sections].sort((a, b) => Number(sectionIsOpen(b)) - Number(sectionIsOpen(a)) || a.section.localeCompare(b.section));
+  const chosen = sections.find((s) => s.section === form.section);
 
-  // Default to the first available section as soon as the modal opens (or
+  // Default to the first section that needs a coordinator as soon as the modal opens (or
   // the list loads) — a picker with 8 sections and none pre-selected is
   // more friction than a sensible default the TPO can still change.
   useEffect(() => {
@@ -62,6 +68,7 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
   const handleClose = () => {
     if (saving) return;
     setForm(EMPTY_FORM);
+    setScope(EVERYONE);
     setError(null);
     onClose();
   };
@@ -75,13 +82,15 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
         name: form.name,
         email: form.email,
         section: form.section,
+        branch_scope: audienceForRequest(scope),
         phone: form.phone || undefined,
       });
       onAdded(res.coordinator);
       setForm(EMPTY_FORM);
+      setScope(EVERYONE);
       onClose();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to add this coordinator.");
+      setError(err instanceof ApiError ? err.errors?.branch_scope?.[0] ?? err.errors?.section?.[0] ?? err.errors?.email?.[0] ?? err.message : "Failed to add this coordinator.");
     } finally {
       setSaving(false);
     }
@@ -197,6 +206,7 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
                   {availableSections.map((s) => (
                     <option key={s.section} value={s.section}>
                       Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                      {s.coordinator_name === null ? " · no coordinator" : (s.uncovered_count ?? 0) > 0 ? ` · ${s.uncovered_count} not covered` : " · covered"}
                     </option>
                   ))}
                 </HpSelect>
@@ -206,7 +216,7 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
                   className="flex min-h-10 items-center gap-2 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/[0.05] px-3 py-2 text-2xs font-medium text-amber-700 dark:text-amber-300"
                 >
                   <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                  <span>{sections.length === 0 ? "No sections found yet — import students first." : "Every section already has a coordinator."}</span>
+                  <span>No sections found yet — import students first.</span>
                 </div>
               )}
             </div>
@@ -225,6 +235,8 @@ export function AddCoordinatorModal({ open, onClose, sections, onAdded }: AddCoo
               />
             </div>
           </div>
+
+          {form.section && <ScopePicker value={scope} onChange={setScope} covers={chosen?.coordinators ?? []} />}
 
           {error && <HpFormError>{error}</HpFormError>}
         </form>

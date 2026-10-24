@@ -9,6 +9,7 @@ use App\Models\ContestProblem;
 use App\Models\ProblemTestCase;
 use App\Services\Judge\JudgeQueue;
 use App\Services\Judge\JudgeRequest;
+use App\Services\Integrity\IntegrityService;
 use App\Services\JudgeService;
 use App\Services\ProblemCodeGenerator\StarterCodeGenerator;
 use Illuminate\Http\JsonResponse;
@@ -75,7 +76,7 @@ class ContestSubmissionController extends Controller
     {
         $this->assertVisible($request, $contest, $contestProblem);
         if (! $contest->hasEnded()) {
-            $this->assertRegistered($request, $contest);
+            $this->assertRegistered($request, $contest, gate: true);
         }
 
         return $this->enqueue($request, $contest, $contestProblem, JudgeRequest::KIND_RUN, $queue);
@@ -91,7 +92,7 @@ class ContestSubmissionController extends Controller
             ], 422);
         }
 
-        $this->assertRegistered($request, $contest);
+        $this->assertRegistered($request, $contest, gate: true);
 
         return $this->enqueue($request, $contest, $contestProblem, JudgeRequest::KIND_SUBMIT, $queue);
     }
@@ -141,7 +142,7 @@ class ContestSubmissionController extends Controller
      * tampered/modified client that stops reporting violations still hits
      * this on its very next run/submit/show call.
      */
-    private function assertRegistered(Request $request, Contest $contest): void
+    private function assertRegistered(Request $request, Contest $contest, bool $gate = false): void
     {
         $participant = ContestParticipant::where('contest_id', $contest->id)
             ->where('user_id', $request->user()->id)
@@ -151,6 +152,12 @@ class ContestSubmissionController extends Controller
 
         if ($participant->proctoringSession?->isLocked()) {
             abort(403, 'You have been locked out of this contest due to repeated proctoring violations. This has been reported to your TPO and section coordinator.');
+        }
+
+        // run / submit also need a live proctoring signal — without one they are refused, so a script that never opens the
+        // page (no camera, no heartbeat) cannot submit. show() stays open: the page loads the problem BEFORE the consent gate.
+        if ($gate) {
+            app(IntegrityService::class)->gate('contest', $participant->proctoringSession, $request->user());
         }
     }
 

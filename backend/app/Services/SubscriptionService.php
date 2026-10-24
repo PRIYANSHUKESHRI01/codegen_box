@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Notifications\PlanNotifier;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -226,6 +227,7 @@ class SubscriptionService
         }
 
         app(LifecycleMailService::class)->planGranted($user, $subscription, $days, complimentary: ! $offline);
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->granted($user, $subscription->loadMissing('plan'), $days, complimentary: ! $offline));
 
         return $subscription;
     }
@@ -280,6 +282,7 @@ class SubscriptionService
         ]);
 
         app(LifecycleMailService::class)->planExtended($subscription, $days);
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->extended($subscription->loadMissing('plan'), $days));
 
         return $subscription->fresh('plan');
     }
@@ -332,6 +335,7 @@ class SubscriptionService
         ]);
 
         app(LifecycleMailService::class)->planEnded($subscription);
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->ended($subscription->loadMissing('plan')));
 
         return $subscription->fresh('plan');
     }
@@ -414,6 +418,8 @@ class SubscriptionService
                 : ['plan_code' => $plan->code]
         );
 
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->assigned($subscription->loadMissing('plan'), $trialDays !== null));
+
         return $subscription;
     }
 
@@ -494,6 +500,8 @@ class SubscriptionService
                     'project_lab_access' => $currentPlan->project_lab_access,
                     'max_workspace_hours_per_month' => $currentPlan->max_workspace_hours_per_month,
                     'max_active_projects' => $currentPlan->max_active_projects,
+                    'max_core_practice_per_day' => $currentPlan->max_core_practice_per_day,
+                    'core_tests_access' => $currentPlan->core_tests_access,
                 ]
             );
 
@@ -511,6 +519,8 @@ class SubscriptionService
                 $college->name,
                 ['previous_max_students' => $previousMax, 'max_students' => $maxStudents]
             );
+
+            $this->notifyPlan(fn (PlanNotifier $n) => $n->seatLimit($college, $maxStudents, $previousMax));
 
             return $subscription->fresh('plan');
         });
@@ -532,6 +542,8 @@ class SubscriptionService
             $company->name,
             ['plan_code' => $plan->code]
         );
+
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->assigned($subscription->loadMissing('plan'), false));
 
         return $subscription;
     }
@@ -606,6 +618,16 @@ class SubscriptionService
         });
     }
 
+    /** In-app notification for a plan event — fire-and-forget: telling them must never be why the plan change fails. */
+    private function notifyPlan(\Closure $work): void
+    {
+        try {
+            $work(app(PlanNotifier::class));
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
     /**
      * Flips past-due active subscriptions to expired. The days-remaining
      * countdown shown to users is computed live from dates regardless of
@@ -637,10 +659,21 @@ class SubscriptionService
             ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_BASE)->paidTier())
             ->get();
 
+        // A college's or company's plan that just lapsed: their people are told too (in-app), the same 7-day window.
+        $orgPlansEnded = (clone $due)
+            ->with('plan')
+            ->whereIn('subscriber_type', [College::class, Company::class])
+            ->where('current_period_end', '>=', now()->subDays(7))
+            ->get();
+
         $expired = $due->update(['status' => Subscription::STATUS_EXPIRED]);
 
         foreach ($toAnnounce as $subscription) {
             app(LifecycleMailService::class)->planExpired($subscription);
+        }
+
+        foreach ($toAnnounce->concat($orgPlansEnded) as $subscription) {
+            $this->notifyPlan(fn (PlanNotifier $n) => $n->expired($subscription));
         }
 
         foreach (User::whereIn('id', $students)->get() as $student) {

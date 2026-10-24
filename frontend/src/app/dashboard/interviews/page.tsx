@@ -3,11 +3,13 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Mic, CheckCircle2, Loader2, PlayCircle, Layers } from "lucide-react";
+import { Mic, CheckCircle2, Loader2, PlayCircle, Layers, Sparkles, ArrowRight } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { getStoredUser } from "@/lib/auth";
+import { domainPrepCopy } from "@/lib/departments";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { StudentInterviewSummary } from "@/types/interview";
@@ -22,6 +24,7 @@ const TYPE_BADGE: Record<string, { label: string; className: string }> = {
 
 export default function InterviewsListPage() {
   const { status } = useAuthGuard(["user"]);
+  const { yours } = domainPrepCopy(null, getStoredUser()?.department ?? null);
   const [interviews, setInterviews] = useState<StudentInterviewSummary[]>([]);
   const [tracks, setTracks] = useState<StudentInterviewTrackSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,9 +47,12 @@ export default function InterviewsListPage() {
 
   if (status !== "ready") return <SessionLoader />;
 
-  const notStarted = interviews.filter((i) => !i.my_session_status || i.my_session_status === "invited");
-  const inProgress = interviews.filter((i) => i.my_session_status === "in_progress");
-  const completed = interviews.filter((i) => i.my_session_status === "completed");
+  // The student's own practice interviews live in their own section, so the ones set by their college stay easy to find.
+  const practice = interviews.filter((i) => i.interview_type === "practice");
+  const assigned = interviews.filter((i) => i.interview_type !== "practice");
+  const notStarted = assigned.filter((i) => !i.my_session_status || i.my_session_status === "invited");
+  const inProgress = assigned.filter((i) => i.my_session_status === "in_progress");
+  const completed = assigned.filter((i) => i.my_session_status === "completed");
 
   return (
     <DashboardShell
@@ -64,6 +70,24 @@ export default function InterviewsListPage() {
       {/* The free plan gets one AI mock interview, ever — no daily counter, so this is its banner. */}
       <FreeTrialBanner feature="mock_interview" />
 
+      <Link
+        href="/dashboard/interviews/practice"
+        className="group mt-4 flex flex-wrap items-center justify-between gap-3 rounded-panel border border-accent-primary/25 bg-gradient-to-r from-accent-primary/[0.08] to-transparent p-4 transition-colors hover:border-accent-primary/50"
+      >
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary/15 text-accent-primary">
+            <Sparkles className="h-5 w-5" aria-hidden />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-extrabold text-primary">Build your own practice interview</span>
+            <span className="block text-xs text-text-secondary">Pick a role from {yours}, the kind of round and the difficulty — AI asks, you answer aloud, AI scores.</span>
+          </span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-accent-primary">
+          Practise now <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+        </span>
+      </Link>
+
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -79,6 +103,7 @@ export default function InterviewsListPage() {
           {inProgress.length > 0 && <InterviewSection title="Resume" interviews={inProgress} accent="warning" />}
           {notStarted.length > 0 && <InterviewSection title="Available" interviews={notStarted} accent="primary" />}
           {completed.length > 0 && <InterviewSection title="Completed" interviews={completed} accent="muted" />}
+          {practice.length > 0 && <InterviewSection title="Your practice interviews" interviews={practice} accent="primary" />}
         </div>
       )}
     </DashboardShell>
@@ -104,11 +129,14 @@ function TrackSection({ tracks }: { tracks: StudentInterviewTrackSummary[] }) {
               <div className="w-10 h-10 rounded-control bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
                 <Layers className="w-5 h-5" />
               </div>
-              {track.company && (
-                <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-accent-secondary/10 text-accent-secondary border-accent-secondary/25">
-                  {track.company.name}
-                </span>
-              )}
+              <div className="flex flex-col items-end gap-1">
+                {track.for_your_branch && <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/25">For your branch</span>}
+                {track.company && (
+                  <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-accent-secondary/10 text-accent-secondary border-accent-secondary/25">
+                    {track.company.name}
+                  </span>
+                )}
+              </div>
             </div>
             <h3 className="text-sm font-bold text-primary leading-snug">{track.title}</h3>
             {track.role_title && <p className="text-xs text-text-secondary">{track.role_title}</p>}
@@ -153,6 +181,7 @@ function InterviewSection({
                 <Mic className="w-5 h-5" />
               </div>
               <div className="flex flex-col items-end gap-1">
+                {interview.for_your_branch && <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-sky-500/10 text-sky-600 dark:text-sky-300 border-sky-500/25">For your branch</span>}
                 {interview.company && TYPE_BADGE[interview.interview_type] && (
                   <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", TYPE_BADGE[interview.interview_type].className)}>
                     {interview.company.name}

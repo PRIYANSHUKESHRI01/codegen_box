@@ -1,0 +1,297 @@
+[
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Count Palindromic Substrings (HCLTech Graduate Engineer Trainee)\nGiven a string s, return the number of palindromic substrings in it. A string is a palindrome when it reads the same backward as forward. A substring is a contiguous sequence of characters within the string.\n\nInput Example 1: s = \"abc\" -> Output: 3 (Substrings: \"a\", \"b\", \"c\")\nInput Example 2: s = \"aaa\" -> Output: 6 (Substrings: \"a\", \"a\", \"a\", \"aa\", \"aa\", \"aaa\")\n\nProvide the optimal O(N^2) time and O(1) space 'Expand Around Center' solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Expand Around Center Algorithm):\n\nKey Concept:\nA palindrome of length N has 2N - 1 possible centers (N single-character centers for odd palindromes, N - 1 two-character centers for even palindromes).\nExpand outwards from each center while characters match.\n\nPython Implementation:\n```python\ndef count_substrings(s: str) -> int:\n    n = len(s)\n    count = 0\n    \n    def expand(left: int, right: int) -> int:\n        c = 0\n        while left >= 0 and right < n and s[left] == s[right]:\n            c += 1\n            left -= 1\n            right += 1\n        return c\n        \n    for i in range(n):\n        count += expand(i, i)       # Odd length\n        count += expand(i, i + 1)   # Even length\n        \n    return count\n\nprint(count_substrings(\"abc\")) # Output: 3\nprint(count_substrings(\"aaa\")) # Output: 6\n```\n\nC++ Implementation:\n```cpp\n#include <string>\n#include <iostream>\nusing namespace std;\n\nint countSubstrings(const string& s) {\n    int n = s.length(), count = 0;\n    auto expand = [&](int l, int r) {\n        int c = 0;\n        while (l >= 0 && r < n && s[l] == s[r]) {\n            c++; l--; r++;\n        }\n        return c;\n    };\n    for (int i = 0; i < n; ++i) {\n        count += expand(i, i);\n        count += expand(i, i + 1);\n    }\n    return count;\n}\n```\nTime Complexity: O(N^2)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Matrix Diagonal Difference and Symmetry\nGiven a square matrix of size N x N, calculate the absolute difference between the sums of its diagonals:\n1. Primary Diagonal (top-left to bottom-right)\n2. Secondary Diagonal (top-right to bottom-left)\n\nInput Example:\nN = 3\nmatrix = [\n  [11, 2, 4],\n  [4, 5, 6],\n  [10, 8, -12]\n]\nPrimary diagonal: 11 + 5 + (-12) = 4\nSecondary diagonal: 4 + 5 + 10 = 19\nAbsolute Difference: |4 - 19| = 15\nOutput: 15\n\nProvide an optimal single-pass O(N) time solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Single Loop Traversal):\n\nKey Concept:\nIn an N x N matrix, the primary diagonal element at row `i` is `matrix[i][i]`, and the secondary diagonal element is `matrix[i][n - 1 - i]`.\nBoth can be summed simultaneously in a single loop from 0 to N - 1.\n\nPython Implementation:\n```python\ndef diagonal_difference(matrix: list[list[int]]) -> int:\n    n = len(matrix)\n    d1, d2 = 0, 0\n    for i in range(n):\n        d1 += matrix[i][i]\n        d2 += matrix[i][n - 1 - i]\n    return abs(d1 - d2)\n\nmat = [[11, 2, 4], [4, 5, 6], [10, 8, -12]]\nprint(diagonal_difference(mat)) # Output: 15\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Profit and Loss with Successive Discounts:\nA laptop is listed at a marked price of ₹60,000. The retailer offers two successive discounts of 10% and 5%. Despite these discounts, the retailer earns a 14% profit on his cost price. What was the original cost price of the laptop?\n\nOptions:\nA) ₹45,000\nB) ₹46,000\nC) ₹47,500\nD) ₹48,000",
+    "answer_notes": "Correct Option: A (₹45,000)\n\nCalculation Steps:\n1. Marked Price (MP) = ₹60,000.\n2. Apply successive discounts of 10% and 5%:\n   Selling Price (SP) = MP * (1 - 0.10) * (1 - 0.05)\n                      = 60,000 * 0.90 * 0.95\n                      = 54,000 * 0.95\n                      = ₹51,300.\n3. The retailer earns 14% profit on Cost Price (CP):\n   SP = CP * (1 + 0.14) = 1.14 * CP.\n4. Calculate Cost Price:\n   CP = SP / 1.14 = 51,300 / 1.14 = ₹45,000.\n\nVerification:\nProfit = 51,300 - 45,000 = 6,300.\nProfit % = (6,300 / 45,000) * 100 = 14%. Matches exactly.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Square Table Seating Arrangement:\nEight software engineers—A, B, C, D, E, F, G, and H—sit around a square table. Four sit at the four corners facing inward towards the center, and four sit in the middle of the four sides facing outward away from the center:\n1. A sits at a corner and faces inward.\n2. B sits second to the right of A.\n3. C sits opposite to B.\n4. D sits in the middle of a side and is adjacent to C.\n5. E sits opposite to A.\n\nWhich direction does D face?\n\nOptions:\nA) Inward\nB) Outward\nC) Cannot be determined\nD) North-East",
+    "answer_notes": "Correct Option: B (Outward)\n\nDeduction Steps:\n1. The rule establishes that all persons sitting in the middle of the sides face OUTWARD, while all persons sitting at the corners face INWARD.\n2. Premise 4 states: 'D sits in the middle of a side'.\n3. By rule definition, since D sits in the middle of a side, D MUST face OUTWARD!\n\nTherefore, Option B (Outward) is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Clocks: Right Angle Occurrence:\nAt what time between 4 o'clock and 5 o'clock are the hands of a clock at right angles (90 degrees) to each other for the first time?\n\nOptions:\nA) 4 hours 5 5/11 minutes\nB) 4 hours 38 2/11 minutes\nC) 4 hours 10 10/11 minutes\nD) 4 hours 15 minutes",
+    "answer_notes": "Correct Option: A (4 hours 5 5/11 minutes)\n\nFormula & Calculation:\n1. Formula for angle: Angle = |30H - (11/2)M|\n2. We want Angle = 90° for H = 4.\n   Case 1 (First right angle, minute hand behind hour hand):\n   30(4) - (11/2)M = 90\n   120 - 90 = (11/2)M\n   30 = (11/2)M => M = 60 / 11 = 5 5/11 minutes.\n\n3. Case 2 (Second right angle, minute hand ahead of hour hand):\n   (11/2)M - 120 = 90 => (11/2)M = 210 => M = 420 / 11 = 38 2/11 minutes.\n\nSince the question asks for the first occurrence between 4 and 5, it occurs at 4 hours 5 5/11 minutes.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "SQL Query: Nth Highest Salary Without Using LIMIT\nWrite an ANSI standard SQL query to find the 3rd highest distinct salary from an Employee table (id INT, salary DECIMAL) WITHOUT using the LIMIT or TOP keywords, ensuring compatibility with all relational database engines.",
+    "answer_notes": "Optimal ANSI SQL Query using Correlated Subquery:\n\n```sql\nSELECT DISTINCT e1.salary\nFROM Employee e1\nWHERE 2 = (\n    SELECT COUNT(DISTINCT e2.salary)\n    FROM Employee e2\n    WHERE e2.salary > e1.salary\n);\n```\n\nExplanation:\n1. For any candidate salary `e1.salary`, the correlated subquery counts how many distinct salaries in the table are strictly greater than `e1.salary`.\n2. For the 1st highest salary: 0 salaries are greater.\n3. For the 2nd highest salary: 1 salary is greater.\n4. For the 3rd highest salary: exactly 2 salaries are greater.\n5. Hence, filtering `WHERE 2 = (...)` accurately retrieves the 3rd highest salary without relying on non-standard pagination clauses."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Object-Oriented Programming: Shallow Copy vs Deep Copy\nExplain the memory difference between Shallow Copy and Deep Copy in C++ / Java. How does a shallow copy of an object containing raw pointer fields lead to 'Double Free' segmentation faults during destruction?",
+    "answer_notes": "Shallow Copy vs Deep Copy:\n\n1. Shallow Copy:\n   - Copies all primitive fields directly.\n   - For reference or pointer fields, it copies ONLY the pointer address (the reference), NOT the underlying heap memory.\n   - Both original and cloned objects now point to the identical heap buffer.\n\n2. The 'Double Free' Crash:\n   - When Object 1 is destroyed, its destructor runs: `delete ptr;` (freeing heap memory).\n   - When Object 2 is subsequently destroyed, its destructor executes `delete ptr;` on the ALREADY FREED address.\n   - The operating system detects an invalid heap pointer free and terminates the process with a `SIGSEGV` / 'Double Free detected' error.\n\n3. Deep Copy Solution:\n   - A custom copy constructor allocates brand-new independent heap memory and copies the actual underlying data values: `ptr = new int(*other.ptr);`."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems: Virtual Memory Page Fault Lifecycle\nWalk through the exact step-by-step operating system sequence that occurs when a CPU instruction triggers a Page Fault (accessing a page with valid bit = 0).",
+    "answer_notes": "Page Fault Interrupt Handling Flow:\n1. Trap to OS: The Memory Management Unit (MMU) checks the internal page table; seeing valid bit = 0, it triggers a page fault hardware trap.\n2. State Preservation: The CPU halts execution of the faulting process, saves registers and Program Counter onto the kernel stack.\n3. Legality Check: OS verifies if the memory access address is legal. If illegal, it issues a segmentation fault (`SIGSEGV`).\n4. Free Frame Allocation: OS finds a free physical page frame in RAM. If none exists, a page replacement algorithm (e.g., LRU) selects a victim frame to page out to swap disk.\n5. Disk I/O: OS schedules a disk read to fetch the missing page from secondary storage into the designated physical frame. The faulting process is placed into the Blocked/Wait queue.\n6. Page Table Update: Once disk I/O completes (via disk controller interrupt), OS updates the page table entry: writes physical frame number and flips valid bit to 1.\n7. Instruction Restart: Faulting process is moved back to the Ready queue. When rescheduled, the CPU restarts the exact instruction that previously faulted."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "HCLTech Ideapreneurship & Culture Alignment:\n'HCLTech strongly champions a culture of \"Ideapreneurship\"—encouraging grassroots employees to innovate daily. How have you demonstrated self-driven initiative during your college engineering journey?'",
+    "answer_notes": "Exemplary Ideapreneurship Response:\n\n1. Core Philosophy of Ideapreneurship:\n   'Ideapreneurship at HCLTech means frontline engineers are not passive task executers, but active business problem solvers who identify operational bottlenecks and build proactive prototypes.'\n\n2. Concrete College Example:\n   - 'In my 3rd year, our college placement cell was manually sorting 1,200 student resumes via Google Sheets, causing frequent duplicate entries and scheduling errors.'\n   - 'Without being asked, I built a lightweight Python script utilizing Pandas and an open-source PDF text extraction library to automatically parse student CGPA, backlogs, and branch tags, generating clean verified batches.'\n   - 'The placement officer adopted the tool, reducing eligibility verification time from 3 days to under 15 minutes.'\n\n3. Value to HCLTech:\n   'I bring this same proactive, problem-solving mindset to client project delivery at HCLTech.'"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Find First and Last Position of Element in Sorted Array\nGiven an array of integers nums sorted in non-decreasing order, find the starting and ending position of a given target value.\nIf target is not found in the array, return [-1, -1].\nYou must write an algorithm with O(log n) runtime complexity.\n\nInput Example 1: nums = [5, 7, 7, 8, 8, 10], target = 8 -> Output: [3, 4]\nInput Example 2: nums = [5, 7, 7, 8, 8, 10], target = 6 -> Output: [-1, -1]\n\nProvide the optimal binary search solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two Binary Search Passes):\n\nApproach:\n- Run binary search once searching for the FIRST occurrence (when `nums[mid] == target`, save index and continue searching LEFT: `high = mid - 1`).\n- Run binary search a second time searching for the LAST occurrence (when `nums[mid] == target`, save index and continue searching RIGHT: `low = mid + 1`).\n\nPython Implementation:\n```python\ndef search_range(nums: list[int], target: int) -> list[int]:\n    def find_bound(is_first: bool) -> int:\n        low, high = 0, len(nums) - 1\n        bound = -1\n        while low <= high:\n            mid = (low + high) // 2\n            if nums[mid] == target:\n                bound = mid\n                if is_first:\n                    high = mid - 1\n                else:\n                    low = mid + 1\n            elif nums[mid] < target:\n                low = mid + 1\n            else:\n                high = mid - 1\n        return bound\n        \n    return [find_bound(True), find_bound(False)]\n\nprint(search_range([5, 7, 7, 8, 8, 10], 8)) # [3, 4]\nprint(search_range([5, 7, 7, 8, 8, 10], 6)) # [-1, -1]\n```\nTime Complexity: O(log N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Remove Duplicates from Sorted Array II (At Most Twice)\nGiven an integer array nums sorted in non-decreasing order, remove some duplicates in-place such that each unique element appears at most twice. The relative order of the elements should be kept the same.\nReturn k after placing the final result in the first k slots of nums.\n\nInput Example: nums = [1, 1, 1, 2, 2, 3]\nOutput: k = 5, nums = [1, 1, 2, 2, 3, _]\n\nSolve in O(N) time and O(1) space.",
+    "answer_notes": "Optimal Solution (Two Pointers In-Place):\n\nKey Concept:\nSince an element can appear at most twice, we can write an element `x` to index `k` if `k < 2` OR if `x != nums[k - 2]`.\n\nPython Implementation:\n```python\ndef remove_duplicates_ii(nums: list[int]) -> int:\n    k = 0\n    for x in nums:\n        if k < 2 or x != nums[k - 2]:\n            nums[k] = x\n            k += 1\n    return k\n\nnums = [1, 1, 1, 2, 2, 3]\nk = remove_duplicates_ii(nums)\nprint(k, nums[:k]) # Output: 5 [1, 1, 2, 2, 3]\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) in-place"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Pipes, Cisterns & Bottom Leaks:\nA pump can fill a water reservoir in 6 hours. Because of a leak in the reservoir bottom, it now takes 7.5 hours to fill it completely. If the reservoir is completely full, in how many hours will the leak alone empty the entire reservoir?\n\nOptions:\nA) 25 hours\nB) 30 hours\nC) 32 hours\nD) 35 hours",
+    "answer_notes": "Correct Option: B (30 hours)\n\nStep-by-step Solution:\n1. Pump filling rate alone = 1 / 6 of reservoir per hour.\n2. Net filling rate with leak = 1 / 7.5 = 1 / (15/2) = 2 / 15 of reservoir per hour.\n3. Let emptying rate of the leak alone be L:\n   Pump Rate - Leak Rate = Net Rate\n   (1 / 6) - L = 2 / 15\n   L = (1 / 6) - (2 / 15)\n4. Find common denominator for 6 and 15 (LCM = 30):\n   L = (5 / 30) - (4 / 30) = 1 / 30 per hour.\n5. Time required by leak alone to drain the reservoir completely = 1 / (1 / 30) = 30 hours.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Differences of Squares Number Series:\nFind the missing number in the sequence:\n\n3, 12, 27, 48, 75, 108, ?\n\nOptions:\nA) 144\nB) 147\nC) 152\nD) 160",
+    "answer_notes": "Correct Option: B (147)\n\nPattern Deduction:\nObserve the relationship of each term to squares:\n- Term 1: 3 = 3 * (1^2) = 3 * 1 = 3\n- Term 2: 12 = 3 * (2^2) = 3 * 4 = 12\n- Term 3: 27 = 3 * (3^2) = 3 * 9 = 27\n- Term 4: 48 = 3 * (4^2) = 3 * 16 = 48\n- Term 5: 75 = 3 * (5^2) = 3 * 25 = 75\n- Term 6: 108 = 3 * (6^2) = 3 * 36 = 108\n\nFollowing the exact pattern (3 * N^2):\n- Term 7: 3 * (7^2) = 3 * 49 = 147.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Coding-Decoding: Letter Substitution Matrix\nIn a proprietary encryption algorithm, if 'DEVELOPER' is coded as 'EFWFMPQFS', how will the word 'ALGORITHM' be encoded?\n\nOptions:\nA) BMHPSJUIN\nB) BMHPSJTHN\nC) BMHPRIUIN\nD) BMHQTJUIN",
+    "answer_notes": "Correct Option: A (BMHPSJUIN)\n\nPattern Analysis:\nCompare 'DEVELOPER' to 'EFWFMPQFS':\n- D (+1) = E\n- E (+1) = F\n- V (+1) = W\n- E (+1) = F\n- L (+1) = M\n- O (+1) = P\n- P (+1) = Q\n- E (+1) = F\n- R (+1) = S\nEvery character is shifted forward by exactly +1 in alphabetical order.\n\nApplying +1 to 'ALGORITHM':\n- A (+1) = B\n- L (+1) = M\n- G (+1) = H\n- O (+1) = P\n- R (+1) = S\n- I (+1) = J\n- T (+1) = U\n- H (+1) = I\n- M (+1) = N\nResult: 'BMHPSJUIN'.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Automata Fix / Debugging (C String Pointer Length Bug):\nIdentify the logical error in the following C code intended to count string length:\n\n```c\nint myStrLen(char *str) {\n    int len = 0;\n    while (*str) {\n        len++;\n        str++;\n    }\n    return len;\n}\n```\nWhat occurs if a NULL pointer is passed to this function, and how should it be defensively protected?",
+    "answer_notes": "Bug Diagnosis & Defensive Fix:\n\n1. Vulnerability Identified:\n   The function performs NO null pointer validation before attempting to dereference `*str` in the `while (*str)` condition.\n   If a caller passes `myStrLen(NULL)`, the CPU dereferences a NULL pointer address (0x0), immediately triggering a segmentation fault (`SIGSEGV`) and abruptly crashing the application.\n\n2. Defensive Production Fix:\n```c\n#include <stddef.h>\n\nsize_t myStrLenSafe(const char *str) {\n    if (str == NULL) {\n        return 0; // Defensive guard preventing memory faults\n    }\n    size_t len = 0;\n    while (*str != '\\0') {\n        len++;\n        str++;\n    }\n    return len;\n}\n```\nAlso marked parameter as `const char *` to guarantee read-only immutability."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "DBMS Relational Integrity Constraints:\nExplain the three fundamental integrity constraints in relational databases: Entity Integrity, Referential Integrity, and Domain Integrity. What is an 'Orphan Record' and how do Foreign Key cascading options (ON DELETE CASCADE vs SET NULL) prevent them?",
+    "answer_notes": "RDBMS Integrity Constraints:\n\n1. Entity Integrity:\n   - Guarantees each row in a table is uniquely identifiable.\n   - Enforced by Primary Keys: No primary key column can contain NULL values.\n\n2. Domain Integrity:\n   - Enforces valid data types, ranges, and formats for attributes (e.g., `age CHECK (age >= 18)`, `status ENUM('PENDING', 'ACTIVE')`).\n\n3. Referential Integrity & Orphan Records:\n   - Enforces valid relationships between primary key and foreign key tables.\n   - Orphan Record: A child record referencing a `parent_id` that no longer exists because the parent row was deleted.\n   - Prevention:\n     - `ON DELETE RESTRICT / NO ACTION`: Rejects parent deletion if children exist.\n     - `ON DELETE CASCADE`: Automatically deletes all associated child records when the parent is deleted.\n     - `ON DELETE SET NULL`: Sets child foreign key columns to NULL when parent is removed."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Computer Networks: ARP (Address Resolution Protocol)\nHow does ARP resolve an IP address to a physical MAC address on a local area network? What is the structure of an ARP Request frame, and why is it broadcast to FF:FF:FF:FF:FF:FF while the ARP Reply is unicast?",
+    "answer_notes": "ARP Protocol Mechanics:\n\n1. Purpose:\n   Maps a Layer 3 Logical IPv4 address to a Layer 2 Physical MAC address on a shared broadcast domain.\n\n2. ARP Request (Broadcast):\n   - Host A wants to send an IP packet to 192.168.1.5, but does not know its hardware MAC address.\n   - Host A encapsulates an ARP Request: 'Who has 192.168.1.5? Tell 192.168.1.1'.\n   - Because Host A does not know who holds that IP, it transmits the Ethernet frame to the Broadcast MAC address `FF:FF:FF:FF:FF:FF`.\n   - Every switch floods this frame to all connected ports on the VLAN.\n\n3. ARP Reply (Unicast):\n   - Host B recognizes its own IP (192.168.1.5).\n   - Host B already learned Host A's MAC address from the request header.\n   - Therefore, Host B sends the ARP Reply directly and exclusively to Host A's MAC address (Unicast), preventing unnecessary network bandwidth consumption.\n   - Both hosts update their local ARP cache tables."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Java Exception Handling: Checked vs Unchecked & Finally Behavior\nDifferentiate between Checked and Unchecked exceptions in Java. Is it possible for a `finally` block to NOT execute after a try-catch sequence? Detail two specific scenarios.",
+    "answer_notes": "Java Exception Hierarchy & Finally Guarantees:\n\n1. Checked vs Unchecked Exceptions:\n   - Checked Exceptions: Inherit from `java.lang.Exception` (excluding RuntimeException). Checked at compile time. Methods must either catch them (`try-catch`) or declare them (`throws IOException`). e.g., `SQLException`, `ClassNotFoundException`.\n   - Unchecked Exceptions: Inherit from `java.lang.RuntimeException` or `Error`. Compiler does not force handling. Represent programmer logic bugs (e.g., `NullPointerException`, `IndexOutOfBoundsException`).\n\n2. When a `finally` block DOES NOT execute:\n   - Scenario 1: Direct JVM termination via `System.exit(0);` inside the try or catch block.\n   - Scenario 2: Fatal JVM crash, Out-Of-Memory Error (`java.lang.OutOfMemoryError`), or sudden external OS process termination (`kill -9`).\n   - Scenario 3: If an infinite loop or thread deadlock occurs inside the `try` block before reaching `finally`."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Willingness to Relocate & Shift Flexibility:\n'HCLTech manages critical infrastructure operations for global aerospace and financial clients. Are you comfortable with rotational day/night shifts and relocating to any of our hubs across Noida, Chennai, Bengaluru, or Madurai?'",
+    "answer_notes": "Exemplary Relocation & Shift Response:\n\n1. Proactive Relocation Stance:\n   'Yes, I am completely flexible and enthusiastic about relocating to any of HCLTech's delivery centers across India. Early in my career, immersion in a major development hub offers the fastest path to technical mentorship and hands-on client exposure.'\n\n2. Rotational Shift Readiness:\n   'I understand that mission-critical infrastructure delivery requires 24/7 reliability for North American and European clients. I maintain disciplined health habits and have successfully managed late-night coding hackathons in college. I view rotational shifts as an opportunity to gain early operational visibility into high-impact production environments.'"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Maximum Subarray (Kadane's Algorithm)\nGiven an integer array nums, find the subarray with the largest sum, and return its sum.\n\nInput Example 1: nums = [-2, 1, -3, 4, -1, 2, 1, -5, 4] -> Output: 6 (Subarray [4, -1, 2, 1])\nInput Example 2: nums = [1] -> Output: 1\nInput Example 3: nums = [5, 4, -1, 7, 8] -> Output: 23\n\nProvide the optimal O(N) Kadane's algorithm in C++ and Python.",
+    "answer_notes": "Optimal Solution (Kadane's Algorithm):\n\nKey Concept:\nAt each index `i`, we decide whether to add `nums[i]` to our existing subarray sum `cur_sum + nums[i]`, or start a fresh subarray at `nums[i]`.\n`cur_sum = max(nums[i], cur_sum + nums[i])`\n\nPython Implementation:\n```python\ndef max_sub_array(nums: list[int]) -> int:\n    max_sum = nums[0]\n    cur_sum = nums[0]\n    \n    for x in nums[1:]:\n        cur_sum = max(x, cur_sum + x)\n        max_sum = max(max_sum, cur_sum)\n        \n    return max_sum\n\nprint(max_sub_array([-2, 1, -3, 4, -1, 2, 1, -5, 4])) # Output: 6\n```\n\nC++ Implementation:\n```cpp\n#include <vector>\n#include <algorithm>\n#include <iostream>\nusing namespace std;\n\nint maxSubArray(const vector<int>& nums) {\n    int maxSum = nums[0], curSum = nums[0];\n    for (size_t i = 1; i < nums.size(); ++i) {\n        curSum = max(nums[i], curSum + nums[i]);\n        maxSum = max(maxSum, curSum);\n    }\n    return maxSum;\n}\n```\nTime Complexity: O(N) single pass.\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: String Compression (Run-Length Encoding In-Place)\nGiven an array of characters chars, compress it using the following algorithm:\nBegin with an empty string s. For each group of consecutive repeating characters in chars:\n- If the group's length is 1, append the character to s.\n- Otherwise, append the character followed by the group's length.\nThe compressed string s should not be returned directly, but instead be stored in the input character array chars.\nYou must write an algorithm that uses only constant extra space.\n\nInput Example: chars = [\"a\", \"a\", \"b\", \"b\", \"c\", \"c\", \"c\"]\nOutput: Return 6, chars = [\"a\", \"2\", \"b\", \"2\", \"c\", \"3\"]\n\nProvide an optimal O(N) solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two Pointers In-Place):\n\nApproach:\n- `write` pointer tracks where compressed output is placed.\n- `read` pointer scans groups of matching characters.\n- Write the character; if `count > 1`, convert count to string and write each digit.\n\nPython Implementation:\n```python\ndef compress(chars: list[str]) -> int:\n    write = 0\n    read = 0\n    n = len(chars)\n    \n    while read < n:\n        char = chars[read]\n        count = 0\n        while read < n and chars[read] == char:\n            read += 1\n            count += 1\n            \n        chars[write] = char\n        write += 1\n        \n        if count > 1:\n            for digit in str(count):\n                chars[write] = digit\n                write += 1\n                \n    return write\n\nc = [\"a\", \"a\", \"b\", \"b\", \"c\", \"c\", \"c\"]\nprint(compress(c), c[:6]) # 6, ['a', '2', 'b', '2', 'c', '3']\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) in-place"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Probability with Marbles in Urns:\nAn urn contains 4 red, 5 blue, and 6 green marbles. Three marbles are drawn at random without replacement. What is the probability that all three drawn marbles are of different colors?\n\nOptions:\nA) 24/91\nB) 18/91\nC) 12/65\nD) 20/91",
+    "answer_notes": "Correct Option: A (24/91)\n\nCalculation Steps:\n1. Total Marbles = 4 + 5 + 6 = 15 marbles.\n2. Total ways to choose 3 marbles from 15:\n   Total Combinations = 15C3 = (15 * 14 * 13) / (3 * 2 * 1) = 5 * 7 * 13 = 455.\n3. Favorable outcomes (1 Red, 1 Blue, and 1 Green):\n   - Ways to choose 1 Red = 4C1 = 4\n   - Ways to choose 1 Blue = 5C1 = 5\n   - Ways to choose 1 Green = 6C1 = 6\n   Favorable Combinations = 4 * 5 * 6 = 120.\n4. Probability = Favorable / Total\n               = 120 / 455\n               = (Divide top and bottom by 5)\n               = 24 / 91.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Family Tree Deduction (Blood Relations):\nA family consists of six members: P, Q, R, S, T, and U. There are two married couples in the family:\n1. Q is a doctor and the mother of T.\n2. U is a lawyer and the grandfather of R.\n3. S is a student and the sister of T.\n4. R is an engineer and the son of P.\n\nHow is P related to U?\n\nOptions:\nA) Son\nB) Brother\nC) Son-in-law\nD) Nephew",
+    "answer_notes": "Correct Option: A (Son)\n\nStep-by-step Family Deduction:\n1. Generation 1 (Grandparents): U is grandfather of R. Thus U is in the oldest generation and is married.\n2. Generation 2 (Parents): Q is mother of T. Since R is son of P, and there are two married couples, P must be married to Q. (Couple 1: U and spouse; Couple 2: P and Q).\n3. Generation 3 (Children): T, S (sister of T), R (son of P and Q).\n4. Relationship of P to U: Since U is grandfather of R, and P is father of R, P MUST be the son of U.\n\nTherefore, Option A (Son) is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Train Speed Excluding Stoppages:\nExcluding stoppages, the average speed of a high-speed express train is 54 km/h, and including stoppages at intermediate stations, its average speed drops to 45 km/h. For how many minutes does the train stop per hour on average?\n\nOptions:\nA) 9 minutes\nB) 10 minutes\nC) 12 minutes\nD) 15 minutes",
+    "answer_notes": "Correct Option: B (10 minutes)\n\nStandard Formula:\nStoppage Time per hour = [(Speed without stoppage - Speed with stoppage) / Speed without stoppage] * 60 minutes\n\nGiven:\n- Speed without stoppage = 54 km/h\n- Speed with stoppage = 45 km/h\n\nCalculation:\nStoppage Time = [(54 - 45) / 54] * 60\n              = (9 / 54) * 60\n              = (1 / 6) * 60\n              = 10 minutes per hour.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Database Views vs Materialized Views:\nContrast standard SQL Views with Materialized Views. Explain why a standard view incurs zero disk storage overhead whereas a materialized view requires disk space and scheduled refresh pipelines.",
+    "answer_notes": "Standard Views vs Materialized Views:\n\n1. Standard View (Virtual Table):\n   - Merely a saved SQL query definition stored in the data dictionary.\n   - Incurs zero data storage footprint on disk.\n   - Query Execution: When queried (`SELECT * FROM my_view`), the database executes the underlying query on the fly, merging where clauses.\n   - Drawback: If the underlying query joins 5 huge tables, executing the view repeatedly is CPU and disk I/O intensive.\n\n2. Materialized View (Physical Snapshot):\n   - Physically executes the query and persists the resulting tabular data onto disk pages.\n   - Query Execution: Blazing fast reads because it acts as a pre-computed cache.\n   - Storage & Refresh: Consumes disk space and requires refresh mechanisms (e.g., `REFRESH MATERIALIZED VIEW` on a cron, or fast incremental triggers on underlying table updates)."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Operating Systems Architecture: Monolithic Kernel vs Microkernel\nCompare the Monolithic Kernel architecture (e.g., Linux) with the Microkernel architecture (e.g., QNX, MINIX) in terms of fault isolation, IPC performance overhead, and driver crash resilience.",
+    "answer_notes": "Monolithic Kernel vs Microkernel:\n\n1. Monolithic Kernel (Linux, Unix):\n   - All core OS subsystems (File system, VFS, Network stack, Memory management, Device drivers) run inside the unified privileged Kernel Space (Ring 0).\n   - Performance: High performance because components communicate via direct fast C function calls without context switching.\n   - Drawback: Poor fault isolation—a bug or null pointer dereference in a third-party GPU driver crashes the entire operating system (Kernel Panic).\n\n2. Microkernel (MINIX, QNX):\n   - Only the absolute minimal primitives (IPC, low-level scheduling, primitive memory management) reside in Kernel Space.\n   - Drivers, file systems, and network protocols run as isolated User Space processes (Ring 3).\n   - Benefit: Superior crash resilience—if a disk driver crashes, the microkernel restarts the user process without system downtime.\n   - Drawback: Noticeable performance penalty due to constant Inter-Process Communication (IPC) and user-kernel mode context switches."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Team Conflict and Technical Consensus:\n'Describe an academic or hackathon experience where you disagreed with a colleague regarding software design. How did you arrive at consensus?'",
+    "answer_notes": "STAR Resolution Framework:\n- Situation: 'During our mobile app development project, my partner wanted to use LocalStorage to store user tokens, whereas I advocated for Secure Encrypted Keystore storage.'\n- Task: 'I needed to persuade my teammate without causing friction, keeping project delivery on schedule.'\n- Action:\n  1. Empathetic Listening: Acknowledged his point that LocalStorage was faster to implement in the short term.\n  2. Proof of Concept: I demonstrated a live JavaScript XSS script extracting the plain-text token from LocalStorage in under 30 seconds.\n  3. Shared Execution: I offered to write the Android Keystore encryption wrapper myself so his workload remained unchanged.'\n- Result: 'We adopted the secure implementation, passed our security audit, and strengthened our peer collaboration.'"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Valid Anagram\nGiven two strings s and t, return true if t is an anagram of s, and false otherwise.\nAn Anagram is a word or phrase formed by rearranging the letters of a different word or phrase, typically using all the original letters exactly once.\n\nInput Example 1: s = \"anagram\", t = \"nagaram\" -> Output: true\nInput Example 2: s = \"rat\", t = \"car\" -> Output: false\n\nProvide the optimal O(N) frequency array solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (26-Element Frequency Counting):\n\nPython Implementation:\n```python\ndef is_anagram(s: str, t: str) -> bool:\n    if len(s) != len(t):\n        return False\n    counts = [0] * 26\n    for c1, c2 in zip(s, t):\n        counts[ord(c1) - ord('a')] += 1\n        counts[ord(c2) - ord('a')] -= 1\n    return all(x == 0 for x in counts)\n\nprint(is_anagram(\"anagram\", \"nagaram\")) # Output: True\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1)"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Move Zeroes to End of Array\nGiven an integer array nums, move all 0's to the end of it while maintaining the relative order of the non-zero elements.\nNote that you must do this in-place without making a copy of the array.\n\nInput Example: nums = [0, 1, 0, 3, 12] -> Output: [1, 3, 12, 0, 0]\n\nProvide the optimal O(N) two-pointer solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (Two-Pointer In-Place Swap):\n\nApproach:\nMaintain `last_non_zero_found_at = 0`. Iterate through array: whenever `nums[cur] != 0`, swap `nums[last_non_zero_found_at]` with `nums[cur]` and advance `last_non_zero_found_at++`.\n\nPython Implementation:\n```python\ndef move_zeroes(nums: list[int]) -> None:\n    insert_pos = 0\n    for num in nums:\n        if num != 0:\n            nums[insert_pos] = num\n            insert_pos += 1\n            \n    while insert_pos < len(nums):\n        nums[insert_pos] = 0\n        insert_pos += 1\n\narr = [0, 1, 0, 3, 12]\nmove_zeroes(arr)\nprint(arr) # Output: [1, 3, 12, 0, 0]\n```\nTime Complexity: O(N)\nAuxiliary Space: O(1) in-place"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Compound Interest (Compounded Semi-Annually):\nWhat is the compound interest accrued on a principal of ₹10,000 for 1.5 years at 10% per annum, compounded half-yearly?\n\nOptions:\nA) ₹1,500\nB) ₹1,576.25\nC) ₹1,625.50\nD) ₹1,550.00",
+    "answer_notes": "Correct Option: B (₹1,576.25)\n\nCalculation Steps:\n1. Semi-annual compounding parameters:\n   - Principal (P) = ₹10,000\n   - Annual Rate (R) = 10% => Semi-annual Rate (r) = 10 / 2 = 5% per half-year\n   - Time (T) = 1.5 years => Number of conversion periods (n) = 1.5 * 2 = 3 half-years\n\n2. Amount Formula:\n   A = P * (1 + r / 100)^n\n     = 10,000 * (1 + 5 / 100)^3\n     = 10,000 * (1.05)^3\n     = 10,000 * 1.157625\n     = ₹11,576.25.\n\n3. Compound Interest (CI):\n   CI = Amount - Principal\n      = 11,576.25 - 10,000\n      = ₹1,576.25.\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Syllogisms with Negative Premises:\nStatements:\n1. No byte is a bit.\n2. All nibbles are bytes.\n\nConclusions:\nI. No nibble is a bit.\nII. Some bits are not nibbles.\n\nWhich conclusions logically follow?\n\nOptions:\nA) Only I follows\nB) Only II follows\nC) Both I and II follow\nD) Neither follows",
+    "answer_notes": "Correct Option: C (Both I and II follow)\n\nEuler / Venn Diagram Analysis:\n1. Statement 1: 'No byte is a bit' (Byte circle and Bit circle are completely disjoint).\n2. Statement 2: 'All nibbles are bytes' (Nibbles circle is completely inside Bytes circle).\n\nEvaluation:\n- Conclusion I ('No nibble is a bit'): Since nibbles are entirely inside bytes, and bytes never touch bits, nibbles can NEVER touch bits. Strictly FOLLOWS!\n- Conclusion II ('Some bits are not nibbles'): In fact, NO bit is a nibble (all bits are outside bytes, which contain all nibbles). If 'No bit is a nibble' is true, the weaker statement 'Some bits are not nibbles' must also be true. Strictly FOLLOWS!\n\nTherefore, Both I and II follow. Option C is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Reading Comprehension & Critical Analysis:\nPassage: 'Zero Trust architecture enforces continuous verification of identity and device health rather than relying on perimeter perimeter firewalls. In an era where workforces access enterprise workloads across unmanaged home Wi-Fi and mobile networks, assuming breach is the only defensible operational stance.'\n\nWhat is the author's primary assertion?\nA) Traditional perimeter firewalls are completely obsolete for all enterprise tasks.\nB) Continuous verification across all access points is essential in modern distributed environments.\nC) Employees should be prohibited from remote work.\nD) Home Wi-Fi networks can never be secured.",
+    "answer_notes": "Correct Option: B\n\nExplanation:\nThe author explicitly states that 'continuous verification of identity and device health' is the required posture because modern workforces access data across distributed, unmanaged networks. Option B captures the exact core assertion without extreme distortions."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "C++ Pointers vs References:\nCompare Pointers and References in C++ across three critical dimensions: Reassignment, Nullability, and Memory Address identity.",
+    "answer_notes": "C++ Pointers vs References:\n\n1. Reassignment:\n   - Pointer: Can be reassigned at any time to point to a different memory address: `ptr = &var2;`.\n   - Reference: An alias established at initialization that CANNOT be reseated to refer to another object.\n\n2. Nullability:\n   - Pointer: Can hold `nullptr` / `NULL` indicating no target.\n   - Reference: Cannot be null; must always bind to a valid existing object upon declaration.\n\n3. Memory Address Identity:\n   - Pointer: Has its own distinct memory address on the stack (`&ptr != &var`).\n   - Reference: Shares the exact identical memory address with the referent object (`&ref == &var`)."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Computer Networks: OSI 7-Layer Protocol Data Units (PDUs)\nList the seven layers of the OSI reference model from bottom to top, stating the exact Protocol Data Unit (PDU) name used at each layer (Physical, Data Link, Network, Transport, Application).",
+    "answer_notes": "OSI Layers & Protocol Data Units (PDUs):\n1. Layer 1 - Physical Layer: PDU is 'Bit' (electrical/optical signals).\n2. Layer 2 - Data Link Layer: PDU is 'Frame' (Ethernet header with MAC addresses, payload, FCS).\n3. Layer 3 - Network Layer: PDU is 'Packet' (IP header with logical IP addresses, routing data).\n4. Layer 4 - Transport Layer: PDU is 'Segment' (for TCP) or 'Datagram' (for UDP) (ports, sequence numbers).\n5. Layer 5 - Session Layer: PDU is 'Data' / Protocol message.\n6. Layer 6 - Presentation Layer: PDU is 'Data' (syntax, encryption, compression).\n7. Layer 7 - Application Layer: PDU is 'Data' / Message (HTTP payload, DNS message, SMTP)."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Why HCLTech & Strategic Brand Knowledge:\n'Why HCLTech? What sets HCLTech apart from other major technology services multinationals?'",
+    "answer_notes": "Exemplary Company Research Response:\n1. Global Scale: 'HCLTech operates across 60 countries with over 220,000 professionals, delivering engineering and R&D services (ERS) to the world's top enterprises.'\n2. Products & Platforms: 'Unlike traditional pure-play services firms, HCLTech has a strong software products portfolio (HCLSoftware) in digital transformation, secure DevOps, and automation.'\n3. People-Centric Philosophy: 'HCLTech's famous \"Employees First, Customers Second\" (EFCS) philosophy and Ideapreneurship empower junior developers to take ownership of ideas from day one.'"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Two Sum (Hash Map Lookup)\nGiven an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nInput Example: nums = [2, 7, 11, 15], target = 9 -> Output: [0, 1]\n\nProvide the optimal O(N) hash map solution in C++ and Python.",
+    "answer_notes": "Optimal Solution (One-Pass Hash Map):\n\nPython Implementation:\n```python\ndef two_sum(nums: list[int], target: int) -> list[int]:\n    seen = {}\n    for i, n in enumerate(nums):\n        diff = target - n\n        if diff in seen:\n            return [seen[diff], i]\n        seen[n] = i\n    return []\n\nprint(two_sum([2, 7, 11, 15], 9)) # Output: [0, 1]\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Hands-on Coding Assessment",
+    "question": "Problem: Reverse Words in a String\nGiven an input string s, reverse the order of the words.\nA word is defined as a sequence of non-space characters. The words in s will be separated by at least one space.\nReturn a string of the words in reverse order concatenated by a single space, with no leading or trailing whitespace.\n\nInput Example: s = \"the sky is blue\" -> Output: \"blue is sky the\"\n\nProvide an optimal O(N) solution in C++ and Python.",
+    "answer_notes": "Optimal Solution:\n\nPython Implementation:\n```python\ndef reverse_words(s: str) -> str:\n    return \" \".join(reversed(s.split()))\n\nprint(reverse_words(\"the sky is blue\")) # Output: \"blue is sky the\"\n```\nTime Complexity: O(N)\nAuxiliary Space: O(N)"
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Linear Age Equations:\nTen years ago, the ratio of the ages of a father and his daughter was 3:1. Ten years hence, the ratio of their ages will be 2:1. What is the present age of the father?\n\nOptions:\nA) 50 years\nB) 60 years\nC) 70 years\nD) 80 years",
+    "answer_notes": "Correct Option: C (70 years)\n\nCalculation Steps:\n1. Let their ages 10 years ago be 3x and x.\n2. Present ages:\n   - Father = 3x + 10\n   - Daughter = x + 10\n3. Ten years hence (add 10 more years):\n   - Father = 3x + 20\n   - Daughter = x + 20\n4. Given ratio 10 years hence is 2:1:\n   (3x + 20) / (x + 20) = 2 / 1\n   3x + 20 = 2(x + 20)\n   3x + 20 = 2x + 40\n   x = 20.\n5. Present age of Father:\n   Father = 3x + 10 = 3(20) + 10 = 60 + 10 = 70 years.\n\nTherefore, Option C is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Direction Sense and Pythagorean Displacement:\nA drone flies 12 km Due North from base camp, turns Due East and flies 9 km, and then hovers. What is the straight-line shortest displacement of the drone from its base camp?\n\nOptions:\nA) 15 km\nB) 18 km\nC) 21 km\nD) 13.5 km",
+    "answer_notes": "Correct Option: A (15 km)\n\nPythagorean Theorem Derivation:\n1. North and East form a perpendicular right angle (90 degrees).\n2. Shortest Distance = sqrt(North^2 + East^2)\n                     = sqrt(12^2 + 9^2)\n                     = sqrt(144 + 81)\n                     = sqrt(225)\n                     = 15 km.\n\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Verbal Ability",
+    "question": "Subject-Verb Agreement with Collective Nouns:\nChoose the grammatically correct option to fill the blank:\n'The engineering panel ________ agreed upon the new architecture guidelines after extensive benchmarking.'\n\nOptions:\nA) have\nB) has\nC) were\nD) are",
+    "answer_notes": "Correct Option: B (has)\n\nGrammar Rule:\n- 'The engineering panel' is a collective noun acting as a single unified entity (they all agreed upon one set of guidelines).\n- In standard formal English, singular collective nouns acting in unison take singular verbs ('has').\n\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical Assessment & Domain MCQs",
+    "question": "Relational Database Foreign Key Constraints:\nWhat is a Foreign Key in SQL? Can a Foreign Key reference a column that is a Unique Key rather than a Primary Key? Can a Foreign Key column contain duplicate values and NULL values?",
+    "answer_notes": "SQL Foreign Key Mechanics:\n\n1. Definition:\n   A column or combination of columns in a child table that references a primary key or unique key in a parent table, establishing referential integrity.\n\n2. Can it reference a Unique Key?\n   - YES. In ANSI SQL, a foreign key can reference either a `PRIMARY KEY` or any column with a `UNIQUE` constraint in the referenced table.\n\n3. Duplicates and NULLs:\n   - Can contain duplicate values: YES (many children can reference the same parent row in a 1-to-many relationship).\n   - Can contain NULL values: YES (indicates an optional relationship where the child row is not yet assigned to any parent)."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Deadlock Handling: The Four Coffman Conditions\nList the four Coffman conditions necessary for a deadlock in modern operating systems. How does enforcing a global numerical order on all system resources prevent Circular Wait?",
+    "answer_notes": "Coffman Conditions & Circular Wait Prevention:\n\n1. Four Coffman Conditions:\n   - Mutual Exclusion: Non-shareable resource mode.\n   - Hold and Wait: Process holds resources while requesting new ones.\n   - No Preemption: Resources cannot be forcibly revoked.\n   - Circular Wait: A closed chain of processes each waiting for a resource held by the next.\n\n2. Preventing Circular Wait via Resource Ordering (Havender's Method):\n   - Assign a global unique integer to every resource type: `F: R -> N`.\n   - Protocol Rule: A process can only request resource `R_j` if `F(R_j) > F(R_i)` for all resources `R_i` currently held by that process.\n   - Mathematical Proof: If every process acquires resources in strictly ascending numerical order, a cyclic dependency graph cannot form, mathematically guaranteeing deadlock cannot occur!"
+  }
+]
+

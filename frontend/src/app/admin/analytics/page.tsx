@@ -25,9 +25,12 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BarChart } from "@/components/dashboard/tpo/BarChart";
+import { CoreHeatmapCard } from "@/components/dashboard/tpo/CoreHeatmapCard";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
+import { branchGroupKey, branchShortLabel, useBranchCatalog } from "@/lib/branches";
 import { TpoReportsData } from "@/lib/generateTpoReports";
 import {
   HpCard,
@@ -75,6 +78,8 @@ type BranchReadinessRow = { branch: string; avgReadiness: number; avgPractice: n
 
 export default function ReadinessAnalyticsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
+  const catalog = useBranchCatalog();
+  const { scope: deptScope } = useDepartmentScope();
   const [data, setData] = useState<TpoReportsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,14 +88,14 @@ export default function ReadinessAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<TpoReportsData>("/tpo/reports/data");
+      const res = await api.get<TpoReportsData>(deptScope === "ALL" ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`);
       setData(res);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Failed to load analytics.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deptScope]);
 
   useEffect(() => {
     if (status === "ready") load();
@@ -107,16 +112,18 @@ export default function ReadinessAnalyticsPage() {
   // replaces the previously-fictional avgDsaScore/avgSpeedScore mock.
   const branchReadiness = (() => {
     if (!data) return [];
-    const groups = new Map<string, { readiness: number[]; practice: number[] }>();
+    // "Mechanical", "MECH" and "ME" are one branch: group by what it means, label with the short name.
+    const groups = new Map<string, { label: string; readiness: number[]; practice: number[] }>();
     for (const s of data.students) {
-      if (!s.branch) continue;
-      const g = groups.get(s.branch) ?? { readiness: [], practice: [] };
+      const key = branchGroupKey(s);
+      if (!key) continue;
+      const g = groups.get(key) ?? { label: branchShortLabel(s, catalog) ?? key, readiness: [], practice: [] };
       g.readiness.push(s.readiness_score);
       g.practice.push(s.practice_score);
-      groups.set(s.branch, g);
+      groups.set(key, g);
     }
-    return Array.from(groups.entries()).map(([branch, g]) => ({
-      branch,
+    return Array.from(groups.values()).map((g) => ({
+      branch: g.label,
       avgReadiness: Math.round(g.readiness.reduce((a, b) => a + b, 0) / g.readiness.length),
       avgPractice: Math.round(g.practice.reduce((a, b) => a + b, 0) / g.practice.length),
     }));
@@ -463,6 +470,9 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
           </HpCard>
         </div>
       </HpItem>
+
+      {/* Core Prep, by branch and subject — renders nothing unless this college has students in a live core branch. */}
+      <CoreHeatmapCard />
 
       {/* Company-wise hiring */}
       <HpItem>

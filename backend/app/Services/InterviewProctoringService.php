@@ -7,6 +7,7 @@ use App\Models\InterviewProctoringViolation;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewSession;
 use App\Models\User;
+use App\Services\Integrity\StrikeMath;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -63,6 +64,7 @@ class InterviewProctoringService
         ?InterviewQuestion $question,
         ?string $ip,
         array $meta,
+        ?int $strikes = null,
     ): array {
         if ($session->isLocked()) {
             $this->logViolation($session, $type, $question, $ip, $meta, false);
@@ -70,9 +72,10 @@ class InterviewProctoringService
             return ['session' => $session, 'locked' => true, 'already_locked' => true];
         }
 
-        $isStrike = InterviewProctoringViolation::isStrikeType($type);
+        // `$strikes` is set only by the integrity layer; null = the original rule.
+        $isStrike = $strikes === null ? InterviewProctoringViolation::isStrikeType($type) : $strikes > 0;
 
-        return DB::transaction(function () use ($session, $type, $question, $ip, $meta, $isStrike) {
+        return DB::transaction(function () use ($session, $type, $question, $ip, $meta, $isStrike, $strikes) {
             /** @var InterviewProctoringSession $locked */
             $locked = InterviewProctoringSession::whereKey($session->id)->lockForUpdate()->first();
 
@@ -82,7 +85,7 @@ class InterviewProctoringService
                 return ['session' => $locked->fresh(), 'locked' => $locked->isLocked(), 'already_locked' => $locked->isLocked()];
             }
 
-            $locked->increment('violation_count');
+            $locked->increment('violation_count', StrikeMath::toAdd($strikes, (int) $locked->violation_count));
             $locked->refresh();
 
             $threshold = (int) config('proctoring.max_violations_before_lock', 3);

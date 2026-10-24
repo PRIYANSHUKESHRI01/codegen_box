@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Search, Plus, Building2, X, UserCog, Trash2 } from "lucide-react";
 import { BulkImportStudentsPanel } from "@/components/dashboard/tpo/BulkImportStudentsPanel";
 import { CollegeCoordinatorsModal } from "@/components/admin/mellow/CollegeCoordinatorsModal";
+import { CollegeDepartmentsModal } from "@/components/admin/mellow/CollegeDepartmentsModal";
+import { departmentShort, useBranchCatalog } from "@/lib/branches";
 import { DeleteCollegeModal } from "@/components/admin/superadmin/DeleteCollegeModal";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
@@ -26,6 +28,8 @@ interface ApiCollege {
   subscription_is_trial?: boolean;
   /** Null = unlimited (Academic Enterprise, or a custom plan negotiated as unlimited). */
   plan_max_students?: number | null;
+  /** The departments the college runs (Engineering, Management, Commerce, Arts …). */
+  departments?: string[] | null;
 }
 
 interface College {
@@ -45,6 +49,7 @@ interface College {
   subscriptionStatus: string | null;
   subscriptionIsTrial: boolean;
   planMaxStudents: number | null;
+  departments: string[];
 }
 
 function mapCollegeFromApi(college: ApiCollege): College {
@@ -66,6 +71,7 @@ function mapCollegeFromApi(college: ApiCollege): College {
     subscriptionStatus: college.subscription_status ?? null,
     subscriptionIsTrial: college.subscription_is_trial ?? false,
     planMaxStudents: college.plan_max_students ?? null,
+    departments: college.departments && college.departments.length > 0 ? college.departments : ["engineering"],
   };
 }
 
@@ -99,6 +105,10 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
   const [showAddCollegeModal, setShowAddCollegeModal] = useState(false);
   const [importModalCollege, setImportModalCollege] = useState<{ id: number; name: string } | null>(null);
   const [coordinatorsModalCollege, setCoordinatorsModalCollege] = useState<{ id: number; name: string } | null>(null);
+  const [departmentsModalCollege, setDepartmentsModalCollege] = useState<{ id: number; name: string } | null>(null);
+  const catalog = useBranchCatalog();
+  // Departments the new college will run from day one (Engineering & Technology unless changed).
+  const [newCollegeDepartments, setNewCollegeDepartments] = useState<string[]>(["engineering"]);
   const [newCollegeName, setNewCollegeName] = useState("");
   const [newCollegeCode, setNewCollegeCode] = useState("");
   const [newTpoName, setNewTpoName] = useState("");
@@ -157,6 +167,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
           tier: newCollegeTier,
           tpo_name: newTpoName,
           tpo_email: newTpoEmail,
+          departments: newCollegeDepartments.length > 0 ? newCollegeDepartments : ["engineering"],
           ...(newCollegeTier === "Custom"
             ? {
                 custom_max_students: Number(newCollegeMaxStudents),
@@ -181,6 +192,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
       setNewCollegeAnnualPrice("");
       setIsDemo(false);
       setDemoDays("14");
+      setNewCollegeDepartments(["engineering"]);
       triggerToast(
         isDemo
           ? `"${res.college.name}" onboarded as a ${demoDays}-day demo! TPO temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.tpo.email)}`
@@ -435,6 +447,14 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
                     Import Students
                   </button>
                   <button
+                    onClick={() => setDepartmentsModalCollege({ id: Number(col.id), name: col.name })}
+                    title={col.departments.map((d) => departmentShort(catalog, d)).join(" · ")}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-border-subtle bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary text-xs font-bold transition-all"
+                  >
+                    Departments
+                    <span className="tabular rounded-full bg-accent-primary/15 px-1.5 text-3xs text-accent-primary">{col.departments.length}</span>
+                  </button>
+                  <button
                     onClick={() => setCoordinatorsModalCollege({ id: Number(col.id), name: col.name })}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-border-subtle bg-elevated hover:bg-surface-hover text-text-secondary hover:text-primary text-xs font-bold transition-all"
                   >
@@ -531,6 +551,30 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
                     className="w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary"
                   />
                 </div>
+              </div>
+
+              <div>
+                <span className="block font-semibold text-text-secondary mb-1">Departments the college runs</span>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Departments the college runs">
+                  {(catalog?.departments ?? []).map((d) => {
+                    const on = newCollegeDepartments.includes(d.code);
+                    return (
+                      <button
+                        key={d.code}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setNewCollegeDepartments((cur) => (on ? cur.filter((c) => c !== d.code) : [...cur, d.code]))}
+                        className={cn(
+                          "rounded-full border px-3 py-1.5 text-2xs font-bold transition-colors",
+                          on ? "border-accent-primary bg-accent-primary text-white" : "border-border-strong bg-elevated text-text-secondary hover:text-primary"
+                        )}
+                      >
+                        {d.short}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-3xs text-text-muted">Can be changed any time by the college itself (Settings → Departments) or from the college&apos;s card here.</p>
               </div>
 
               <div>
@@ -775,6 +819,15 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
           </div>
         </div>
       )}
+
+      <CollegeDepartmentsModal
+        college={departmentsModalCollege}
+        onClose={() => setDepartmentsModalCollege(null)}
+        onSaved={(message) => {
+          triggerToast(message);
+          loadColleges();
+        }}
+      />
 
       <CollegeCoordinatorsModal
         college={coordinatorsModalCollege}

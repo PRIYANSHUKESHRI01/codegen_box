@@ -1,0 +1,408 @@
+{
+    "ece": {
+        "engineering_mathematics": [
+            "linear_algebra",
+            "calculus",
+            "differential_equations",
+            "vector_calculus",
+            "complex_analysis",
+            "probability_statistics",
+            "numerical_methods",
+            "transform_theory"
+        ],
+        "network_theory": [
+            "network_elements_laws",
+            "network_theorems",
+            "transient_response",
+            "sinusoidal_steady_state",
+            "resonance_filters",
+            "two_port_networks",
+            "network_graphs"
+        ],
+        "signals_and_systems": [
+            "signal_classification",
+            "lti_convolution",
+            "fourier_series_transform",
+            "laplace_transform",
+            "z_transform",
+            "sampling",
+            "dft_fft"
+        ],
+        "electronic_devices": [
+            "semiconductor_physics",
+            "pn_junction_diode",
+            "bjt",
+            "mosfet",
+            "optoelectronic_devices",
+            "device_fabrication"
+        ],
+        "analog_circuits": [
+            "diode_circuits",
+            "bjt_fet_biasing",
+            "small_signal_amplifiers",
+            "frequency_response",
+            "feedback_amplifiers",
+            "oscillators",
+            "opamp_circuits",
+            "power_amplifiers_regulators"
+        ],
+        "digital_circuits": [
+            "number_systems_boolean",
+            "logic_minimisation",
+            "combinational_circuits",
+            "sequential_circuits",
+            "counters_registers",
+            "fsm_design",
+            "logic_families",
+            "memories_adc_dac"
+        ],
+        "control_systems": [
+            "modelling_block_diagrams",
+            "time_response",
+            "stability_routh",
+            "root_locus",
+            "frequency_domain_bode_nyquist",
+            "compensators_pid",
+            "state_space"
+        ],
+        "communications": [
+            "random_processes_noise",
+            "analog_modulation",
+            "digital_modulation",
+            "sampling_pcm",
+            "information_theory_coding",
+            "detection_ber",
+            "wireless_mobile",
+            "optical_satellite"
+        ],
+        "electromagnetics": [
+            "electrostatics_magnetostatics",
+            "maxwell_equations",
+            "transmission_lines",
+            "waveguides",
+            "antennas"
+        ],
+        "microprocessors_embedded": [
+            "architecture_8085_8086",
+            "interfacing_peripherals",
+            "microcontrollers_8051_arm",
+            "embedded_c",
+            "communication_protocols",
+            "rtos_basics",
+            "computer_organisation"
+        ],
+        "vlsi_design": [
+            "cmos_logic",
+            "timing_analysis",
+            "layout_fabrication",
+            "verilog_rtl",
+            "low_power_design",
+            "verification_dft"
+        ]
+    },
+    "eee": {
+        "engineering_mathematics": [
+            "linear_algebra",
+            "calculus",
+            "differential_equations",
+            "complex_variables",
+            "probability_statistics",
+            "numerical_methods",
+            "transform_theory"
+        ],
+        "electric_circuits": [
+            "network_solution_methods",
+            "network_theorems",
+            "transient_analysis",
+            "ac_circuits_power",
+            "three_phase_circuits",
+            "two_port_resonance"
+        ],
+        "electromagnetic_fields": [
+            "electrostatics",
+            "magnetostatics",
+            "time_varying_fields",
+            "wave_propagation"
+        ],
+        "signals_and_systems": [
+            "signal_classification",
+            "lti_convolution",
+            "fourier_laplace",
+            "z_transform"
+        ],
+        "electrical_machines": [
+            "transformers",
+            "dc_machines",
+            "induction_machines",
+            "synchronous_machines",
+            "special_machines",
+            "machine_theory_basics"
+        ],
+        "power_systems": [
+            "generation_economics",
+            "transmission_line_parameters",
+            "per_unit_load_flow",
+            "fault_analysis",
+            "stability",
+            "protection_switchgear",
+            "hvdc_facts",
+            "distribution_systems"
+        ],
+        "control_systems": [
+            "modelling_block_diagrams",
+            "time_response",
+            "stability_root_locus",
+            "frequency_domain",
+            "compensators_pid",
+            "state_space"
+        ],
+        "measurements_instrumentation": [
+            "bridges_instruments",
+            "instrument_transformers",
+            "power_energy_measurement",
+            "transducers_sensors",
+            "digital_instruments",
+            "error_analysis"
+        ],
+        "analog_digital_electronics": [
+            "diodes_transistors",
+            "opamp_applications",
+            "oscillators_555",
+            "combinational_logic",
+            "sequential_logic",
+            "microprocessor_basics",
+            "adc_dac"
+        ],
+        "power_electronics_drives": [
+            "power_devices",
+            "rectifiers",
+            "dc_dc_converters",
+            "inverters",
+            "ac_voltage_controllers",
+            "dc_ac_drives",
+            "ev_charging_basics"
+        ],
+        "utilisation_safety": [
+            "illumination",
+            "electric_heating_welding",
+            "electric_traction",
+            "wiring_earthing",
+            "standards_safety",
+            "renewable_energy"
+        ]
+    },
+    "mech": {
+        "engineering_mathematics": [
+            "linear_algebra",
+            "calculus",
+            "differential_equations",
+            "vector_calculus",
+            "complex_variables",
+            "probability_statistics",
+            "numerical_methods"
+        ],
+        "engineering_mechanics": [
+            "equilibrium_free_body",
+            "trusses_frames",
+            "centroid_inertia",
+            "kinematics_particles",
+            "rigid_body_dynamics",
+            "work_energy_momentum"
+        ],
+        "strength_of_materials": [
+            "stress_strain",
+            "axial_torsion",
+            "beams_sfd_bmd",
+            "bending_shear_stress",
+            "deflection_of_beams",
+            "mohrs_circle_failure",
+            "columns_buckling",
+            "thin_thick_cylinders"
+        ],
+        "theory_of_machines": [
+            "mechanisms_kinematics",
+            "cams_gears",
+            "flywheel_governors",
+            "balancing",
+            "friction_drives",
+            "vibrations"
+        ],
+        "machine_design": [
+            "design_philosophy_fatigue",
+            "fasteners_joints",
+            "shafts_keys_couplings",
+            "springs",
+            "gears_design",
+            "bearings",
+            "brakes_clutches"
+        ],
+        "fluid_mechanics": [
+            "fluid_properties_statics",
+            "kinematics_bernoulli",
+            "momentum_analysis",
+            "viscous_flow_pipes",
+            "boundary_layer_dimensional",
+            "turbines",
+            "pumps_compressors"
+        ],
+        "thermodynamics": [
+            "laws_of_thermodynamics",
+            "entropy_availability",
+            "properties_pure_substances",
+            "ideal_real_gases",
+            "power_cycles",
+            "refrigeration_cycles"
+        ],
+        "heat_transfer": [
+            "conduction_steady",
+            "fins_transient",
+            "convection",
+            "radiation",
+            "heat_exchangers",
+            "boiling_condensation"
+        ],
+        "ic_engines_automotive": [
+            "engine_cycles_performance",
+            "combustion_emissions",
+            "fuel_injection_ignition",
+            "transmission_steering",
+            "ev_hybrid_basics"
+        ],
+        "manufacturing_engineering": [
+            "casting",
+            "metal_forming",
+            "machining_theory",
+            "machine_tools_cnc",
+            "welding_joining",
+            "non_traditional_machining",
+            "tool_life_economics"
+        ],
+        "metrology_quality": [
+            "limits_fits_tolerances",
+            "measuring_instruments",
+            "spc_control_charts",
+            "quality_systems"
+        ],
+        "industrial_engineering": [
+            "production_planning",
+            "inventory_control",
+            "forecasting_scheduling",
+            "work_study",
+            "operations_research",
+            "maintenance_reliability"
+        ],
+        "materials_science": [
+            "crystal_structure_defects",
+            "phase_diagrams",
+            "heat_treatment",
+            "mechanical_properties_testing",
+            "engineering_materials"
+        ],
+        "cad_cam_design": [
+            "engineering_graphics",
+            "geometric_modelling",
+            "cam_nc_programming",
+            "fea_basics"
+        ]
+    },
+    "civil": {
+        "engineering_mathematics": [
+            "linear_algebra",
+            "calculus",
+            "differential_equations",
+            "probability_statistics",
+            "numerical_methods"
+        ],
+        "engineering_mechanics": [
+            "equilibrium_trusses",
+            "centroid_inertia",
+            "dynamics"
+        ],
+        "solid_mechanics": [
+            "stress_strain",
+            "bending_shear",
+            "torsion",
+            "mohrs_circle_failure",
+            "columns"
+        ],
+        "structural_analysis": [
+            "determinacy_stability",
+            "trusses_beams_frames",
+            "influence_lines",
+            "energy_methods_deflection",
+            "force_method",
+            "displacement_methods",
+            "matrix_methods",
+            "arches_cables"
+        ],
+        "concrete_structures": [
+            "concrete_materials_mix",
+            "working_stress",
+            "limit_state_flexure",
+            "limit_state_shear_torsion",
+            "columns_footings",
+            "slabs_stairs",
+            "prestressed_concrete"
+        ],
+        "steel_structures": [
+            "connections",
+            "tension_members",
+            "compression_members",
+            "beams_plate_girders",
+            "industrial_structures"
+        ],
+        "geotechnical_engineering": [
+            "soil_classification_phase",
+            "permeability_seepage",
+            "effective_stress_consolidation",
+            "shear_strength",
+            "earth_pressure_slopes",
+            "bearing_capacity_foundations",
+            "pile_foundations",
+            "site_investigation"
+        ],
+        "fluid_mechanics_hydraulics": [
+            "fluid_statics_kinematics",
+            "bernoulli_momentum",
+            "pipe_flow",
+            "open_channel_flow",
+            "hydraulic_machines"
+        ],
+        "hydrology_irrigation": [
+            "precipitation_runoff",
+            "hydrographs_flood",
+            "groundwater_wells",
+            "crop_water_requirement",
+            "canals_dams_structures"
+        ],
+        "environmental_engineering": [
+            "water_demand_quality",
+            "water_treatment",
+            "wastewater_characteristics",
+            "wastewater_treatment",
+            "air_noise_pollution",
+            "solid_waste"
+        ],
+        "transportation_engineering": [
+            "highway_geometric_design",
+            "pavement_design",
+            "traffic_engineering",
+            "railways_airports",
+            "transport_planning"
+        ],
+        "surveying_geomatics": [
+            "levelling_traversing",
+            "theodolite_tacheometry",
+            "curves_setting_out",
+            "gps_remote_sensing",
+            "errors_adjustment"
+        ],
+        "construction_management": [
+            "building_materials",
+            "estimation_costing",
+            "project_planning_cpm_pert",
+            "construction_equipment",
+            "contracts_safety"
+        ]
+    }
+}

@@ -66,15 +66,15 @@ class SendProctoringViolationReport implements ShouldQueue
 
         $recipients = $college->tpoAdmins()->get();
 
+        // Every active coordinator who looks after this student (their section, and their branches within it) — a
+        // branch-scoped college can have more than one coordinator per section, each for their own branches.
         if ($student->section) {
-            $coordinator = User::where('college_id', $college->id)
+            User::where('college_id', $college->id)
                 ->where('role', User::ROLE_SECTION_COORDINATOR)
-                ->where('section', $student->section)
-                ->first();
-
-            if ($coordinator) {
-                $recipients->push($coordinator);
-            }
+                ->where('is_blocked', false)
+                ->get()
+                ->filter(fn (User $coordinator) => $coordinator->coordinates($student))
+                ->each(fn (User $coordinator) => $recipients->push($coordinator));
         }
 
         $recipients = $recipients->unique('id');

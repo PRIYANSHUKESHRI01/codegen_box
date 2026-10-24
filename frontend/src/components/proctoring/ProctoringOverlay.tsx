@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ClipboardX, Maximize } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { VIOLATION_LABEL, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
+import { AssuranceBadge, IntegrityHoldLayer } from "./IntegrityHoldLayer";
+import { violationLabel, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
 
 /**
  * Rendered on top of the normal contest problem UI (absolutely positioned,
@@ -70,7 +71,7 @@ export function ProctoringOverlay({
           count (not just at toast time). */}
       {session && (
         <div className="fixed top-4 right-4 z-50 flex items-center gap-2.5 px-3 py-1.5 rounded-control bg-surface border border-border-strong shadow-card text-2xs font-bold">
-          <span className="flex items-center gap-1.5 text-status-danger" title="Your session is being recorded locally">
+          <span className="flex items-center gap-1.5 text-status-danger" title="Your attempt is being proctored">
             <span className="w-2 h-2 rounded-full bg-status-danger animate-pulse" aria-hidden="true" />
             <span className="hidden sm:inline">Recording</span>
           </span>
@@ -79,6 +80,7 @@ export function ProctoringOverlay({
             <AlertTriangle className={session.violation_count > 0 ? "w-3.5 h-3.5 text-status-warning" : "w-3.5 h-3.5 text-text-muted"} />
             {session.violation_count}/{session.max_violations} strikes
           </span>
+          <AssuranceBadge />
         </div>
       )}
 
@@ -104,7 +106,7 @@ export function ProctoringOverlay({
             Warning {toast.count}/{toast.max}
           </p>
           <p className="text-2xs text-text-secondary mt-1">
-            {VIOLATION_LABEL[toast.type]}. {toast.max - toast.count > 0 ? `${toast.max - toast.count} more strike${toast.max - toast.count === 1 ? "" : "s"} and your attempt ends.` : ""}
+            {violationLabel(toast.type)}. {toast.max - toast.count > 0 ? `${toast.max - toast.count} more strike${toast.max - toast.count === 1 ? "" : "s"} and your attempt ends.` : ""}
           </p>
         </div>
       )}
@@ -127,6 +129,9 @@ export function ProctoringOverlay({
           </div>
         </div>
       )}
+
+      {/* Screen share stopped / camera gone / signal lost / Guardian quiet / attempt open elsewhere. */}
+      <IntegrityHoldLayer />
     </>
   );
 }

@@ -1,7 +1,9 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { BranchScopeBar } from "@/components/branches/BranchScopeBar";
+import { inBranchScope, SCOPE_ALL } from "@/lib/branches";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -36,10 +38,12 @@ import {
   Table2,
   type LucideIcon,
   Code2,
+  CircuitBoard,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import type { TpoReportsData, ReportPreview } from "@/lib/generateTpoReports";
 import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
@@ -99,6 +103,8 @@ interface CohortSummary {
   activeStudents: number;
   /** The language the most students have submitted in, if anyone has. */
   topLanguage: string | null;
+  /** Students of a branch whose Core Prep is live. */
+  coreStudents: number;
 }
 
 /**
@@ -124,6 +130,7 @@ function computeSummary(data: TpoReportsData, sectionFilter: string | null): Coh
     codingStudents: students.filter((s) => s.coding.languages.length > 0).length,
     activeStudents: students.filter((s) => s.activity.engagement === "active").length,
     topLanguage: rollupLanguages(students)[0]?.language ?? null,
+    coreStudents: students.filter((s) => !!s.core).length,
   };
 }
 
@@ -146,6 +153,8 @@ interface ReportDef {
   preview?: (data: TpoReportsData, sectionFilter: string | null) => Promise<ReportPreview>;
   /** Whether this report is meaningfully scoped by section — Directory/Funnel/Deck operate on drives, not per-student data, so the section filter never changes their output. */
   sectionAware?: boolean;
+  /** Hides the report from colleges it means nothing to (no core-branch student with Core Prep live). */
+  available?: (data: TpoReportsData) => boolean;
   /** A real, computed-on-the-spot figure shown on the card itself — so a TPO
    * knows roughly what a report contains before spending a click on it. */
   liveStat: (summary: CohortSummary) => LiveStat;
@@ -190,6 +199,18 @@ const REPORTS: ReportDef[] = [
     liveStat: (s) => ({
       text: s.codingStudents === 0 ? "No code submitted yet" : `${s.codingStudents} coding · ${s.activeStudents} active this week${s.topLanguage ? ` · most use ${languageLabel(s.topLanguage)}` : ""}`,
     }),
+  },
+  {
+    id: "core-proficiency",
+    name: "Core Subject Proficiency Report",
+    description: "For ECE, EEE, Mechanical and Civil students: accuracy in every Core Prep subject, core readiness, tests taken and each student's weakest subject — one sheet per branch family.",
+    format: "Excel",
+    category: "Analytics",
+    icon: CircuitBoard,
+    generate: async (data) => (await loadReportLib()).generateCoreProficiencyReport(data),
+    preview: async () => (await loadReportLib()).coreProficiencyRows(),
+    available: (data) => data.students.some((s) => !!s.core),
+    liveStat: (s) => ({ text: `${s.coreStudents} core-branch student${s.coreStudents === 1 ? "" : "s"} on Core Prep` }),
   },
   {
     id: "directory",
@@ -274,10 +295,21 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export default function PlacementReportsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
+  // Every report is the department the TPO is looking at (the switcher under the page title), or the whole college.
+  const { scope: deptScope } = useDepartmentScope();
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
   const [sectionFilter, setSectionFilter] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [data, setData] = useState<TpoReportsData | null>(null);
+  const [rawData, setData] = useState<TpoReportsData | null>(null);
+  const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
+  // The branch switcher narrows the STUDENT side of every report (rosters, readiness, who fails a drive).
+  // Drive definitions and their college-wide funnel counts stay as they are — a drive is not a branch.
+  const data = useMemo<TpoReportsData | null>(() => {
+    if (!rawData || branchScope === SCOPE_ALL) return rawData;
+    const students = rawData.students.filter((s) => inBranchScope(s, branchScope));
+    const ids = new Set(students.map((s) => s.id));
+    return { ...rawData, students, drives: rawData.drives.map((d) => ({ ...d, non_compliant: d.non_compliant.filter((n) => ids.has(n.id)) })) };
+  }, [rawData, branchScope]);
   const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -295,17 +327,18 @@ export default function PlacementReportsPage() {
     setLoadError(null);
     try {
       const [reportsRes, coordinatorsRes] = await Promise.all([
-        api.get<TpoReportsData>("/tpo/reports/data"),
+        api.get<TpoReportsData>(deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`),
         api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
       ]);
       setData(reportsRes);
+      setBranchScope(SCOPE_ALL);
       setCoordinators(coordinatorsRes.coordinators);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "Failed to load report data.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [deptScope]);
 
   useEffect(() => {
     if (status === "ready") loadData();
@@ -352,7 +385,8 @@ export default function PlacementReportsPage() {
     );
   }
 
-  const filtered = REPORTS.filter((r) => categoryFilter === "All" || r.category === categoryFilter);
+  const reports = data ? REPORTS.filter((r) => !r.available || r.available(data)) : REPORTS;
+  const filtered = reports.filter((r) => categoryFilter === "All" || r.category === categoryFilter);
   const summary = data ? computeSummary(data, sectionFilter) : null;
   const sectionStats = data ? computeSectionStats(data.students, coordinators) : [];
 
@@ -386,7 +420,7 @@ export default function PlacementReportsPage() {
   const tabs = CATEGORY_FILTERS.map((f) => ({
     id: f,
     label: f,
-    count: f === "All" ? REPORTS.length : REPORTS.filter((r) => r.category === f).length,
+    count: f === "All" ? reports.length : reports.filter((r) => r.category === f).length,
   }));
 
   return (
@@ -425,11 +459,12 @@ export default function PlacementReportsPage() {
                         <HpPill tone="sky" size="sm" dot>
                           Generated on demand
                         </HpPill>
-                        <span>{REPORTS.length} reports · PDF, Excel &amp; CSV</span>
+                        <span>{reports.length} reports · PDF, Excel &amp; CSV</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {rawData && <BranchScopeBar students={rawData.students} value={branchScope} onChange={setBranchScope} className="mr-2" />}
                     <span className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Scope</span>
                     <AnimatePresence mode="popLayout" initial={false}>
                       <motion.span
@@ -553,6 +588,7 @@ export default function PlacementReportsPage() {
                               <span className="flex min-w-0 items-center gap-2">
                                 <HpAvatar name={s.coordinator.name} size="xs" />
                                 <span className="truncate text-xs font-semibold text-text-secondary">{s.coordinator.name}</span>
+                                {s.coordinators.length > 1 && <span className="shrink-0 text-3xs font-semibold text-text-muted" title={s.coordinators.map((c) => c.name).join(", ")}>+{s.coordinators.length - 1}</span>}
                               </span>
                               <span className="flex shrink-0 items-center gap-0.5 lg:ml-auto">
                                 <a

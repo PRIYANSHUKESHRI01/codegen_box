@@ -21,6 +21,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CheckoutController;
 use App\Http\Controllers\Api\ContestController;
 use App\Http\Controllers\Api\ContestProctoringController;
+use App\Http\Controllers\Api\GuardianController;
+use App\Http\Controllers\Api\IntegrityController;
+use App\Http\Controllers\Api\IntegrityReviewController;
 use App\Http\Controllers\Api\ContestSubmissionController;
 use App\Http\Controllers\Api\CompanyCandidateController;
 use App\Http\Controllers\Api\CompanyCollegeController;
@@ -30,11 +33,13 @@ use App\Http\Controllers\Api\CompanyHackathonController;
 use App\Http\Controllers\Api\CompanyInterviewController;
 use App\Http\Controllers\Api\CompanyInterviewRoleTemplateController;
 use App\Http\Controllers\Api\CompanyInterviewTrackController;
+use App\Http\Controllers\Api\CompanyPrepController;
 use App\Http\Controllers\Api\CompanyProctoringController;
 use App\Http\Controllers\Api\CompanyReportsController;
 use App\Http\Controllers\Api\CompanySoftSkillController;
 use App\Http\Controllers\Api\CompanyVaultController;
 use App\Http\Controllers\Api\ContactRequestController;
+use App\Http\Controllers\Api\CoordinatorNoteController;
 use App\Http\Controllers\Api\CoordinatorProctoringController;
 use App\Http\Controllers\Api\CoordinatorStudentController;
 use App\Http\Controllers\Api\CoordinatorStudentReportController;
@@ -42,6 +47,9 @@ use App\Http\Controllers\Api\HackathonArenaController;
 use App\Http\Controllers\Api\InterviewController;
 use App\Http\Controllers\Api\InterviewProctoringController;
 use App\Http\Controllers\Api\InterviewQuestionBankController;
+use App\Http\Controllers\Api\DrillController;
+use App\Http\Controllers\Api\StudySittingController;
+use App\Http\Controllers\Api\PracticeInterviewController;
 use App\Http\Controllers\Api\InterviewQuestionGenerationController;
 use App\Http\Controllers\Api\InterviewTrackController;
 use App\Http\Controllers\Api\InternalCustomerController;
@@ -54,6 +62,7 @@ use App\Http\Controllers\Api\MarketingLeadController;
 use App\Http\Controllers\Api\MySubmissionsController;
 use App\Http\Controllers\Api\EmailPreferenceController;
 use App\Http\Controllers\Api\NewsletterController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PasswordResetController;
 use App\Http\Controllers\Api\PhoneVerificationController;
 use App\Http\Controllers\Api\ProblemController;
@@ -61,7 +70,20 @@ use App\Http\Controllers\Api\AdminProjectLabController;
 use App\Http\Controllers\Api\ProjectLabController;
 use App\Http\Controllers\Api\ProjectWorkspaceController;
 use App\Http\Controllers\Api\PublicController;
+use App\Http\Controllers\Api\AdminCoreImportController;
+use App\Http\Controllers\Api\AdminCoreTestController;
+use App\Http\Controllers\Api\CoreTestProctoringController;
+use App\Http\Controllers\Api\StudentCoreController;
+use App\Http\Controllers\Api\TpoCoreInsightsController;
+use App\Http\Controllers\Api\TpoCoreTestController;
+use App\Http\Controllers\Api\AdminCoreQuestionController;
+use App\Http\Controllers\Api\AdminCoreTaxonomyController;
+use App\Http\Controllers\Api\BranchController;
+use App\Http\Controllers\Api\CollegeDepartmentController;
 use App\Http\Controllers\Api\PublicPlanController;
+use App\Http\Controllers\Api\SuperAdminBranchController;
+use App\Http\Controllers\Api\SuperAdminDepartmentController;
+use App\Http\Controllers\Api\TpoBranchController;
 use App\Http\Controllers\Api\PayuReturnController;
 use App\Http\Controllers\Api\PayuWebhookController;
 use App\Http\Controllers\Api\RazorpayWebhookController;
@@ -78,6 +100,7 @@ use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SuperAdminAccountController;
 use App\Http\Controllers\Api\SuperAdminController;
+use App\Http\Controllers\Api\SuperAdminCredentialController;
 use App\Http\Controllers\Api\SuperAdminPaymentController;
 use App\Http\Controllers\Api\SuperAdminPlanController;
 use App\Http\Controllers\Api\SuperAdminSubscriptionController;
@@ -89,9 +112,11 @@ use App\Http\Controllers\Api\TpoInterviewTrackController;
 use App\Http\Controllers\Api\TpoDriveApplicationController;
 use App\Http\Controllers\Api\TpoDriveController;
 use App\Http\Controllers\Api\TpoProctoringController;
+use App\Http\Controllers\Api\TpoExamNetworkController;
 use App\Http\Controllers\Api\TpoReportsController;
 use App\Http\Controllers\Api\TpoSoftSkillController;
 use App\Http\Controllers\Api\TpoStudentController;
+use App\Http\Controllers\Api\TpoStudentNoteController;
 use App\Http\Controllers\Api\TpoStudentReportController;
 use App\Http\Controllers\Api\VaultIntegrationController;
 use App\Http\Controllers\Api\VocabularyController;
@@ -101,6 +126,14 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// The AptRun Guardian (the Windows desktop agent that watches the operating system during a proctored attempt). It is a
+// separate program with its own credentials, so these sit outside the student login: pairing redeems a one-time code, and
+// every report after that carries a bearer token AND an Ed25519 signature. See App\Services\Integrity\GuardianService.
+Route::get('/guardian/download', [GuardianController::class, 'download'])->middleware('throttle:guardian-download');
+Route::post('/guardian/pair', [GuardianController::class, 'pair'])->middleware('throttle:guardian-pair');
+Route::post('/guardian/beat', [GuardianController::class, 'beat'])->middleware('throttle:guardian-beat');
+Route::post('/guardian/unpair', [GuardianController::class, 'unpair'])->middleware('throttle:guardian-beat');
 
 // The public marketing site's "Talk to Our Team" form — unauthenticated,
 // never creates a user account (see ContactRequest's own docblock for why).
@@ -126,6 +159,8 @@ Route::middleware(['signed', 'throttle:30,1'])->group(function () {
 Route::prefix('public')->middleware('throttle:60,1')->group(function () {
     Route::get('/stats', [PublicController::class, 'stats']);
     Route::get('/problems/sample', [PublicController::class, 'sampleProblems']);
+    // The branch catalogue (names/codes only) every branch picker reads.
+    Route::get('/branches', [BranchController::class, 'index']);
 });
 
 // The pricing page's live price list. Its own named limiter, not the 60/min group above: the
@@ -202,6 +237,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     Route::post('/me/onboarding', [StudentPreferencesController::class, 'complete']);
     Route::post('/me/onboarding/skip', [StudentPreferencesController::class, 'skip']);
     Route::put('/me/preferences', [StudentPreferencesController::class, 'update']);
+    // The branch question: state your branch + what to lead with, ask later, or flag the college's label as wrong.
+    Route::put('/me/branch', [StudentPreferencesController::class, 'branch']);
+    Route::post('/me/branch/skip', [StudentPreferencesController::class, 'skipBranch']);
+    Route::post('/me/branch/dispute', [StudentPreferencesController::class, 'disputeBranch']);
     Route::get('/me/language-insights', [StudentPreferencesController::class, 'languageInsights']);
 
     // Settings → Billing, and the /pricing page when signed in. mine()
@@ -215,6 +254,19 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     Route::get('/me/plan-signal', [SubscriptionController::class, 'signal'])->middleware('throttle:plan-signal');
     // Live price of a cart — the same service prices the real checkout below.
     Route::get('/me/purchase-quote', [SubscriptionController::class, 'quote']);
+
+    // In-app notifications (the bell) — every role, scoped to the caller. `signal` is what open tabs poll every
+    // ~15 s: unread count + newest id, one aggregate query. See NotificationController.
+    Route::prefix('notifications')->group(function () {
+        Route::get('/signal', [NotificationController::class, 'signal'])->middleware('throttle:notification-signal');
+        Route::get('/', [NotificationController::class, 'index'])->middleware('throttle:notifications');
+        Route::get('/preferences', [NotificationController::class, 'preferences'])->middleware('throttle:notifications');
+        Route::put('/preferences', [NotificationController::class, 'updatePreferences'])->middleware('throttle:notifications');
+        Route::post('/read-all', [NotificationController::class, 'markAllRead'])->middleware('throttle:notifications');
+        Route::delete('/read', [NotificationController::class, 'clearRead'])->middleware('throttle:notifications');
+        Route::post('/{id}/read', [NotificationController::class, 'markRead'])->whereNumber('id')->middleware('throttle:notifications');
+        Route::delete('/{id}', [NotificationController::class, 'destroy'])->whereNumber('id')->middleware('throttle:notifications');
+    });
 
     // Paying for a plan (PayU hosted checkout — docs/payments-payu.md — or Razorpay Standard Checkout —
     // docs/payments-razorpay.md; config billing.gateway picks). There is no route that activates a paid plan
@@ -274,6 +326,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 // import on a college's behalf (e.g. they emailed us their
                 // spreadsheet instead of uploading it themselves) — part of
                 // the same college-management workflow, same permission.
+                // Which departments (Engineering, Management, Commerce, Arts …) the college runs.
+                Route::get('/colleges/{college}/departments', [CollegeDepartmentController::class, 'showForCollege']);
+                Route::put('/colleges/{college}/departments', [CollegeDepartmentController::class, 'updateForCollege']);
+
                 Route::get('/students/import-template', [StudentImportController::class, 'template']);
                 Route::post('/colleges/{college}/students/import', [StudentImportController::class, 'storeForCollege']);
                 Route::get('/colleges/{college}/students/imports', [StudentImportController::class, 'indexForCollege']);
@@ -328,6 +384,12 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             });
 
             Route::middleware('permission:'.User::PERM_CONTESTS)->group(function () {
+
+                // Exam integrity review: risk, the tamper-evident timeline, network and the encrypted evidence stills. What a
+                // caller can see is decided by IntegrityReport::scopeFor() from their role (404, never 403, outside it).
+                Route::get('/integrity', [IntegrityReviewController::class, 'index']);
+                Route::get('/integrity/{uuid}', [IntegrityReviewController::class, 'show']);
+                Route::get('/integrity/{uuid}/evidence/{evidence}', [IntegrityReviewController::class, 'evidence'])->whereNumber('evidence');
                 // Contests are platform-run and centrally curated by Mellow
                 // staff — never auto-generated, same as companies/drives above.
                 Route::get('/contests', [AdminContestController::class, 'index']);
@@ -440,6 +502,56 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 });
             });
 
+            // Core Prep authoring (ECE / EEE / Mech / Civil technical questions): the question bank with its
+            // review workflow, bulk import with a dry-run, taxonomy, coverage and student issue reports. Going
+            // live to students is superadmin-only (see /superadmin/core/…).
+            Route::middleware('permission:'.User::PERM_CORE_PREP)->prefix('core')->group(function () {
+                Route::get('/taxonomy', [AdminCoreTaxonomyController::class, 'index']);
+                Route::post('/subjects', [AdminCoreTaxonomyController::class, 'storeSubject']);
+                Route::put('/subjects/{subject}', [AdminCoreTaxonomyController::class, 'updateSubject']);
+                Route::delete('/subjects/{subject}', [AdminCoreTaxonomyController::class, 'destroySubject']);
+                Route::post('/topics', [AdminCoreTaxonomyController::class, 'storeTopic']);
+                Route::put('/topics/{topic}', [AdminCoreTaxonomyController::class, 'updateTopic']);
+                Route::delete('/topics/{topic}', [AdminCoreTaxonomyController::class, 'destroyTopic']);
+                Route::get('/coverage', [AdminCoreTaxonomyController::class, 'coverage']);
+
+                Route::get('/questions', [AdminCoreQuestionController::class, 'index']);
+                Route::post('/questions', [AdminCoreQuestionController::class, 'store']);
+                Route::post('/questions/bulk-status', [AdminCoreQuestionController::class, 'bulkStatus']);
+                Route::post('/questions/ai-draft', [AdminCoreQuestionController::class, 'aiDraft']);
+                Route::get('/questions/{coreQuestion}', [AdminCoreQuestionController::class, 'show']);
+                Route::put('/questions/{coreQuestion}', [AdminCoreQuestionController::class, 'update']);
+                Route::post('/questions/{coreQuestion}/status', [AdminCoreQuestionController::class, 'setStatus']);
+                Route::post('/questions/{coreQuestion}/fix-key', [AdminCoreQuestionController::class, 'fixKey']);
+                Route::post('/questions/{coreQuestion}/image', [AdminCoreQuestionController::class, 'uploadImage']);
+                Route::delete('/questions/{coreQuestion}/image', [AdminCoreQuestionController::class, 'removeImage']);
+                Route::delete('/questions/{coreQuestion}', [AdminCoreQuestionController::class, 'destroy']);
+
+                // Item analysis: recompute now (it also runs nightly); the flags themselves ride on /questions (?flagged=1).
+                Route::post('/item-analysis/run', [AdminCoreQuestionController::class, 'runItemAnalysis']);
+
+                Route::get('/reports', [AdminCoreQuestionController::class, 'reports']);
+                Route::post('/reports/{report}/resolve', [AdminCoreQuestionController::class, 'resolveReport']);
+
+                // The platform's own timed Core tests ("papers"): build from a blueprint or hand-pick, then publish.
+                Route::get('/tests', [AdminCoreTestController::class, 'index']);
+                Route::post('/tests', [AdminCoreTestController::class, 'store']);
+                Route::get('/tests/pool', [AdminCoreTestController::class, 'pool']);
+                Route::get('/tests/candidates', [AdminCoreTestController::class, 'candidates']);
+                Route::get('/tests/{coreTest}', [AdminCoreTestController::class, 'show']);
+                Route::put('/tests/{coreTest}', [AdminCoreTestController::class, 'update']);
+                Route::delete('/tests/{coreTest}', [AdminCoreTestController::class, 'destroy']);
+                Route::get('/tests/{coreTest}/questions', [AdminCoreTestController::class, 'questions']);
+                Route::put('/tests/{coreTest}/questions', [AdminCoreTestController::class, 'setQuestions']);
+                Route::post('/tests/{coreTest}/blueprint', [AdminCoreTestController::class, 'blueprint']);
+
+                Route::get('/import-template', [AdminCoreImportController::class, 'template']);
+                Route::get('/imports', [AdminCoreImportController::class, 'index']);
+                Route::post('/imports', [AdminCoreImportController::class, 'store'])->middleware('throttle:20,1');
+                Route::get('/imports/{import}', [AdminCoreImportController::class, 'show']);
+                Route::post('/imports/{import}/commit', [AdminCoreImportController::class, 'commit'])->middleware('throttle:20,1');
+            });
+
             Route::middleware('permission:'.User::PERM_SOFT_SKILLS)->group(function () {
                 // Soft Skills — the third pillar alongside Contests/AI
                 // Interviews (see SoftSkillAssessment's docblock). Only
@@ -542,6 +654,16 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // Both re-check the caller's own password, so they share a tight per-user limiter (see AppServiceProvider).
             Route::post('/users/{user}/reset-password', [SuperAdminController::class, 'resetPassword'])
                 ->middleware('throttle:superadmin-sensitive');
+            // Filter-bar facets for the account directory: accounts per role and per university under the current filters.
+            Route::get('/users/facets', [SuperAdminController::class, 'directoryFacets']);
+            // The temporary login an account was issued, until its owner replaces it. Unlock = re-enter your own password
+            // (10 minutes, this session only); both are limited and audited, and nothing here is ever cached.
+            Route::get('/credentials/status', [SuperAdminCredentialController::class, 'status']);
+            Route::post('/credentials/unlock', [SuperAdminCredentialController::class, 'unlock'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/credentials/lock', [SuperAdminCredentialController::class, 'lock']);
+            Route::post('/users/{user}/credentials', [SuperAdminCredentialController::class, 'reveal'])
+                ->middleware('throttle:superadmin-credentials');
             Route::get('/colleges/{college}/deletion-preview', [SuperAdminController::class, 'collegeDeletionPreview']);
             Route::delete('/colleges/{college}', [SuperAdminController::class, 'destroyCollege'])
                 ->middleware('throttle:superadmin-sensitive');
@@ -580,6 +702,30 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-sensitive');
             // What a plan INCLUDES (daily limits, free tries, Arena / Pool / Project Lab access) — live too.
             Route::put('/plans/{plan:code}/entitlements', [SuperAdminPlanController::class, 'updateEntitlements'])
+                ->middleware('throttle:superadmin-sensitive');
+
+            // Branches: the catalogue (disciplines, branches, spellings) behind every branch picker and
+            // eligibility check. Adding a spelling re-resolves every student with that label at once.
+            // Departments (Engineering, Management, Commerce, Arts …): their modules, disciplines, and per-branch Domain Prep coverage.
+            Route::get('/departments', [SuperAdminDepartmentController::class, 'index']);
+            Route::post('/departments', [SuperAdminDepartmentController::class, 'store']);
+            Route::put('/departments/{department:code}', [SuperAdminDepartmentController::class, 'update']);
+            Route::delete('/departments/{department:code}', [SuperAdminDepartmentController::class, 'destroy']);
+            Route::post('/disciplines', [SuperAdminDepartmentController::class, 'storeDiscipline']);
+            Route::put('/disciplines/{discipline:code}', [SuperAdminDepartmentController::class, 'updateDiscipline']);
+
+            Route::get('/branches', [SuperAdminBranchController::class, 'index']);
+            Route::post('/branches', [SuperAdminBranchController::class, 'storeBranch']);
+            Route::put('/branches/{branch:code}', [SuperAdminBranchController::class, 'updateBranch']);
+            Route::post('/branch-aliases', [SuperAdminBranchController::class, 'storeAlias']);
+            Route::delete('/branch-aliases/{alias}', [SuperAdminBranchController::class, 'destroyAlias']);
+            // Core Prep go-live: a business decision (it changes what every student of a branch sees), so superadmin only.
+            Route::post('/core/disciplines/{discipline}/live', [AdminCoreTaxonomyController::class, 'setLive'])
+                ->middleware('throttle:superadmin-sensitive');
+            // Staged rollout: show a branch's Core Prep to chosen pilot colleges before it is live for everyone.
+            Route::put('/core/disciplines/{discipline}/pilots', [AdminCoreTaxonomyController::class, 'setPilots'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/branches/re-resolve', [SuperAdminBranchController::class, 'reresolveAll'])
                 ->middleware('throttle:superadmin-sensitive');
 
             // Payments: every plan purchase and what it is worth; "re-check" asks the order's gateway again for one order.
@@ -624,6 +770,14 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     Route::middleware('role:'.User::ROLE_ADMIN_TPO)
         ->prefix('tpo')
         ->group(function () {
+            // The college's exam network: the address ranges its students must be on to START a proctored attempt.
+            Route::get('/exam-network', [TpoExamNetworkController::class, 'show']);
+            Route::put('/exam-network', [TpoExamNetworkController::class, 'update'])->middleware('throttle:30,1');
+            // Exam integrity review: risk, the tamper-evident timeline, network and the encrypted evidence stills. What a
+            // caller can see is decided by IntegrityReport::scopeFor() from their role (404, never 403, outside it).
+            Route::get('/integrity', [IntegrityReviewController::class, 'index']);
+            Route::get('/integrity/{uuid}', [IntegrityReviewController::class, 'show']);
+            Route::get('/integrity/{uuid}/evidence/{evidence}', [IntegrityReviewController::class, 'evidence'])->whereNumber('evidence');
             Route::get('/drives/mapped', [TpoDriveController::class, 'mapped']);
             Route::get('/drives/available', [TpoDriveController::class, 'available']);
             Route::get('/drives/pending', [TpoDriveController::class, 'pending']);
@@ -636,6 +790,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
 
             // Self-serve bulk roster import — the primary path for a college
             // onboarding their whole batch at once.
+            // The departments this college runs (the switcher on every TPO screen reads them).
+            Route::get('/departments', [CollegeDepartmentController::class, 'showMine']);
+            Route::put('/departments', [CollegeDepartmentController::class, 'updateMine']);
+
             Route::get('/students/import-template', [StudentImportController::class, 'template']);
             Route::post('/students/import', [StudentImportController::class, 'storeMine']);
             Route::get('/students/imports', [StudentImportController::class, 'indexMine']);
@@ -645,6 +803,27 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // placeholder-template notification emails, plus adding one
             // student by hand (the same account+welcome-email pipeline as
             // the CSV import above, for a single straggler).
+            // Branch mapping: what the branch labels in this college's roster mean. A mapping is
+            // this college's alone and re-resolves every matching student in one query.
+            Route::get('/branches', [TpoBranchController::class, 'index']);
+            Route::post('/branches/map', [TpoBranchController::class, 'map']);
+            Route::post('/branches/unmap', [TpoBranchController::class, 'unmap']);
+
+            // Mock Core tests: a college's own timed technical tests, from a blueprint or a copy of one of Mellow's papers.
+            Route::get('/core-tests', [TpoCoreTestController::class, 'index']);
+            Route::post('/core-tests', [TpoCoreTestController::class, 'store']);
+            Route::get('/core-tests/pool', [TpoCoreTestController::class, 'pool']);
+            Route::get('/core-tests/library', [TpoCoreTestController::class, 'library']);
+            Route::post('/core-tests/library/{paper}/copy', [TpoCoreTestController::class, 'copy']);
+            Route::get('/core-tests/{coreTest}', [TpoCoreTestController::class, 'show']);
+            Route::put('/core-tests/{coreTest}', [TpoCoreTestController::class, 'update']);
+            Route::delete('/core-tests/{coreTest}', [TpoCoreTestController::class, 'destroy']);
+            Route::post('/core-tests/{coreTest}/blueprint', [TpoCoreTestController::class, 'blueprint']);
+
+            // Core Prep across this college's ECE/EEE/Mech/Civil students: branch × subject strengths, and the per-student report data.
+            Route::get('/core-insights/heatmap', [TpoCoreInsightsController::class, 'heatmap']);
+            Route::get('/core-insights/proficiency', [TpoCoreInsightsController::class, 'proficiency']);
+
             Route::get('/students/cohort', [TpoStudentController::class, 'index']);
             Route::post('/students', [TpoStudentController::class, 'store']);
             Route::post('/students/bulk-notify', [TpoStudentController::class, 'bulkNotify']);
@@ -652,6 +831,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // The Cohort table's "View Report" drill-down: one student's
             // full contest/interview/drive history, activity calendar, and
             // (new) the actual code behind any of their submissions.
+            Route::get('/students/{student}/notes', [TpoStudentNoteController::class, 'index']);
             Route::get('/students/{student}/report', [TpoStudentReportController::class, 'show']);
             Route::get('/students/{student}/submissions/{submission}', [TpoStudentReportController::class, 'submission']);
             Route::get('/students/{student}/contest-submissions/{contestSubmission}', [TpoStudentReportController::class, 'contestSubmission']);
@@ -759,6 +939,11 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     Route::middleware('role:'.User::ROLE_ADMIN_COMPANY)
         ->prefix('company')
         ->group(function () {
+            // Exam integrity review: risk, the tamper-evident timeline, network and the encrypted evidence stills. What a
+            // caller can see is decided by IntegrityReport::scopeFor() from their role (404, never 403, outside it).
+            Route::get('/integrity', [IntegrityReviewController::class, 'index']);
+            Route::get('/integrity/{uuid}', [IntegrityReviewController::class, 'show']);
+            Route::get('/integrity/{uuid}/evidence/{evidence}', [IntegrityReviewController::class, 'evidence'])->whereNumber('evidence');
             Route::get('/colleges', [CompanyCollegeController::class, 'index']);
 
             Route::get('/drives', [CompanyDriveController::class, 'index']);
@@ -913,9 +1098,20 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     Route::middleware('role:'.User::ROLE_SECTION_COORDINATOR)
         ->prefix('coordinator')
         ->group(function () {
+            // Exam integrity review: risk, the tamper-evident timeline, network and the encrypted evidence stills. What a
+            // caller can see is decided by IntegrityReport::scopeFor() from their role (404, never 403, outside it).
+            Route::get('/integrity', [IntegrityReviewController::class, 'index']);
+            Route::get('/integrity/{uuid}', [IntegrityReviewController::class, 'show']);
+            Route::get('/integrity/{uuid}/evidence/{evidence}', [IntegrityReviewController::class, 'evidence'])->whereNumber('evidence');
             Route::get('/students', [CoordinatorStudentController::class, 'index']);
             Route::post('/students/{user}/toggle-block', [CoordinatorStudentController::class, 'toggleBlock']);
-            Route::post('/students/bulk-notify', [CoordinatorStudentController::class, 'bulkNotify']);
+            Route::post('/students/bulk-notify', [CoordinatorStudentController::class, 'bulkNotify'])->middleware('throttle:coordinator-notify');
+
+            // The coordinator's follow-up log on the students they look after (see CoordinatorNoteController).
+            Route::get('/students/{student}/notes', [CoordinatorNoteController::class, 'index']);
+            Route::post('/students/{student}/notes', [CoordinatorNoteController::class, 'store']);
+            Route::put('/notes/{note}', [CoordinatorNoteController::class, 'update']);
+            Route::delete('/notes/{note}', [CoordinatorNoteController::class, 'destroy']);
 
             // Same full activity report TpoStudentReportController exposes
             // to a student's own college TPO — contest/interview/drive
@@ -936,7 +1132,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     // Hack Arena: the students' hackathon world (see HackathonArenaController). Reads are
     // open to students and, as a read-only preview, to the hosting roles; a college TPO and
     // every other role get a 403. Writes are student-only, each with its own per-user limiter.
-    Route::middleware('role:'.User::ROLE_USER.','.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_COMPANY.','.User::ROLE_SUPERADMIN)
+    Route::middleware('role:'.User::ROLE_USER.','.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_COMPANY.','.User::ROLE_SUPERADMIN, 'capability:hackathons')
         ->prefix('arena')
         ->group(function () {
             Route::get('/home', [HackathonArenaController::class, 'home']);
@@ -946,7 +1142,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/hackathons/{hackathon:slug}/results', [HackathonArenaController::class, 'results']);
         });
 
-    Route::middleware('role:'.User::ROLE_USER)
+    Route::middleware('role:'.User::ROLE_USER, 'capability:hackathons')
         ->prefix('arena')
         ->group(function () {
             Route::get('/mine', [HackathonArenaController::class, 'mine']);
@@ -968,13 +1164,21 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     // contest, and superadmin. ProblemController::index()'s per-user
     // `solved` flag is harmless for a staff caller — it's just always false.
     Route::middleware('role:'.User::ROLE_USER.','.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_TPO.','.User::ROLE_SUPERADMIN.','.User::ROLE_ADMIN_COMPANY)
-        ->get('/problems', [ProblemController::class, 'index']);
+        ->get('/problems', [ProblemController::class, 'index'])->middleware('capability:coding_practice');
 
     // Read-only interview question bank browse — shared by every authoring
     // role (Ops/TPO/Company) to pick questions to attach to their own
     // interview. Same multi-role shape as /problems above.
     Route::middleware('role:'.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_TPO.','.User::ROLE_SUPERADMIN.','.User::ROLE_ADMIN_COMPANY)
         ->get('/interview-question-bank/browse', [InterviewQuestionBankController::class, 'index']);
+
+    // Company-wise previous year questions (PYQs) & interview prep catalog —
+    // open to students and all staff roles so students can practice company questions anytime.
+    Route::middleware('role:'.User::ROLE_USER.','.User::ROLE_ADMIN_INTERNAL.','.User::ROLE_ADMIN_TPO.','.User::ROLE_SUPERADMIN.','.User::ROLE_ADMIN_COMPANY)
+        ->group(function () {
+            Route::get('/company-prep', [CompanyPrepController::class, 'index'])->middleware('capability:company_prep');
+            Route::get('/company-prep/{company:slug}', [CompanyPrepController::class, 'show'])->middleware('capability:company_prep');
+        });
 
     // AI-generated interview questions (Gemini) — shared across every
     // authoring role exactly like the browse route above. A write action
@@ -987,63 +1191,91 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     // and the Practice Arena's DSA problem catalog.
     Route::middleware('role:'.User::ROLE_USER)
         ->group(function () {
+            // Exam integrity: telemetry, evidence stills and the Guardian's pairing for a proctored attempt. The attempt
+            // itself is created by each surface's proctoring/start. See IntegrityController.
+            Route::get('/integrity/policy', [IntegrityController::class, 'policy'])->middleware('throttle:integrity-beat');
+            Route::post('/integrity/{uuid}/events', [IntegrityController::class, 'events'])->middleware('throttle:integrity-beat');
+            Route::post('/integrity/{uuid}/evidence', [IntegrityController::class, 'evidence'])->middleware('throttle:integrity-evidence');
+            Route::post('/integrity/{uuid}/end', [IntegrityController::class, 'end'])->middleware('throttle:integrity-beat');
+            Route::get('/integrity/guardian', [IntegrityController::class, 'guardianStatus'])->middleware('throttle:integrity-beat');
+            Route::post('/integrity/guardian/code', [IntegrityController::class, 'guardianCode'])->middleware('throttle:guardian-pair');
+
             Route::get('/drives', [StudentDriveController::class, 'index']);
             Route::get('/drives/{placementDrive}', [StudentDriveController::class, 'show']);
 
-            Route::get('/problems/{problem}', [ProblemController::class, 'show']);
+            Route::get('/problems/{problem}', [ProblemController::class, 'show'])->middleware('capability:coding_practice');
             // Run/Submit only enqueue (202 + token) — the verdict is collected
             // from /judge/{token} below. Per-user throttles, never per-IP.
-            Route::post('/problems/{problem}/run', [SubmissionController::class, 'run'])->middleware('throttle:judge-run');
-            Route::post('/problems/{problem}/submit', [SubmissionController::class, 'submit'])->middleware('throttle:judge-submit');
-            Route::get('/judge/{token}', [JudgeResultController::class, 'show'])->middleware('throttle:judge-poll');
+            Route::post('/problems/{problem}/run', [SubmissionController::class, 'run'])->middleware('capability:coding_practice')->middleware('throttle:judge-run');
+            Route::post('/problems/{problem}/submit', [SubmissionController::class, 'submit'])->middleware('capability:coding_practice')->middleware('throttle:judge-submit');
+            Route::get('/judge/{token}', [JudgeResultController::class, 'show'])->middleware('capability:coding_practice,contests')->middleware('throttle:judge-poll');
 
             // A student's own submission history (practice + contest, unified)
             // and the code behind any of it — self-service mirror of
             // TpoStudentReportController/CoordinatorStudentReportController/
             // AdminStudentReportController, which expose the exact same thing
             // about someone ELSE'S submissions.
-            Route::get('/submissions', [MySubmissionsController::class, 'index']);
-            Route::get('/submissions/{submission}', [MySubmissionsController::class, 'show']);
-            Route::get('/contest-submissions/{contestSubmission}', [MySubmissionsController::class, 'contestSubmission']);
+            Route::get('/submissions', [MySubmissionsController::class, 'index'])->middleware('capability:coding_practice');
+            Route::get('/submissions/{submission}', [MySubmissionsController::class, 'show'])->middleware('capability:coding_practice');
+            Route::get('/contest-submissions/{contestSubmission}', [MySubmissionsController::class, 'contestSubmission'])->middleware('capability:contests');
 
             // Real solved-count/streak/topic-mastery/etc — powers the
             // dashboard, performance report, and practice pages.
             Route::get('/me/stats', [StudentStatsController::class, 'mine']);
             Route::get('/me/rating-history', [StudentStatsController::class, 'ratingHistory']);
+            // The student's readiness, day by day (the chart, "you crossed 60 on…", what missed days cost) — see ReadinessHistoryService.
+            Route::get('/me/readiness/history', [StudentStatsController::class, 'readinessHistory']);
             // Own interview performance (with scores) — see InterviewController::history()'s docblock for why this is separate from /interviews below.
-            Route::get('/me/interviews', [InterviewController::class, 'history']);
+            Route::get('/me/interviews', [InterviewController::class, 'history'])->middleware('capability:ai_interviews');
             // Own Soft Skills performance — powers the Reports page's "Soft Skills Performance" card, same shape as /me/interviews above.
-            Route::get('/me/soft-skills', [SoftSkillController::class, 'history']);
+            Route::get('/me/soft-skills', [SoftSkillController::class, 'history'])->middleware('capability:soft_skills');
+
+            // Practice interview studio: build your own AI mock interview for a branch role (see PracticeInterviewService). Creating one
+            // can spend an AI call when the question bank is short for the role, hence the same per-user limiter as the other AI generators.
+            Route::get('/me/practice-interviews/options', [PracticeInterviewController::class, 'options'])->middleware('capability:ai_interviews');
+            Route::post('/me/practice-interviews', [PracticeInterviewController::class, 'store'])->middleware('capability:ai_interviews')->middleware('throttle:ai-generation');
+
+            // Skill Drills: the questions are generated in the browser; the server keeps the answers (streak, mastery). See config/drills.php.
+            // Drills belong to a programme that codes or has them (engineering), not to Commerce / Management / Arts — the same rule the home shelf uses.
+            Route::get('/me/drills', [DrillController::class, 'summary'])->middleware('capability:coding_practice,skill_drills');
+            Route::get('/me/practice-shelf', [DrillController::class, 'shelf']);
+            Route::post('/me/drills/attempts', [DrillController::class, 'record'])->middleware('capability:coding_practice,skill_drills')->middleware('throttle:drill-attempts');
+
+            // Proctored sittings for Core Prep practice and Skill Drills (camera + fullscreen + strikes). See StudySittingService.
+            Route::post('/me/sittings', [StudySittingController::class, 'store'])->middleware('throttle:60,1');
+            Route::post('/me/sittings/{sitting}/proctoring/start', [StudySittingController::class, 'start']);
+            Route::post('/me/sittings/{sitting}/proctoring/violations', [StudySittingController::class, 'reportViolation'])->middleware('throttle:120,1');
+            Route::post('/me/sittings/{sitting}/complete', [StudySittingController::class, 'complete']);
 
             // Global leaderboard, ranked by real solved-score (or real
             // contest rating once a student has one — see User::displayRating()).
-            Route::get('/leaderboard', [LeaderboardController::class, 'index']);
+            Route::get('/leaderboard', [LeaderboardController::class, 'index'])->middleware('capability:coding_practice');
 
-            Route::get('/contests', [ContestController::class, 'index']);
-            Route::get('/contests/{contest}', [ContestController::class, 'show']);
-            Route::post('/contests/{contest}/register', [ContestController::class, 'register']);
-            Route::delete('/contests/{contest}/register', [ContestController::class, 'unregister']);
-            Route::get('/contests/{contest}/leaderboard', [ContestController::class, 'leaderboard']);
-            Route::get('/contests/{contest}/problems/{contestProblem}', [ContestSubmissionController::class, 'show']);
-            Route::post('/contests/{contest}/problems/{contestProblem}/run', [ContestSubmissionController::class, 'run'])->middleware('throttle:judge-run');
-            Route::post('/contests/{contest}/problems/{contestProblem}/submit', [ContestSubmissionController::class, 'submit'])->middleware('throttle:judge-submit');
+            Route::get('/contests', [ContestController::class, 'index'])->middleware('capability:contests');
+            Route::get('/contests/{contest}', [ContestController::class, 'show'])->middleware('capability:contests');
+            Route::post('/contests/{contest}/register', [ContestController::class, 'register'])->middleware('capability:contests');
+            Route::delete('/contests/{contest}/register', [ContestController::class, 'unregister'])->middleware('capability:contests');
+            Route::get('/contests/{contest}/leaderboard', [ContestController::class, 'leaderboard'])->middleware('capability:contests');
+            Route::get('/contests/{contest}/problems/{contestProblem}', [ContestSubmissionController::class, 'show'])->middleware('capability:contests');
+            Route::post('/contests/{contest}/problems/{contestProblem}/run', [ContestSubmissionController::class, 'run'])->middleware('capability:contests')->middleware('throttle:judge-run');
+            Route::post('/contests/{contest}/problems/{contestProblem}/submit', [ContestSubmissionController::class, 'submit'])->middleware('capability:contests')->middleware('throttle:judge-submit');
 
             // AI Interviews — see InterviewController's docblock. No
             // judge-* throttle needed (no judge involved), plain default.
-            Route::get('/interviews', [InterviewController::class, 'index']);
-            Route::get('/interviews/{interview}', [InterviewController::class, 'show']);
-            Route::post('/interviews/{interview}/start', [InterviewController::class, 'start']);
-            Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer']);
-            Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete']);
-            Route::get('/interviews/{interview}/result', [InterviewController::class, 'result']);
-            Route::get('/interviews/{interview}/responses/{interviewResponse}/audio', [InterviewController::class, 'responseAudio']);
+            Route::get('/interviews', [InterviewController::class, 'index'])->middleware('capability:ai_interviews');
+            Route::get('/interviews/{interview}', [InterviewController::class, 'show'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/start', [InterviewController::class, 'start'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
+            Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
+            Route::get('/interviews/{interview}/responses/{interviewResponse}/audio', [InterviewController::class, 'responseAudio'])->middleware('capability:ai_interviews');
 
             // Camera/mic proctoring for the interview attempt — mirrors the
             // contest proctoring routes above (start() is idempotent, resumes
             // an existing session on refresh; reportViolation() is what the
             // frontend's tab-switch/fullscreen/devtools detectors call).
-            Route::post('/interviews/{interview}/proctoring/start', [InterviewProctoringController::class, 'start']);
-            Route::post('/interviews/{interview}/proctoring/violations', [InterviewProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
+            Route::post('/interviews/{interview}/proctoring/start', [InterviewProctoringController::class, 'start'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/proctoring/violations', [InterviewProctoringController::class, 'reportViolation'])->middleware('capability:ai_interviews')->middleware('throttle:proctoring-event');
 
             // Soft Skills — the option-based third pillar alongside
             // Contests/AI Interviews above (see SoftSkillAssessment's
@@ -1053,19 +1285,19 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // like a real exam), submit() is the one moment everything gets
             // graded. No judge-*/ai-generation throttle needed — grading is
             // exact-match, no Gemini call in the student-facing path at all.
-            Route::get('/soft-skills', [SoftSkillController::class, 'index']);
-            Route::get('/soft-skills/{softSkillAssessment}', [SoftSkillController::class, 'show']);
-            Route::post('/soft-skills/{softSkillAssessment}/start', [SoftSkillController::class, 'start']);
-            Route::post('/soft-skills/sessions/{softSkillSession}/answer', [SoftSkillController::class, 'answer']);
-            Route::post('/soft-skills/sessions/{softSkillSession}/submit', [SoftSkillController::class, 'submit']);
-            Route::get('/soft-skills/sessions/{softSkillSession}', [SoftSkillController::class, 'viewSession']);
+            Route::get('/soft-skills', [SoftSkillController::class, 'index'])->middleware('capability:soft_skills');
+            Route::get('/soft-skills/{softSkillAssessment}', [SoftSkillController::class, 'show'])->middleware('capability:soft_skills');
+            Route::post('/soft-skills/{softSkillAssessment}/start', [SoftSkillController::class, 'start'])->middleware('capability:soft_skills');
+            Route::post('/soft-skills/sessions/{softSkillSession}/answer', [SoftSkillController::class, 'answer'])->middleware('capability:soft_skills');
+            Route::post('/soft-skills/sessions/{softSkillSession}/submit', [SoftSkillController::class, 'submit'])->middleware('capability:soft_skills');
+            Route::get('/soft-skills/sessions/{softSkillSession}', [SoftSkillController::class, 'viewSession'])->middleware('capability:soft_skills');
 
             // Camera/mic proctoring for a Soft Skills attempt — same shape as
             // the interview/contest proctoring routes above (start() is
             // idempotent and resumes on refresh; reportViolation() is what the
             // frontend's tab-switch/fullscreen/devtools detectors call).
-            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/start', [SoftSkillProctoringController::class, 'start']);
-            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/violations', [SoftSkillProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
+            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/start', [SoftSkillProctoringController::class, 'start'])->middleware('capability:soft_skills');
+            Route::post('/soft-skills/sessions/{softSkillSession}/proctoring/violations', [SoftSkillProctoringController::class, 'reportViolation'])->middleware('capability:soft_skills')->middleware('throttle:proctoring-event');
 
             // The "Final Interview" 3-round pipeline — index() is where a
             // candidate discovers a track exists at all (standalone
@@ -1073,15 +1305,15 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // locked/unlocked/scored state per round. Taking a round itself
             // reuses the plain /interviews/{interview}/... routes above
             // unchanged.
-            Route::get('/interview-tracks', [InterviewTrackController::class, 'index']);
-            Route::get('/interview-tracks/{interviewTrack}', [InterviewTrackController::class, 'show']);
+            Route::get('/interview-tracks', [InterviewTrackController::class, 'index'])->middleware('capability:ai_interviews');
+            Route::get('/interview-tracks/{interviewTrack}', [InterviewTrackController::class, 'show'])->middleware('capability:ai_interviews');
 
             // Articles — read-only, whatever Mellow Ops has published (see
             // AdminArticleController). Every student sees the same catalog.
-            Route::get('/articles/topics', [ArticleController::class, 'topics']);
-            Route::get('/articles/topics/{articleTopic}', [ArticleController::class, 'topicShow']);
-            Route::get('/articles/{article}', [ArticleController::class, 'show']);
-            Route::post('/articles/{article}/read', [ArticleController::class, 'markRead']);
+            Route::get('/articles/topics', [ArticleController::class, 'topics'])->middleware('capability:learning_centre');
+            Route::get('/articles/topics/{articleTopic}', [ArticleController::class, 'topicShow'])->middleware('capability:learning_centre');
+            Route::get('/articles/{article}', [ArticleController::class, 'show'])->middleware('capability:learning_centre');
+            Route::post('/articles/{article}/read', [ArticleController::class, 'markRead'])->middleware('capability:learning_centre');
 
             // Learning Centre — the Articles nav item's new home (Reading Hub
             // links back to /articles/* above unchanged) plus three practice
@@ -1089,69 +1321,86 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // (deterministic grading, no Gemini call), Vocabulary (Gemini
             // generates a fresh quiz per attempt). See LearningCentreController's
             // docblock for the hub stats this overview route powers.
-            Route::get('/learning-centre/overview', [LearningCentreController::class, 'overview']);
+            // Core Prep — branch technical practice and timed proctored tests for ECE / EEE / Mech / Civil students. It only
+            // exists for a student once staff have switched their branch live (CoreAccess); until then these answer 404 and
+            // /core answers {available: false}. /me/core-stats is the same home, for the dashboard.
+            Route::get('/core', [StudentCoreController::class, 'home']);
+            Route::get('/me/core-stats', [StudentCoreController::class, 'home']);
+            Route::post('/core/practice/next', [StudentCoreController::class, 'practiceNext']);
+            Route::post('/core/practice/{coreQuestion}/answer', [StudentCoreController::class, 'practiceAnswer']);
+            Route::post('/core/questions/{coreQuestion}/report', [StudentCoreController::class, 'report']);
+            Route::get('/core/tests', [StudentCoreController::class, 'tests']);
+            Route::post('/core/tests/{test}/start', [StudentCoreController::class, 'startTest']);
+            Route::get('/core/sessions/{session}', [StudentCoreController::class, 'session']);
+            Route::put('/core/sessions/{session}/answers/{coreQuestion}', [StudentCoreController::class, 'answer']);
+            Route::post('/core/sessions/{session}/submit', [StudentCoreController::class, 'submit']);
+            Route::get('/core/sessions/{session}/result', [StudentCoreController::class, 'result']);
+            Route::post('/core/sessions/{session}/proctoring/start', [CoreTestProctoringController::class, 'start']);
+            Route::post('/core/sessions/{session}/proctoring/violations', [CoreTestProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
 
-            Route::get('/learning-centre/speaking/prompts', [SpeakingPracticeController::class, 'index']);
-            Route::post('/learning-centre/speaking/prompts/generate', [SpeakingPracticeController::class, 'generate'])
+            Route::get('/learning-centre/overview', [LearningCentreController::class, 'overview'])->middleware('capability:learning_centre');
+
+            Route::get('/learning-centre/speaking/prompts', [SpeakingPracticeController::class, 'index'])->middleware('capability:learning_centre');
+            Route::post('/learning-centre/speaking/prompts/generate', [SpeakingPracticeController::class, 'generate'])->middleware('capability:learning_centre')
                 ->middleware('throttle:ai-generation');
-            Route::get('/learning-centre/speaking/prompts/{speakingPrompt}', [SpeakingPracticeController::class, 'show']);
-            Route::post('/learning-centre/speaking/prompts/{speakingPrompt}/attempts', [SpeakingPracticeController::class, 'submit'])
+            Route::get('/learning-centre/speaking/prompts/{speakingPrompt}', [SpeakingPracticeController::class, 'show'])->middleware('capability:learning_centre');
+            Route::post('/learning-centre/speaking/prompts/{speakingPrompt}/attempts', [SpeakingPracticeController::class, 'submit'])->middleware('capability:learning_centre')
                 ->middleware('throttle:ai-generation');
 
-            Route::get('/learning-centre/listening/lessons', [ListeningLabController::class, 'index']);
+            Route::get('/learning-centre/listening/lessons', [ListeningLabController::class, 'index'])->middleware('capability:learning_centre');
             // Writing a lesson around the student's own topic is the one Listening Lab call that costs a Gemini request.
-            Route::post('/learning-centre/listening/lessons/generate', [ListeningLabController::class, 'generate'])
+            Route::post('/learning-centre/listening/lessons/generate', [ListeningLabController::class, 'generate'])->middleware('capability:learning_centre')
                 ->middleware('throttle:ai-generation');
-            Route::get('/learning-centre/listening/lessons/{listeningLesson}', [ListeningLabController::class, 'show']);
-            Route::post('/learning-centre/listening/lessons/{listeningLesson}/attempts', [ListeningLabController::class, 'submit']);
+            Route::get('/learning-centre/listening/lessons/{listeningLesson}', [ListeningLabController::class, 'show'])->middleware('capability:learning_centre');
+            Route::post('/learning-centre/listening/lessons/{listeningLesson}/attempts', [ListeningLabController::class, 'submit'])->middleware('capability:learning_centre');
 
             // Vocabulary Sprint: a curated word bank with spaced repetition. Sessions
             // (daily / deck / weak words) are built from the bank with no Gemini call;
             // only /generate (quick quiz on any topic) costs one. Answers are graded
             // one question at a time — see VocabularyController's docblock.
-            Route::get('/learning-centre/vocabulary/overview', [VocabularyProgressController::class, 'overview']);
-            Route::get('/learning-centre/vocabulary/words', [VocabularyProgressController::class, 'words']);
-            Route::post('/learning-centre/vocabulary/sessions', [VocabularyController::class, 'start'])
+            Route::get('/learning-centre/vocabulary/overview', [VocabularyProgressController::class, 'overview'])->middleware('capability:learning_centre');
+            Route::get('/learning-centre/vocabulary/words', [VocabularyProgressController::class, 'words'])->middleware('capability:learning_centre');
+            Route::post('/learning-centre/vocabulary/sessions', [VocabularyController::class, 'start'])->middleware('capability:learning_centre')
                 ->middleware('throttle:60,1');
-            Route::get('/learning-centre/vocabulary/attempts/{vocabularyAttempt}', [VocabularyController::class, 'show']);
-            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/answer', [VocabularyController::class, 'answer'])
+            Route::get('/learning-centre/vocabulary/attempts/{vocabularyAttempt}', [VocabularyController::class, 'show'])->middleware('capability:learning_centre');
+            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/answer', [VocabularyController::class, 'answer'])->middleware('capability:learning_centre')
                 ->middleware('throttle:240,1');
-            Route::post('/learning-centre/vocabulary/generate', [VocabularyController::class, 'generate'])
+            Route::post('/learning-centre/vocabulary/generate', [VocabularyController::class, 'generate'])->middleware('capability:learning_centre')
                 ->middleware('throttle:ai-generation');
             // Original all-at-once grading, kept for a frontend deployed before the upgrade.
-            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/submit', [VocabularyController::class, 'submit']);
+            Route::post('/learning-centre/vocabulary/attempts/{vocabularyAttempt}/submit', [VocabularyController::class, 'submit'])->middleware('capability:learning_centre');
 
             // Project Lab — SOW-guided, full-stack projects built in a browser
             // VS Code workspace. Browsing the catalog is open to every student;
             // the SOW body, PDF, milestone detail and workspace need the Project
             // Lab add-on (402 `project_lab_required` otherwise) — see
             // ProjectLabController's docblock. Throttles are per user.
-            Route::get('/project-lab/topics', [ProjectLabController::class, 'index']);
-            Route::get('/project-lab/topics/{projectTopic:slug}', [ProjectLabController::class, 'show']);
-            Route::post('/project-lab/topics/{projectTopic:slug}/start', [ProjectLabController::class, 'start'])->middleware('throttle:lab-topic-start');
-            Route::get('/project-lab/topics/{projectTopic:slug}/sow.pdf', [ProjectLabController::class, 'downloadSow'])->middleware('throttle:lab-sow');
-            Route::get('/project-lab/projects', [ProjectLabController::class, 'mine']);
-            Route::get('/project-lab/enrollments/{enrollment}', [ProjectLabController::class, 'showEnrollment']);
-            Route::post('/project-lab/enrollments/{enrollment}/milestones/{milestone}/toggle', [ProjectLabController::class, 'toggleMilestone'])->middleware('throttle:lab-milestone');
-            Route::post('/project-lab/enrollments/{enrollment}/abandon', [ProjectLabController::class, 'abandon']);
+            Route::get('/project-lab/topics', [ProjectLabController::class, 'index'])->middleware('capability:project_lab');
+            Route::get('/project-lab/topics/{projectTopic:slug}', [ProjectLabController::class, 'show'])->middleware('capability:project_lab');
+            Route::post('/project-lab/topics/{projectTopic:slug}/start', [ProjectLabController::class, 'start'])->middleware('capability:project_lab')->middleware('throttle:lab-topic-start');
+            Route::get('/project-lab/topics/{projectTopic:slug}/sow.pdf', [ProjectLabController::class, 'downloadSow'])->middleware('capability:project_lab')->middleware('throttle:lab-sow');
+            Route::get('/project-lab/projects', [ProjectLabController::class, 'mine'])->middleware('capability:project_lab');
+            Route::get('/project-lab/enrollments/{enrollment}', [ProjectLabController::class, 'showEnrollment'])->middleware('capability:project_lab');
+            Route::post('/project-lab/enrollments/{enrollment}/milestones/{milestone}/toggle', [ProjectLabController::class, 'toggleMilestone'])->middleware('capability:project_lab')->middleware('throttle:lab-milestone');
+            Route::post('/project-lab/enrollments/{enrollment}/abandon', [ProjectLabController::class, 'abandon'])->middleware('capability:project_lab');
 
             // The workspace (browser VS Code). show() is the boot poll; heartbeat()
             // runs every minute while the workspace page is open and is the idle
             // detector and the hours meter — see WorkspaceManager.
-            Route::post('/project-lab/enrollments/{enrollment}/workspace/start', [ProjectWorkspaceController::class, 'start'])->middleware('throttle:lab-workspace-start');
-            Route::get('/project-lab/enrollments/{enrollment}/workspace', [ProjectWorkspaceController::class, 'show'])->middleware('throttle:lab-workspace-poll');
-            Route::post('/project-lab/enrollments/{enrollment}/workspace/heartbeat', [ProjectWorkspaceController::class, 'heartbeat'])->middleware('throttle:lab-workspace-heartbeat');
-            Route::post('/project-lab/enrollments/{enrollment}/workspace/integrity', [ProjectWorkspaceController::class, 'integrity'])->middleware('throttle:lab-integrity');
-            Route::post('/project-lab/enrollments/{enrollment}/workspace/stop', [ProjectWorkspaceController::class, 'stop'])->middleware('throttle:lab-workspace-stop');
-            Route::post('/project-lab/enrollments/{enrollment}/submit', [ProjectWorkspaceController::class, 'submit'])->middleware('throttle:lab-submit');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/start', [ProjectWorkspaceController::class, 'start'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-start');
+            Route::get('/project-lab/enrollments/{enrollment}/workspace', [ProjectWorkspaceController::class, 'show'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-poll');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/heartbeat', [ProjectWorkspaceController::class, 'heartbeat'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-heartbeat');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/integrity', [ProjectWorkspaceController::class, 'integrity'])->middleware('capability:project_lab')->middleware('throttle:lab-integrity');
+            Route::post('/project-lab/enrollments/{enrollment}/workspace/stop', [ProjectWorkspaceController::class, 'stop'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-stop');
+            Route::post('/project-lab/enrollments/{enrollment}/submit', [ProjectWorkspaceController::class, 'submit'])->middleware('capability:project_lab')->middleware('throttle:lab-submit');
 
             // Proctoring — contest problem-solving only, never practice (see
             // ContestProctoringController's docblock). start() is idempotent
             // (resumes an existing session's real state on page refresh);
             // reportViolation() is what the frontend's tab-switch/fullscreen/
             // devtools detectors call as they fire.
-            Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/start', [ContestProctoringController::class, 'start']);
-            Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/violations', [ContestProctoringController::class, 'reportViolation'])->middleware('throttle:proctoring-event');
+            Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/start', [ContestProctoringController::class, 'start'])->middleware('capability:contests');
+            Route::post('/contests/{contest}/problems/{contestProblem}/proctoring/violations', [ContestProctoringController::class, 'reportViolation'])->middleware('capability:contests')->middleware('throttle:proctoring-event');
 
             // A student's own place in the Vault — see StudentVaultController's
             // docblock. Getting in is the readiness score's doing (refreshed

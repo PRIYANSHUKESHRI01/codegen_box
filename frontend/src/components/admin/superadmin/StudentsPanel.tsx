@@ -5,7 +5,9 @@ import { Search, Ban, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { UserManageDrawer } from "./UserManageDrawer";
-import { formatDateTime, type ApiCollege, type ApiPage, type ApiPlatformUser } from "./types";
+import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
+import { UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
+import { departmentShort, useBranchCatalog } from "@/lib/branches";
 
 const TIER_BADGE_CLASS: Record<string, string> = {
   "Placement Ready": "bg-status-success/15 text-status-success border-status-success/30",
@@ -24,27 +26,26 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
   const [searchDebounced, setSearchDebounced] = useState("");
   const [activeStudentId, setActiveStudentId] = useState<number | null>(null);
 
-  const [colleges, setColleges] = useState<{ id: number; name: string }[]>([]);
   const [collegeId, setCollegeId] = useState("");
+  // Superadmin sees every department; narrowing to one is a filter, never a restriction.
+  const catalog = useBranchCatalog();
+  const [department, setDepartment] = useState("");
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 350);
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    api
-      .get<{ colleges: ApiCollege[] }>("/admin/colleges")
-      .then((res) => setColleges(res.colleges.map((c) => ({ id: c.id, name: c.name }))))
-      .catch(() => {});
-  }, []);
+  // Counts per university for students only, so the picker can say which universities actually have any.
+  const facets = useDirectoryFacets({ role: "user", collegeId: "", search: searchDebounced });
 
   const buildParams = useCallback((extra: Record<string, string> = {}) => {
     const params = new URLSearchParams({ role: "user", has_college: "1", ...extra });
     if (searchDebounced) params.set("search", searchDebounced);
     if (collegeId) params.set("college_id", collegeId);
+    if (department) params.set("department", department);
     return params;
-  }, [searchDebounced, collegeId]);
+  }, [searchDebounced, collegeId, department]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -85,15 +86,17 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
           <p className="text-xs text-text-muted">{total.toLocaleString()} student(s) enrolled via a partner college.</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <UniversityPicker value={collegeId} onChange={setCollegeId} facets={facets} allowNone={false} />
           <select
-            value={collegeId}
-            onChange={(e) => setCollegeId(e.target.value)}
-            className="px-2.5 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary outline-none focus:border-accent-primary"
+            aria-label="Filter by department"
+            value={department}
+            onChange={(e) => setDepartment(e.target.value)}
+            className="rounded-control border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-primary outline-none focus:border-accent-primary"
           >
-            <option value="">All Colleges</option>
-            {colleges.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
+            <option value="">All departments</option>
+            {(catalog?.departments ?? []).map((d) => (
+              <option key={d.code} value={d.code}>
+                {d.name}
               </option>
             ))}
           </select>
@@ -114,7 +117,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
         <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">Loading students...</div>
       ) : students.length === 0 ? (
         <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          {searchDebounced || collegeId ? "No students match this filter." : "No students found."}
+          {searchDebounced || collegeId || department ? "No students match this filter." : "No students found."}
         </div>
       ) : (
         <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
@@ -124,7 +127,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
                 <tr>
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3">College</th>
-                  <th className="px-4 py-3">Branch</th>
+                  <th className="px-4 py-3">Department · Branch</th>
                   <th className="px-4 py-3">Plan</th>
                   <th className="px-4 py-3">Readiness</th>
                   <th className="px-4 py-3">Joined</th>
@@ -143,7 +146,10 @@ export function StudentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
                       <div className="text-3xs font-mono text-text-muted">{s.email}</div>
                     </td>
                     <td className="px-4 py-3 text-text-secondary font-medium">{s.college?.name ?? "—"}</td>
-                    <td className="px-4 py-3 text-text-secondary">{s.branch ?? "—"}</td>
+                    <td className="px-4 py-3 text-text-secondary">
+                      <div>{s.branch ?? "—"}</div>
+                      <div className="text-3xs text-text-muted">{departmentShort(catalog, s.department ?? "engineering")}</div>
+                    </td>
                     <td className="px-4 py-3 text-text-secondary">
                       {s.subscription ? (
                         <>

@@ -4,6 +4,31 @@ namespace App\Providers;
 
 use App\Models\Subscription;
 use App\Models\User;
+use App\Events\CoreQuestionKeyFixed;
+use App\Models\CandidateImport;
+use App\Models\Contest;
+use App\Models\CoreTest;
+use App\Models\DriveCollegeMapping;
+use App\Models\Hackathon;
+use App\Models\HackathonAnnouncement;
+use App\Models\Interview;
+use App\Models\InterviewTrack;
+use App\Models\PlacementDrive;
+use App\Models\SoftSkillAssessment;
+use App\Models\VaultInquiry;
+use App\Models\VaultMessage;
+use App\Models\StudentImport;
+use App\Observers\DriveMappingObserver;
+use App\Observers\HackathonAnnouncementObserver;
+use App\Observers\HackathonObserver;
+use App\Observers\ImportObserver;
+use App\Observers\PlacementDriveObserver;
+use App\Observers\PublishedAssessmentObserver;
+use App\Observers\VaultInquiryObserver;
+use App\Observers\VaultMessageObserver;
+use App\Services\Core\RegradeCoreQuestion;
+use App\Support\BranchCatalog;
+use Illuminate\Support\Facades\Event;
 use App\Services\LeadAssignmentService;
 use App\Services\SubscriptionService;
 use App\Services\Vault\VaultService;
@@ -31,6 +56,10 @@ class AppServiceProvider extends ServiceProvider
         // swap in their own with $this->app->instance(WorkspaceRuntime::class, …).
         $this->app->bind(ProcessRunner::class, SymfonyProcessRunner::class);
 
+        // The branch catalogue is loaded once per request/job and answered from memory (it is
+        // consulted per student per drive in cohort paths) — see App\Support\BranchCatalog.
+        $this->app->scoped(BranchCatalog::class);
+
         $this->app->singleton(WorkspaceRuntime::class, function ($app) {
             return config('workspaces.runtime') === 'fake'
                 ? new FakeWorkspaceRuntime
@@ -43,6 +72,23 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // A fixed answer key rescoring everything graded against the old one (practice verdicts and finished test attempts).
+        Event::listen(CoreQuestionKeyFixed::class, RegradeCoreQuestion::class);
+
+        // In-app notifications (the bell): raised where the thing happens — a model's own lifecycle — so every controller,
+        // job and console that makes it happen is covered, and a new one added later cannot forget. See App\Enums\NotificationType.
+        DriveCollegeMapping::observe(DriveMappingObserver::class);
+        PlacementDrive::observe(PlacementDriveObserver::class);
+        Hackathon::observe(HackathonObserver::class);
+        HackathonAnnouncement::observe(HackathonAnnouncementObserver::class);
+        StudentImport::observe(ImportObserver::class);
+        VaultInquiry::observe(VaultInquiryObserver::class);
+        VaultMessage::observe(VaultMessageObserver::class);
+        CandidateImport::observe(ImportObserver::class);
+        foreach ([Contest::class, Interview::class, SoftSkillAssessment::class, CoreTest::class, InterviewTrack::class] as $assessment) {
+            $assessment::observe(PublishedAssessmentObserver::class);
+        }
+
         // Throttles queued jobs tagged with the RateLimited('transactional-emails')
         // middleware (see SendAccountCredentialsEmail) — protects the mail
         // provider's own rate limits when a bulk import fans out hundreds or
@@ -137,12 +183,40 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by('proctoring-event:'.$request->user()?->id);
         });
 
+        // Exam integrity (see App\Services\Integrity). Per USER, never per address: a campus lab puts a whole class behind
+        // one. A telemetry batch goes out every ~10 s plus an immediate one per serious event, so 120/min is a wide margin
+        // that still stops a broken or hostile client from flooding the hash-chained log.
+        RateLimiter::for('integrity-beat', function (Request $request) {
+            return Limit::perMinute(120)->by('integrity-beat:'.($request->user()?->id ?? $request->ip()));
+        });
+        RateLimiter::for('integrity-evidence', function (Request $request) {
+            return Limit::perMinute(40)->by('integrity-evidence:'.($request->user()?->id ?? $request->ip()));
+        });
+        // The Guardian beats every ~2 s. Keyed by its token (it has no login). Pairing is keyed per address but loose:
+        // a whole lab pairs at the start of a session, and a 32^8 code space cannot be walked at this rate anyway.
+        RateLimiter::for('guardian-beat', function (Request $request) {
+            return Limit::perMinute(150)->by('guardian-beat:'.hash('sha256', (string) $request->bearerToken()));
+        });
+        // The installer is a 6 MB file served to anyone: per address, enough for a lab behind one NAT address to fetch it in turn.
+        RateLimiter::for('guardian-download', function (Request $request) {
+            return Limit::perMinute(60)->by('guardian-download:'.$request->ip());
+        });
+        RateLimiter::for('guardian-pair', function (Request $request) {
+            return Limit::perMinute(240)->by('guardian-pair:'.($request->user()?->id ?? $request->ip()));
+        });
+
         // AI interview question generation (Gemini) — per USER, same
         // reasoning as the judge limiters above. Generous enough for a
         // couple of "regenerate this one" retries per minute, caps
         // runaway API cost from a broken/looping client.
         RateLimiter::for('ai-generation', function (Request $request) {
             return Limit::perMinute(5)->by('ai-generation:'.$request->user()?->id);
+        });
+
+        // Skill Drills answers (DrillController) — per USER. One request per answered batch (the browser sends a handful at a time),
+        // so this is generous for a fast drill and still stops a looping client.
+        RateLimiter::for('drill-attempts', function (Request $request) {
+            return Limit::perMinute(60)->by('drill-attempts:'.$request->user()?->id);
         });
 
         // Phone OTP verification (PhoneVerificationController) — per USER,
@@ -170,6 +244,19 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(10)->by('superadmin-sensitive:'.$request->user()?->id);
         });
 
+        // Looking up issued logins happens in bursts while a superadmin works down a list, but only AFTER the password-confirmed
+        // unlock — so it can be looser than the limiter above, yet still far too slow to harvest a whole directory.
+        RateLimiter::for('superadmin-credentials', function (Request $request) {
+            return Limit::perMinute(40)->by('superadmin-credentials:'.$request->user()?->id);
+        });
+
+        // A Section Coordinator's bulk notification fans an e-mail / WhatsApp out to a whole section. Per user, per hour: a
+        // coordinator checking in on their students does this a few times a week, and a hijacked coordinator session
+        // must not be able to mass-message a college.
+        RateLimiter::for('coordinator-notify', function (Request $request) {
+            return Limit::perHour(12)->by('coordinator-notify:'.($request->user()?->id ?? $request->ip()));
+        });
+
         // Routine plan support work (give a student a plan, add days). Per user and far looser than the
         // password-confirming actions above: nothing here guesses a password, and a superadmin working
         // through a list of scholarship students must not be throttled halfway down it.
@@ -180,6 +267,15 @@ class AppServiceProvider extends ServiceProvider
         // The plan-change poll every open dashboard makes (every ~30 s, plus on focus). Per user, never per
         // IP: a campus lab puts a whole class behind one address. Generous so several tabs and the odd
         // refresh never trip it; a script hammering it still does.
+        // The bell polls this every ~15 s per open tab (4/min); 90 leaves room for several tabs, focus-refreshes and a
+        // burst after a laptop wakes. Listing/marking is human-paced.
+        RateLimiter::for('notification-signal', function (Request $request) {
+            return Limit::perMinute(90)->by('notification-signal:'.($request->user()?->id ?? $request->ip()));
+        });
+        RateLimiter::for('notifications', function (Request $request) {
+            return Limit::perMinute(90)->by('notifications:'.($request->user()?->id ?? $request->ip()));
+        });
+
         RateLimiter::for('plan-signal', function (Request $request) {
             return Limit::perMinute(90)->by('plan-signal:'.($request->user()?->id ?? $request->ip()));
         });

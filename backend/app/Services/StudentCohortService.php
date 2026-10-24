@@ -2,10 +2,14 @@
 
 namespace App\Services;
 
+use App\Models\CoreSubject;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Models\Submission;
 use App\Models\User;
+use App\Services\Core\CoreAccess;
+use App\Services\Core\CoreMasteryService;
+use App\Support\DepartmentCapabilities;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -87,15 +91,72 @@ class StudentCohortService
         $this->readiness->prime($students);
 
         $ids = $students->pluck('id')->all();
-        $activity = $this->activityFor($ids);
+
+        // Students of a branch whose Core Prep is live: their practice is Core Prep as much as coding, so it counts as
+        // activity, and their row carries a Core block. Empty for a roster with none, which then pays for nothing extra.
+        $access = app(CoreAccess::class);
+        $coreIds = $students->filter(fn (User $s) => $access->liveFamily($s->getAttributes()['discipline'] ?? null))->pluck('id')->all();
+
+        // Students whose department has no coding practice (Commerce, Arts, Management …): "practice" for them is everything they do on the
+        // platform, not code submissions they cannot make — otherwise the whole department would read as "never started".
+        $broadIds = $students->filter(fn (User $s) => ! (DepartmentCapabilities::forUser($s)['coding_practice'] ?? true))->pluck('id')->all();
+
+        $activity = $this->activityFor($ids, $coreIds, $broadIds);
         $coding = $this->languages->forStudents($students);
+        $core = $this->coreFor($coreIds);
+
+        // Who placed each block — one query, and none at all when nobody is blocked (the common case).
+        $blockerIds = $students->filter(fn (User $s) => $s->is_blocked && $s->blocked_by !== null)->pluck('blocked_by')->unique()->values()->all();
+        $blockerRoles = $blockerIds === [] ? [] : User::whereIn('id', $blockerIds)->pluck('role', 'id')->all();
 
         return $students
-            ->map(fn (User $student) => $this->row($student, $activeMappings, $activity[$student->id] ?? $this->emptyActivity(), $coding[$student->id]))
+            ->map(fn (User $student) => $this->row($student, $activeMappings, $activity[$student->id] ?? $this->emptyActivity(), $coding[$student->id], $core[$student->id] ?? null, $blockerRoles))
             ->all();
     }
 
-    private function row(User $student, Collection $activeMappings, array $activity, array $coding): array
+    /**
+     * What a core-branch student's row says about Core Prep: how much they answered lately and where they are weakest.
+     * Grouped queries over the whole set, never per student.
+     *
+     * @param  array<int, int>  $coreIds
+     * @return array<int, array{answered_30d: int, weakest_subject: ?string, weakest_accuracy: ?int}>
+     */
+    private function coreFor(array $coreIds): array
+    {
+        if ($coreIds === []) {
+            return [];
+        }
+
+        $stats = app(CoreMasteryService::class)->subjectStatsFor($coreIds);
+        $names = CoreSubject::query()->pluck('name', 'id');
+        $minAttempts = (int) config('core_prep.mastery.weak_min_attempts', 3);
+        $out = [];
+
+        foreach ($coreIds as $id) {
+            $weakest = null;
+            $weakestAccuracy = null;
+            $answered = 0;
+
+            foreach ($stats[$id] ?? [] as $subjectId => $s) {
+                $answered += $s['attempts'];
+                if ($s['attempts'] < $minAttempts) {
+                    continue;
+                }
+                $accuracy = (int) round($s['correct'] / $s['attempts'] * 100);
+                if ($weakestAccuracy === null || $accuracy < $weakestAccuracy) {
+                    $weakestAccuracy = $accuracy;
+                    $weakest = $names[$subjectId] ?? null;
+                }
+            }
+
+            $out[$id] = ['answered_30d' => $answered, 'weakest_subject' => $weakest, 'weakest_accuracy' => $weakest === null ? null : $weakestAccuracy];
+        }
+
+        return $out;
+    }
+
+    /** @param  array{answered_30d: int, weakest_subject: ?string, weakest_accuracy: ?int}|null  $core */
+    private function row(User $student, Collection $activeMappings, array $activity, array $coding, ?array $core = null, array $blockerRoles = []): array
     {
         // A plain "eligible for at least one active drive" boolean goes
         // silently misleading the moment any one mapped drive has no real
@@ -118,12 +179,26 @@ class StudentCohortService
             'email' => $student->email,
             'roll_number' => $student->roll_number,
             'branch' => $student->branch,
+            // What the college's label resolved to (null = not recognised yet) — filters and
+            // branch-wise reports run on these, 'branch' stays the college's own wording.
+            'branch_code' => $student->branch_code,
+            'discipline' => $student->discipline,
+            'branch_source' => $student->branch_source,
+            // The department the student belongs to (Engineering, Commerce …): null = not known yet, which the roster reads as engineering.
+            'department' => $student->department,
+            'track_focus' => $student->track_focus,
             'section' => $student->section,
             'phone' => $student->phone,
             'parent_phone' => $student->parent_phone,
             'cgpa' => $student->cgpa,
             'backlogs' => $student->backlogs,
             'is_blocked' => $student->is_blocked,
+            // Why and by whom, so a TPO can see what a coordinator did: null while the account is active.
+            'blocked' => $student->is_blocked ? [
+                'reason' => $student->blocked_reason,
+                'at' => $student->blocked_at?->toIso8601String(),
+                'by_coordinator' => ($blockerRoles[$student->blocked_by] ?? null) === User::ROLE_SECTION_COORDINATOR,
+            ] : null,
             'readiness_score' => $student->readinessScore(),
             'readiness_tier' => $student->readinessTier(),
             'practice_score' => $student->practiceScore(),
@@ -134,6 +209,11 @@ class StudentCohortService
             'activated' => $activated,
             'onboarded' => $student->onboarding_completed_at !== null,
             'solved' => $activity['solved'],
+            // Null for everyone whose branch has no live Core Prep — a CSE row is the row it has always been, plus this one null.
+            'core' => $core === null ? null : $core + [
+                'profile' => $student->readinessBreakdown()['profile'] ?? 'software',
+                'readiness' => collect($student->readinessBreakdown()['components'])->firstWhere('key', 'core_technical')['score'] ?? null,
+            ],
             'activity' => [
                 'engagement' => $this->engagement($activated, $activity['last_practice_at']),
                 'last_practice_at' => $activity['last_practice_at']?->toIso8601String(),
@@ -205,12 +285,22 @@ class StudentCohortService
      * many distinct problems each has solved (by difficulty), when they last
      * submitted anything, and on how many of the last 30 days they practised.
      *
+     * For students of a branch whose Core Prep is live (`$coreIds`), Core practice and Core tests count as practice too:
+     * they move "last practice" and add active days. Everyone else is measured exactly as before.
+     *
+     * For students of a department without coding practice (`$broadIds`), "practice" is any learning activity — interviews, soft
+     * skills, the Learning Centre labs, articles, Domain Prep — see broadActivityFor().
+     *
      * @param  array<int, int>  $ids
+     * @param  array<int, int>  $coreIds
+     * @param  array<int, int>  $broadIds
      * @return array<int, array{solved: array<string, int>, last_practice_at: ?Carbon, active_days_30: int}>
      */
-    private function activityFor(array $ids): array
+    private function activityFor(array $ids, array $coreIds = [], array $broadIds = []): array
     {
         $activity = [];
+        $core = $coreIds === [] ? [] : array_flip($coreIds);
+        $broad = $broadIds === [] ? [] : $this->broadActivityFor($broadIds);
 
         foreach (array_chunk($ids, self::ID_CHUNK) as $chunk) {
             $solved = DB::table('submissions')
@@ -245,23 +335,88 @@ class StudentCohortService
                 ->groupBy('user_id')
                 ->pluck('active_days', 'user_id');
 
+            // Only for the core students in this chunk: their latest Core activity, and the distinct days they did anything
+            // (coding or Core) in the last 30.
+            $chunkCore = array_values(array_filter($chunk, fn ($id) => isset($core[$id])));
+            $lastCore = collect();
+            $coreDays = collect();
+            if ($chunkCore !== []) {
+                $sinceDay = now()->subDays(29)->startOfDay();
+
+                $lastCore = DB::query()->fromSub(
+                    DB::table('core_practice_answers')->select('user_id')->selectRaw('MAX(created_at) as last_at')->whereIn('user_id', $chunkCore)->groupBy('user_id')
+                        ->unionAll(DB::table('core_test_sessions')->select('user_id')->selectRaw('MAX(COALESCE(completed_at, started_at)) as last_at')->whereIn('user_id', $chunkCore)->groupBy('user_id')),
+                    'c'
+                )->select('user_id')->selectRaw('MAX(last_at) as last_at')->groupBy('user_id')->pluck('last_at', 'user_id');
+
+                $days = DB::table('submissions')->select('user_id')->selectRaw('DATE(submitted_on) as d')->whereIn('user_id', $chunkCore)->where('submitted_on', '>=', $sinceDay->toDateString())
+                    ->unionAll(DB::table('core_practice_answers')->select('user_id')->selectRaw('DATE(created_at) as d')->whereIn('user_id', $chunkCore)->where('created_at', '>=', $sinceDay->toDateTimeString()))
+                    ->unionAll(DB::table('core_test_sessions')->select('user_id')->selectRaw('DATE(COALESCE(completed_at, started_at)) as d')->whereIn('user_id', $chunkCore)->whereRaw('COALESCE(completed_at, started_at) >= ?', [$sinceDay->toDateTimeString()]));
+
+                $coreDays = DB::query()->fromSub($days, 'dd')->select('user_id')->selectRaw('COUNT(DISTINCT d) as days')->groupBy('user_id')->pluck('days', 'user_id');
+            }
+
             foreach ($chunk as $id) {
                 $byDifficulty = ($solved->get($id) ?? collect())->pluck('solved_count', 'difficulty');
                 $easy = (int) ($byDifficulty['easy'] ?? 0);
                 $medium = (int) ($byDifficulty['medium'] ?? 0);
                 $hard = (int) ($byDifficulty['hard'] ?? 0);
 
-                $times = array_filter([$lastPractice[$id] ?? null, $lastContest[$id] ?? null]);
+                $times = array_filter([$lastPractice[$id] ?? null, $lastContest[$id] ?? null, $lastCore[$id] ?? null]);
                 $last = $times === [] ? null : Carbon::parse(max($times));
 
                 $activity[$id] = [
                     'solved' => ['total' => $easy + $medium + $hard, 'easy' => $easy, 'medium' => $medium, 'hard' => $hard],
                     'last_practice_at' => $last,
-                    'active_days_30' => (int) ($activeDays[$id] ?? 0),
+                    'active_days_30' => (int) ($coreDays[$id] ?? $activeDays[$id] ?? 0),
                 ];
+
+                if (isset($broad[$id])) {
+                    $later = array_filter([$last, $broad[$id]['last']]);
+                    $activity[$id]['last_practice_at'] = $later === [] ? null : max($later);
+                    $activity[$id]['active_days_30'] = max($activity[$id]['active_days_30'], $broad[$id]['days']);
+                }
             }
         }
 
         return $activity;
+    }
+
+    /**
+     * For students who cannot practise code: when they last did anything on the platform, and on how many of the last 30 days.
+     * The same modules the readiness score counts as activity (interviews, soft skills, Speaking / Listening / Vocabulary,
+     * articles) plus Domain Prep practice and tests — one grouped union for the whole set, never a query per student.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, array{last: ?Carbon, days: int}>
+     */
+    private function broadActivityFor(array $ids): array
+    {
+        $since = now()->subDays(29)->startOfDay()->toDateTimeString();
+        $out = [];
+
+        foreach (array_chunk($ids, self::ID_CHUNK) as $chunk) {
+            // A fresh union per query (a query builder is mutated by unionAll).
+            $union = fn () => collect([
+                DB::table('interview_sessions')->select('user_id')->selectRaw('COALESCE(completed_at, started_at, created_at) as at')->whereIn('user_id', $chunk),
+                DB::table('soft_skill_sessions')->select('user_id')->selectRaw('COALESCE(completed_at, started_at, created_at) as at')->whereIn('user_id', $chunk),
+                DB::table('speaking_attempts')->select('user_id')->selectRaw('created_at as at')->whereIn('user_id', $chunk),
+                DB::table('listening_attempts')->select('user_id')->selectRaw('created_at as at')->whereIn('user_id', $chunk),
+                DB::table('vocabulary_answers')->select('user_id')->selectRaw('created_at as at')->whereIn('user_id', $chunk),
+                DB::table('article_reads')->select('user_id')->selectRaw('read_at as at')->whereIn('user_id', $chunk),
+                DB::table('core_practice_answers')->select('user_id')->selectRaw('created_at as at')->whereIn('user_id', $chunk),
+                DB::table('core_test_sessions')->select('user_id')->selectRaw('COALESCE(completed_at, started_at, created_at) as at')->whereIn('user_id', $chunk),
+            ])->reduce(fn ($carry, $select) => $carry === null ? $select : $carry->unionAll($select));
+
+            $last = DB::query()->fromSub($union(), 'a')->whereNotNull('at')->select('user_id')->selectRaw('MAX(at) as last_at')->groupBy('user_id')->pluck('last_at', 'user_id');
+
+            $days = DB::query()->fromSub($union(), 'a')->where('at', '>=', $since)->select('user_id')->selectRaw('COUNT(DISTINCT DATE(at)) as days')->groupBy('user_id')->pluck('days', 'user_id');
+
+            foreach ($last as $userId => $at) {
+                $out[(int) $userId] = ['last' => Carbon::parse($at), 'days' => (int) ($days[$userId] ?? 0)];
+            }
+        }
+
+        return $out;
     }
 }

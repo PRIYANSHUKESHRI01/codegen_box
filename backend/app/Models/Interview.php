@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\HasBranchAudience;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -31,6 +32,8 @@ use Illuminate\Support\Str;
  */
 class Interview extends Model
 {
+    use HasBranchAudience;
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_PUBLISHED = 'published';
@@ -53,6 +56,12 @@ class Interview extends Model
 
     /** RETIRED — no new ones can be created (see Contest::CONTEST_TYPE_TALENT_POOL). Existing rows stay as ordinary Mellow interviews and still count toward readiness. Targeted by audience_scope. */
     public const INTERVIEW_TYPE_TALENT_POOL = 'talent_pool';
+
+    /**
+     * A student's OWN practice interview (see PracticeInterviewService): private to its creator, never listed to staff, never created
+     * through the staff APIs — which is why it is deliberately not in INTERVIEW_TYPES below.
+     */
+    public const INTERVIEW_TYPE_PRACTICE = 'practice';
 
     public const INTERVIEW_TYPES = [
         self::INTERVIEW_TYPE_GENERAL,
@@ -92,16 +101,31 @@ class Interview extends Model
         'round_name',
         'category_weights',
         'qualifying_score_percent',
+        'discipline',
+        'practice_config',
     ];
 
     protected function casts(): array
     {
         return [
+            'practice_config' => 'array',
             'is_mock' => 'boolean',
             'round_number' => 'integer',
             'category_weights' => 'array',
             'qualifying_score_percent' => 'decimal:2',
         ];
+    }
+
+    /**
+     * The branch family this interview is for, when it is for one: set on it, inherited from its track, or implied by an
+     * audience that names exactly one core family. Null for every general interview — and then the question generator and
+     * scorer behave exactly as they always have.
+     */
+    public function effectiveDiscipline(): ?string
+    {
+        $discipline = $this->discipline ?? $this->track?->discipline ?? \App\Support\InterviewDiscipline::fromAudience($this->branch_audience ?? $this->track?->branch_audience);
+
+        return \App\Support\InterviewDiscipline::isCore($discipline) ? $discipline : null;
     }
 
     public function getRouteKeyName(): string
@@ -194,6 +218,17 @@ class Interview extends Model
         return $this->interview_type === self::INTERVIEW_TYPE_COMPANY;
     }
 
+    public function isPractice(): bool
+    {
+        return $this->interview_type === self::INTERVIEW_TYPE_PRACTICE;
+    }
+
+    /** Staff screens and counts must never list a student's private practice interviews. */
+    public function scopeExcludingPractice(Builder $query): Builder
+    {
+        return $query->where('interviews.interview_type', '!=', self::INTERVIEW_TYPE_PRACTICE);
+    }
+
     public function isTpoMock(): bool
     {
         return $this->interview_type === self::INTERVIEW_TYPE_TPO_MOCK;
@@ -270,6 +305,11 @@ class Interview extends Model
      */
     public function isVisibleToUser(User $user): bool
     {
+        // A student's own practice interview is theirs alone.
+        if ($this->interview_type === self::INTERVIEW_TYPE_PRACTICE) {
+            return $this->created_by === $user->id;
+        }
+
         // A track round after the first is never self-discoverable — it
         // only gets an InterviewSession once InterviewTrackAdvancementService
         // invites the candidate in after they pass the previous round.
@@ -282,6 +322,14 @@ class Interview extends Model
 
         if ($this->interview_type === self::INTERVIEW_TYPE_COMPANY_HIRING) {
             return $this->sessions()->where('user_id', $user->id)->exists();
+        }
+
+        // A TPO or Mellow can aim an interview at certain branches (null = everyone). A track's first round
+        // takes its audience from the track, which is where it is set.
+        $audienceOwner = $this->isTrackRound() ? $this->track : $this;
+
+        if ($audienceOwner !== null && ! $audienceOwner->audienceIncludes($user)) {
+            return false;
         }
 
         return $this->isVisibleToCollege($user->college_id);

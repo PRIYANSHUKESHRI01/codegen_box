@@ -7,6 +7,7 @@ use App\Models\InterviewSession;
 use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Core\CoreAccess;
 use App\Services\Payments\GatewayManager;
 use App\Services\ProjectLab\ProjectLabAccess;
 
@@ -93,6 +94,12 @@ class SubscriptionPresenter
             'drive_access' => $entitlements['drive_access'],
             'hackathon_access' => $entitlements['hackathon_access'],
             'vault_access' => $entitlements['vault_access'],
+            // Core Prep (branch technical practice and tests). `core_prep.available` is what puts it in the student's
+            // navigation: their branch is a core family, staff switched it live, and there is published material.
+            'max_core_practice_per_day' => $entitlements['max_core_practice_per_day'],
+            'core_practice_used_today' => app(PlanGate::class)->corePracticeUsedToday($user),
+            'core_tests_access' => $entitlements['core_tests_access'],
+            'core_prep' => app(CoreAccess::class)->state($user),
             // The free plan's one-time tries and how many are spent; null on every plan without a trial cap.
             'feature_trial' => app(PlanGate::class)->trialSummary($user),
         ];

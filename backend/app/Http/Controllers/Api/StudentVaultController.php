@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\VaultInquiry;
 use App\Models\VaultProfile;
 use App\Services\PlanGate;
+use App\Services\ReadinessHistoryService;
 use App\Services\Vault\VaultService;
 use App\Services\Vault\VaultSyncService;
 use App\Support\SingleMail;
@@ -44,10 +45,11 @@ class StudentVaultController extends Controller
      */
     public const SHARED_FIELDS = [
         'Your name and email address',
-        'Your college, branch, CGPA and backlogs (if your college recorded them)',
+        'Your college, department, branch, CGPA and backlogs (if your college recorded them)',
         'Your skills, bio, LinkedIn and GitHub links',
         'Your resume, if you uploaded one',
         'Your readiness score and what it is made of',
+        'If your programme has subject practice (Core Prep, Management Prep, Commerce Prep or Subject Prep): how you do in each subject',
         'Your contest rating, if you have one',
     ];
 
@@ -147,7 +149,11 @@ class StudentVaultController extends Controller
                 'threshold' => $line['enter'],
                 'exit_threshold' => $line['exit'],
                 'points_needed' => max(0, $line['enter'] - $breakdown['score']),
+                // What the components add up to, and what missed days have taken off it (score = base_score - decay.points).
+                'base_score' => $breakdown['base_score'] ?? $breakdown['score'],
+                'decay' => $breakdown['decay'] ?? null,
             ],
+            'history' => app(ReadinessHistoryService::class)->history($user, $breakdown, 30),
             // Does the plan include listing? The score, the explanation and the breakdown are shown either way;
             // only the yes is withheld (and the page shows what to upgrade to).
             'access' => $vault->hasPlanAccess($user),

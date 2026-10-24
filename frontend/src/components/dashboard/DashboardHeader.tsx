@@ -7,7 +7,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Menu,
   Search,
-  Bell,
   Shield,
   Briefcase,
   Trophy,
@@ -22,9 +21,13 @@ import {
   Megaphone,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/navigation/ThemeToggle";
+import { BackButton } from "@/components/navigation/BackButton";
+import { resolveBack } from "@/lib/backNav";
 import { PlanChip } from "@/components/billing/PlanChip";
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { codesAtAll } from "@/lib/departments";
 import { DashboardRole } from "./DashboardSidebar";
 
 interface DashboardHeaderProps {
@@ -35,6 +38,8 @@ interface DashboardHeaderProps {
   /** Accepted for API compatibility; the header no longer varies by TPO view. */
   currentTpoView?: "mellow" | "tpo";
   onOpenMobile?: () => void;
+  /** Overrides the page-tree back target (see DashboardShell); `false` hides the arrow. */
+  back?: { href: string; label: string } | false;
   actionButton?: {
     label: string;
     icon?: any;
@@ -42,20 +47,12 @@ interface DashboardHeaderProps {
   };
 }
 
-interface NotificationItem {
-  id: number;
-  title: string;
-  desc: string;
-  time: string;
-  unread: boolean;
-  category: "Security" | "Drive" | "Infrastructure";
-}
-
 export function DashboardHeader({
   title,
   role,
   onOpenMobile,
   actionButton,
+  back,
 }: DashboardHeaderProps) {
   const router = useRouter();
   const { user } = useAuth();
@@ -74,18 +71,8 @@ export function DashboardHeader({
   // `role` itself still drives content-shaping checks (currentTpoView, the
   // useMyStats call above) so the page's actual content is unaffected.
   const identityRole = user?.role === "superadmin" ? "superadmin" : role;
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [notificationsRead, setNotificationsRead] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // No real notification system exists yet (no backend table, no events) —
-  // this used to ship 3 permanently-hardcoded fake alerts to every role,
-  // including one about a Plagiarism Radar feature that has since been
-  // removed entirely (see AdminController/ProblemBankPanel). Left empty
-  // and honest until a real notifications feature is built, rather than
-  // fabricating more placeholder content.
-  const [notifications] = useState<NotificationItem[]>([]);
 
   // Which command-palette row Enter will run. Arrow-key navigation, because
   // the palette's own footer has always advertised "↑ ↓ to navigate" while
@@ -93,7 +80,6 @@ export function DashboardHeader({
   // ⌘K) that couldn't be driven from the keyboard.
   const [activeIndex, setActiveIndex] = useState(0);
   const resultsRef = useRef<HTMLDivElement | null>(null);
-  const notificationsRef = useRef<HTMLDivElement | null>(null);
 
   // The shortcut hint is rendered per-platform: this app is mostly used on
   // Windows, where a ⌘ glyph names a key the keyboard doesn't have. Resolved
@@ -116,7 +102,6 @@ export function DashboardHeader({
       }
       if (e.key === "Escape") {
         setCommandOpen(false);
-        setNotificationsOpen(false);
       }
     };
 
@@ -124,32 +109,12 @@ export function DashboardHeader({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Dismiss the notifications popover on an outside click. Escape already
-  // closed it, but a popover that survives clicking the page behind it reads
-  // as stuck — and this one sits over content people are trying to reach.
-  useEffect(() => {
-    if (!notificationsOpen) return;
-    const onPointerDown = (e: MouseEvent) => {
-      if (!notificationsRef.current?.contains(e.target as Node)) {
-        setNotificationsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    return () => document.removeEventListener("mousedown", onPointerDown);
-  }, [notificationsOpen]);
-
   // Opening the palette, or narrowing the query, always re-aims at the first
   // result — otherwise Enter fires whatever row the previous search left
   // highlighted, which may not even be on screen any more.
   useEffect(() => {
     setActiveIndex(0);
   }, [searchQuery, commandOpen]);
-
-  const markAllNotificationsRead = () => {
-    setNotificationsRead(true);
-  };
-
-  const unreadCount = notifications.filter((n) => n.unread).length;
 
   // The portal this role works inside — the breadcrumb's parent crumb, and a
   // real link back to that portal's root rather than a decorative label.
@@ -165,7 +130,8 @@ export function DashboardHeader({
     if (identityRole === "admin_marketing") return { label: "Lead Growth", href: "/marketing" };
     if (identityRole === "admin_company") return { label: "Hiring Cell", href: "/admin" };
     if (identityRole === "section_coordinator") return { label: "Section Cell", href: "/coordinator" };
-    return { label: "Developer Arena", href: "/dashboard" };
+    // A Commerce, Management or Arts student does not code, so their home is not a "Developer" anything.
+    return { label: user?.role === "user" && !codesAtAll(user) ? "Student Arena" : "Developer Arena", href: "/dashboard" };
   })();
 
   // A portal's own root gets ONE crumb, not a parent plus a child.
@@ -178,6 +144,8 @@ export function DashboardHeader({
   // ?view=mellow query that pathname never includes.
   const pathname = usePathname();
   const atPortalRoot = pathname === portal.href.split("?")[0];
+  // One level up the page tree, or null at a portal root. Every signed-in page below its home gets this arrow.
+  const backTarget = back === false ? null : back ?? resolveBack(pathname, portal);
 
   // The organisation being operated on, and the only chip left in the header.
   //
@@ -369,6 +337,8 @@ export function DashboardHeader({
             <Menu className="h-4 w-4" />
           </button>
 
+          {backTarget && <BackButton target={backTarget} />}
+
           {/*
             A breadcrumb that actually tracks where you are.
 
@@ -466,90 +436,8 @@ export function DashboardHeader({
               reachable only through a small link at the foot of the sidebar. */}
           {role === "user" && <PlanChip />}
 
-          {/* Notifications */}
-          <div className="relative" ref={notificationsRef}>
-            <button
-              onClick={() => setNotificationsOpen(!notificationsOpen)}
-              className={cn(
-                "relative flex h-9 w-9 items-center justify-center rounded-[10px] border transition-all duration-200 hover:scale-105 hover:border-accent-primary/40 hover:bg-surface-hover hover:text-accent-primary active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
-                notificationsOpen
-                  ? "border-accent-primary/40 bg-accent-primary/5 text-accent-primary ring-[6px] ring-accent-primary/[0.07]"
-                  : "border-border-subtle bg-surface text-text-muted"
-              )}
-              title="Notifications"
-              aria-label="View notifications"
-              aria-expanded={notificationsOpen}
-              aria-haspopup="dialog"
-            >
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && !notificationsRead && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] animate-pulse-subtle items-center justify-center rounded-full bg-status-danger px-1 text-3xs font-bold text-white ring-2 ring-surface">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
-
-            {/* Notifications Popover Card */}
-            <AnimatePresence>
-              {notificationsOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 mt-2 w-80 sm:w-96 rounded-panel bg-surface/95 backdrop-blur-xl border border-border-strong shadow-card p-3.5 z-50"
-                >
-                  <div className="flex items-center justify-between pb-2.5 border-b border-border-subtle">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                        Notifications
-                      </span>
-                      {unreadCount > 0 && !notificationsRead && (
-                        <span className="px-1.5 py-0.5 rounded-full text-3xs font-bold bg-accent-primary/10 text-accent-primary border border-accent-primary/20">
-                          {unreadCount} new
-                        </span>
-                      )}
-                    </div>
-                    <button
-                      onClick={markAllNotificationsRead}
-                      className="text-2xs text-accent-primary hover:underline font-semibold transition-colors"
-                    >
-                      Mark all read
-                    </button>
-                  </div>
-
-                  <div className="py-2 space-y-2 max-h-72 overflow-y-auto">
-                    {notifications.length === 0 && (
-                      <p className="text-2xs text-text-muted text-center py-4">No new notifications.</p>
-                    )}
-                    {notifications.map((item) => (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          "p-2.5 rounded-control border text-xs transition-all",
-                          item.unread
-                            ? "bg-accent-primary/5 border-accent-primary/25"
-                            : "bg-surface-hover/50 hover:bg-surface-hover border-border-subtle"
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold text-primary truncate leading-tight">
-                            {item.title}
-                          </span>
-                          <span className="text-3xs text-text-muted whitespace-nowrap">
-                            {item.time}
-                          </span>
-                        </div>
-                        <p className="text-text-secondary mt-1 text-2xs leading-relaxed">
-                          {item.desc}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+          {/* Notifications — the live bell (components/notifications): unread badge, popover, full list. */}
+          <NotificationBell />
 
           {/* Theme. h-9 to match the controls either side of it — the compact
               toggle is a 32px pill by default, which left it sitting a

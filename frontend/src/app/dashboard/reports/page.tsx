@@ -23,6 +23,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { codesAtAll } from "@/lib/departments";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { StatTile } from "@/components/dashboard/student/StatTile";
 import { RatingChart } from "@/components/dashboard/student/RatingChart";
@@ -30,6 +31,7 @@ import { VerdictDonut } from "@/components/dashboard/student/VerdictDonut";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
 import { RatingBadge } from "@/components/dashboard/student/RatingBadge";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
+import { InactivityNotice } from "@/components/dashboard/student/InactivityNotice";
 import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { SubmissionHistoryList } from "@/components/dashboard/student/SubmissionHistoryList";
 import { LanguageFocusCard } from "@/components/dashboard/student/LanguageFocusCard";
@@ -71,6 +73,8 @@ export default function PerformanceReportPage() {
   const [showAllTopics, setShowAllTopics] = useState(false);
 
   const { stats, loading: statsLoading } = useMyStats(status === "ready");
+  // A programme without coding practice (Management, Commerce, Arts …) has no solved history, rating or code to report.
+  const codes = codesAtAll(user);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -79,18 +83,22 @@ export default function PerformanceReportPage() {
 
   useEffect(() => {
     if (status !== "ready") return;
-    api
-      .get<{ history: RatingHistoryPoint[] }>("/me/rating-history")
-      .then((res) => setRatingHistory(res.history))
-      .catch(() => setRatingHistory([]));
+    if (codes) {
+      api
+        .get<{ history: RatingHistoryPoint[] }>("/me/rating-history")
+        .then((res) => setRatingHistory(res.history))
+        .catch(() => setRatingHistory([]));
+    }
     api
       .get<{ drives: ApiDriveSummary[] }>("/drives")
       .then((res) => setDrives(res.drives))
       .catch(() => setDrives([]));
-    api
-      .get<{ submissions: SubmissionHistoryRow[] }>("/submissions")
-      .then((res) => setSubmissions(res.submissions))
-      .catch(() => setSubmissions([]));
+    if (codes) {
+      api
+        .get<{ submissions: SubmissionHistoryRow[] }>("/submissions")
+        .then((res) => setSubmissions(res.submissions))
+        .catch(() => setSubmissions([]));
+    }
     api
       .get<{ interviews: StudentReportInterview[] }>("/me/interviews")
       .then((res) => setInterviews(res.interviews))
@@ -99,7 +107,7 @@ export default function PerformanceReportPage() {
       .get<{ soft_skills: SoftSkillHistoryEntry[] }>("/me/soft-skills")
       .then((res) => setSoftSkills(res.soft_skills))
       .catch(() => setSoftSkills([]));
-  }, [status]);
+  }, [status, codes]);
 
   // Same instant-open-then-fetch shape as the TPO/Admin/Coordinator report
   // page's openSubmissionCode() — the modal opens immediately with every
@@ -169,6 +177,12 @@ export default function PerformanceReportPage() {
 
   const eligibleCount = drives.filter((d) => d.student_eligibility.status === "eligible").length;
 
+  // For a programme without coding the summary is about what they do take part in.
+  const interviewsDone = interviews.filter((iv) => iv.status === "completed");
+  const scoredInterviews = interviewsDone.filter((iv) => iv.has_score && iv.composite_score_percent !== null);
+  const interviewAverage = scoredInterviews.length > 0 ? Math.round(scoredInterviews.reduce((n, iv) => n + (iv.composite_score_percent ?? 0), 0) / scoredInterviews.length) : null;
+  const softSkillAverage = softSkills.length > 0 ? Math.round(softSkills.reduce((n, t) => n + t.score_percent, 0) / softSkills.length) : null;
+
   const visibleTopics = showAllTopics ? stats.topic_mastery : stats.topic_mastery.slice(0, TOPIC_MASTERY_COLLAPSED_COUNT);
 
   // Simple, real insights generated from the already-fetched topic mastery —
@@ -211,7 +225,11 @@ export default function PerformanceReportPage() {
     <DashboardShell
       role="user"
       title="Performance Report"
-      subtitle="A full breakdown of your real solved history, accuracy, topic mastery, interview performance and submitted code."
+      subtitle={
+        codes
+          ? "A full breakdown of your real solved history, accuracy, topic mastery, interview performance and submitted code."
+          : "A full breakdown of your readiness, interview performance and soft-skills results."
+      }
       actionButton={{ label: "Download PDF", icon: Download, onClick: handleDownload }}
     >
       <AnimatePresence>
@@ -230,6 +248,27 @@ export default function PerformanceReportPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {!codes && (
+          <>
+            <StatTile label="Readiness" value={`${stats.readiness.score}%`} icon={Gauge} tone="primary" hint={stats.readiness.tier} />
+            <StatTile
+              label="Interviews Taken"
+              value={interviewsDone.length}
+              icon={Mic}
+              tone="success"
+              hint={interviewAverage === null ? "None scored yet" : `${interviewAverage}% average`}
+            />
+            <StatTile
+              label="Soft Skills Tests"
+              value={softSkills.length}
+              icon={Brain}
+              tone="warning"
+              hint={softSkillAverage === null ? "None taken yet" : `${softSkillAverage}% average`}
+            />
+          </>
+        )}
+        {codes && (
+          <>
         <StatTile
           label="Acceptance Rate"
           value={`${acceptanceRate}%`}
@@ -252,6 +291,8 @@ export default function PerformanceReportPage() {
           tone="warning"
           hint={`Best: ${stats.streak.max} days`}
         />
+          </>
+        )}
         <StatTile
           label="Drives Eligible"
           value={eligibleCount}
@@ -280,11 +321,15 @@ export default function PerformanceReportPage() {
           </div>
         </div>
 
-        <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} />
+        <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} profile={stats.readiness.profile} decay={stats.readiness.decay} />
+
+        <InactivityNotice decay={stats.readiness.decay} score={stats.readiness.score} baseScore={stats.readiness.base_score} className="mt-5" />
 
         <VaultLine score={stats.readiness.score} vault={stats.readiness.vault} className="mt-5" />
       </section>
 
+      {codes && (
+      <>
       {/* Rating trend */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
@@ -444,6 +489,9 @@ export default function PerformanceReportPage() {
         </section>
       )}
 
+      </>
+      )}
+
       {/* Interview performance — every interview invited to or taken, with
           the score the plain /interviews list deliberately never shows (see
           InterviewController::history()'s docblock). Each row links straight
@@ -534,7 +582,7 @@ export default function PerformanceReportPage() {
           actual code behind any of them — the same detailed view a TPO/
           coordinator/Mellow staff member sees when looking at your report,
           just for yourself. See SubmissionHistoryList's docblock. */}
-      <SubmissionHistoryList submissions={submissions} onOpenCode={openSubmissionCode} maxHeightClassName="max-h-[640px]" />
+      {codes && <SubmissionHistoryList submissions={submissions} onOpenCode={openSubmissionCode} maxHeightClassName="max-h-[640px]" />}
 
       <CodeViewModal data={viewingCode} onClose={() => setViewingCode(null)} />
     </DashboardShell>

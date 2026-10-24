@@ -28,6 +28,15 @@ final class StudentPreferences
         'higher_studies',
         'competitive_programming',
         'skill_building',
+        // Non-CS branches: a core-company offer, or GATE / PSU preparation.
+        'core_company',
+        'psu_gate',
+        // Management, Commerce and Arts / Humanities programmes.
+        'mba_admission',
+        'professional_certs',
+        'govt_exams',
+        'academia',
+        'entrepreneurship',
     ];
 
     /** What the student wants to spend their time on — each maps to a real area of the platform. */
@@ -38,7 +47,33 @@ final class StudentPreferences
         'communication',
         'soft_skills',
         'projects',
+        'core_subjects',
     ];
+
+    /**
+     * What a non-CS student wants to lead with (CSE students have no track — everything is software).
+     *  core_first — branch technical prep leads; coding is optional ("I don't code yet" is a valid answer)
+     *  balanced   — core and IT-company preparation side by side
+     *  it_first   — aiming at IT-services / product roles; the software experience, same as CSE
+     */
+    public const TRACK_FOCUS = ['core_first', 'balanced', 'it_first'];
+
+    /**
+     * The areas a student can say they are drawn to, per branch family. Used to point interviews and
+     * practice at what they care about; the frontend mirrors the labels in lib/studentPreferences.ts.
+     */
+    public const CORE_INTERESTS = [
+        'ece' => ['vlsi', 'embedded', 'communication_rf', 'signal_processing', 'analog_design', 'iot'],
+        'eee' => ['power_systems', 'power_electronics_ev', 'electrical_machines', 'control_systems', 'renewable_energy', 'electrical_design'],
+        'mech' => ['design_cad', 'thermal', 'manufacturing', 'automotive_ev', 'robotics', 'quality_production'],
+        'civil' => ['structural', 'geotechnical', 'transportation', 'construction_management', 'environmental', 'planning_surveying'],
+    ];
+
+    /** @return list<string> every interest id, whichever family it belongs to */
+    public static function allCoreInterests(): array
+    {
+        return array_values(array_unique(array_merge(...array_values(self::CORE_INTERESTS))));
+    }
 
     public const PACE_CASUAL = 'casual';
 
@@ -69,10 +104,36 @@ final class StudentPreferences
         self::PACE_INTENSE => ['solved' => 35, 'hard' => 10],
     ];
 
+    /**
+     * Whether a student has answered everything onboarding needs. A student who leads with core prep
+     * ("I don't code yet") is complete without a programming language.
+     */
+    public static function isComplete(\App\Models\User $user): bool
+    {
+        // A student whose programme has no coding practice (Commerce, Arts, Management …) is never asked for a language.
+        return ($user->primary_language !== null || $user->track_focus === 'core_first' || ! DepartmentCapabilities::forUser($user)['coding_practice'])
+            && $user->skill_level !== null
+            && $user->career_goal !== null;
+    }
+
     /** @return array{solved: int, hard: int} */
     public static function weeklyTargets(?string $pace): array
     {
         return self::PACE_TARGETS[$pace] ?? self::PACE_TARGETS[self::DEFAULT_PACE];
+    }
+
+    /**
+     * The weekly pace as Core Prep goals: practice questions answered and timed tests taken. A technical question takes
+     * a third of the time a coding problem does, so the question target is three times the problems target; one test a
+     * week, two for an intense pace.
+     *
+     * @return array{questions: int, tests: int}
+     */
+    public static function coreWeeklyTargets(?string $pace): array
+    {
+        $targets = self::weeklyTargets($pace);
+
+        return ['questions' => $targets['solved'] * 3, 'tests' => $pace === self::PACE_INTENSE ? 2 : 1];
     }
 
     /**
@@ -82,12 +143,19 @@ final class StudentPreferences
      *
      * @return array<string, array<int, mixed>>
      */
-    public static function rules(bool $required): array
+    public static function rules(bool $required, ?string $trackFocus = null, bool $codes = true): array
     {
         $presence = $required ? 'required' : 'sometimes';
+        // "I don't code yet" (core_first) is a complete answer: the language is then optional. So is every answer of a student whose
+        // programme has no coding practice at all (`$codes` false).
+        $languagePresence = $required && $trackFocus !== 'core_first' && $codes ? 'required' : 'sometimes';
 
         return [
-            'primary_language' => [$presence, 'string', Rule::in(JudgeService::SUPPORTED_LANGUAGES)],
+            'branch_code' => ['sometimes', 'string', Rule::exists('branches', 'code')->where('is_active', true)],
+            'track_focus' => ['sometimes', 'nullable', 'string', Rule::in(self::TRACK_FOCUS)],
+            'core_interests' => ['sometimes', 'nullable', 'array', 'max:8'],
+            'core_interests.*' => ['string', 'distinct', Rule::in(self::allCoreInterests())],
+            'primary_language' => [$languagePresence, 'nullable', 'string', Rule::in(JudgeService::SUPPORTED_LANGUAGES)],
             'preferred_languages' => ['sometimes', 'nullable', 'array', 'max:'.self::MAX_LANGUAGES],
             'preferred_languages.*' => ['string', 'distinct', Rule::in(JudgeService::SUPPORTED_LANGUAGES)],
             'skill_level' => [$presence, 'string', Rule::in(self::SKILL_LEVELS)],
@@ -95,6 +163,8 @@ final class StudentPreferences
             'focus_areas' => ['sometimes', 'nullable', 'array', 'max:'.count(self::FOCUS_AREAS)],
             'focus_areas.*' => ['string', 'distinct', Rule::in(self::FOCUS_AREAS)],
             'weekly_pace' => ['sometimes', 'nullable', 'string', Rule::in(self::PACES)],
+            // "Show me coding practice anyway" — honoured only where the student's programme has it switched off (see the controller).
+            'coding_opt_in' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -113,7 +183,7 @@ final class StudentPreferences
     {
         $values = $validated;
 
-        $primary = $validated['primary_language'] ?? $currentPrimary;
+        $primary = array_key_exists('primary_language', $validated) ? $validated['primary_language'] : $currentPrimary;
 
         if (array_key_exists('preferred_languages', $validated) || array_key_exists('primary_language', $validated)) {
             $others = array_key_exists('preferred_languages', $validated)
@@ -121,6 +191,13 @@ final class StudentPreferences
                 : $currentPreferred;
 
             $values['preferred_languages'] = array_values(array_unique(array_filter([$primary, ...$others])));
+        }
+
+        // Handled by BranchAssignmentService / the controller, not stored through this array.
+        unset($values['branch_code']);
+
+        if (array_key_exists('core_interests', $validated)) {
+            $values['core_interests'] = array_values(array_unique($validated['core_interests'] ?? []));
         }
 
         if (array_key_exists('focus_areas', $validated)) {

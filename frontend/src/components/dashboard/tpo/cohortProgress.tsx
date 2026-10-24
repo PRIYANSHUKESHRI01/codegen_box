@@ -1,11 +1,13 @@
 "use client";
 
-import { Code2, Hourglass, MoonStar, PauseCircle, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
+import { CircuitBoard, Code2, Hourglass, MoonStar, PauseCircle, Rocket, TrendingUp, type LucideIcon } from "lucide-react";
 import { HpPill, type HpTone } from "@/components/portal/kit";
 import { cn } from "@/lib/utils";
 import { languageLabel } from "@/lib/judgeLanguages";
 import { relativeDays } from "@/lib/languageInsights";
 import { ENGAGEMENT_LABEL } from "@/lib/cohortInsights";
+import { DEFAULT_DEPARTMENT, useBranchCatalog } from "@/lib/branches";
+import { domainPrepLabel } from "@/lib/departments";
 import type { CohortStudent, Engagement } from "@/types/cohort";
 
 /**
@@ -53,6 +55,38 @@ export function SolvedCount({ solved, className }: { solved: CohortStudent["solv
       title={`${solved.easy} easy · ${solved.medium} medium · ${solved.hard} hard`}
     >
       <span className="font-extrabold text-primary">{solved.total}</span> solved
+    </span>
+  );
+}
+
+const TRACK_LABEL: Record<string, string> = { core_first: "Core first", balanced: "Balanced", it_first: "IT first" };
+
+/**
+ * A core-branch student's Core Prep standing in one small stack: the track they chose, their core readiness, and the
+ * subject they are weakest in (with a few answers behind it). Nothing for a student whose branch has no live Core
+ * Prep — their row is unchanged.
+ */
+export function CoreCell({ student, className }: { student: CohortStudent; className?: string }) {
+  const catalog = useBranchCatalog();
+  const core = student.core;
+  if (!core) return null;
+
+  // Management, Commerce and Arts have no Core-versus-IT track to report: the cell says which prep it is (Commerce Prep …) instead.
+  const own = student.department && student.department !== DEFAULT_DEPARTMENT ? domainPrepLabel(catalog, student.department) : null;
+
+  return (
+    <span className={cn("flex flex-col items-start gap-0.5", className)}>
+      <span className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-1.5 py-px text-3xs font-bold text-sky-700 ring-1 ring-inset ring-sky-500/25 dark:text-sky-300" title={`Scored by the ${core.profile} weighting`}>
+        <CircuitBoard className="h-2.5 w-2.5" aria-hidden />
+        {own ?? (student.track_focus ? TRACK_LABEL[student.track_focus] ?? "Core" : "Track not chosen")}
+        {core.readiness !== null && <span className="tabular font-semibold opacity-80">· {own ? own.replace(/ Prep$/, "") : "Core"} {core.readiness}%</span>}
+      </span>
+      {core.weakest_subject && (
+        <span className="text-3xs font-semibold text-text-muted" title="The subject with the lowest accuracy over their recent answers">
+          Weakest: {core.weakest_subject}
+          {core.weakest_accuracy !== null && <span className="tabular"> {core.weakest_accuracy}%</span>}
+        </span>
+      )}
     </span>
   );
 }

@@ -9,6 +9,7 @@ use App\Models\PlacementDrive;
 use App\Models\Problem;
 use App\Models\User;
 use App\Services\EligibilityService;
+use App\Support\DepartmentCapabilities;
 use Illuminate\Http\Request;
 
 /**
@@ -105,7 +106,8 @@ class StudentDriveController extends Controller
                 ->orderByDesc('asked_year')
                 ->orderBy('display_order')
                 ->get(['id', 'asked_year', 'category', 'round_name', 'question', 'answer_notes']),
-            'recommended_problems' => $this->recommendedProblems($company),
+            // Coding problems only mean something to a programme that codes; a Commerce student is not sent to a Practice Arena they do not have.
+            'recommended_problems' => DepartmentCapabilities::allows($user, 'coding_practice') ? $this->recommendedProblems($company) : [],
         ]);
     }
 

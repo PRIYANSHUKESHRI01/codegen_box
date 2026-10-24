@@ -23,6 +23,10 @@ export default defineConfig({
   ],
   webServer: {
     command: "npm run dev",
+    // A browser driven by Playwright is, rightly, treated as automation by the exam-integrity layer and would be locked out of any
+    // proctored page. This build-time switch (never set in a production build) lets OUR OWN test runs through. The API those runs
+    // talk to should have INTEGRITY_ENABLED=false (docs/exam-integrity.md → Troubleshooting).
+    env: { NEXT_PUBLIC_INTEGRITY_ALLOW_AUTOMATION: "1" },
     port: 3000,
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

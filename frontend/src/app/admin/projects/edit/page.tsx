@@ -1,9 +1,8 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { TopicEditor } from "@/components/admin/projectLab/TopicEditor";
@@ -58,11 +57,6 @@ function EditProjectContent() {
 
   return (
     <DashboardShell role="admin_internal" title={id ? "Edit project" : "New project"} subtitle="Write the SOW, list the milestones, then publish when it's ready.">
-      <Link href="/admin/projects" className="-mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-primary">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        All projects
-      </Link>
-
       {loading ? (
         <div className="flex items-center gap-2 py-10 text-xs text-text-secondary" aria-busy="true">
           <Loader2 className="h-4 w-4 animate-spin" />

@@ -168,6 +168,11 @@ class StudentCohortProgressTest extends TestCase
             return $queries;
         };
 
+        // One warm-up request WITH a student: the branch / department catalogue is read once and cached across requests (a fixed cost,
+        // not a per-student one), and an empty roster returns before it ever touches it.
+        $this->student();
+        $countQueries();
+
         foreach (range(1, 3) as $_) {
             $s = $this->student();
             $this->practiceHistory($s, 'python', accepted: 1);

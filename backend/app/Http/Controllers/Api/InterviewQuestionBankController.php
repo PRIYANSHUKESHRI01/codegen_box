@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\InterviewQuestionBank;
+use App\Support\InterviewDiscipline;
 use Illuminate\Http\Request;
 
 /**
@@ -23,9 +24,16 @@ class InterviewQuestionBankController extends Controller
             $query->where('category', $category);
         }
 
+        // Picking questions for a core-branch interview: that branch's own questions, plus the common non-technical ones
+        // (behavioural, HR, situational…). A software technical question has no place in an ECE interview, and is left out.
+        if ($discipline = $request->query('discipline')) {
+            abort_unless(in_array($discipline, InterviewDiscipline::families(), true), 422, 'Unknown branch family.');
+            $query->where(fn ($q) => $q->where('discipline', $discipline)->orWhere(fn ($common) => $common->whereNull('discipline')->where('category', '!=', InterviewQuestionBank::CATEGORY_TECHNICAL)));
+        }
+
         return response()->json([
             'questions' => $query->orderBy('category')->orderBy('id')
-                ->get(['id', 'question_text', 'category', 'difficulty', 'expected_duration_seconds', 'tags']),
+                ->get(['id', 'question_text', 'category', 'difficulty', 'expected_duration_seconds', 'tags', 'discipline']),
         ]);
     }
 }

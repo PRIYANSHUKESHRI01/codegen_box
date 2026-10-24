@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
+use App\Services\IssuedCredentialVault;
 use App\Models\ActivityLog;
 use App\Models\Company;
 use App\Models\CompanyPrepQuestion;
@@ -213,6 +214,8 @@ class AdminCompanyController extends Controller
             'role' => User::ROLE_ADMIN_COMPANY,
             'company_id' => $company->id,
         ]);
+
+        app(IssuedCredentialVault::class)->keep($admin, $temporaryPassword, 'created');
 
         return [$admin, $temporaryPassword];
     }

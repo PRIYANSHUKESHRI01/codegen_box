@@ -4,6 +4,7 @@ namespace App\Services\Vault;
 
 use App\Models\User;
 use App\Models\VaultProfile;
+use App\Services\ReadinessHistoryService;
 use App\Services\ReadinessScoreService;
 use Throwable;
 
@@ -15,13 +16,16 @@ use Throwable;
  * score on their own (a contest being finalised, an interview being scored).
  *
  * One bulk scoring pass per chunk, then one cheap decision per student: a student
- * with no Vault profile and a score nowhere near the bar costs no writes at all.
+ * with no Vault profile and a score nowhere near the bar costs no Vault writes at
+ * all. The same pass also records each student's score for today (ReadinessHistoryService)
+ * and nudges a student whose score is slipping.
  */
 class VaultRefreshService
 {
     public function __construct(
         private readonly ReadinessScoreService $readiness,
         private readonly VaultService $vault,
+        private readonly ReadinessHistoryService $history,
     ) {}
 
     /**
@@ -43,12 +47,21 @@ class VaultRefreshService
                 $stats['scored']++;
 
                 try {
-                    $this->vault->applyReadiness($student, $result['breakdown'], $profiles[$student->id] ?? null);
+                    $profile = $this->vault->applyReadiness($student, $result['breakdown'], $profiles[$student->id] ?? null);
+                    $this->history->nudge($student, $result['breakdown'], (bool) $profile?->is_eligible);
                 } catch (Throwable $e) {
                     // One student's failure must not stop the other 249.
                     report($e);
                     $stats['errors']++;
                 }
+            }
+
+            // The day-by-day record. Its failure (a missing table the moment before `migrate`) must not undo the scoring above.
+            try {
+                $this->history->record(array_map(fn (array $r) => $r['breakdown'], $scores));
+            } catch (Throwable $e) {
+                report($e);
+                $stats['errors']++;
             }
         }
 

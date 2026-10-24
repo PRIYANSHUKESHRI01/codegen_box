@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\HasBranchAudience;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 
 class Contest extends Model
 {
+    use HasBranchAudience;
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_PUBLISHED = 'published';
@@ -338,6 +341,11 @@ class Contest extends Model
                     ->where('status', DriveCollegeMapping::STATUS_APPROVED)
                     ->where('is_active', true)
                     ->exists();
+        }
+
+        // A TPO or Mellow can aim a contest at certain branches (null = everyone).
+        if (! $this->audienceIncludes($user)) {
+            return false;
         }
 
         return $this->isVisibleToCollege($user->college_id);

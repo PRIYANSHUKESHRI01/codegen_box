@@ -8,11 +8,12 @@
 | Applies ONLY to contest problem-solving (App\Http\Controllers\Api\
 | ContestSubmissionController / ContestProctoringController) — practice
 | (App\Http\Controllers\Api\ProblemController / SubmissionController) is
-| never proctored. All webcam/mic recording happens entirely in the
-| browser and is never uploaded here (see frontend/src/lib/proctoring) —
-| this app only ever receives small JSON violation events, never media
-| bytes, which is what keeps this safe to run on a modest VPS at
-| hundreds of concurrent contest-takers.
+| never proctored. Webcam/mic VIDEO and AUDIO stay in the browser. What the
+| server receives is small: batches of JSON events and, at an interval it
+| chooses, small still pictures (webcam / screen) that it stores encrypted
+| and deletes after a retention period — all of that is the integrity layer,
+| see config/integrity.php and docs/exam-integrity.md. This file only decides
+| WHICH surfaces are proctored and how many strikes lock a student.
 |
 */
 
@@ -42,5 +43,20 @@ return [
     // answers already autosaved are graded and the attempt is ended — see
     // SoftSkillProctoringService.
     'soft_skills_enabled' => (bool) env('PROCTORING_SOFT_SKILLS', true),
+
+    // Core Prep timed tests (App\Http\Controllers\Api\CoreTestProctoringController) — same camera / fullscreen /
+    // tab-switch proctoring and the same shared strike threshold. PROCTORING_CORE_TESTS=false runs them
+    // un-proctored again (a campus whose lab machines have no webcams).
+    'core_tests_enabled' => (bool) env('PROCTORING_CORE_TESTS', true),
+
+    // Core Prep practice and Skill Drills run in proctored "sittings" (App\Models\StudySitting): camera, fullscreen, tab-switch
+    // detection and the same shared strike threshold, enforced on the server — an answer is refused without an active, consented
+    // sitting. PROCTORING_STUDY=false runs them as plain practice (a campus whose lab machines have no webcams).
+    'study_enabled' => (bool) env('PROCTORING_STUDY', true),
+
+    // After a practice / drill sitting is locked for violations, a new sitting of the same kind cannot be opened for this many minutes.
+    // 0 (the default) = the student can start another straight away: practice is not graded, so a lock ends that sitting and nothing more
+    // (a locked Core TEST is final — that is a separate rule). Raise it to add a waiting period.
+    'study_lock_cooldown_minutes' => (int) env('PROCTORING_STUDY_COOLDOWN', 0),
 
 ];

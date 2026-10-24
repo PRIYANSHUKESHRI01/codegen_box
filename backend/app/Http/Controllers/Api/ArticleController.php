@@ -21,8 +21,10 @@ class ArticleController extends Controller
     {
         $userId = $request->user()->id;
 
+        // Topics with at least one published article. whereHas rather than HAVING on the count alias: HAVING without a GROUP BY works on
+        // MySQL but is rejected by SQLite (the test database), which hid this endpoint from every automated check.
         $topics = ArticleTopic::withCount(['articles' => fn ($q) => $q->where('status', Article::STATUS_PUBLISHED)])
-            ->having('articles_count', '>', 0)
+            ->whereHas('articles', fn ($q) => $q->where('status', Article::STATUS_PUBLISHED))
             ->orderBy('display_order')
             ->get();
 

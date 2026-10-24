@@ -46,6 +46,11 @@ interface StudentProfileDrawerProps {
    * keeps the original drawer exactly as it was.
    */
   variant?: "default" | "premium";
+  /**
+   * Extra sections rendered at the foot of the profile (below Contact) — the Section Coordinator's follow-up log, and the
+   * TPO's read-only view of it. The drawer itself knows nothing about them.
+   */
+  extra?: React.ReactNode;
 }
 
 const TIER_STYLE: Record<CohortStudent["readiness_tier"], string> = {
@@ -60,7 +65,7 @@ const TIER_TONE: Record<CohortStudent["readiness_tier"], HpTone> = {
   "Needs Training": "amber",
 };
 
-export function StudentProfileDrawer({ student, onClose, collegeName = "your college", variant }: StudentProfileDrawerProps) {
+export function StudentProfileDrawer({ student, onClose, collegeName = "your college", variant, extra }: StudentProfileDrawerProps) {
   const [downloading, setDownloading] = useState(false);
   const { user } = useAuth();
   const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
@@ -86,7 +91,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
   };
 
   if (premium) {
-    return <PremiumDrawer student={student} onClose={onClose} downloading={downloading} onDownload={handleDownloadReport} />;
+    return <PremiumDrawer student={student} onClose={onClose} downloading={downloading} onDownload={handleDownloadReport} extra={extra} />;
   }
 
   return (
@@ -285,6 +290,8 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                 </div>
               </div>
 
+              {extra}
+
               {/* Individual report */}
               <div className="space-y-2">
                 {/* The actual drill-down this drawer never had: every
@@ -325,11 +332,13 @@ function PremiumDrawer({
   onClose,
   downloading,
   onDownload,
+  extra,
 }: {
   student: CohortStudent | null;
   onClose: () => void;
   downloading: boolean;
   onDownload: () => void;
+  extra?: React.ReactNode;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -421,6 +430,11 @@ function PremiumDrawer({
                             {student.is_blocked ? "Account Blocked" : "Account Active"}
                           </HpPill>
                         </div>
+                        {student.is_blocked && student.blocked?.reason && (
+                          <p className="mt-2 text-2xs leading-snug text-rose-700 dark:text-rose-300">
+                            Blocked{student.blocked.by_coordinator ? " by a section coordinator" : ""}: {student.blocked.reason}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </motion.section>
@@ -574,6 +588,8 @@ function PremiumDrawer({
                       />
                     </div>
                   </section>
+
+                  {extra}
                 </div>
 
                 {/* Actions */}

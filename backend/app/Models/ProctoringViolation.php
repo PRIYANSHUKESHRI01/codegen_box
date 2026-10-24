@@ -87,7 +87,8 @@ class ProctoringViolation extends Model
             self::TYPE_WINDOW_BLUR => 'Window lost focus',
             self::TYPE_CONTEXT_MENU_BLOCKED => 'Right-click blocked',
             self::TYPE_TAB_CLOSE_ATTEMPT => 'Attempted to close or navigate away',
-            default => $type,
+            // Events added by the integrity layer (focus_lost, forbidden_process, …) read the same way everywhere.
+            default => \App\Services\Integrity\EventCatalog::label($type),
         };
     }
 }

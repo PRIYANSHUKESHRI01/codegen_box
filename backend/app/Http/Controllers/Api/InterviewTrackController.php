@@ -30,6 +30,7 @@ class InterviewTrackController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->filter(fn (InterviewTrack $t) => $t->isVisibleToUser($request->user()))
+            ->sortByDesc(fn (InterviewTrack $t) => (int) $t->isForBranchOf($request->user()))
             ->values();
 
         $round1ByTrackId = Interview::whereIn('interview_track_id', $tracks->pluck('id'))
@@ -43,7 +44,7 @@ class InterviewTrackController extends Controller
             ->keyBy('interview_id');
 
         return response()->json([
-            'tracks' => $tracks->map(function (InterviewTrack $t) use ($round1ByTrackId, $sessionsByInterviewId) {
+            'tracks' => $tracks->map(function (InterviewTrack $t) use ($request, $round1ByTrackId, $sessionsByInterviewId) {
                 $round1 = $round1ByTrackId->get($t->id);
                 $session = $round1 ? $sessionsByInterviewId->get($round1->id) : null;
 
@@ -56,6 +57,7 @@ class InterviewTrackController extends Controller
                     'track_type' => $t->track_type,
                     'company' => $t->company ? ['id' => $t->company->id, 'name' => $t->company->name, 'logo' => $t->company->logo] : null,
                     'round_count' => $t->rounds()->count(),
+                    'for_your_branch' => $t->isForBranchOf($request->user()),
                     'my_round1_status' => $session?->status,
                 ];
             }),

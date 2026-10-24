@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\InterviewRoleTemplate;
 use App\Models\InterviewTrack;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -34,6 +35,7 @@ class TpoInterviewTrackController extends Controller
         }
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'interview_role_template_id' => ['required', 'integer', 'exists:interview_role_templates,id'],
@@ -53,6 +55,7 @@ class TpoInterviewTrackController extends Controller
                 'interview_role_template_id' => $template->id,
                 'owning_college_id' => $collegeId,
                 'created_by' => $request->user()->id,
+                'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
             ]);
 
             $track->createRounds($template->rounds_config);
@@ -68,10 +71,15 @@ class TpoInterviewTrackController extends Controller
         $this->authorizeOwnership($request, $interviewTrack);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(InterviewTrack::STATUSES)],
         ]);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $interviewTrack->update($validated);
 

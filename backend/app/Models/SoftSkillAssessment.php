@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
+use App\Models\Concerns\HasBranchAudience;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -17,6 +18,8 @@ use Illuminate\Support\Str;
  */
 class SoftSkillAssessment extends Model
 {
+    use HasBranchAudience;
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_PUBLISHED = 'published';
@@ -163,6 +166,11 @@ class SoftSkillAssessment extends Model
      */
     public function isVisibleToUser(User $user): bool
     {
+        // A TPO or Mellow can aim a test at certain branches (null = everyone).
+        if (! $this->audienceIncludes($user)) {
+            return false;
+        }
+
         return match ($this->assessment_type) {
             self::TYPE_TPO_MOCK => $user->college_id !== null && $this->owning_college_id === $user->college_id,
             self::TYPE_COMPANY => $user->college_id !== null && DriveCollegeMapping::where('college_id', $user->college_id)

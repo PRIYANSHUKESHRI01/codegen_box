@@ -13,6 +13,7 @@ import {
   CalendarDays,
   GraduationCap,
   Layers,
+  GitBranch,
   Ban,
   SearchX,
   Save,
@@ -23,6 +24,9 @@ import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
+import { audienceForRequest, audienceFrom, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { ScopePicker } from "@/components/coordinator/ScopePicker";
+import { sectionIsOpen, type SectionOption } from "@/lib/coordinatorSections";
 import {
   HpAvatar,
   HpButton,
@@ -51,18 +55,17 @@ export interface Coordinator {
   email: string;
   phone: string | null;
   section: string;
+  /** Which branches of the section they look after; null = all of it. */
+  branch_scope?: { disciplines: string[]; branches: string[] } | null;
+  /** "All branches", or "ECE, EEE" — what the scope reads as. */
+  scope_label?: string;
   is_blocked: boolean;
   managed_student_count: number;
   avatar_url: string | null;
   created_at: string;
 }
 
-/** One real section at this college, from student data — see SectionCoordinatorService::sectionsFor(). `coordinator_name` is null when the section has no coordinator yet. */
-export interface SectionOption {
-  section: string;
-  student_count: number;
-  coordinator_name: string | null;
-}
+export type { SectionOption };
 
 type FilterId = "all" | "active" | "blocked";
 
@@ -111,13 +114,15 @@ function EditCoordinatorModal({
   onSaved: (updated: Coordinator) => void;
 }) {
   const [section, setSection] = useState(coordinator.section);
+  const [scope, setScope] = useState<BranchAudience>(audienceFrom(coordinator.branch_scope));
   const [phone, setPhone] = useState(coordinator.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectableSections = sections.filter(
-    (s) => s.coordinator_name === null || s.section === coordinator.section
-  );
+  // Any section can be chosen now — a section may have several coordinators, one per branch. The server refuses a
+  // choice that would put two coordinators on the same students, and the scope picker shows who is already where.
+  const selectableSections = sections;
+  const chosen = sections.find((s) => s.section === section);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,11 +131,12 @@ function EditCoordinatorModal({
     try {
       const res = await api.put<{ coordinator: Coordinator }>(`/tpo/coordinators/${coordinator.id}`, {
         section,
+        branch_scope: audienceForRequest(scope),
         phone: phone || undefined,
       });
       onSaved(res.coordinator);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to update this coordinator.");
+      setError(err instanceof ApiError ? err.errors?.branch_scope?.[0] ?? err.errors?.section?.[0] ?? err.message : "Failed to update this coordinator.");
     } finally {
       setSaving(false);
     }
@@ -182,10 +188,8 @@ function EditCoordinatorModal({
               </option>
             ))}
           </HpSelect>
-          <p className="mt-1.5 text-2xs leading-relaxed text-text-muted">
-            Lists their current section plus every section that doesn&apos;t have a coordinator yet.
-          </p>
         </div>
+        <ScopePicker value={scope} onChange={setScope} covers={chosen?.coordinators ?? []} excludeId={coordinator.id} />
         <div>
           <label htmlFor="ec-phone" className={hpLabel}>
             Phone
@@ -248,11 +252,12 @@ export default function SectionCoordinatorsPage() {
     );
   }
 
-  const sectionsCovered = new Set(coordinators.map((c) => c.section)).size;
+  const openSections = sections.filter(sectionIsOpen);
+  const sectionsCovered = sections.length - openSections.length;
+  const uncoveredStudents = sections.reduce((sum, s) => sum + (s.uncovered_count ?? 0), 0);
   const blockedCount = coordinators.filter((c) => c.is_blocked).length;
   const activeCount = coordinators.length - blockedCount;
   const studentsDelegated = coordinators.reduce((sum, c) => sum + c.managed_student_count, 0);
-  const openSections = sections.filter((s) => s.coordinator_name === null);
   const coveragePct = sections.length > 0 ? Math.round((Math.min(sectionsCovered, sections.length) / sections.length) * 100) : 0;
 
   const handleToggleBlock = async (coordinator: Coordinator) => {
@@ -347,7 +352,7 @@ export default function SectionCoordinatorsPage() {
                 icon={GraduationCap}
                 tone="violet"
                 loading={loading}
-                hint="Under a coordinator"
+                hint={uncoveredStudents > 0 ? `${uncoveredStudents} not covered yet` : "Everyone is covered"}
               />
               <HpStatCard
                 label="Blocked"
@@ -479,7 +484,7 @@ export default function SectionCoordinatorsPage() {
                           </p>
                           <p className="mt-0.5 text-2xs leading-relaxed text-text-muted">
                             {openSections.length > 0
-                              ? `${openSections.length} still without a coordinator`
+                              ? `${openSections.length} with students nobody covers`
                               : "Every section has a coordinator"}
                           </p>
                         </div>
@@ -487,7 +492,8 @@ export default function SectionCoordinatorsPage() {
 
                       <ul className="mt-5 space-y-2">
                         {sections.map((s) => {
-                          const open = s.coordinator_name === null;
+                          const open = sectionIsOpen(s);
+                          const noOne = s.coordinator_name === null;
                           return (
                             <li
                               key={s.section}
@@ -510,16 +516,22 @@ export default function SectionCoordinatorsPage() {
                                 {s.section}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className={cn("truncate text-xs font-semibold", open ? "text-text-secondary" : "text-primary")}>
+                                <p className={cn("line-clamp-2 break-words text-xs font-semibold", noOne ? "text-text-secondary" : "text-primary")} title={s.coordinator_name ?? undefined}>
                                   {s.coordinator_name ?? "No coordinator yet"}
                                 </p>
                                 <p className="tabular text-3xs text-text-muted">
                                   {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                                  {(s.coordinators?.length ?? 0) > 0 && s.coordinators!.some((c) => c.scope_label !== "All branches") && (
+                                    <span> · {s.coordinators!.map((c) => c.scope_label).join(" / ")}</span>
+                                  )}
+                                  {!noOne && (s.uncovered_count ?? 0) > 0 && (
+                                    <span className="font-semibold text-amber-700 dark:text-amber-300"> · {s.uncovered_count} not covered</span>
+                                  )}
                                 </p>
                               </div>
                               {open ? (
                                 <HpPill tone="amber" size="sm">
-                                  Open
+                                  {noOne ? "Open" : "Partly open"}
                                 </HpPill>
                               ) : (
                                 <HpAvatar name={s.coordinator_name ?? ""} size="xs" />
@@ -590,6 +602,12 @@ function CoordinatorCard({
           <ScMetric icon={Layers} label="Section" value={`Section ${c.section}`} tone="sky" />
           <ScMetric icon={GraduationCap} label="Students" value={c.managed_student_count} tone="violet" />
         </div>
+        {c.branch_scope && (
+          <p className="mt-2.5 flex items-center gap-1.5 text-2xs text-text-muted" title="Only these branches of the section">
+            <GitBranch className="h-3 w-3 shrink-0 text-sky-500" aria-hidden />
+            <span className="truncate font-semibold text-text-secondary">{c.scope_label ?? "Specific branches"} only</span>
+          </p>
+        )}
 
         <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5">
           <ScMeta icon={Phone}>

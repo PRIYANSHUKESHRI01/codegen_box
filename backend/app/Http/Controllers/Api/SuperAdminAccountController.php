@@ -9,6 +9,7 @@ use App\Models\College;
 use App\Models\PaymentOrder;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\IssuedCredentialVault;
 use App\Services\SubscriptionAdminPresenter;
 use App\Services\SubscriptionPresenter;
 use App\Services\UserPurgeService;
@@ -42,6 +43,7 @@ class SuperAdminAccountController extends Controller
         private readonly SubscriptionAdminPresenter $subscriptionRows,
         private readonly SubscriptionPresenter $coverage,
         private readonly UserPurgeService $purger,
+        private readonly IssuedCredentialVault $credentialVault,
     ) {}
 
     // ─────────────────────────────── read ───────────────────────────────
@@ -58,6 +60,8 @@ class SuperAdminAccountController extends Controller
                 'login_id' => $user->email,
                 // Never the password itself: it is a one-way hash, and a user replaces a temporary one at first login.
                 'password_state' => $user->must_change_password ? 'temporary' : 'set_by_user',
+                // Whether the temporary password can be looked up (lookup itself: SuperAdminCredentialController).
+                'credential_state' => $this->credentialVault->statesFor([$user])[$user->id],
                 'credentials_email_sent_at' => $user->credentials_email_sent_at,
                 'last_seen_at' => $user->last_seen_at,
                 'active_sessions' => $user->tokens()->count(),
@@ -218,7 +222,7 @@ class SuperAdminAccountController extends Controller
 
         return response()->json([
             'token' => $token->plainTextToken,
-            'user' => $user->load(['college', 'company']),
+            'user' => $user->load(['college.collegeDepartments', 'company']),
             'expires_at' => $expiresAt->toIso8601String(),
             'minutes' => self::IMPERSONATION_MINUTES,
         ]);

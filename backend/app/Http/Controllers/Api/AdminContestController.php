@@ -14,6 +14,7 @@ use App\Models\Problem;
 use App\Models\User;
 use App\Services\ContestFinalizeService;
 use App\Services\ContestReportService;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -53,6 +54,7 @@ class AdminContestController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'start_at' => ['required', 'date'],
@@ -95,6 +97,7 @@ class AdminContestController extends Controller
             'company_id' => $companyId,
             'placement_drive_id' => $placementDriveId,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ]);
 
         if ($contestType === Contest::CONTEST_TYPE_COMPANY) {
@@ -153,6 +156,7 @@ class AdminContestController extends Controller
         $this->guardNotTpoMock($contest);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'start_at' => ['sometimes', 'date'],
@@ -160,6 +164,10 @@ class AdminContestController extends Controller
             'is_rated' => ['sometimes', 'boolean'],
             'status' => ['sometimes', Rule::in(Contest::STATUSES)],
         ]);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $contest->update($validated);
 

@@ -152,6 +152,8 @@ class PlanPricingTest extends TestCase
             'project_lab_access' => false,
             'workspace_hours_per_month' => null,
             'active_projects' => null,
+            'core_practice_per_day' => 10,
+            'core_tests_access' => false,
         ], $this->plan('coder')->entitlementSummary());
 
         // Expert is complete; Grandmaster carries the very same access for its three years.
@@ -166,6 +168,8 @@ class PlanPricingTest extends TestCase
                 'project_lab_access' => true,
                 'workspace_hours_per_month' => 80,
                 'active_projects' => 3,
+                'core_practice_per_day' => null,
+                'core_tests_access' => true,
             ], $this->plan($code)->entitlementSummary(), $code);
         }
     }
@@ -612,7 +616,7 @@ class PlanPricingTest extends TestCase
         $expert = $this->plan('expert');
         $this->assertSame([5499, 35, 365], [$expert->list_price, $expert->discount_percent, $expert->duration_days]);
         $this->assertSame(
-            ['practice_problems_per_day' => null, 'mock_interviews_per_day' => 10, 'free_trial_uses' => null, 'drive_access' => true, 'hackathon_access' => true, 'vault_access' => true, 'project_lab_access' => true, 'workspace_hours_per_month' => 80, 'active_projects' => 3],
+            ['practice_problems_per_day' => null, 'mock_interviews_per_day' => 10, 'free_trial_uses' => null, 'drive_access' => true, 'hackathon_access' => true, 'vault_access' => true, 'project_lab_access' => true, 'workspace_hours_per_month' => 80, 'active_projects' => 3, 'core_practice_per_day' => null, 'core_tests_access' => true],
             $expert->entitlementSummary()
         );
         $this->assertFalse($expert->isContactOnly());

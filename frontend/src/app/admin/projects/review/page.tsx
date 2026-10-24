@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Circle, Download, ExternalLink, FileArchive, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { CheckCircle2, Circle, Download, ExternalLink, FileArchive, Loader2, Plus, Trash2, TriangleAlert } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { AuthorshipCard } from "@/components/admin/projectLab/AuthorshipCard";
@@ -120,11 +120,6 @@ function ReviewContent() {
 
   return (
     <DashboardShell role="admin_internal" title={s ? `${s.student.name} — ${s.topic.title}` : "Review submission"} subtitle={s ? `Attempt ${s.attempt}` : undefined}>
-      <Link href="/admin/projects?tab=review" className="-mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-primary">
-        <ArrowLeft className="h-3.5 w-3.5" />
-        Review queue
-      </Link>
-
       {error && (
         <div role="alert" className="rounded-panel border border-status-danger/30 bg-status-danger/10 p-5 text-sm text-status-danger">
           {error}

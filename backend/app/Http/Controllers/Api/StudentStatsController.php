@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ContestParticipant;
+use App\Services\ReadinessHistoryService;
 use App\Services\StudentStatsService;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,12 @@ class StudentStatsController extends Controller
                 'next_steps' => $user->readinessBreakdown()['next_steps'],
                 // How far this score is from the Vault line — see VaultService. The Vault page is where it is acted on.
                 'vault' => $user->readinessBreakdown()['vault'],
+                // Which weighting made the score (software · core · balanced), and until when the better of two is kept after a branch's Core Prep goes live.
+                'profile' => $user->readinessBreakdown()['profile'] ?? 'software',
+                'grace_until' => $user->readinessBreakdown()['grace_until'] ?? null,
+                // What the components add up to, and what missed days have taken off it (score = base_score - decay.points).
+                'base_score' => $user->readinessBreakdown()['base_score'] ?? $user->readinessScore(),
+                'decay' => $user->readinessBreakdown()['decay'] ?? null,
             ],
             'rating' => [
                 'current_rating' => $user->current_rating,
@@ -44,6 +51,17 @@ class StudentStatsController extends Controller
             'activity' => $service->activityHeatmap($user),
             'weekly_goals' => $service->weeklyGoalsProgress($user),
         ]);
+    }
+
+    /**
+     * The student's readiness day by day: the points to chart (today from the live score) and a few facts — when they
+     * first reached the Vault line, how far they have moved in a week, and, if the trend is real, how long to the line.
+     */
+    public function readinessHistory(Request $request, ReadinessHistoryService $history)
+    {
+        $user = $request->user();
+
+        return response()->json($history->history($user, $user->readinessBreakdown(), (int) $request->query('days', 30)));
     }
 
     /**

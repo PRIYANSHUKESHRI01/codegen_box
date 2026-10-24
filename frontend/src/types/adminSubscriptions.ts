@@ -126,6 +126,7 @@ export interface ManagedUserResponse {
   login: {
     login_id: string;
     password_state: "temporary" | "set_by_user";
+    credential_state?: "viewable" | "owner_set" | "not_recorded" | "protected";
     credentials_email_sent_at: string | null;
     last_seen_at: string | null;
     active_sessions: number;

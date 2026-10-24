@@ -3,7 +3,7 @@
 //   company:  GET /api/company/vault[/{id}]           (CompanyVaultController)
 //   staff:    GET /api/admin/vault/*                  (AdminVaultController)
 
-import type { ReadinessComponent } from "./studentStats";
+import type { ReadinessComponent, ReadinessDecay, ReadinessHistory } from "./studentStats";
 
 /** The one derived status every screen reads — see VaultProfile::resolveStatus() on the backend. */
 export type VaultStatus =
@@ -79,7 +79,11 @@ export interface StudentVaultResponse {
     /** A listed student only comes off when their score drops below this. */
     exit_threshold: number;
     points_needed: number;
+    base_score?: number;
+    decay?: ReadinessDecay | null;
   };
+  /** The last 30 days of the score. Absent from an older API. */
+  history?: ReadinessHistory;
   /** Does the student's plan include being listed? Everything else on the page shows either way. */
   access: boolean;
   profile: StudentVaultProfile | null;

@@ -302,14 +302,6 @@ export default function SpeakingSessionPage() {
   return (
     <DashboardShell role="user" title="Speaking Practice" subtitle={prompt.title}>
       <div className="max-w-2xl mx-auto space-y-4">
-        <Link
-          href="/dashboard/learning-centre/speaking"
-          className="inline-flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          All prompts
-        </Link>
-
         {error && stage !== "recording" && (
           <div role="alert" className="flex items-start gap-2 p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-xs text-status-danger">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />

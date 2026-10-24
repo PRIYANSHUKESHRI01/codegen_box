@@ -214,6 +214,15 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.96) translateY(8px)" },
           to: { opacity: "1", transform: "scale(1) translateY(0)" },
         },
+        // The notification bell ringing when something arrives (components/notifications/NotificationBell.tsx).
+        wiggle: {
+          "0%, 100%": { transform: "rotate(0deg)" },
+          "15%": { transform: "rotate(14deg)" },
+          "30%": { transform: "rotate(-12deg)" },
+          "45%": { transform: "rotate(9deg)" },
+          "60%": { transform: "rotate(-6deg)" },
+          "75%": { transform: "rotate(3deg)" },
+        },
       },
       animation: {
         "pulse-subtle": "pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite",
@@ -221,6 +230,7 @@ const config: Config = {
         float: "float 5s ease-in-out infinite",
         "fade-in": "fade-in 0.15s ease-out",
         "modal-in": "modal-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+        wiggle: "wiggle 0.9s ease-in-out 2",
       },
     },
   },

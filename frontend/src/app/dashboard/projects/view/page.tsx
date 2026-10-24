@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
   Clock3,
@@ -103,14 +102,6 @@ function ProjectViewContent() {
 
   return (
     <DashboardShell role="user" title={topic?.title ?? "Project"} subtitle={topic?.category}>
-      <Link
-        href="/dashboard/projects"
-        className="-mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-text-secondary transition-colors hover:text-primary"
-      >
-        <ArrowLeft className="h-3.5 w-3.5" />
-        All projects
-      </Link>
-
       {loadError && (
         <div role="alert" className="rounded-panel border border-status-danger/30 bg-status-danger/10 p-5 text-sm text-status-danger">
           {loadError}

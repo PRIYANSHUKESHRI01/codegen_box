@@ -4,6 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useCallback, useEffect, useState } from "react";
 import { Activity, AlertTriangle, Ban, SearchX, ShieldAlert } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { IntegrityReview } from "@/components/proctoring/IntegrityReview";
 import { ProctoringSessionList } from "@/components/proctoring/ProctoringSessionList";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -187,6 +188,11 @@ export default function CompanyProctoringPage() {
               onReinstated={loadSessions}
             />
           )}
+        </HpItem>
+
+        {/* Every proctored attempt (contests, interviews, tests, practice) with its tamper-evident log, pictures and network. */}
+        <HpItem>
+          <IntegrityReview apiBase="/company/integrity" />
         </HpItem>
       </HpStagger>
     </DashboardShell>

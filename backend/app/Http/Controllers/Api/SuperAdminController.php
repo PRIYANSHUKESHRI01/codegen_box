@@ -16,10 +16,12 @@ use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\CollegePurgeService;
+use App\Services\IssuedCredentialVault;
 use App\Services\Judge\JudgeStatusService;
 use App\Services\LeadAssignmentService;
 use App\Services\StudentStatsService;
 use App\Support\SingleMail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -59,22 +61,8 @@ class SuperAdminController extends Controller
     {
         $query = User::query()->with('college:id,name');
 
-        if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('handle', 'like', "%{$search}%");
-            });
-        }
-
-        if ($roles = $request->query('roles')) {
-            $validRoles = array_intersect(explode(',', $roles), User::ROLES);
-            if ($validRoles !== []) {
-                $query->whereIn('role', $validRoles);
-            }
-        } elseif ($role = $request->query('role')) {
-            $query->where('role', $role);
-        }
+        $this->applySearch($query, $request);
+        $this->applyRoles($query, $request);
 
         if ($request->has('has_college')) {
             $request->boolean('has_college')
@@ -82,9 +70,13 @@ class SuperAdminController extends Controller
                 : $query->whereNull('college_id');
         }
 
-        // Lets the Students tab narrow to one college's roster at a time.
-        if ($collegeId = $request->query('college_id')) {
-            $query->where('college_id', $collegeId);
+        // Narrow to one university's roster (every role that belongs to one: students, TPOs, coordinators), or `none` for the
+        // accounts that belong to no university (Mellow staff, hiring companies, individual coders).
+        $this->applyCollege($query, $request);
+
+        // One department's students (Engineering, Management, Commerce, Arts …); a student never classified counts as engineering.
+        if (($department = $request->query('department')) && is_string($department)) {
+            $query->where('role', User::ROLE_USER)->inDepartment($department);
         }
 
         // The plan a student holds THEMSELVES (not their college's): a plan code, `paid` for any
@@ -106,11 +98,16 @@ class SuperAdminController extends Controller
 
         $page = $query->latest()->paginate(50);
 
+        // Whether a superadmin could look up the temporary password this account was issued — a presence check on one
+        // page of ids, never the password and never a hash comparison (see IssuedCredentialVault::statesFor()).
+        $credentialStates = app(IssuedCredentialVault::class)->statesFor($page->getCollection());
+
         // Real, cheap-per-row enrichment bounded to this one page (≤50 rows)
         // — same bounded-loop precedent as AdminController::colleges() and
         // MarketingLeadController::leadSummary(), never run across the whole
         // unfiltered table.
-        $page->getCollection()->transform(function (User $user) {
+        $page->getCollection()->transform(function (User $user) use ($credentialStates) {
+            $user->credential_state = $credentialStates[$user->id] ?? IssuedCredentialVault::STATE_NOT_RECORDED;
             $coverage = $user->subscriptionCoverage();
             $user->subscription_plan_name = $coverage['plan']?->name;
             $user->subscription = $coverage['plan'] ? [
@@ -129,6 +126,80 @@ class SuperAdminController extends Controller
         });
 
         return $page;
+    }
+
+    private function applySearch(Builder $query, Request $request): void
+    {
+        if ($search = trim((string) $request->query('search'))) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('handle', 'like', "%{$search}%");
+            });
+        }
+    }
+
+    /** `roles` (comma-separated) wins over the single `role`; unknown values are dropped rather than rejected. */
+    private function applyRoles(Builder $query, Request $request): void
+    {
+        if ($roles = $request->query('roles')) {
+            $validRoles = array_intersect(explode(',', (string) $roles), User::ROLES);
+            if ($validRoles !== []) {
+                $query->whereIn('role', $validRoles);
+            }
+        } elseif ($role = $request->query('role')) {
+            $query->where('role', $role);
+        }
+    }
+
+    private function applyCollege(Builder $query, Request $request): void
+    {
+        $collegeId = $request->query('college_id');
+
+        if ($collegeId === 'none') {
+            $query->whereNull('college_id');
+        } elseif ($collegeId !== null && $collegeId !== '' && ctype_digit((string) $collegeId)) {
+            $query->where('college_id', (int) $collegeId);
+        }
+    }
+
+    /**
+     * What the directory's filter bar needs to be honest: how many accounts of each ROLE the current university + search
+     * leaves (so picking a university shows "TPOs 1 · Coordinators 4 · Students 230" before you click anything), and how
+     * many accounts each UNIVERSITY has for the current role + search (so the list can say which universities have any).
+     * Two grouped counts — never row data, so it stays cheap on a table of thousands.
+     */
+    public function directoryFacets(Request $request)
+    {
+        $byRole = User::query();
+        $this->applySearch($byRole, $request);
+        $this->applyCollege($byRole, $request);
+        $roles = $byRole->selectRaw('role, COUNT(*) as accounts')->groupBy('role')->pluck('accounts', 'role');
+
+        $byCollege = User::query()->whereNotNull('college_id');
+        $this->applySearch($byCollege, $request);
+        $this->applyRoles($byCollege, $request);
+        $perCollege = $byCollege->selectRaw('college_id, COUNT(*) as accounts')->groupBy('college_id')->pluck('accounts', 'college_id');
+
+        $noCollege = User::query()->whereNull('college_id');
+        $this->applySearch($noCollege, $request);
+        $this->applyRoles($noCollege, $request);
+
+        return response()->json([
+            'roles' => $roles,
+            'colleges' => College::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'short_code', 'city'])
+                ->map(fn (College $c) => [
+                    'id' => $c->id,
+                    'name' => $c->name,
+                    'short_code' => $c->short_code,
+                    'city' => $c->city,
+                    'accounts' => (int) ($perCollege[$c->id] ?? 0),
+                ])
+                ->values(),
+            'without_college' => $noCollege->count(),
+        ]);
     }
 
     /**
@@ -286,6 +357,8 @@ class SuperAdminController extends Controller
             'permissions' => $allowedPermissions !== [] ? $grantedPermissions : null,
         ]);
 
+        app(IssuedCredentialVault::class)->keep($user, $temporaryPassword, 'created', $request->user());
+
         ActivityLog::record(
             $request->user(),
             "Created account (role: {$user->role})",
@@ -392,10 +465,17 @@ class SuperAdminController extends Controller
     }
 
     /**
-     * Give an account a brand-new temporary password and show it to the
-     * superadmin — the only way to "see" a login, because passwords are stored
-     * as one-way hashes and a user replaces their temporary one at first login,
-     * so the current password simply does not exist anywhere to be read back.
+     * Give an account a new password — generated here, or typed by the superadmin
+     * in `new_password` — and show it to them. Passwords are stored as one-way
+     * hashes, so this (and the credential lookup in SuperAdminCredentialController,
+     * which covers the temporary password an account was issued) is how a superadmin
+     * gets a login they can read.
+     *
+     * By default the new password is temporary: the owner must replace it at next
+     * sign-in, and until they do the superadmin can look it up again (it is kept
+     * encrypted, see IssuedCredentialVault). With `require_change` off the superadmin
+     * is setting the owner's permanent password: nothing is kept, because there is no
+     * "issued, not yet replaced" state to look up.
      *
      * The old password stops working immediately and every session the account
      * has open is signed out; the user must choose their own password at next
@@ -411,6 +491,9 @@ class SuperAdminController extends Controller
         $validated = $request->validate([
             'password' => ['required', 'string'],
             'send_email' => ['sometimes', 'boolean'],
+            // bcrypt only reads the first 72 bytes — a longer password would silently ignore the tail.
+            'new_password' => ['sometimes', 'nullable', 'string', 'min:8', 'max:72'],
+            'require_change' => ['sometimes', 'boolean'],
         ]);
 
         $this->confirmSuperadminPassword($request, $validated['password']);
@@ -421,36 +504,56 @@ class SuperAdminController extends Controller
             ], 422);
         }
 
-        $temporaryPassword = Str::password(16);
+        $chosen = isset($validated['new_password']) && $validated['new_password'] !== '';
+        $requireChange = $request->boolean('require_change', true);
 
-        DB::transaction(function () use ($user, $temporaryPassword) {
+        if ($chosen && strcasecmp($validated['new_password'], $user->email) === 0) {
+            throw ValidationException::withMessages(['new_password' => ['The password cannot be the same as the login email.']]);
+        }
+
+        $temporaryPassword = $chosen ? $validated['new_password'] : Str::password(16);
+
+        DB::transaction(function () use ($user, $temporaryPassword, $requireChange, $request, $chosen) {
             $user->forceFill([
                 'password' => Hash::make($temporaryPassword),
-                'must_change_password' => true,
+                'must_change_password' => $requireChange,
                 // The credentials-email job refuses to send twice to one account; this is a new password, so it must be allowed to.
                 'credentials_email_sent_at' => null,
             ])->save();
 
             // Sign the account out everywhere: the old password may be the very reason it is being reset.
             $user->tokens()->delete();
+
+            $vault = app(IssuedCredentialVault::class);
+            $requireChange
+                ? $vault->keep($user, $temporaryPassword, $chosen ? 'set_by_superadmin' : 'reset', $request->user())
+                : $vault->forget($user);
         });
 
         $emailed = $request->boolean('send_email')
             ? SingleMail::now(new SendAccountCredentialsEmail($user->id, $temporaryPassword))
             : null;
 
+        // Whoever's account it is should find out an administrator changed their password — the bell is the first place they'll look.
+        app(\App\Services\NotificationService::class)->notify($user, \App\Enums\NotificationType::PasswordChanged, 'An administrator changed your password', 'The AptRun team '.($chosen ? 'set a new' : 'reset your').' password for your account'.($requireChange ? ', and you will be asked to choose your own at next sign-in' : '').'. If you were not expecting this, contact support.', [
+            'url' => '/settings?tab=security',
+            'group_key' => 'password.admin:'.$user->id.':'.now()->format('YmdHis'),
+            'actor' => $request->user(),
+        ]);
+
         // Never the password itself — the audit trail is readable by other staff.
         ActivityLog::record(
             $request->user(),
-            'Reset an account password and viewed the temporary password',
+            $chosen ? 'Set an account password' : 'Reset an account password and viewed the temporary password',
             'User',
             $user->name,
-            ['role' => $user->role, 'emailed_to_user' => $emailed]
+            ['role' => $user->role, 'emailed_to_user' => $emailed, 'must_change_at_next_login' => $requireChange]
         );
 
         return response()->json([
             'user' => $user->fresh(['college:id,name']),
             'temporary_password' => $temporaryPassword,
+            'must_change_password' => $requireChange,
             // null = the superadmin chose not to email it; true/false = it was attempted.
             'credentials_email_sent' => $emailed,
         ]);

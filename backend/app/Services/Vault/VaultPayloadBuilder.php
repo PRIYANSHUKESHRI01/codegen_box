@@ -2,7 +2,12 @@
 
 namespace App\Services\Vault;
 
+use App\Models\CoreSubject;
+use App\Models\User;
 use App\Models\VaultProfile;
+use App\Services\Core\CoreAccess;
+use App\Services\Core\CoreMasteryService;
+use App\Support\BranchCatalog;
 
 /**
  * Builds the profile that leaves AptRun for Mellow Vault (and that the pull API
@@ -36,6 +41,11 @@ class VaultPayloadBuilder
                 'state' => $college->state,
             ],
             'branch' => $user->branch,
+            // Readiness v4: the canonical branch and its family, so the hiring side can filter "all ECE" without parsing a college's own spelling.
+            'branch_code' => $user->branch_code,
+            'discipline' => $user->discipline,
+            // The department (engineering · management · commerce · arts …) — the programme level above the family, for hiring-side filters.
+            'department' => $user->department ?? BranchCatalog::instance()->departmentOfDiscipline($user->discipline),
             'cgpa' => $user->cgpa !== null ? (float) $user->cgpa : null,
             'backlogs' => $user->backlogs,
             'skills' => array_values($user->skills ?? []),
@@ -55,6 +65,8 @@ class VaultPayloadBuilder
                 'tier' => $profile->readiness_tier,
                 'peak' => (int) $profile->peak_readiness,
                 'version' => $profile->readiness_version,
+                // Which weighting made the score: software (everyone before v4) · core · balanced. The components differ by profile.
+                'profile' => $profile->readiness_profile ?? 'software',
                 'computed_at' => $profile->readiness_computed_at?->toIso8601String(),
                 'components' => collect($profile->readiness_components ?? [])
                     ->map(fn (array $c) => [
@@ -66,8 +78,46 @@ class VaultPayloadBuilder
                     ->values()
                     ->all(),
             ],
+            'core' => $this->coreStrengths($user),
             'qualified_at' => $profile->qualified_at?->toIso8601String(),
         ];
+    }
+
+    /** @var array<int, array{code: string, name: string}>|null subject id => names, read once per builder */
+    private ?array $subjects = null;
+
+    /**
+     * For a student of a core branch whose Core Prep is live: how they do in each technical subject they have practised
+     * or been tested on — at least `readiness.core.vault_min_attempts` answers, accuracy rounded to the nearest 5 so the
+     * profile is not re-sent on every single answer. Null for everyone else (a CSE student's payload gains nothing to explain).
+     *
+     * @return array{subjects: list<array{code: string, name: string, accuracy_percent: int}>}|null
+     */
+    private function coreStrengths(User $user): ?array
+    {
+        $discipline = $user->discipline;
+
+        if (! config('readiness.core.counts_towards_score', false)) {
+            return null; // Core Prep is not part of the Vault profile while it is not part of the score
+        }
+
+        if ($discipline === null || ! CoreAccess::isFamily($discipline) || ! (BranchCatalog::instance()->discipline($discipline)['is_live'] ?? false)) {
+            return null;
+        }
+
+        $this->subjects ??= CoreSubject::query()->get(['id', 'code', 'name'])->mapWithKeys(fn (CoreSubject $s) => [$s->id => ['code' => $s->code, 'name' => $s->name]])->all();
+        $minAttempts = (int) config('readiness.core.vault_min_attempts', 10);
+        $strengths = [];
+
+        foreach (app(CoreMasteryService::class)->accuracyFor($user->id)['subjects'] as $subjectId => $stats) {
+            if ($stats['attempts'] >= $minAttempts && isset($this->subjects[$subjectId])) {
+                $strengths[] = $this->subjects[$subjectId] + ['accuracy_percent' => (int) (round($stats['correct'] / $stats['attempts'] * 20) * 5)];
+            }
+        }
+
+        usort($strengths, fn (array $a, array $b) => [$b['accuracy_percent'], $a['name']] <=> [$a['accuracy_percent'], $b['name']]);
+
+        return $strengths === [] ? null : ['subjects' => array_slice($strengths, 0, 8)];
     }
 
     /**

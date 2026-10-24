@@ -8,6 +8,7 @@ import { Modal } from "@/components/ui/Modal";
 import { DriveVisibilityPanel } from "@/components/admin/contests/DriveVisibilityPanel";
 import { GenerateQuestionsPanel } from "@/components/dashboard/interviews/GenerateQuestionsPanel";
 import { RoundQuestionTargetChecklist } from "@/components/dashboard/interviews/RoundQuestionTargetChecklist";
+import { audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 import type { AttachedInterviewQuestion, BankQuestion } from "@/types/interview";
 import type { InterviewRoleTemplate, InterviewTrackSummary, TrackRound } from "@/types/interviewTrack";
 
@@ -55,6 +56,7 @@ export function CreateInterviewTrackModal({
   const [templateId, setTemplateId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [audience, setAudience] = useState<BranchAudience>(EVERYONE);
   const [trackType, setTrackType] = useState<"general" | "company">("general");
 
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
@@ -68,6 +70,13 @@ export function CreateInterviewTrackModal({
   const [createdTrack, setCreatedTrack] = useState<InterviewTrackSummary | null>(null);
 
   const selectedTemplate = templates.find((t) => String(t.id) === templateId);
+  // A hiring partner's own tracks (and Mellow's company tracks, which are tied to a drive) are targeted by the drive, not by branch.
+  const targetsBranches = role === "tpo" || (role === "admin" && trackType === "general");
+
+  // Picking a core role (e.g. "VLSI Design Engineer") aims the track at its branch family — the creator can still change it.
+  useEffect(() => {
+    if (selectedTemplate?.discipline) setAudience({ disciplines: [selectedTemplate.discipline], branches: [] });
+  }, [selectedTemplate?.id, selectedTemplate?.discipline]);
   const needsDrive = role === "company" || (role === "admin" && trackType === "company");
 
   useEffect(() => {
@@ -118,6 +127,7 @@ export function CreateInterviewTrackModal({
         description: description || undefined,
         interview_role_template_id: selectedTemplate.id,
       };
+      if (targetsBranches) payload.branch_audience = audienceForRequest(audience);
       if (role === "admin") {
         payload.track_type = trackType;
         if (trackType === "company") {
@@ -302,6 +312,8 @@ export function CreateInterviewTrackModal({
               targeting={{ selectedIds: selectedCollegeIds, onChange: setSelectedCollegeIds }}
             />
           )}
+
+          {targetsBranches && <BranchAudienceField value={audience} onChange={setAudience} />}
 
           <div>
             <label className="block font-semibold text-text-secondary mb-1">Title *</label>

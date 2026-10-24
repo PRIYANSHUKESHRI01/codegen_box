@@ -9,6 +9,7 @@ use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
 use App\Services\InterviewProctoringService;
 use App\Services\InterviewTrackAdvancementService;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -42,6 +43,7 @@ class TpoInterviewController extends Controller
         }
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
         ]);
@@ -54,6 +56,7 @@ class TpoInterviewController extends Controller
             'interview_type' => Interview::INTERVIEW_TYPE_TPO_MOCK,
             'owning_college_id' => $collegeId,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ]);
 
         return response()->json(['interview' => $interview], 201);
@@ -64,10 +67,15 @@ class TpoInterviewController extends Controller
         $this->authorizeOwnership($request, $interview);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(Interview::STATUSES)],
         ]);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $interview->update($validated);
 

@@ -19,6 +19,8 @@ export interface InterviewRoleTemplate {
   description: string | null;
   tech_stack_tags: string[] | null;
   rounds_config: RoundConfig[];
+  /** The core branch family this role is for (ece / eee / mech / civil); null = every branch. */
+  discipline?: string | null;
   owning_college_id: number | null;
   owning_company_id: number | null;
   is_active: boolean;
@@ -80,6 +82,8 @@ export interface StudentInterviewTrackSummary {
   company: { id: number; name: string; logo: string | null } | null;
   round_count: number;
   my_round1_status: "invited" | "in_progress" | "completed" | null;
+  /** Made for the student's branch; listed first. Absent from an older API. */
+  for_your_branch?: boolean;
 }
 
 export interface TrackPipeline {

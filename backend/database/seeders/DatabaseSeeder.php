@@ -191,6 +191,15 @@ class DatabaseSeeder extends Seeder
         $this->call(SoftSkillQuestionSeeder::class);
         $this->call(SoftSkillAssessmentSeeder::class);
         $this->call(SoftSkillTwentySetsSeeder::class);
+        $this->call(AccentureQuestionSetsSeeder::class);
+        $this->call(CapgeminiPlacementSeeder::class);
+        $this->call(CognizantPlacementSeeder::class);
+        $this->call(WiproPlacementSeeder::class);
+        $this->call(TcsPlacementSeeder::class);
+        $this->call(InfosysPlacementSeeder::class);
+        $this->call(HclTechPlacementSeeder::class);
+        $this->call(TechMahindraPlacementSeeder::class);
+        $this->call(LtiMindtreePlacementSeeder::class);
         $this->call(FeatureFlagSeeder::class);
         // Project Lab's project catalogue (SOW + milestones), read from files.
         $this->call(ProjectLabContentSeeder::class);

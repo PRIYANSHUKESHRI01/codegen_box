@@ -9,6 +9,7 @@ use App\Models\ContestSubmission;
 use App\Models\User;
 use App\Services\ContestFinalizeService;
 use App\Services\ContestReportService;
+use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -46,6 +47,7 @@ class TpoContestController extends Controller
         }
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'start_at' => ['required', 'date'],
@@ -63,6 +65,7 @@ class TpoContestController extends Controller
             'contest_type' => Contest::CONTEST_TYPE_TPO_MOCK,
             'owning_college_id' => $collegeId,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ]);
 
         return response()->json(['contest' => $contest], 201);
@@ -73,12 +76,17 @@ class TpoContestController extends Controller
         $this->authorizeOwnership($request, $contest);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'start_at' => ['sometimes', 'date'],
             'end_at' => ['sometimes', 'date', 'after:start_at'],
             'status' => ['sometimes', Rule::in(Contest::STATUSES)],
         ]);
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
+        }
 
         $contest->update($validated);
 

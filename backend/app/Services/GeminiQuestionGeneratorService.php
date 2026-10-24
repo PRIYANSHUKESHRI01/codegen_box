@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\InterviewDiscipline;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -48,6 +49,7 @@ class GeminiQuestionGeneratorService
         int $count,
         ?string $skills,
         array $avoidQuestionTexts = [],
+        ?string $discipline = null,
     ): array {
         $apiKey = config('services.gemini.api_key');
 
@@ -56,7 +58,7 @@ class GeminiQuestionGeneratorService
         }
 
         $perCategoryCounts = $this->splitCountAcrossCategories($count, $categories);
-        $prompt = $this->buildPrompt($role, $difficulty, $perCategoryCounts, $skills, $avoidQuestionTexts);
+        $prompt = $this->buildPrompt($role, $difficulty, $perCategoryCounts, $skills, $avoidQuestionTexts, $discipline);
 
         try {
             $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
@@ -117,7 +119,7 @@ class GeminiQuestionGeneratorService
         return array_filter($split);
     }
 
-    private function buildPrompt(string $role, string $difficulty, array $perCategoryCounts, ?string $skills, array $avoidQuestionTexts): string
+    private function buildPrompt(string $role, string $difficulty, array $perCategoryCounts, ?string $skills, array $avoidQuestionTexts, ?string $discipline = null): string
     {
         $breakdown = collect($perCategoryCounts)
             ->map(fn (int $n, string $category) => "{$n} ".self::CATEGORY_LABELS[$category].($n === 1 ? ' question' : ' questions'))
@@ -136,7 +138,8 @@ class GeminiQuestionGeneratorService
         $lines[] = 'Requirements for every question:';
         $lines[] = '- Must be answerable OUT LOUD in a spoken interview — never ask to write code, draw a diagram, or use a whiteboard.';
         $lines[] = '- Professional, realistic, and genuinely appropriate for evaluating a candidate for this specific role and difficulty level.';
-        $lines[] = '- Technical questions: favor reasoning, system design, and conceptual understanding over rote trivia lookup.';
+        // A core branch (ECE, EEE, Mechanical, Civil) gets its own wording; everyone else keeps the original line exactly.
+        $lines[] = InterviewDiscipline::generationGuidance($discipline) ?? '- Technical questions: favor reasoning, system design, and conceptual understanding over rote trivia lookup.';
         $lines[] = '- Behavioral/situational questions: phrase as a real scenario the candidate can answer with a concrete example (STAR-friendly).';
         $lines[] = '- HR questions: genuinely about motivation, fit, and career goals — not generic filler.';
         $lines[] = '- expected_duration_seconds should realistically reflect how long a thoughtful spoken answer takes (60-300 seconds).';

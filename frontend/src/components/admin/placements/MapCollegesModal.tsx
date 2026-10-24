@@ -5,7 +5,8 @@ import { Building2, Loader2, Search, Send, CheckCircle2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
-import { AdminDriveRow, AdminPartnerCollege, BRANCH_OPTIONS, inputClass } from "./types";
+import { AdminDriveRow, AdminPartnerCollege, inputClass } from "./types";
+import { BranchPicker } from "@/components/branches/BranchPicker";
 
 interface MapCollegesModalProps {
   drive: AdminDriveRow;
@@ -73,9 +74,6 @@ export function MapCollegesModal({ drive, onClose, onProposed }: MapCollegesModa
     });
   };
 
-  const toggleBranch = (branch: string) => {
-    setBranches((prev) => (prev.includes(branch) ? prev.filter((b) => b !== branch) : [...prev, branch]));
-  };
 
   const handleSubmit = async () => {
     if (selected.size === 0) return;
@@ -247,25 +245,7 @@ export function MapCollegesModal({ drive, onClose, onProposed }: MapCollegesModa
                     All branches
                   </label>
                 </div>
-                {!allBranches && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {BRANCH_OPTIONS.map((b) => (
-                      <button
-                        key={b}
-                        type="button"
-                        onClick={() => toggleBranch(b)}
-                        className={cn(
-                          "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                          branches.includes(b)
-                            ? "bg-accent-primary text-white border-accent-primary"
-                            : "bg-surface text-text-secondary border-border-subtle"
-                        )}
-                      >
-                        {b}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {!allBranches && <BranchPicker value={branches} onChange={setBranches} />}
               </div>
             </div>
           )}

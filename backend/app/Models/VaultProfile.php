@@ -71,6 +71,7 @@ class VaultProfile extends Model
         'readiness_tier',
         'readiness_components',
         'readiness_version',
+        'readiness_profile',
         'readiness_computed_at',
         'qualified_at',
         'eligible_since',

@@ -1,0 +1,445 @@
+[
+ {
+  "question_text": "Walk me through how electricity gets from a power station to a home. What are the main stages and why are voltages changed along the way?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "Generation, step-up transformer, high-voltage transmission, substations with step-down transformers, distribution, then the final low-voltage supply. High voltage means lower current for the same power, so lower I-squared-R losses and thinner conductors; voltage is stepped down for safety and use. Mentions typical voltage levels.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is power factor, and why do utilities and factories care about it?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "electrical_design",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "The ratio of real power to apparent power (cosine of the phase angle for sinusoids). A low power factor means more current for the same useful power, causing larger losses, voltage drop and bigger equipment. Inductive loads lower it; capacitors or synchronous condensers correct it; industries are penalised for a poor power factor.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What does a protection relay do, and why must a protection scheme be both fast and selective?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_systems",
+   "protection"
+  ],
+  "notes_for_reviewer": "It detects abnormal conditions (overcurrent, earth fault, differential) and trips the circuit breaker. Fast limits damage and keeps the system stable; selective means only the faulty section is isolated so the rest keeps supplying. Mentions coordination between upstream and downstream devices and backup protection.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is a per-unit system and why is it used in power system studies?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "Quantities are expressed as fractions of chosen base values, so transformer ratios disappear and equipment values fall in a narrow range, which makes calculations simpler and errors easier to spot. Need to state that base MVA and base voltage are chosen and converted consistently.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the difference between a symmetrical and an unsymmetrical fault, and why do we study sequence components?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "A balanced three-phase fault affects all phases equally and can be solved per phase; line-to-ground or line-to-line faults are unbalanced. Symmetrical components split the unbalanced system into positive, negative and zero-sequence networks that can be solved separately and combined. The answer should mention which sequence networks connect for common fault types.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the Ferranti effect, and when would you see it?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "On a long, lightly loaded or open-ended transmission line, charging current flowing through the line inductance makes the receiving-end voltage higher than the sending-end voltage. It is controlled with shunt reactors. Appears with long cables and EHV lines at night load.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "How does a transformer work, and why does it only work on AC?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "electrical_machines"
+  ],
+  "notes_for_reviewer": "A changing current in the primary produces a changing flux in the core that induces a voltage in the secondary (Faraday's law); the voltage ratio follows the turns ratio. DC gives a constant flux and no induced voltage; a DC supply would just drive a large current through the winding resistance.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Explain how an induction motor develops torque, and what slip means.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "electrical_machines"
+  ],
+  "notes_for_reviewer": "The stator's rotating field induces currents in the rotor, which interact with the field to create torque. The rotor always turns a bit slower than synchronous speed; slip is the fractional difference and is needed because induction requires relative motion. Torque rises with slip up to a maximum then falls; low slip at full load.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Why do we use a starter for a large three-phase induction motor, and what options are there?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "electrical_machines"
+  ],
+  "notes_for_reviewer": "Starting current is five to eight times the rated current and causes voltage dips and stress. Options: star-delta (reduces voltage on windings), auto-transformer, soft starter, and variable-frequency drive for controlled starting. Mentions the trade-off with starting torque.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is back emf in a DC motor, and what would happen if it were absent?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "electrical_machines"
+  ],
+  "notes_for_reviewer": "The motor's own rotation induces a voltage opposing the supply; armature current equals the difference divided by armature resistance. It limits current and sets speed; without it (at standstill) the starting current is very high, which is why a starter is used.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the effect of changing the field excitation of a synchronous motor on a grid?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "electrical_machines",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "At constant load, changing excitation changes the power factor, not the speed: under-excited draws lagging current, over-excited draws leading current and can supply reactive power (synchronous condenser). The V-curve shows armature current against field current. Used for power-factor correction.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the difference between a rectifier, an inverter and a converter, in simple terms?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev"
+  ],
+  "notes_for_reviewer": "A rectifier converts AC to DC; an inverter converts DC to AC; a converter is the general term (AC-DC, DC-DC, DC-AC, AC-AC). Give an everyday example of each (phone charger, solar inverter, DC-DC for LED drivers).",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "How does a buck converter reduce voltage, and why is it more efficient than a linear regulator?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev"
+  ],
+  "notes_for_reviewer": "A switch chops the input and an inductor-capacitor filter averages it; output is roughly duty cycle times input. Since the switch is either fully on or off, little power is dissipated, while a linear regulator burns the voltage difference as heat. Mentions inductor ripple and switching losses.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Why is a MOSFET chosen in some power circuits and an IGBT in others?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev"
+  ],
+  "notes_for_reviewer": "MOSFETs switch very fast and are efficient at lower voltages (up to a few hundred volts), IGBTs handle higher voltage and current with lower conduction loss but switch slower. Choose by voltage, current, switching frequency and cost.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "How does regenerative braking work in an electric vehicle, and what are its limits?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev"
+  ],
+  "notes_for_reviewer": "During braking the motor acts as a generator, converting kinetic energy to electrical energy that the inverter returns to the battery. Limits: battery state of charge and charge-rate limits, low speed (little energy), cold battery, and the need to blend with friction brakes for strong braking. Improves range.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What does a battery management system do in an EV pack, and why is cell balancing needed?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 180,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev"
+  ],
+  "notes_for_reviewer": "It monitors cell voltage, current and temperature, estimates state of charge and health, protects against overcharge, over-discharge, over-current and over-temperature, and balances cells. Cells drift apart in capacity, so the weakest cell would limit the pack or be damaged without balancing.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the difference between open-loop and closed-loop control? Give an example of each.",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "control_systems",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Open loop applies an input without checking the result (a timer-controlled heater); closed loop measures the output and corrects using feedback (a thermostat). Feedback reduces the effect of disturbances and variations but can cause instability if badly designed.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Explain what the P, I and D terms of a PID controller do.",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "control_systems",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Proportional reacts to present error, integral removes steady-state error by accumulating past error (and can cause overshoot/windup), derivative anticipates by reacting to the rate of change and adds damping (and amplifies noise). Real answers mention tuning and anti-windup.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What does it mean for a control system to be stable, and how can you tell from the poles?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "control_systems",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "A bounded input gives a bounded output and transients die away. For a linear system all poles must be in the left half of the s-plane; poles on the axis are marginal. Mentions gain/phase margins as practical measures of how close to instability a design is.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "How does a grid-tied solar inverter work, and what is MPPT?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "power_electronics_ev",
+   "renewable_energy"
+  ],
+  "notes_for_reviewer": "It converts the panels' DC to AC synchronised in voltage, frequency and phase with the grid, and shuts down if the grid fails (anti-islanding). Maximum power point tracking continuously adjusts the operating point because the panel's best voltage changes with sunlight and temperature.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What are the main challenges of connecting a lot of wind and solar power to the grid?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "renewable_energy"
+  ],
+  "notes_for_reviewer": "Variability and forecasting error, reduced system inertia, voltage and frequency control, need for storage or flexible generation, grid congestion and protection coordination. Solutions: forecasting, storage, demand response, grid codes and smart inverters.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Why is earthing needed in an electrical installation?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "editorial-v1",
+   "electrical_design",
+   "safety"
+  ],
+  "notes_for_reviewer": "To keep exposed metal at a safe potential and give fault current a low-impedance path so that protective devices operate quickly, protecting people and equipment. Mentions earth electrodes, bonding and that RCDs add protection against small leakage currents.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "How would you select the cable size and protective device for a new motor circuit?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "electrical_design"
+  ],
+  "notes_for_reviewer": "From motor full-load current, starting current, voltage drop limit, installation method and ambient temperature derating, short-circuit withstand, and standards. Choose a protective device that tolerates starting current but protects the cable. A systematic process matters more than quoting numbers.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "A factory's electricity bill has a high demand charge and a poor power factor penalty. What would you investigate?",
+  "category": "technical",
+  "difficulty": "hard",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "electrical_design",
+   "power_systems"
+  ],
+  "notes_for_reviewer": "Load profile and peaks (shift loads, stagger starts), reactive power compensation (capacitor banks/APFC), efficient motors and drives, losses in wiring and transformers, and metering to verify. Shows both technical and cost reasoning.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "A colleague wants to work on a circuit without isolating it, to save time. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "electrical_design",
+   "safety"
+  ],
+  "notes_for_reviewer": "Stop the work politely, insist on isolation and lock-out/tag-out and a proven-dead check, explain the risk, and escalate to the supervisor if they will not comply. Safety before schedule, no exceptions.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "A feeder trips repeatedly at the same time each evening. How would you approach the problem?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "power_systems",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "Gather data (relay records, load at that time, weather, events), check for overload, a loose connection, a protection setting issue or a recurring fault, inspect and measure rather than reset blindly, and make a temporary fix safe while looking for the root cause.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "You are given a deadline that does not leave time for a required test. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "quality",
+   "time_management"
+  ],
+  "notes_for_reviewer": "Explain the risk, propose a reduced but safe test or phased delivery, agree the decision with the manager, and never certify what was not tested. For safety-critical items the test is not optional.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Your site engineer gives you instructions that differ from the drawing. What do you do?",
+  "category": "situational",
+  "difficulty": "easy",
+  "expected_duration_seconds": 90,
+  "tags": [
+   "communication",
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "Check which document is current, ask for clarification in writing, do not proceed on assumption where safety or cost is involved, and record the decision. Shows respect for the drawings and for the person on site.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "You smell burning near a panel. What do you do?",
+  "category": "situational",
+  "difficulty": "medium",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "safety"
+  ],
+  "notes_for_reviewer": "Keep away, alert others, isolate the supply if it is safe to do so, use the correct extinguisher only if trained and safe (not water on live equipment), raise the alarm and inform the responsible person, and have the panel inspected before re-energising.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Tell me about your final-year or best project. What was your contribution, what went wrong and what did you learn?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "projects"
+  ],
+  "notes_for_reviewer": "A clear problem and design choice, the candidate's own contribution, a real difficulty with the root cause and fix, a measured result, and an honest lesson. Look for ownership and specifics.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Describe a time you had to learn something technical quickly.",
+  "category": "behavioral",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "learning"
+  ],
+  "notes_for_reviewer": "What, why, how they learned (standards, manuals, experts, small experiments), how they checked their understanding and the result. Shows a repeatable way of learning.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Tell me about a time you worked in a team that disagreed about the design. How was it resolved?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "editorial-v1",
+   "teamwork"
+  ],
+  "notes_for_reviewer": "A specific situation, listening to others, using calculation or a test to decide, supporting the final decision, and the outcome without blaming.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Describe a lab experiment or practical that gave unexpected results. What did you do?",
+  "category": "behavioral",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "debugging",
+   "editorial-v1",
+   "lab"
+  ],
+  "notes_for_reviewer": "Compare expected and observed values, check connections, instruments and assumptions, repeat, isolate the cause, and document; strong answers find and name the actual cause.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Why electrical engineering, and what do you want to be doing in three years?",
+  "category": "hr",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "career",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "A real reason for the branch, interest in a specific area (power, drives, EV, renewables, design), realistic growth (site/plant exposure, certifications, ownership of projects) and willingness to work on field and plant.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "What is the difference between on-grid, off-grid and hybrid solar systems?",
+  "category": "technical",
+  "difficulty": "easy",
+  "expected_duration_seconds": 120,
+  "tags": [
+   "editorial-v1",
+   "renewable_energy"
+  ],
+  "notes_for_reviewer": "On-grid feeds the utility grid, cheapest, no battery, stops when the grid fails; off-grid has batteries and is independent of the grid; hybrid combines grid and battery for backup and self-consumption. Choice depends on grid reliability, cost and goals.",
+  "discipline": "eee"
+ },
+ {
+  "question_text": "Why do control systems sometimes oscillate, and how do you reduce it?",
+  "category": "technical",
+  "difficulty": "medium",
+  "expected_duration_seconds": 150,
+  "tags": [
+   "control_systems",
+   "editorial-v1"
+  ],
+  "notes_for_reviewer": "Too much loop gain or delay makes feedback arrive out of phase and reinforce error, producing oscillation or instability. Reduce gain, add damping (derivative action or lead compensation), reduce delays or filter noise, and check gain and phase margins.",
+  "discipline": "eee"
+ }
+]

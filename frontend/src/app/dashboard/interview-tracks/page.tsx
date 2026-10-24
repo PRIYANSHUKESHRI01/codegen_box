@@ -4,7 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Loader2, Lock, CheckCircle2, XCircle, PlayCircle, Award } from "lucide-react";
+import { Loader2, Lock, CheckCircle2, XCircle, PlayCircle, Award } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -50,11 +50,6 @@ function InterviewTrackPipelinePageContent() {
 
   return (
     <DashboardShell role="user" title="Final Interview">
-      <Link href="/dashboard/interviews" className="inline-flex items-center gap-1.5 text-2xs font-semibold text-accent-primary hover:underline mb-4">
-        <ArrowLeft className="w-3.5 h-3.5" />
-        Back to Interviews
-      </Link>
-
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />

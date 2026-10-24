@@ -133,6 +133,8 @@ export interface AdminSoftSkillAssessment {
   description: string | null;
   status: SoftSkillAssessmentStatus;
   assessment_type: SoftSkillAssessmentType;
+  /** Which branches this is for; null = everyone. */
+  branch_audience?: { disciplines?: string[]; branches?: string[] } | null;
   duration_minutes: number;
   pass_percentage: number;
   max_attempts: number | null;

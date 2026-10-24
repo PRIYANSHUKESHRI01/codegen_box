@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Maximize, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { VIOLATION_LABEL, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
+import { AssuranceBadge, IntegrityHoldLayer } from "./IntegrityHoldLayer";
+import { violationLabel, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
 
 /**
  * The interview-specific counterpart to ProctoringOverlay (contest
@@ -93,6 +94,7 @@ export function InterviewSessionHud({
           <span className="text-text-secondary">
             {session.violation_count}/{session.max_violations} strikes
           </span>
+          <AssuranceBadge />
         </div>
       )}
 
@@ -103,7 +105,7 @@ export function InterviewSessionHud({
             Warning {toast.count}/{toast.max}
           </p>
           <p className="text-2xs text-text-secondary mt-1">
-            {VIOLATION_LABEL[toast.type]}. {toast.max - toast.count > 0 ? `${toast.max - toast.count} more strike${toast.max - toast.count === 1 ? "" : "s"} and your interview ends.` : ""}
+            {violationLabel(toast.type)}. {toast.max - toast.count > 0 ? `${toast.max - toast.count} more strike${toast.max - toast.count === 1 ? "" : "s"} and your interview ends.` : ""}
           </p>
         </div>
       )}
@@ -125,6 +127,8 @@ export function InterviewSessionHud({
           </div>
         </div>
       )}
+
+      <IntegrityHoldLayer />
     </>
   );
 }

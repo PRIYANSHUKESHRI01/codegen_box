@@ -69,7 +69,7 @@ class ScoreInterviewSessionJob implements ShouldQueue
         }
 
         try {
-            $results = $scoringService->score($items, (string) $role);
+            $results = $scoringService->score($items, (string) $role, $interview->effectiveDiscipline());
         } catch (Throwable $e) {
             Log::warning('[ScoreInterviewSessionJob] scoring failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
             $session->update(['scoring_failed_at' => now()]);

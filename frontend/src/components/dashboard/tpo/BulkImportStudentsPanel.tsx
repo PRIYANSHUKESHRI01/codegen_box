@@ -18,6 +18,8 @@ import {
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { departmentShort, useBranchCatalog } from "@/lib/branches";
+import { DepartmentPicker, useCollegeDepartments } from "@/components/branches/DepartmentPicker";
 import { HP_TONES, HpButton, HpCard, HpIconTile, HpPill, HpSkeleton, hpEase, type HpTone } from "@/components/portal/kit";
 import { HpFormError } from "@/components/portal/pipeline-kit";
 
@@ -61,6 +63,8 @@ interface ImportError {
 interface ApiStudentImport {
   id: number;
   original_filename: string;
+  /** The department the whole file was imported under. */
+  department_code?: string | null;
   status: ImportStatus;
   total_rows: number;
   processed_rows: number;
@@ -96,7 +100,14 @@ function formatDate(iso: string) {
 
 export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: BulkImportStudentsPanelProps) {
   const { user } = useAuth();
+  const catalog = useBranchCatalog();
   const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
+  // Rosters are imported department by department: the template, the branch list and the checks all belong to the department chosen.
+  // A college that runs one department is never asked.
+  const { departments } = useCollegeDepartments(collegeId);
+  const [chosenDepartment, setChosenDepartment] = useState<string>("");
+  const department = departments.length === 1 ? departments[0].code : chosenDepartment;
+  const needsDepartment = departments.length > 1;
   const [imports, setImports] = useState<ApiStudentImport[]>([]);
   const [loadingImports, setLoadingImports] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -145,14 +156,17 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
     };
   }, [activeImportId, loadImports]);
 
-  const handleDownloadTemplate = async () => {
+  // Excel is the default: its template has a Branches sheet and a drop-down on the branch column, which
+  // prevents the most common roster error (one branch typed six different ways) at the source.
+  const handleDownloadTemplate = async (format: "xlsx" | "csv" = "xlsx") => {
     setDownloadingTemplate(true);
     try {
-      const blob = await api.getFile(templatePath(collegeId));
+      const query = [format === "xlsx" ? "format=xlsx" : "", department ? `department=${encodeURIComponent(department)}` : ""].filter(Boolean).join("&");
+      const blob = await api.getFile(`${templatePath(collegeId)}${query ? `?${query}` : ""}`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "student-import-template.csv";
+      a.download = `student-import-template${department ? `-${department}` : ""}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -164,11 +178,16 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
 
   const handleUpload = async () => {
     if (!file) return;
+    if (needsDepartment && !department) {
+      setUploadError("Choose the department these students belong to first.");
+      return;
+    }
     setUploading(true);
     setUploadError(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (department) formData.append("department", department);
       const res = await api.postFormData<{ import: ApiStudentImport }>(`${basePath(collegeId)}/import`, formData);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -194,17 +213,35 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
               </p>
             </div>
           </div>
-          <HpButton
-            variant="secondary"
-            size="sm"
-            onClick={handleDownloadTemplate}
-            disabled={downloadingTemplate}
-            isLoading={downloadingTemplate}
-            leftIcon={<Download className="h-3.5 w-3.5" />}
-          >
-            Download CSV Template
-          </HpButton>
+          <div className="flex shrink-0 items-center gap-2">
+            <HpButton
+              variant="secondary"
+              size="sm"
+              onClick={() => handleDownloadTemplate("xlsx")}
+              disabled={downloadingTemplate}
+              isLoading={downloadingTemplate}
+              leftIcon={<Download className="h-3.5 w-3.5" />}
+            >
+              Excel Template
+            </HpButton>
+            <button
+              type="button"
+              onClick={() => handleDownloadTemplate("csv")}
+              disabled={downloadingTemplate}
+              className="text-2xs font-semibold text-text-muted underline-offset-4 hover:text-primary hover:underline disabled:opacity-50"
+            >
+              CSV
+            </button>
+          </div>
         </div>
+
+        <DepartmentPicker
+          options={departments}
+          value={department}
+          onChange={setChosenDepartment}
+          label="Which department is this roster for?"
+        />
+        {needsDepartment && !department && <p className="text-2xs text-text-muted">The template and the branch list follow the department you choose.</p>}
 
         {/* Drop zone — the native file input is stretched invisibly over the
             whole zone, so click-to-browse and drag-and-drop are both the
@@ -221,9 +258,9 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
             <input
               ref={fileInputRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              aria-label="Choose a student CSV file"
+              aria-label="Choose a student Excel or CSV file"
               className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
             />
             <span
@@ -243,17 +280,17 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
               ) : (
                 <>
                   <span className="block text-13 font-semibold text-primary">
-                    Drop a CSV here, or{" "}
+                    Drop an Excel or CSV file here, or{" "}
                     <span className="text-indigo-600 underline decoration-indigo-500/40 underline-offset-4 dark:text-indigo-300">browse</span>
                   </span>
-                  <span className="block text-2xs text-text-muted">Use the template&apos;s columns · .csv only</span>
+                  <span className="block text-2xs text-text-muted">Use the template&apos;s columns · .xlsx or .csv</span>
                 </>
               )}
             </span>
           </div>
           <HpButton
             onClick={handleUpload}
-            disabled={!file || uploading}
+            disabled={!file || uploading || (needsDepartment && !department)}
             isLoading={uploading}
             leftIcon={<Upload className="h-4 w-4" />}
             className="h-auto min-h-[44px] w-full sm:w-auto"
@@ -282,7 +319,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
           ) : imports.length === 0 ? (
             <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed border-border-subtle px-4 py-6 text-center">
               <FileSpreadsheet className="h-5 w-5 text-text-muted" />
-              <p className="text-2xs text-text-muted">No imports yet — upload a CSV to add your first batch.</p>
+              <p className="text-2xs text-text-muted">No imports yet — upload a roster to add your first batch.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -305,7 +342,10 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
                         </span>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-semibold text-primary">{imp.original_filename}</p>
-                          <p className="mt-0.5 text-3xs text-text-muted">{formatDate(imp.created_at)}</p>
+                          <p className="mt-0.5 text-3xs text-text-muted">
+                            {formatDate(imp.created_at)}
+                            {imp.department_code && departments.length > 1 ? ` · ${departmentShort(catalog, imp.department_code)}` : ""}
+                          </p>
                         </div>
                       </div>
                       <HpPill tone={PREMIUM_STATUS[imp.status].tone} size="sm" className="shrink-0">
@@ -398,26 +438,28 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
           </p>
         </div>
         <button
-          onClick={handleDownloadTemplate}
+          onClick={() => handleDownloadTemplate("xlsx")}
           disabled={downloadingTemplate}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
         >
           {downloadingTemplate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-          <span>Download CSV Template</span>
+          <span>Download Excel Template</span>
         </button>
       </div>
+
+      <DepartmentPicker options={departments} value={department} onChange={setChosenDepartment} label="Which department is this roster for?" />
 
       <div className="flex flex-col sm:flex-row items-center gap-2 p-3 rounded-control bg-elevated/60 border border-dashed border-border-subtle">
         <input
           ref={fileInputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="flex-1 w-full text-2xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-control file:border-0 file:bg-accent-primary/10 file:text-accent-primary file:text-2xs file:font-bold"
         />
         <button
           onClick={handleUpload}
-          disabled={!file || uploading}
+          disabled={!file || uploading || (needsDepartment && !department)}
           className="flex items-center gap-1.5 px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-2xs font-bold transition-colors disabled:opacity-50 shrink-0 w-full sm:w-auto justify-center"
         >
           {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
@@ -432,7 +474,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
           Loading import history...
         </div>
       ) : imports.length === 0 ? (
-        <p className="text-2xs text-text-muted text-center py-4">No imports yet — upload a CSV to add your first batch.</p>
+        <p className="text-2xs text-text-muted text-center py-4">No imports yet — upload a roster to add your first batch.</p>
       ) : (
         <div className="space-y-2">
           {imports.map((imp) => {

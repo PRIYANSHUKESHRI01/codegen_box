@@ -21,6 +21,7 @@ class StudentImport extends Model
 
     protected $fillable = [
         'college_id',
+        'department_code',
         'uploaded_by',
         'original_filename',
         'status',

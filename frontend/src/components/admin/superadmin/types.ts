@@ -18,6 +18,7 @@ export interface ApiPlatformUser {
   college: { id: number; name: string } | null;
   /** Real academic fields, present on every User row regardless of role (null for staff/TPO accounts). */
   branch: string | null;
+  department?: string | null;
   /** Real, attached server-side only on this endpoint's page rows — never fabricated, never computed per-row at unbounded scale. */
   subscription_plan_name?: string | null;
   /** The plan that governs this student right now — their own, or their college's — with where it comes from. Only meaningful for role=user rows. */
@@ -38,6 +39,26 @@ export interface ApiPlatformUser {
   must_change_password?: boolean;
   /** When the login-credentials email was last sent, or null if it never was (or the last attempt failed). */
   credentials_email_sent_at?: string | null;
+  /** Whether the temporary password this account was issued can be looked up — never the password itself. */
+  credential_state?: CredentialState;
+}
+
+/**
+ * viewable      — still the temporary password it was issued, and a copy is on file (shown after unlocking).
+ * owner_set     — the owner chose their own password: private, can never be shown.
+ * not_recorded  — still temporary, but issued before copies were kept (or the copy lapsed): reset to get a viewable one.
+ * protected     — a superadmin: never shown.
+ */
+export type CredentialState = "viewable" | "owner_set" | "not_recorded" | "protected";
+
+/** GET /superadmin/users/facets — the directory filter bar's counts. */
+export interface DirectoryFacets {
+  /** Accounts per role under the current university + search. */
+  roles: Record<string, number>;
+  /** Every university, with how many accounts it has under the current role + search. */
+  colleges: { id: number; name: string; short_code: string | null; city: string | null; accounts: number }[];
+  /** Accounts under the current role + search that belong to no university. */
+  without_college: number;
 }
 
 /** Laravel's default paginate() envelope — only the fields actually used. */

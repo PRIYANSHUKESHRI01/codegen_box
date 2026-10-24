@@ -53,6 +53,7 @@ class AdminInterviewQuestionBankController extends Controller
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string'],
             'notes_for_reviewer' => ['nullable', 'string'],
+            'discipline' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\InterviewDiscipline::families())],
         ]);
 
         $question = InterviewQuestionBank::create([
@@ -75,6 +76,7 @@ class AdminInterviewQuestionBankController extends Controller
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string'],
             'notes_for_reviewer' => ['nullable', 'string'],
+            'discipline' => ['nullable', \Illuminate\Validation\Rule::in(\App\Support\InterviewDiscipline::families())],
             'is_active' => ['sometimes', 'boolean'],
         ]);
 

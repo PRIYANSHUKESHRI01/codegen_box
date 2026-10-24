@@ -48,7 +48,9 @@ class WeeklyReadinessReportService
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('At-Risk Students');
 
-        $headers = ['Name', 'Email', 'Roll Number', 'Branch', 'CGPA', 'Backlogs', 'Readiness Score', 'Readiness Tier', 'Practice Score (7d)'];
+        // "Scored by" says which weighting made the number: a core-branch student on the Core profile has no coding or contest
+        // points to show, so their Practice Score (coding days) reads 0 by design — this column explains why.
+        $headers = ['Name', 'Email', 'Roll Number', 'Branch', 'CGPA', 'Backlogs', 'Readiness Score', 'Readiness Tier', 'Practice Score (7d)', 'Scored by'];
         $sheet->fromArray($headers, null, 'A1');
 
         $headerRange = 'A1:'.chr(64 + count($headers)).'1';
@@ -67,6 +69,11 @@ class WeeklyReadinessReportService
                 $student->readinessScore(),
                 $student->readinessTier(),
                 $student->practiceScore(),
+                match ($student->readinessBreakdown()['profile'] ?? 'software') {
+                    'core' => 'Core profile',
+                    'balanced' => 'Balanced profile',
+                    default => 'Software profile',
+                },
             ], null, "A{$row}");
             $row++;
         }

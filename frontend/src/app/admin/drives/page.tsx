@@ -71,6 +71,7 @@ import {
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 import { ScCollapse, ScDateTile, ScInlineEmpty, ScMeta, formatRelative } from "@/components/portal/screeningKit";
+import { BranchChips } from "@/components/branches/BranchChips";
 
 type DriveTab = "mapped" | "available" | "pending";
 
@@ -878,18 +879,12 @@ function Fact({ icon: Icon, label, children }: { icon: LucideIcon; label: string
 }
 
 function BranchList({ branches }: { branches: string[] | null }) {
-  if (!branches?.length) return <span>All branches</span>;
   return (
-    <span className="flex flex-wrap gap-1">
-      {branches.map((b) => (
-        <span
-          key={b}
-          className="rounded-md bg-[rgb(var(--bg-surface-rgb))] px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle"
-        >
-          {b}
-        </span>
-      ))}
-    </span>
+    <BranchChips
+      tokens={branches}
+      emptyLabel="All branches"
+      chipClassName="rounded-md bg-[rgb(var(--bg-surface-rgb))] px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle"
+    />
   );
 }
 

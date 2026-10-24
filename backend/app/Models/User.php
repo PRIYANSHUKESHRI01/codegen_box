@@ -12,9 +12,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Services\ReadinessScoreService;
+use App\Support\BranchAudience;
+use App\Support\BranchCatalog;
+use App\Support\BranchNormalizer;
+use App\Support\DepartmentCapabilities;
 use App\Support\StudentPreferences;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -96,6 +101,9 @@ class User extends Authenticatable
     /** Host and judge hackathons in the Hack Arena — see App\Models\Hackathon. */
     public const PERM_HACKATHONS = 'hackathons';
 
+    /** Author Core Prep (branch technical) questions, review and import them — see App\Models\CoreQuestion. */
+    public const PERM_CORE_PREP = 'core_prep';
+
     public const PERMISSIONS_INTERNAL = [
         self::PERM_COLLEGES,
         self::PERM_PLATFORM_USERS,
@@ -109,6 +117,7 @@ class User extends Authenticatable
         self::PERM_SOFT_SKILLS,
         self::PERM_PROJECT_LAB,
         self::PERM_HACKATHONS,
+        self::PERM_CORE_PREP,
     ];
 
     public const PERM_LEADS = 'leads';
@@ -143,6 +152,13 @@ class User extends Authenticatable
     private ?array $readinessBreakdownCache = null;
 
     private ?int $practiceScoreCache = null;
+
+    /**
+     * The department a roster import / manual add is writing this student into, for the NEXT save only (never stored as such).
+     * It decides ambiguous branch labels ("Finance") and fills `department` when the label is missing or not recognised.
+     * Plain property, not an attribute: it must not be mass-assignable or serialized.
+     */
+    public ?string $departmentHint = null;
 
     /**
      * The attributes that are mass assignable.
@@ -203,7 +219,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $appends = ['avatar_url', 'has_resume', 'onboarding_pending'];
+    protected $appends = ['avatar_url', 'has_resume', 'onboarding_pending', 'branch_pending', 'core_enabled', 'capabilities'];
 
     /**
      * The attributes that should be cast.
@@ -217,6 +233,9 @@ class User extends Authenticatable
             'password' => 'hashed',
             'must_change_password' => 'boolean',
             'permissions' => 'array',
+            // Which branches of its section a Section Coordinator looks after ({disciplines, branches}); null = the whole
+            // section. forceFill-only, like is_blocked: only SectionCoordinatorService writes it.
+            'coordinator_scope' => 'array',
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',
             'cgpa' => 'decimal:2',
@@ -250,9 +269,99 @@ class User extends Authenticatable
             'last_seen_at' => 'datetime',
             // Set by the unsubscribe link in a nudge e-mail (EmailPreferenceController) — never mass-assigned.
             'email_nudges_opt_out_at' => 'datetime',
+            // What the person MUTED in Settings → Notifications ({"muted": ["hackathons"]}) — written only by NotificationService.
+            'notification_prefs' => 'array',
             'preferred_languages' => 'array',
             'focus_areas' => 'array',
+            // Branch resolution (see BranchAssignmentService / the `saving` hook below) — written
+            // directly by the server, never mass-assigned.
+            'branch_confirmed_at' => 'datetime',
+            'branch_disputed_at' => 'datetime',
+            'branch_prompt_skipped_at' => 'datetime',
+            'core_interests' => 'array',
+            // Written by the server only (roster import, branch resolution, the student's own Settings toggle) — never mass-assigned.
+            'coding_opt_in' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Whoever writes `branch` (TPO import, manual add, superadmin edit) is a staff/college
+        // actor — students cannot set it — so a changed label is resolved here, once, for every
+        // path, rather than in each controller.
+        static::saving(function (User $user) {
+            if ($user->role !== self::ROLE_USER) {
+                return;
+            }
+
+            // A roster import / manual add into a department: it is the department even when the label says nothing.
+            if ($user->departmentHint !== null && $user->department === null && self::hasDepartmentColumn()) {
+                $user->department = $user->departmentHint;
+            }
+
+            $selfDeclared = $user->isDirty('branch_source') && $user->branch_source === 'self';
+            $labelChanged = $user->isDirty('branch') || ($user->exists && $user->isDirty('college_id'));
+
+            if ($selfDeclared || ! $labelChanged) {
+                return;
+            }
+
+            $user->resolveBranchFromLabel();
+        });
+    }
+
+    /** Whether the departments migration has run (a deploy may ship code before `migrate`); only a positive answer is remembered. */
+    private static function hasDepartmentColumn(): bool
+    {
+        static $present = false;
+
+        return $present || ($present = Schema::hasColumn('users', 'department'));
+    }
+
+    /**
+     * Resolves the raw `branch` text the college provided into branch_code /
+     * discipline (using that college's own mappings first). Fails soft: a
+     * missing catalogue or column must never stop a student from being saved.
+     */
+    public function resolveBranchFromLabel(): void
+    {
+        // Only a positive answer is remembered: before `php artisan migrate` has run the column is
+        // missing and we must keep checking (and skipping), never cache "no" for the process.
+        static $columns = false;
+
+        if (! $columns && ! ($columns = Schema::hasColumn('users', 'branch_code'))) {
+            return;
+        }
+
+        $raw = trim((string) $this->branch);
+
+        if ($raw === '') {
+            // A label was removed. Only clear what the college itself had provided.
+            if ($this->branch_source === 'college') {
+                // The department stays: it is what the college onboarded this student as, with or without a branch label.
+                $this->branch_key = $this->branch_code = $this->discipline = $this->branch_source = null;
+            }
+
+            return;
+        }
+
+        try {
+            $catalog = app(BranchCatalog::class);
+            $hint = $this->departmentHint ?? $this->department;
+            $code = $catalog->resolve($raw, $this->college_id, $hint);
+
+            $this->branch_key = BranchNormalizer::key($raw);
+            $this->branch_code = $code;
+            $this->discipline = $catalog->disciplineOf($code);
+            $this->branch_source = 'college';
+
+            if (self::hasDepartmentColumn()) {
+                // A recognised branch decides the department; an unrecognised one keeps the department we were told (or already had).
+                $this->department = $catalog->departmentOf($code) ?? $hint ?? $this->department;
+            }
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**
@@ -291,6 +400,108 @@ class User extends Authenticatable
 
         return $this->onboarding_skipped_at === null
             || $this->onboarding_skipped_at->lte(now()->subDays(StudentPreferences::SKIP_COOLDOWN_DAYS));
+    }
+
+    /**
+     * True when this student should be asked about their branch now: we don't know it yet (the college
+     * gave none or one we don't recognise, and they haven't said), or — once Core Prep is live for their
+     * family — they haven't chosen what to lead with. Skippable with the same cool-off as the wizard.
+     *
+     * Deliberately QUERY-FREE (it is serialized on every user in every roster): the only lookup is the
+     * in-memory branch catalogue. Fails closed to "don't ask" if the catalogue is unavailable.
+     */
+    public function needsBranchConfirmation(): bool
+    {
+        if (! $this->isStudent()) {
+            return false;
+        }
+
+        if ($this->branch_prompt_skipped_at !== null
+            && $this->branch_prompt_skipped_at->gt(now()->subDays(StudentPreferences::SKIP_COOLDOWN_DAYS))) {
+            return false;
+        }
+
+        if ($this->branch_code === null) {
+            return true;
+        }
+
+        if ($this->track_focus !== null || ! $this->hasDomainPrepFamily()) {
+            return false;
+        }
+
+        // "Lead with your branch, or with IT roles?" only means something where the programme codes at all. A Commerce, Management
+        // or Arts student has no IT track to weigh it against — asking them would be a blocking dialog with nothing to answer.
+        if (! (DepartmentCapabilities::forUser($this)['coding_practice'] ?? true)) {
+            return false;
+        }
+
+        try {
+            return BranchCatalog::instance()->coreEnabledFor($this->discipline, $this->college_id);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Whether this student's department / discipline / branch has Domain Prep (Core Prep, Management Prep …) at all — the
+     * capability, not whether it is switched on for their college (that is coreEnabledFor) or has questions (CoreAccess).
+     * Query-free.
+     */
+    public function hasDomainPrepFamily(): bool
+    {
+        return $this->discipline !== null && DepartmentCapabilities::forUser($this)['domain_prep'];
+    }
+
+    /**
+     * Serialized as `capabilities`: which modules this student sees (see App\Support\DepartmentCapabilities). Null for every
+     * account that is not a student. Not memoised: a save can move the student to another department mid-request, and the
+     * resolution is a few array merges over the memoised catalogue.
+     */
+    protected function capabilities(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (! $this->isStudent()) {
+                    return null;
+                }
+
+                try {
+                    return DepartmentCapabilities::forUser($this);
+                } catch (\Throwable) {
+                    return null;
+                }
+            },
+        );
+    }
+
+    /** Serialized as `branch_pending` — the frontend never re-derives the cool-off or the "Core Prep is live" rule. */
+    protected function branchPending(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->needsBranchConfirmation(),
+        );
+    }
+
+    /**
+     * Serialized as `core_enabled`: Core Prep is switched on for this student's branch family at their college (live for
+     * everyone, or their college is a pilot). Query-free like `branch_pending`; it says nothing about whether any
+     * questions exist. The onboarding wizard uses it to decide whether to ask the Core/IT track question.
+     */
+    protected function coreEnabled(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (! $this->isStudent() || ! $this->hasDomainPrepFamily()) {
+                    return false;
+                }
+
+                try {
+                    return BranchCatalog::instance()->coreEnabledFor($this->discipline, $this->college_id);
+                } catch (\Throwable) {
+                    return false;
+                }
+            },
+        );
     }
 
     /** Serialized as `onboarding_pending` so the frontend never re-derives the skip cool-off itself. */
@@ -419,6 +630,91 @@ class User extends Authenticatable
     public function isSectionCoordinator(): bool
     {
         return $this->role === self::ROLE_SECTION_COORDINATOR;
+    }
+
+    /**
+     * THE definition of "the students this Section Coordinator looks after": students (never staff) of the coordinator's
+     * own college, in their own section, and — when the coordinator was given a branch scope — of those branches. Every place
+     * a coordinator reads or acts on a student (the roster, reports, notifications, blocking, notes, proctoring, the
+     * violation e-mail) goes through this one query, so what the list shows and what an id-guess is allowed to reach can
+     * never disagree.
+     *
+     * Sections are compared trimmed and case-insensitively IN SQL, so "a " and "A" are one section on every database (MySQL
+     * already folded case, SQLite did not — the roster and the single-student checks used to disagree on that).
+     * A coordinator with no college or no section sees nobody rather than every unsectioned student.
+     * A branch-scoped coordinator never sees a student whose branch is unknown: that student belongs to the TPO until their
+     * branch is mapped.
+     */
+    public function scopeCoordinatedBy(Builder $query, User $coordinator): Builder
+    {
+        $query->where('users.role', self::ROLE_USER);
+
+        $section = trim((string) $coordinator->section);
+
+        if ($coordinator->role !== self::ROLE_SECTION_COORDINATOR || $coordinator->college_id === null || $section === '') {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $query->where('users.college_id', $coordinator->college_id)
+            ->whereRaw('LOWER(TRIM(users.section)) = ?', [mb_strtolower($section)]);
+
+        $scope = BranchAudience::normalize($coordinator->coordinator_scope);
+
+        if ($scope !== null) {
+            $query->where(function (Builder $either) use ($scope) {
+                // Any of: a whole department, a whole branch family, or one specific branch.
+                if (($scope['departments'] ?? []) !== []) {
+                    $either->orWhereIn('users.department', $scope['departments']);
+                }
+                if ($scope['disciplines'] !== []) {
+                    $either->orWhereIn('users.discipline', $scope['disciplines']);
+                }
+                if ($scope['branches'] !== []) {
+                    $either->orWhereIn('users.branch_code', $scope['branches']);
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    /** In-memory twin of scopeCoordinatedBy() for a student already loaded (a parity test pins the two together). */
+    public function coordinates(User $student): bool
+    {
+        $section = mb_strtolower(trim((string) $this->section));
+
+        if ($this->role !== self::ROLE_SECTION_COORDINATOR || $this->college_id === null || $section === ''
+            || $student->role !== self::ROLE_USER || (int) $student->college_id !== (int) $this->college_id
+            || mb_strtolower(trim((string) $student->section)) !== $section) {
+            return false;
+        }
+
+        $scope = BranchAudience::normalize($this->coordinator_scope);
+
+        return $scope === null
+            || ($student->department !== null && in_array($student->department, $scope['departments'] ?? [], true))
+            || ($student->discipline !== null && in_array($student->discipline, $scope['disciplines'], true))
+            || ($student->branch_code !== null && in_array($student->branch_code, $scope['branches'], true));
+    }
+
+    /**
+     * Narrow to the students of one department. A student with no department recorded yet counts as the fallback department
+     * (engineering) — the product's one department until this existed — so filtering "Engineering" never loses anybody that was
+     * simply never classified, and filtering any other department never shows them.
+     */
+    public function scopeInDepartment(Builder $query, ?string $department): Builder
+    {
+        if ($department === null || $department === '') {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($department) {
+            $q->where('users.department', $department);
+
+            if ($department === (string) config('departments.fallback', Department::ENGINEERING)) {
+                $q->orWhereNull('users.department');
+            }
+        });
     }
 
     public function isCompanyAdmin(): bool
@@ -743,6 +1039,9 @@ class User extends Authenticatable
             'drive_access' => $plan?->drive_access ?? true,
             'hackathon_access' => $plan?->hackathon_access ?? true,
             'vault_access' => $plan?->vault_access ?? true,
+            // Core Prep (branch technical practice and tests): null = unlimited practice; tests are a switch.
+            'max_core_practice_per_day' => $plan?->max_core_practice_per_day,
+            'core_tests_access' => $plan?->core_tests_access ?? true,
         ];
     }
 

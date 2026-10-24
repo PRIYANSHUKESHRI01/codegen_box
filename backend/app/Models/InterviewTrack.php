@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasBranchAudience;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -20,6 +21,8 @@ use Illuminate\Support\Str;
  */
 class InterviewTrack extends Model
 {
+    use HasBranchAudience;
+
     public const STATUS_DRAFT = 'draft';
 
     public const STATUS_PUBLISHED = 'published';
@@ -50,6 +53,7 @@ class InterviewTrack extends Model
         'status',
         'track_type',
         'role_title',
+        'discipline',
         'interview_role_template_id',
         'company_id',
         'placement_drive_id',
@@ -57,6 +61,17 @@ class InterviewTrack extends Model
         'owning_company_id',
         'created_by',
     ];
+
+    protected static function booted(): void
+    {
+        // A track built from a role template is for that template's branch family — set here, once, so every controller
+        // that creates tracks (Mellow, TPO, company) inherits it instead of each remembering to copy it.
+        static::creating(function (InterviewTrack $track) {
+            if ($track->discipline === null && $track->interview_role_template_id !== null) {
+                $track->discipline = InterviewRoleTemplate::whereKey($track->interview_role_template_id)->value('discipline');
+            }
+        });
+    }
 
     public function getRouteKeyName(): string
     {
@@ -154,6 +169,10 @@ class InterviewTrack extends Model
             return $this->rounds()->whereHas('sessions', fn ($q) => $q->where('user_id', $user->id))->exists();
         }
 
+        if (! $this->audienceIncludes($user)) {
+            return false;
+        }
+
         return $this->isVisibleToCollege($user->college_id);
     }
 
@@ -178,6 +197,7 @@ class InterviewTrack extends Model
                 'owning_college_id' => $this->owning_college_id,
                 'owning_company_id' => $this->owning_company_id,
                 'created_by' => $this->created_by,
+                'discipline' => $this->discipline,
                 'round_number' => $round['round_number'],
                 'round_name' => $round['round_name'],
                 'category_weights' => $round['category_weights'],

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\NotificationType;
 use App\Models\ContactRequest;
 use App\Models\User;
 
@@ -40,6 +41,12 @@ class LeadAssignmentService
         }
 
         $lead->forceFill(['assigned_marketing_id' => $employee->id])->save();
+
+        app(NotificationService::class)->notify($employee, NotificationType::LeadNew, 'New lead assigned to you', "{$lead->name} ({$lead->email}) signed up on their own. Reach out while they are warm.", [
+            'url' => '/marketing',
+            'data' => ['lead_id' => $lead->id],
+            'group_key' => "lead.assigned:{$lead->id}",
+        ]);
     }
 
     /**
@@ -125,6 +132,12 @@ class LeadAssignmentService
         }
 
         $customer->forceFill(['assigned_internal_id' => $employee->id])->save();
+
+        app(NotificationService::class)->notify($employee, NotificationType::LeadNew, 'New customer assigned to you', "{$customer->name} is now a customer and has you as their owner.", [
+            'url' => '/admin/customers',
+            'data' => ['customer_id' => $customer->id],
+            'group_key' => "customer.assigned:{$customer->id}",
+        ]);
     }
 
     /**
@@ -187,6 +200,13 @@ class LeadAssignmentService
         }
 
         $request->forceFill(['assigned_marketing_id' => $employee->id])->save();
+
+        $from = $request->organization_name ? "{$request->name} from {$request->organization_name}" : $request->name;
+        app(NotificationService::class)->notify($employee, NotificationType::LeadNew, 'New enquiry assigned to you', "{$from} asked to talk to the team ({$request->audience}).", [
+            'url' => '/marketing/inquiries',
+            'data' => ['contact_request_id' => $request->id],
+            'group_key' => "contact.assigned:{$request->id}",
+        ]);
     }
 
     /** The contact-request analog of assignUnassignedLeads() above, for the same self-correcting reason. */

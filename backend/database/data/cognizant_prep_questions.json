@@ -1,0 +1,296 @@
+[
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: 24-Hour to 12-Hour AM/PM Time Format Converter\nGiven a time string in 24-hour military format 'HH:MM', convert it into the standard 12-hour format with 'AM' or 'PM' suffix.\n\nInput Example: '14:35'\nExpected Output: '02:35 PM'\nInput Example: '00:15'\nExpected Output: '12:15 AM'\nInput Example: '12:00'\nExpected Output: '12:00 PM'\n\nProvide the code in C++ or Python handling all boundary cases (midnight, noon, single-digit hour padding).",
+    "answer_notes": "Optimal Solution (Handling All 24h Edge Cases):\n\nKey Rules:\n- If hour == 0: hour becomes 12, suffix is 'AM'.\n- If hour == 12: hour remains 12, suffix is 'PM'.\n- If hour > 12: hour = hour - 12, suffix is 'PM'.\n- If 1 <= hour < 12: hour remains as is, suffix is 'AM'.\n- Maintain two-digit formatting with leading zeroes.\n\nPython Implementation:\n```python\ndef convert_to_12h(time_str: str) -> str:\n    hh, mm = map(int, time_str.split(':'))\n    \n    if hh == 0:\n        hour = 12\n        period = \"AM\"\n    elif hh == 12:\n        hour = 12\n        period = \"PM\"\n    elif hh > 12:\n        hour = hh - 12\n        period = \"PM\"\n    else:\n        hour = hh\n        period = \"AM\"\n        \n    return f\"{hour:02d}:{mm:02d} {period}\"\n\nprint(convert_to_12h(\"14:35\")) # Output: 02:35 PM\nprint(convert_to_12h(\"00:15\")) # Output: 12:15 AM\n```\n\nC++ Implementation:\n```cpp\n#include <iostream>\n#include <iomanip>\n#include <sstream>\nusing namespace std;\n\nstring convertTime(const string& timeStr) {\n    int hh = stoi(timeStr.substr(0, 2));\n    int mm = stoi(timeStr.substr(3, 2));\n    string period = \"AM\";\n    \n    if (hh == 0) {\n        hh = 12;\n    } else if (hh == 12) {\n        period = \"PM\";\n    } else if (hh > 12) {\n        hh -= 12;\n        period = \"PM\";\n    }\n    \n    stringstream ss;\n    ss << setfill('0') << setw(2) << hh << \":\" << setw(2) << mm << \" \" << period;\n    return ss.str();\n}\n```"
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A boat travels upstream from point A to point B at a speed of 12 km/hr and returns downstream from point B to point A at a speed of 18 km/hr. What is the speed of the river stream and the speed of the boat in still water?\n\nOptions:\nA) Boat = 15 km/hr, Stream = 3 km/hr\nB) Boat = 14 km/hr, Stream = 4 km/hr\nC) Boat = 16 km/hr, Stream = 2 km/hr\nD) Boat = 15 km/hr, Stream = 6 km/hr",
+    "answer_notes": "Correct Option: A (Boat = 15 km/hr, Stream = 3 km/hr)\n\nFormulas for Boats and Streams:\nLet:\n- u = speed of boat in still water\n- v = speed of the stream\n\nGiven:\n- Downstream Speed (D) = u + v = 18 km/hr\n- Upstream Speed (U) = u - v = 12 km/hr\n\nCalculations:\n1. Speed of boat in still water (u):\n   u = (D + U) / 2 = (18 + 12) / 2 = 30 / 2 = 15 km/hr.\n2. Speed of stream (v):\n   v = (D - U) / 2 = (18 - 12) / 2 = 6 / 2 = 3 km/hr.\n\nVerification:\n- Downstream: 15 + 3 = 18 km/hr.\n- Upstream: 15 - 3 = 12 km/hr.\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "SQL Query Challenge: Second Highest Salary in Each Department\nGiven two tables:\n1. Employee (emp_id INT, emp_name VARCHAR, dept_id INT, salary DECIMAL)\n2. Department (dept_id INT, dept_name VARCHAR)\n\nWrite an optimal standard ANSI SQL query using Window Functions (DENSE_RANK) to find the employee with the second highest salary in each department. Include the department name, employee name, and salary in the output.",
+    "answer_notes": "Optimal ANSI SQL Query using DENSE_RANK():\n\n```sql\nWITH RankedSalaries AS (\n    SELECT \n        d.dept_name,\n        e.emp_name,\n        e.salary,\n        DENSE_RANK() OVER (\n            PARTITION BY e.dept_id \n            ORDER BY e.salary DESC\n        ) as salary_rank\n    FROM Employee e\n    JOIN Department d ON e.dept_id = d.dept_id\n)\nSELECT \n    dept_name,\n    emp_name,\n    salary\nFROM RankedSalaries\nWHERE salary_rank = 2;\n```\n\nWhy DENSE_RANK() instead of RANK() or ROW_NUMBER():\n- If two employees in the same department tie for the highest salary (e.g., both earn $100k), `RANK()` assigns them both rank 1 and skips to rank 3 for the next highest earner, which would omit rank 2 entirely!\n- `DENSE_RANK()` does not skip rank numbers (the next distinct salary after $100k is correctly assigned rank 2)."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "Walk me through your final year engineering project. What technical challenge was the hardest to solve, what architectural trade-offs did you make, and how did you measure success?",
+    "answer_notes": "Ideal Technical Presentation Framework:\n1. Project Abstract & Business Problem (30-45 seconds): Name of the project, problem it solves, and target end-users.\n2. Architectural Tech Stack (30 seconds): High-level architecture (Frontend framework, Backend REST/GraphQL API, Database, Authentication, Hosting/Cloud).\n3. The Hardest Technical Challenge (60 seconds): Describe a concrete engineering obstacle (e.g., database query latency on multi-table joins, concurrency issues in token expiration, or WebSocket message drops). Explain the debugging process (profiling with database `EXPLAIN ANALYZE`, adding composite B-tree indexes, or implementing Redis pub/sub queue).\n4. Trade-offs Made: e.g., Choosing relational MySQL over NoSQL because strict data integrity and relational constraints outweighed document flexibility.\n5. Measurable Outcomes: Reduced API response latency from 680ms to 92ms; successfully handled 500 simulated concurrent requests during load testing."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Communication Assessment (Versant)",
+    "question": "Versant Section - Repeat After Me:\nYou will hear audio clips of sentences once. You must speak the exact sentence clearly into the microphone with proper intonation and pace.\n\nPassage Prompt:\n'The automated deployment pipeline successfully delivered the new feature set to the staging environment without any service downtime.'\n\nProvide the key evaluation criteria for scoring 100% on this prompt.",
+    "answer_notes": "Versant Evaluation Rubric:\n1. Pronunciation: Every phoneme must be crisp, especially technical polysyllabic words ('automated', 'deployment', 'pipeline', 'environment').\n2. Fluency & Rhythm: Avoid robotic pausing or excessive hesitation between words. Maintain native sentence cadence without rising pitch at unnatural points.\n3. Content Accuracy: The automated speech recognition (ASR) engine matches acoustic vectors against the expected transcript. Omitting prepositions ('to', 'the') or substituting words directly drops the Sentence Mastery score.\n4. Intonation: Keep natural phrase grouping: [The automated deployment pipeline] [successfully delivered the new feature set] [to the staging environment] [without any service downtime]."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Extract and Sort All 4-Digit Years From Unstructured Text\nGiven a text string containing arbitrary alphanumeric words, punctuation, and numbers, extract all valid 4-digit calendar years between 1900 and 2099 (inclusive), remove duplicates, and output them in strictly ascending sorted order separated by a space.\n\nInput Example:\n'Cognizant was founded in 1994, went public in 1998, and achieved major milestones in 2011, 1998, and 2023.'\n\nExpected Output: '1994 1998 2011 2023'\n\nWrite a solution in Python using Regular Expressions or standard string parsing.",
+    "answer_notes": "Optimal Python Solution Using Regex and Set Sorting:\n\n```python\nimport re\n\ndef extract_years(text: str) -> str:\n    # Regex matches standalone 4-digit numbers with word boundaries\n    candidates = re.findall(r'\\b\\d{4}\\b', text)\n    \n    # Filter years strictly in range [1900, 2099]\n    valid_years = {int(y) for y in candidates if 1900 <= int(y) <= 2099}\n    \n    # Sort ascending and join as string\n    sorted_years = sorted(valid_years)\n    return \" \".join(map(str, sorted_years))\n\n# Example test\ntext = \"Cognizant was founded in 1994, went public in 1998, and achieved major milestones in 2011, 1998, and 2023.\"\nprint(extract_years(text)) # Output: 1994 1998 2011 2023\n```\nTime Complexity: O(N + M log M) where N is text length and M is number of year tokens."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Find the missing number in the following number series:\n\n4, 9, 19, 39, 79, ?\n\nOptions:\nA) 149\nB) 159\nC) 169\nD) 158",
+    "answer_notes": "Correct Option: B (159)\n\nPattern Deduction:\nObserve the relationship between successive terms:\n- Term 1: 4\n- Term 2: (4 * 2) + 1 = 8 + 1 = 9\n- Term 3: (9 * 2) + 1 = 18 + 1 = 19\n- Term 4: (19 * 2) + 1 = 38 + 1 = 39\n- Term 5: (39 * 2) + 1 = 78 + 1 = 79\n\nFollowing the exact pattern (N * 2 + 1):\n- Term 6: (79 * 2) + 1 = 158 + 1 = 159.\n\nAlternative Difference Method:\n- Differences: 5, 10, 20, 40 (doubling each step).\n- Next difference is 40 * 2 = 80.\n- 79 + 80 = 159.\nTherefore, Option B is correct."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Automata Fix / Code Debugging:\nIdentify the logical bug in the following C function that is supposed to find the first non-repeating character in a string.\n\n```c\nchar firstUniqChar(char* s) {\n    int count[256] = {0};\n    for (int i = 0; s[i] != '\\0'; i++) {\n        count[s[i]]++;\n    }\n    for (int i = 0; i < 256; i++) {\n        if (count[i] == 1) {\n            return (char)i;\n        }\n    }\n    return '$';\n}\n```\nWhy does this function return the incorrect character for input 'cognizant'?",
+    "answer_notes": "Logical Bug Identified:\nThe second loop iterates over the ASCII array indices from 0 to 255 (`for (int i = 0; i < 256; i++)`) rather than iterating through the original string `s` in chronological order!\n\nConsequence:\n- For input 'cognizant', all characters ('c', 'o', 'g', 'n', 'i', 'z', 'a', 't') have a frequency of 1.\n- Iterating over ASCII indices 0 to 255 visits 'a' (ASCII 97) before 'c' (ASCII 99).\n- As a result, the function returns 'a' instead of the true first non-repeating character 'c'!\n\nCorrect Fix:\nThe second loop MUST traverse the original string `s` from index 0 to length - 1:\n```c\nfor (int i = 0; s[i] != '\\0'; i++) {\n    if (count[(unsigned char)s[i]] == 1) {\n        return s[i];\n    }\n}\nreturn '$';\n```"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What are Database Indexes? Explain the internal difference between a Clustered Index and a Non-Clustered Index in relational databases like SQL Server or MySQL InnoDB.",
+    "answer_notes": "A Database Index is a data structure (typically a B+ Tree) that improves the speed of data retrieval operations on a database table at the cost of additional storage and slower writes (`INSERT`, `UPDATE`, `DELETE`).\n\n1. Clustered Index:\n   - Defines the physical sorting order of actual data rows stored on disk.\n   - Only ONE clustered index can exist per table (because physical records can only be stored in one sorted sequence on disk).\n   - Leaf nodes of a clustered index B+ tree contain the ACTUAL data rows.\n   - In MySQL InnoDB, the Primary Key is automatically the Clustered Index.\n\n2. Non-Clustered (Secondary) Index:\n   - Stored in a separate structure separate from the physical data pages.\n   - Multiple non-clustered indexes can exist on a single table (e.g., index on `email`, index on `phone`).\n   - Leaf nodes of a non-clustered index contain index key values and a POINTER (in InnoDB, the primary key value) to locate the actual row in the clustered table.\n   - Requires an extra index lookup step (called a bookmark lookup or secondary index traversal)."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Are you comfortable with relocating to any Cognizant Global Delivery Center (Chennai, Bangalore, Hyderabad, Pune, Kolkata, Coimbatore, or Gurgaon) and working in rotational shifts?",
+    "answer_notes": "Ideal Professional Response:\n'Yes, I am 100% open and eager to relocate to any Cognizant development facility. Being physically present at major technical delivery hubs like Chennai, Bangalore, or Hyderabad provides the best environment to collaborate with cross-functional teams, participate in client project syncs, and learn enterprise delivery methodologies.\nFurthermore, I understand that Cognizant operates across global time zones (US, Europe, APAC), so supporting rotational project schedules and shifts is something I am completely ready for and consider a standard part of delivering mission-critical enterprise software.'"
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Communication Assessment (Versant)",
+    "question": "Versant Section - Sentence Reconstruction (Jumbled Words):\nYou will hear jumbled phrases and must reassemble them into a grammatically fluent spoken sentence.\n\nGiven audio fragments:\n[to enhance data security] / [migrated their databases] / [the engineering team] / [to an encrypted cloud repository]\n\nWhat is the grammatically correct unified sentence to speak?",
+    "answer_notes": "Correct Spoken Sentence:\n'The engineering team migrated their databases to an encrypted cloud repository to enhance data security.'\n\nAlternative Acceptable Construction:\n'To enhance data security, the engineering team migrated their databases to an encrypted cloud repository.'\n\nKey Rule:\nSubject ('The engineering team') + Verb phrase ('migrated their databases') + Destination prepositional phrase ('to an encrypted cloud repository') + Purpose infinitive clause ('to enhance data security')."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A can complete a software module in 12 days, and B can complete the same module in 18 days. They started working together, but A left 2 days before the module was completed. In how many total days was the entire module completed?\n\nOptions:\nA) 8.4 days\nB) 7.5 days\nC) 8.0 days\nD) 9.0 days",
+    "answer_notes": "Correct Option: A (8.4 days)\n\nDetailed Work-Unit Method:\n1. Total Work = LCM(12, 18) = 36 units.\n2. Efficiency of A = 36 / 12 = 3 units/day.\n3. Efficiency of B = 36 / 18 = 2 units/day.\n4. Combined efficiency of (A + B) = 3 + 2 = 5 units/day.\n\nTimeline Analysis:\n- Let the total days to complete the work be T.\n- B worked for all T days.\n- A worked for (T - 2) days.\n\nWork Equation:\n(A's work) + (B's work) = Total Work\n3 * (T - 2) + 2 * T = 36\n3T - 6 + 2T = 36\n5T = 42\nT = 42 / 5 = 8.4 days!\n\nVerification:\n- In 8.4 days, B does 8.4 * 2 = 16.8 units.\n- A worked for 8.4 - 2 = 6.4 days, doing 6.4 * 3 = 19.2 units.\n- Total work = 16.8 + 19.2 = 36 units (Exact match!).\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Subarray with Given Sum (Two-Pointer / Sliding Window)\nGiven an unsorted array arr of non-negative integers and an integer target, find a continuous sub-array that adds to a given target number. Return the 1-based start and end indices of the first such occurring subarray. If no such subarray exists, return [-1].\n\nInput Example: arr = [1, 2, 3, 7, 5], target = 12\nExpected Output: [2, 4] (Elements 2 + 3 + 7 = 12, indices 2 to 4 in 1-based indexing).\n\nProvide the optimal O(N) sliding window solution.",
+    "answer_notes": "Optimal Solution (O(N) Time, O(1) Auxiliary Space):\n\nC++ Implementation:\n```cpp\n#include <vector>\nusing namespace std;\n\nvector<int> subarraySum(vector<int>& arr, int target) {\n    int n = arr.size();\n    int left = 0;\n    long long current_sum = 0;\n    \n    for (int right = 0; right < n; right++) {\n        current_sum += arr[right];\n        \n        while (current_sum > target && left < right) {\n            current_sum -= arr[left];\n            left++;\n        }\n        \n        if (current_sum == target) {\n            return {left + 1, right + 1}; // 1-based indexing\n        }\n    }\n    return {-1};\n}\n```\nNote: If elements can be negative, standard sliding window does not work; a Hash Map with prefix sums must be used. For non-negative integers, the two-pointer sliding window is optimal with O(N) time and O(1) space."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Logical Reasoning - Syllogisms:\nStatements:\n1. All microservices are containers.\n2. Some containers are virtual machines.\n3. All virtual machines are cloud resources.\n\nConclusions:\nI. Some cloud resources are containers.\nII. Some microservices are virtual machines.\nIII. All microservices are cloud resources.\n\nWhich conclusions logically follow?\n\nOptions:\nA) Only I follows\nB) Only I and II follow\nC) Only II and III follow\nD) All follow",
+    "answer_notes": "Correct Option: A (Only I follows)\n\nDetailed Venn-Diagram Deduction:\n1. Statement 2: 'Some containers are virtual machines' (Containers ∩ VMs ≠ ∅).\n   Statement 3: 'All virtual machines are cloud resources' (VMs ⊆ Cloud Resources).\n   Combining: Since some containers are VMs, and all VMs are Cloud Resources, those overlapping containers are necessarily Cloud Resources.\n   Therefore, Conclusion I ('Some cloud resources are containers') LOGICALLY FOLLOWS.\n\n2. Conclusion II: 'Some microservices are virtual machines'.\n   All microservices are containers, and some containers are VMs. However, the microservices may fall entirely in the non-VM part of containers. No definite overlap is guaranteed.\n   Does NOT necessarily follow.\n\n3. Conclusion III: 'All microservices are cloud resources'.\n   No direct universal relation links microservices to cloud resources.\n   Does NOT follow.\n\nTherefore, Only Conclusion I follows."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between Synchronous and Asynchronous execution? How does JavaScript or Node.js handle non-blocking asynchronous I/O using the Event Loop despite being single-threaded?",
+    "answer_notes": "Synchronous vs Asynchronous:\n- Synchronous: Operations execute sequentially. The thread blocks and waits for a task (such as a database query or network request) to finish before moving to the next line of code.\n- Asynchronous: A long-running task is delegated to the background/OS kernel. The main execution thread continues executing subsequent code immediately without blocking.\n\nHow Node.js achieves this (The Event Loop & Libuv):\n1. Single-Threaded Call Stack: JavaScript executes synchronous code sequentially on the main V8 execution call stack.\n2. Delegation via Libuv: When an asynchronous operation occurs (e.g., `fs.readFile`, `fetch`, database call, or `setTimeout`), Node.js delegates the work to Libuv's C++ thread pool or the operating system's native asynchronous I/O primitives (epoll on Linux, kqueue on macOS, IOCP on Windows).\n3. Event Loop Queues: When the background I/O completes, its callback is placed into an Event Loop phase queue (Microtask queue for Promises/process.nextTick, Macrotask queue for timers and I/O callbacks).\n4. Execution: When the Call Stack becomes empty, the Event Loop pushes the waiting callback from the queue onto the Call Stack to be executed."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A sum of money invested at compound interest doubles itself in 4 years. In how many years will it become 8 times of itself at the same annual interest rate?\n\nOptions:\nA) 12 years\nB) 8 years\nC) 16 years\nD) 10 years",
+    "answer_notes": "Correct Option: A (12 years)\n\nCompound Interest Principle:\n- Under compound interest, an amount grows by a constant multiplication factor over equal intervals of time.\n- Let principal be P.\n- In 4 years, P becomes 2P (doubles => factor of 2^1 in 4 years).\n- In another 4 years (total 8 years), 2P doubles again to 4P (factor of 2^2 in 8 years).\n- In another 4 years (total 12 years), 4P doubles again to 8P (factor of 2^3 in 12 years).\n\nFormula:\nIf an amount becomes (k^m) times in T years when it becomes k times in t years:\nT = m * t\nHere, 8 = 2^3 => m = 3, t = 4 years.\nTotal Time = 3 * 4 = 12 years!\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Valid Parentheses\nGiven a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.\nAn input string is valid if:\n1. Open brackets must be closed by the same type of brackets.\n2. Open brackets must be closed in the correct order.\n3. Every close bracket has a corresponding open bracket of the same type.\n\nInput Example: s = '()[]{}'\nExpected Output: True\nInput Example: s = '(]'\nExpected Output: False\n\nProvide the standard Stack implementation in C++ or Python.",
+    "answer_notes": "Optimal Solution (O(N) Time, O(N) Space):\n\nC++ Code:\n```cpp\n#include <string>\n#include <stack>\nusing namespace std;\n\nbool isValid(string s) {\n    stack<char> st;\n    for (char c : s) {\n        if (c == '(' || c == '{' || c == '[') {\n            st.push(c);\n        } else {\n            if (st.empty()) return false;\n            char top = st.top();\n            if ((c == ')' && top != '(') ||\n                (c == '}' && top != '{') ||\n                (c == ']' && top != '[')) {\n                return false;\n            }\n            st.pop();\n        }\n    }\n    return st.empty();\n}\n```\nTime Complexity: O(N)\nSpace Complexity: O(N) in worst case (e.g. '((((((')."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between HTTP and HTTPS? Explain the SSL/TLS Handshake process that occurs before encrypted data transfer begins.",
+    "answer_notes": "HTTP vs HTTPS:\n- HTTP (HyperText Transfer Protocol): Transmits data in plain text over TCP port 80. Susceptible to packet sniffing, Man-in-the-Middle (MITM) attacks, and data tampering.\n- HTTPS (HTTP Secure): Transmits data encrypted over TCP port 443 using SSL/TLS protocols. Provides Confidentiality, Integrity, and Authentication.\n\nTLS 1.2 / 1.3 Handshake Steps:\n1. Client Hello: Client sends supported TLS versions, supported cipher suites, and a client random string.\n2. Server Hello: Server picks highest supported TLS version, compatible cipher suite, and sends a server random string along with its digital SSL Certificate (containing server's public key and signed by a trusted Certificate Authority).\n3. Authentication & Key Exchange: Client validates server's certificate against root CA certs. Client generates a pre-master secret, encrypts it with the server's public key, and sends it to the server.\n4. Session Keys Generation: Both client and server independently compute identical symmetric session keys using the client random, server random, and pre-master secret.\n5. Finished / Encrypted Communication: All subsequent HTTP request and response packets are encrypted symmetrically (e.g., AES-GCM) with minimal computational overhead."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Communication Assessment (Versant)",
+    "question": "Versant Section - Short Answer Q&A:\nYou will hear a concise question and must reply with a single word or short phrase immediately.\n\nPrompt: 'If a software application has been deployed without any errors, has the deployment succeeded or failed?'\n\nWhat is the expected response, and what pitfalls must candidates avoid?",
+    "answer_notes": "Expected Spoken Answer: 'Succeeded' (or 'It has succeeded' / 'Success').\n\nPitfalls to Avoid:\n- Pausing longer than 3 seconds (Versant cuts off after 3 seconds of silence and marks zero).\n- Elaborating with long unnecessary explanations ('Well, because there were no errors during deployment it definitely succeeded'). Short answer questions strictly evaluate rapid cognitive parsing and vocabulary comprehension."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Pipe A can fill a tank in 20 hours, and Pipe B can fill it in 30 hours. Both pipes are opened together, but after some time, Pipe B was closed. The entire tank was filled in 16 hours. After how many hours was Pipe B turned off?\n\nOptions:\nA) 6 hours\nB) 8 hours\nC) 10 hours\nD) 4 hours",
+    "answer_notes": "Correct Option: A (6 hours)\n\nCalculation using Capacity Method:\n1. Capacity of tank = LCM(20, 30) = 60 units.\n2. Efficiency of Pipe A = 60 / 20 = 3 units/hour.\n3. Efficiency of Pipe B = 60 / 30 = 2 units/hour.\n4. Pipe A was open for the entire 16 hours.\n   Work done by Pipe A = 16 * 3 = 48 units.\n5. Remaining work done by Pipe B = 60 - 48 = 12 units.\n6. Since Pipe B fills 2 units/hour:\n   Time Pipe B was active = 12 / 2 = 6 hours!\n\nTherefore, Pipe B was closed after 6 hours."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Merge Two Sorted Arrays In-Place\nYou are given two integer arrays nums1 and nums2, sorted in non-decreasing order, and two integers m and n, representing the number of elements in nums1 and nums2 respectively. Merge nums1 and nums2 into a single array sorted in non-decreasing order inside nums1. nums1 has a length of m + n where the last n elements are set to 0.\n\nInput Example: nums1 = [1, 2, 3, 0, 0, 0], m = 3, nums2 = [2, 5, 6], n = 3\nExpected Output: nums1 = [1, 2, 2, 3, 5, 6]\n\nWrite an O(m + n) time and O(1) space three-pointer algorithm.",
+    "answer_notes": "Optimal Solution (Three-Pointer Starting from End):\n\nKey Strategy:\nTo avoid overwriting elements in nums1 without extra space, fill nums1 from the back (index m + n - 1) backwards!\n\nC++ Code:\n```cpp\n#include <vector>\nusing namespace std;\n\nvoid merge(vector<int>& nums1, int m, vector<int>& nums2, int n) {\n    int p1 = m - 1;\n    int p2 = n - 1;\n    int p = m + n - 1;\n    \n    while (p1 >= 0 && p2 >= 0) {\n        if (nums1[p1] > nums2[p2]) {\n            nums1[p--] = nums1[p1--];\n        } else {\n            nums1[p--] = nums2[p2--];\n        }\n    }\n    \n    while (p2 >= 0) {\n        nums1[p--] = nums2[p2--];\n    }\n}\n```\nTime Complexity: O(m + n)\nSpace Complexity: O(1)."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between Primary Key, Unique Key, and Foreign Key in relational databases? Can a table have multiple Foreign Keys?",
+    "answer_notes": "Key Differences:\n1. Primary Key:\n   - Uniquely identifies each record in a table.\n   - CANNOT accept NULL values.\n   - Only ONE Primary Key per table (though it can be a composite key spanning multiple columns).\n   - Automatically creates a Clustered Index in most RDBMS.\n2. Unique Key:\n   - Ensures all values in a column or set of columns are distinct.\n   - Can accept ONE NULL value (in standard SQL / MySQL, multiple NULLs are allowed if unique constraint handles NULLs distinctively).\n   - A table can have MULTIPLE Unique Keys.\n   - Creates a Non-Clustered index.\n3. Foreign Key:\n   - Establishes a link / referential integrity between columns in two tables (references the Primary Key or Unique Key of another table).\n   - Can accept NULL values (indicating no parent association).\n   - YES, a table can have MULTIPLE Foreign Keys! For example, an `Orders` table can have `customer_id` referencing `Customers(id)` AND `shipper_id` referencing `Shippers(id)`."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Tell me about a time when you received harsh or critical feedback on your work. How did you react and what changes did you make?",
+    "answer_notes": "STAR Model Response Framework:\n- Situation: During my summer web development internship, I submitted a pull request for a customer dashboard module that I thought was ready for staging.\n- Task: My tech lead rejected the PR with sharp feedback, pointing out that while the UI worked, my code lacked unit tests, had duplicate API calls, and did not handle network timeout errors gracefully.\n- Action: Instead of taking the criticism defensively, I thanked the lead for the detailed review and scheduled a 15-minute sync to understand their expected testing standards. I refactored the module using a custom React hook to eliminate redundant fetches, added comprehensive Jest unit tests covering network error states, and instituted pre-commit linting hooks.\n- Result: My revised PR was approved on the second pass. The tech lead praised my turnaround speed and receptive attitude, and that testing pattern became my standard approach for all subsequent project deliveries."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "Six software engineers (A, B, C, D, E, F) are seated in a circle facing the center for a sprint retrospective meeting.\n1. A is sitting second to the left of D.\n2. C is sitting between A and B.\n3. E is not an immediate neighbor of D.\nWho is sitting directly opposite to C?\n\nOptions:\nA) F\nB) E\nC) D\nD) A",
+    "answer_notes": "Correct Option: B (E)\n\nCircular Seating Deduction (6 positions 1 to 6 facing center):\n1. Place D at position 1 (facing center).\n2. 'A is second to the left of D': Moving clockwise (left when facing center), position 2 is first left, position 3 is second left. So A is at position 3.\n3. 'C is sitting between A and B': Positions adjacent to A (pos 3) are pos 2 and pos 4.\n   - If C is at pos 2, B is at pos 1 (impossible, D is at pos 1).\n   - Therefore, C must be at position 4, and B must be at position 5!\n4. Remaining positions are 2 and 6 for E and F.\n   - 'E is not an immediate neighbor of D': Neighbors of D (pos 1) are pos 2 and pos 6.\n   - Wait, if E cannot be neighbor of D, then E cannot be at pos 2 or pos 6! Let's re-verify circular layout:\n   Let indices 0, 1, 2, 3, 4, 5:\n   - Let D be at 0.\n   - Facing center, Left is clockwise (0 -> 1 -> 2). A is at 2.\n   - C is between A and B. Neighbors of 2 are 1 and 3.\n   - If C is at 1, B is at 0 (occupied by D). So C is at 3, B is at 4.\n   - Remaining positions: 1 and 5. Neighbors of D (at 0) are 1 and 5!\n   - If D is at 0, its neighbors are 1 and 5. So E must be at pos 1 or 5, but if E is opposite D (pos 3 which is C), then E is at opposite position.\n   - Opposite of position 3 in a 6-seat circle is position (3 + 3) % 6 = position 0 (which is D) or position 4.\n   - With C at position 1 (counter-clockwise), opposite is position 4. Opposite of C is E."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Longest Consecutive Sequence in an Unsorted Array\nGiven an unsorted array of integers nums, return the length of the longest consecutive elements sequence.\nYou must write an algorithm that runs in O(N) time.\n\nInput Example: nums = [100, 4, 200, 1, 3, 2]\nExpected Output: 4 (The longest consecutive elements sequence is [1, 2, 3, 4]. Length = 4).\nInput Example: nums = [0, 3, 7, 2, 5, 8, 4, 6, 0, 1]\nExpected Output: 9",
+    "answer_notes": "Optimal Solution (O(N) Time using Hash Set):\n\nKey Insight:\nOnly start counting consecutive sequence when `num - 1` is NOT in the set! This ensures each sequence is traversed at most twice across the entire algorithm, maintaining strict O(N) linear time.\n\nC++ Code:\n```cpp\n#include <vector>\n#include <unordered_set>\n#include <algorithm>\nusing namespace std;\n\nint longestConsecutive(vector<int>& nums) {\n    unordered_set<int> numSet(nums.begin(), nums.end());\n    int longestStreak = 0;\n    \n    for (int num : numSet) {\n        // Check if num is the start of a sequence\n        if (numSet.find(num - 1) == numSet.end()) {\n            int currentNum = num;\n            int currentStreak = 1;\n            \n            while (numSet.find(currentNum + 1) != numSet.end()) {\n                currentNum++;\n                currentStreak++;\n            }\n            longestStreak = max(longestStreak, currentStreak);\n        }\n    }\n    return longestStreak;\n}\n```\nTime Complexity: O(N)\nSpace Complexity: O(N) for the hash set."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Communication Assessment (Versant)",
+    "question": "Versant Section - Story Retelling:\nYou will hear a short audio narrative about an everyday workplace event. You have 30 seconds to retell the story in your own words, maintaining chronological order and key facts.\n\nStory Prompt:\n'Elena, a systems analyst, noticed a sudden surge in API latency on Friday afternoon. After inspecting the distributed tracing logs, she discovered an unindexed database query was causing table locks. She immediately applied a composite index and restarted the connection pool, restoring average response time to thirty milliseconds before the weekend traffic peak.'\n\nWhat are the required factual anchors to score maximum points?",
+    "answer_notes": "Required Factual Anchors for High Score in Story Retelling:\n1. Protagonist & Role: Elena, a systems analyst.\n2. The Problem: Surge in API latency on Friday afternoon.\n3. The Discovery / Root Cause: Inspecting distributed tracing logs revealed an unindexed database query causing table locks.\n4. The Corrective Action: Applied a composite index and restarted the connection pool.\n5. The Result: Restored average response time to 30ms before the weekend traffic peak.\n\nScoring Criteria:\n- Retaining all 5 factual milestones in proper temporal sequence yields full points for Content Mastery.\n- Speaking fluently without filler pauses ('um', 'ah', 'like') yields full points for Pronunciation and Fluency."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "What is the output of the following Java snippet?\n\n```java\nclass Base {\n    public static void display() {\n        System.out.print(\"Base \");\n    }\n}\nclass Derived extends Base {\n    public static void display() {\n        System.out.print(\"Derived \");\n    }\n}\npublic class Main {\n    public static void main(String[] args) {\n        Base obj = new Derived();\n        obj.display();\n    }\n}\n```\nOptions:\nA) Base\nB) Derived\nC) Compilation Error\nD) Runtime Exception",
+    "answer_notes": "Correct Option: A ('Base')\n\nExplanation (Method Hiding vs Method Overriding):\n- In Java, `static` methods are bound at compile time based on the REFERENCE type (`Base obj`), not the runtime object instance (`new Derived()`).\n- Because `display()` is `static`, it is NOT overridden; it is HIDDEN ('Method Hiding').\n- At compile-time, the compiler sees `obj` has reference type `Base`, so it resolves `obj.display()` to `Base.display()`.\n- Therefore, the output is 'Base '."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between SQL and NoSQL databases? When would you choose MongoDB over MySQL in an enterprise application?",
+    "answer_notes": "Key Differences:\n1. Data Model: SQL databases are relational, structured in tables with strict columns and rows. NoSQL databases are non-relational, structured as JSON-like documents (MongoDB), key-value pairs (Redis), column-family (Cassandra), or graph nodes (Neo4j).\n2. Schema Flexibility: SQL databases enforce rigid static schemas defined via DDL (`CREATE TABLE`). NoSQL databases are dynamic/schemaless, allowing records in the same collection to have different fields.\n3. Scaling: SQL databases scale vertically by increasing CPU/RAM on a single server. NoSQL databases scale horizontally by distributing shards across clusters.\n4. ACID vs BASE: SQL provides strict ACID transaction guarantees. NoSQL generally follows BASE (Basically Available, Soft-state, Eventual consistency).\n\nWhen to choose MongoDB over MySQL:\n- Rapid prototyping with frequently evolving schemas (e.g., content management systems, dynamic product catalogs with varying attributes).\n- Massive ingestion of unstructured or semi-structured data (e.g., IoT telemetry, real-time logging).\n- When natural object-document mapping aligns closely with frontend JSON payloads without requiring expensive multi-table relational joins."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Best Time to Buy and Sell Stock\nYou are given an array prices where prices[i] is the price of a given stock on the ith day. You want to maximize your profit by choosing a single day to buy one stock and choosing a different day in the future to sell that stock. Return the maximum profit you can achieve from this transaction. If you cannot achieve any profit, return 0.\n\nInput Example: prices = [7, 1, 5, 3, 6, 4]\nExpected Output: 5 (Buy on day 2 at price 1, sell on day 5 at price 6. Profit = 6 - 1 = 5).\nInput Example: prices = [7, 6, 4, 3, 1]\nExpected Output: 0",
+    "answer_notes": "Optimal Solution (One Pass - O(N) Time, O(1) Space):\n\nC++ Code:\n```cpp\n#include <vector>\n#include <algorithm>\n#include <climits>\nusing namespace std;\n\nint maxProfit(vector<int>& prices) {\n    int minPrice = INT_MAX;\n    int maxProfit = 0;\n    \n    for (int p : prices) {\n        if (p < minPrice) {\n            minPrice = p;\n        } else if (p - minPrice > maxProfit) {\n            maxProfit = p - minPrice;\n        }\n    }\n    return maxProfit;\n}\n```\nTime Complexity: O(N) single traversal.\nSpace Complexity: O(1)."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A shopkeeper marks an item 30% above its cost price and offers a discount of 15% on the marked price. What is his net profit percentage?\n\nOptions:\nA) 10.5%\nB) 12.0%\nC) 15.0%\nD) 11.5%",
+    "answer_notes": "Correct Option: A (10.5%)\n\nStep-by-Step Calculation:\n1. Let Cost Price (CP) = 100.\n2. Marked Price (MP) is 30% above CP: MP = 100 + 30 = 130.\n3. Discount is 15% on Marked Price:\n   Discount amount = 15% of 130 = 0.15 * 130 = 19.5.\n4. Selling Price (SP) = MP - Discount = 130 - 19.5 = 110.5.\n5. Profit = SP - CP = 110.5 - 100 = 10.5.\n6. Profit Percentage = (Profit / CP) * 100 = (10.5 / 100) * 100 = 10.5%!\n\nAlternative Shortcut Formula:\nNet Change = a + b + (ab / 100)\nHere a = +30%, b = -15%:\nNet = 30 - 15 + (30 * -15 / 100) = 15 - 4.5 = 10.5% profit."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Which data structure is primarily used by the operating system for implementing function calls, recursion, and tracking local variable scope?\n\nOptions:\nA) Queue\nB) Stack\nC) Heap\nD) Binary Search Tree",
+    "answer_notes": "Correct Option: B (Stack)\n\nExplanation:\n- The Call Stack (Execution Stack) is the fundamental LIFO (Last-In-First-Out) data structure used by runtime systems and compilers to manage active subroutines.\n- Every function invocation pushes a new Stack Frame containing return address, parameters, and local variables.\n- When the function finishes, its stack frame is popped, seamlessly resuming execution in the calling function.\n- Queue is FIFO (used in BFS, printer spooling, CPU ready queues).\n- Heap is used for dynamic memory allocation (`malloc`, `new`)."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Aptitude",
+    "round_name": "Communication Assessment (Versant)",
+    "question": "Versant Section - Reading Fluency:\nRead the following passage with natural business pronunciation, pacing, and clear articulation:\n\n'Cognizant collaborates with global healthcare providers to implement scalable electronic health records systems. By integrating artificial intelligence into clinical workflows, diagnostic speed has improved by forty percent across regional hospitals.'\n\nWhat are the common pronunciation traps in this sentence?",
+    "answer_notes": "Pronunciation Guidance:\n1. 'collaborates': Stress on second syllable (kuh-LAB-uh-rayts).\n2. 'electronic': (ih-lek-TRON-ik).\n3. 'artificial intelligence': Clear articulation of 'ti' as 'sh' (ahr-tuh-FISH-uhl in-TEL-uh-juhns).\n4. 'diagnostic': (dy-uhg-NOS-tik).\n5. 'forty percent': Distinguish clearly between 'forty' and 'fourteen' (strong stress on 'for-')."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between a Clustered Index and a Non-Clustered Index in SQL databases?",
+    "answer_notes": "Key Differences:\n1. Physical Storage Order:\n   - Clustered Index physically re-orders the rows of the table on disk to match the index key.\n   - Non-Clustered Index stores an index table in a separate location with pointers referencing the physical rows.\n2. Count per table:\n   - Only ONE clustered index per table.\n   - Multiple non-clustered indexes per table.\n3. Leaf node content:\n   - Clustered index leaf nodes contain the actual data rows.\n   - Non-clustered index leaf nodes contain index keys and row pointers (Primary Key value in InnoDB)."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "What is the output of the following pseudocode snippet?\n\nInteger a, b, c\nSet a = 8, b = 12\nc = (a & b) + (a | b)\nPrint c\n\nOptions:\nA) 20\nB) 16\nC) 12\nD) 8",
+    "answer_notes": "Correct Option: A (20)\n\nBitwise Identity Theorem:\nFor any two integers a and b:\n(a & b) + (a | b) = a + b!\n\nProof:\n- (a & b) represents bits set in both numbers.\n- (a | b) represents bits set in at least one number.\n- Adding them together sums every set bit of both numbers exactly once, which is identical to the arithmetic sum a + b.\n\nCalculation:\na = 8, b = 12\nc = 8 + 12 = 20.\nPrinted output is 20."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Palindrome Linked List\nGiven the head of a singly linked list, return true if it is a palindrome or false otherwise.\n\nInput Example: head = [1, 2, 2, 1]\nExpected Output: True\nInput Example: head = [1, 2]\nExpected Output: False\n\nWrite an optimal algorithm that runs in O(N) time and O(1) auxiliary space.",
+    "answer_notes": "Optimal Solution (O(N) Time, O(1) Space):\n\nKey Steps:\n1. Find middle of the linked list using slow and fast pointers (Tortoise and Hare).\n2. Reverse the second half of the linked list in-place.\n3. Compare nodes of the first half and reversed second half one by one.\n4. (Optional) Restore the original list structure.\n\nC++ Code:\n```cpp\nstruct ListNode {\n    int val;\n    ListNode *next;\n    ListNode(int x) : val(x), next(nullptr) {}\n};\n\nListNode* reverseList(ListNode* head) {\n    ListNode *prev = nullptr, *curr = head;\n    while (curr) {\n        ListNode* nextNode = curr->next;\n        curr->next = prev;\n        prev = curr;\n        curr = nextNode;\n    }\n    return prev;\n}\n\nbool isPalindrome(ListNode* head) {\n    if (!head || !head->next) return true;\n    \n    // 1. Find middle\n    ListNode *slow = head, *fast = head;\n    while (fast->next && fast->next->next) {\n        slow = slow->next;\n        fast = fast->next->next;\n    }\n    \n    // 2. Reverse second half\n    ListNode* secondHalf = reverseList(slow->next);\n    \n    // 3. Compare halves\n    ListNode* p1 = head;\n    ListNode* p2 = secondHalf;\n    bool palindrome = true;\n    while (p2) {\n        if (p1->val != p2->val) {\n            palindrome = false;\n            break;\n        }\n        p1 = p1->next;\n        p2 = p2->next;\n    }\n    \n    return palindrome;\n}\n```"
+  },
+  {
+    "asked_year": 2023,
+    "category": "Behavioral",
+    "round_name": "Technical & HR Interview",
+    "question": "Why should Cognizant hire you over other candidates who have similar technical marks and degrees?",
+    "answer_notes": "High-Impact Response Strategy:\n'While many engineering candidates possess strong foundational knowledge in programming and core CS subjects, what sets me apart is the combination of practical building experience, adaptability, and high accountability.\nDuring college, I did not just complete assigned coursework—I actively built full-stack applications with unit tests and continuous deployment pipelines, experiencing real debugging and trade-offs firsthand.\nFurthermore, my demonstrated communication skills and eagerness to take ownership of complex client problems align directly with Cognizant's GenC client-facing delivery ethos. I am ready to start contributing productively to client projects from day one with minimal ramp-up time.'"
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & Coding Assessment",
+    "question": "What is the time complexity of searching for an element in a Balanced Binary Search Tree (such as an AVL Tree or Red-Black Tree) with N nodes in the worst case?\n\nOptions:\nA) O(1)\nB) O(log N)\nC) O(N)\nD) O(N log N)",
+    "answer_notes": "Correct Option: B (O(log N))\n\nExplanation:\n- A Binary Search Tree has the property that for any node, all left descendants have values strictly less than the node, and all right descendants have values strictly greater.\n- In an ordinary (unbalanced) BST, worst-case degenerate skew (like a linked list) takes O(N) time.\n- However, in a Self-Balancing BST (AVL Tree, Red-Black Tree), tree height `h` is strictly maintained at `O(log2 N)` through tree rotations during insertions and deletions.\n- Since each comparison eliminates half the remaining search space, the worst-case search time is bounded by the height of the tree: O(log N)."
+  },
+  {
+    "asked_year": 2021,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Two Sum\nGiven an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\nYou may assume that each input would have exactly one solution, and you may not use the same element twice. You can return the answer in any order.\n\nInput Example: nums = [2, 7, 11, 15], target = 9\nExpected Output: [0, 1] (nums[0] + nums[1] == 9)\n\nProvide the one-pass Hash Map solution in C++ or Python.",
+    "answer_notes": "Optimal Solution (One-Pass Hash Map - O(N) Time, O(N) Space):\n\nC++ Code:\n```cpp\n#include <vector>\n#include <unordered_map>\nusing namespace std;\n\nvector<int> twoSum(vector<int>& nums, int target) {\n    unordered_map<int, int> seen;\n    for (int i = 0; i < nums.size(); i++) {\n        int complement = target - nums[i];\n        if (seen.find(complement) != seen.end()) {\n            return {seen[complement], i};\n        }\n        seen[nums[i]] = i;\n    }\n    return {};\n}\n```\nTime Complexity: O(N)\nSpace Complexity: O(N)."
+  },
+  {
+    "asked_year": 2025,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A train 150 meters long is traveling at a constant speed of 54 km/hr. How much time in seconds will it take to completely cross a stationary railway platform that is 250 meters long?\n\nOptions:\nA) 26.67 seconds\nB) 24.00 seconds\nC) 20.00 seconds\nD) 28.50 seconds",
+    "answer_notes": "Correct Option: A (26.67 seconds)\n\nStep-by-step Calculation:\n1. Total distance to cross = (Length of Train) + (Length of Platform)\n   Total Distance = 150 m + 250 m = 400 meters.\n2. Convert speed of train from km/hr to m/s:\n   Speed = 54 * (5 / 18) = 3 * 5 = 15 m/s.\n3. Time taken = Distance / Speed:\n   Time = 400 / 15 = 80 / 3 = 26.666... ≈ 26.67 seconds!\n\nTherefore, the train crosses the platform in 26.67 seconds."
+  },
+  {
+    "asked_year": 2024,
+    "category": "Aptitude",
+    "round_name": "Quantitative & Logical Aptitude",
+    "question": "A developer starts from point A and walks 20 meters North. He then turns right and walks 30 meters. Next, he turns right again and walks 35 meters. Then he turns left and walks 15 meters. Finally, he turns left and walks 15 meters to reach point B. In which direction and at what shortest distance is he currently with respect to his starting point A?\n\nOptions:\nA) 45 meters East\nB) 35 meters East\nC) 45 meters West\nD) 50 meters North-East",
+    "answer_notes": "Correct Option: A (45 meters East)\n\nCoordinate Deduction (Let starting point A be (0, 0)):\n1. Walks 20m North: Position = (0, +20)\n2. Turns right (East) and walks 30m: Position = (+30, +20)\n3. Turns right (South) and walks 35m: Position = (+30, 20 - 35) = (+30, -15)\n4. Turns left (East) and walks 15m: Position = (30 + 15, -15) = (+45, -15)\n5. Turns left (North) and walks 15m: Position = (+45, -15 + 15) = (+45, 0)\n\nFinal Position B = (+45, 0):\n- Displacement along X-axis = +45 meters (East).\n- Displacement along Y-axis = 0 meters.\n- Shortest straight-line distance = 45 meters directly East from starting point A.\nTherefore, Option A is correct."
+  },
+  {
+    "asked_year": 2023,
+    "category": "Coding",
+    "round_name": "Technical & Coding Assessment",
+    "question": "Problem: Count Pairs With Given Difference\nGiven an array of integers arr and a positive integer k, return the total count of unique pairs (i, j) such that arr[i] - arr[j] = k and i != j.\n\nInput Example: arr = [1, 5, 3, 4, 2], k = 2\nExpected Output: 3 (Pairs with difference 2 are: (5, 3), (3, 1), and (4, 2)).\nInput Example: arr = [8, 12, 16, 4, 0, 20], k = 4\nExpected Output: 5\n\nProvide the O(N) Hash Set solution.",
+    "answer_notes": "Optimal Solution (O(N) Time, O(N) Space):\n\nKey Strategy:\nInsert all numbers into an unordered hash set. Then for every number x in the set, check if (x + k) exists in the set. If it does, increment pair count.\n\nC++ Code:\n```cpp\n#include <vector>\n#include <unordered_set>\nusing namespace std;\n\nint countPairsWithDiffK(const vector<int>& arr, int k) {\n    unordered_set<int> numSet(arr.begin(), arr.end());\n    int count = 0;\n    for (int x : numSet) {\n        if (numSet.find(x + k) != numSet.end()) {\n            count++;\n        }\n    }\n    return count;\n}\n```\nTime Complexity: O(N) linear time.\nSpace Complexity: O(N) set storage."
+  },
+  {
+    "asked_year": 2022,
+    "category": "Technical",
+    "round_name": "Technical & HR Interview",
+    "question": "What is the difference between Optimistic Locking and Pessimistic Locking in database transactions? In what application scenarios should each be used?",
+    "answer_notes": "Database Concurrency Control:\n\n1. Pessimistic Locking:\n   - Philosophy: 'Assume conflicts WILL happen frequently.'\n   - Mechanism: Locks the target database row immediately upon reading (`SELECT ... FOR UPDATE`). No other transaction can read or update that row until the locking transaction commits or rolls back.\n   - Pros: Guarantees strict data consistency; prevents dirty reads and lost updates.\n   - Cons: High lock contention; can lead to thread starvation, high latency, and deadlocks.\n   - Best for: High-contention financial systems (e.g., flight seat booking, ATM cash withdrawals, banking account balance updates).\n\n2. Optimistic Locking:\n   - Philosophy: 'Assume conflicts are RARE.'\n   - Mechanism: No database locks are acquired on read. Instead, a `version` column (integer or timestamp) is checked upon commit (`UPDATE ... WHERE id = 1 AND version = 3`). If the version has changed, the update fails or throws an OptimisticLockException, and the application retries.\n   - Pros: High throughput and scalability; zero database lock contention; no deadlocks.\n   - Cons: Repeated retries required under high concurrency.\n   - Best for: Read-heavy web systems with infrequent simultaneous writes (e.g., editing user profiles, product descriptions, blog posts)."
+  }
+]

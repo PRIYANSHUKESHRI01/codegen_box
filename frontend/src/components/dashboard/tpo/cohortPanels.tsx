@@ -33,10 +33,13 @@ export function CohortEngagementCard({
   students,
   active,
   onSelect,
+  codes = true,
 }: {
   students: readonly CohortStudent[];
   active: Engagement | typeof ALL;
   onSelect: (engagement: Engagement | typeof ALL) => void;
+  /** False when the roster is of a programme without coding practice (Commerce, Arts …): practice then means anything they do on the platform. */
+  codes?: boolean;
 }) {
   const counts = useMemo(() => engagementCounts(students), [students]);
   const { onboarded } = useMemo(() => codingSummary(students), [students]);
@@ -44,7 +47,7 @@ export function CohortEngagementCard({
 
   return (
     <HpCard spotlight={false} className="flex flex-col p-4 sm:p-5">
-      <HpSectionHeader title="Practice engagement" subtitle="Based on coding practice and contests — select a group to focus the roster" icon={Activity} tone="emerald" />
+      <HpSectionHeader title="Practice engagement" subtitle={codes ? "Based on coding practice and contests — select a group to focus the roster" : "Based on everything they do on AptRun — interviews, tests and learning — select a group to focus the roster"} icon={Activity} tone="emerald" />
 
       <div className="mt-5 flex h-2.5 w-full overflow-hidden rounded-full bg-elevated [&>*+*]:border-l-2 [&>*+*]:border-[rgb(var(--bg-surface-rgb))]" role="img" aria-label="Engagement mix">
         {ENGAGEMENT_ORDER.map((e) =>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { KeyRound, Copy, Check, Mail } from "lucide-react";
+import { KeyRound, Copy, Check, Mail, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
@@ -18,22 +18,39 @@ export interface ResetTarget {
 interface ResetResult {
   temporary_password: string;
   credentials_email_sent: boolean | null;
+  /** False = the superadmin set a permanent password; nothing is kept to look up later. */
+  must_change_password?: boolean;
+}
+
+/** Strong, easy-to-read-out password for the "suggest one" button: no look-alike characters (0/O, 1/l/I). */
+function suggestPassword(): string {
+  const alphabet = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint32Array(14);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
 }
 
 /**
  * Two steps in one dialog: confirm (re-enter your own password — a stolen
  * session alone mustn't be able to take over accounts), then show the new
- * password once. The password only ever lives in this component's state, so
+ * password. The password only ever lives in this component's state, so
  * closing the dialog discards it.
  *
- * It cannot show an account's CURRENT password and never will: passwords are
- * stored as one-way hashes, and a user replaces their temporary password the
- * first time they sign in, so no copy of it exists to read. This is the honest
- * way to get a working login for someone — and "View as" (in the manage drawer)
- * is the way to see what they see without touching their password at all.
+ * The superadmin either lets the server generate a strong password or types
+ * one themselves. By default the new password is temporary (the owner must
+ * replace it at next sign-in) and stays retrievable until they do, via the
+ * accounts table's "Show password". Choosing "keep it, don't ask them to
+ * change it" sets the owner's permanent password and keeps no copy.
+ *
+ * A password an owner chose for themselves is a one-way hash and can never be
+ * shown — this dialog is how a superadmin replaces it with one they know.
  */
 export function ResetPasswordModal({ target, onClose, onReset }: { target: ResetTarget; onClose: () => void; onReset: () => void }) {
   const [password, setPassword] = useState("");
+  const [mode, setMode] = useState<"generate" | "choose">("generate");
+  const [newPassword, setNewPassword] = useState("");
+  const [showNew, setShowNew] = useState(false);
+  const [requireChange, setRequireChange] = useState(true);
   const [sendEmail, setSendEmail] = useState(true);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,15 +60,21 @@ export function ResetPasswordModal({ target, onClose, onReset }: { target: Reset
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password || working) return;
+    if (mode === "choose" && newPassword.length < 8) {
+      setError("A password needs at least 8 characters.");
+      return;
+    }
     setWorking(true);
     setError(null);
     try {
-      const res = await api.post<ResetResult>(`/superadmin/users/${target.id}/reset-password`, { password, send_email: sendEmail });
+      const body = mode === "choose" ? { password, send_email: sendEmail, new_password: newPassword, require_change: requireChange } : { password, send_email: sendEmail };
+      const res = await api.post<ResetResult>(`/superadmin/users/${target.id}/reset-password`, body);
       setResult(res);
       setPassword("");
+      setNewPassword("");
       onReset();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not reset the password. Check your connection and try again.");
+      setError(err instanceof ApiError ? err.errors?.new_password?.[0] ?? err.message : "Could not reset the password. Check your connection and try again.");
     } finally {
       setWorking(false);
     }
@@ -70,7 +93,7 @@ export function ResetPasswordModal({ target, onClose, onReset }: { target: Reset
   return (
     <Modal
       onClose={onClose}
-      title={result ? "New temporary password" : "Reset password"}
+      title={result ? (result.must_change_password === false ? "Password set" : "New temporary password") : "Change password"}
       subtitle={`${target.name} · ${roleInfo(target.role).label}`}
       icon={KeyRound}
       size="md"
@@ -96,7 +119,7 @@ export function ResetPasswordModal({ target, onClose, onReset }: { target: Reset
               disabled={working || !password}
               className="px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {working ? "Resetting…" : "Reset & show password"}
+              {working ? (mode === "choose" ? "Saving…" : "Resetting…") : mode === "choose" ? "Set password" : "Reset & show password"}
             </button>
           </>
         )
@@ -109,7 +132,7 @@ export function ResetPasswordModal({ target, onClose, onReset }: { target: Reset
             <CopyRow value={target.email} copied={copied === "login"} onCopy={() => copy("login", target.email)} />
           </div>
           <div className="space-y-1.5">
-            <div className="text-2xs font-semibold text-text-muted uppercase tracking-wider">Temporary password</div>
+            <div className="text-2xs font-semibold text-text-muted uppercase tracking-wider">{result.must_change_password === false ? "Password" : "Temporary password"}</div>
             <CopyRow value={result.temporary_password} copied={copied === "password"} onCopy={() => copy("password", result.temporary_password)} mono />
           </div>
 
@@ -130,16 +153,88 @@ export function ResetPasswordModal({ target, onClose, onReset }: { target: Reset
           </div>
 
           <p className="text-2xs text-text-muted">
-            This is the only time this password is shown. The previous password no longer works and every session {target.name} had open has been signed out;
-            they will be asked to choose their own password at next login.
+            {result.must_change_password === false ? (
+              <>This is a permanent password and no copy is kept, so this is the only time it is shown. </>
+            ) : (
+              <>
+                {target.name} will be asked to choose their own password at next login. Until they do you can look this one up again with <strong className="text-text-secondary">Show password</strong> on
+                the account. Once they choose theirs it is private and can never be shown.{" "}
+              </>
+            )}
+            The previous password no longer works and every session {target.name} had open has been signed out.
           </p>
         </div>
       ) : (
         <form id="reset-password-form" onSubmit={submit} className="space-y-4">
           <p className="text-xs text-text-secondary">
-            This replaces <strong className="text-primary">{target.name}</strong>&apos;s password with a new temporary one that you will see on the next
-            screen. Their current password stops working immediately and they are signed out everywhere.
+            This replaces <strong className="text-primary">{target.name}</strong>&apos;s password. Their current password stops working immediately and they are signed out everywhere.
           </p>
+
+          <div role="radiogroup" aria-label="New password" className="grid grid-cols-2 gap-2">
+            {(
+              [
+                ["generate", "Generate a strong one"],
+                ["choose", "I\u2019ll type one"],
+              ] as const
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className={cn(
+                  "flex cursor-pointer items-center gap-2 rounded-control border px-3 py-2 text-xs font-semibold",
+                  mode === value ? "border-accent-primary bg-accent-primary/10 text-accent-primary" : "border-border-subtle text-text-secondary"
+                )}
+              >
+                <input type="radio" name="reset-mode" checked={mode === value} onChange={() => setMode(value)} className="h-3.5 w-3.5" />
+                {label}
+              </label>
+            ))}
+          </div>
+
+          {mode === "choose" && (
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="reset-new-password" className="block text-xs font-semibold text-text-secondary mb-1">
+                  New password for {target.name} <span className="font-normal text-text-muted">(8–72 characters)</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id="reset-new-password"
+                    type={showNew ? "text" : "password"}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    maxLength={72}
+                    className="min-w-0 flex-1 px-3 py-2 text-xs rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary font-mono"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNew((v) => !v)}
+                    aria-label={showNew ? "Hide new password" : "Show new password"}
+                    className="shrink-0 rounded-control border border-border-subtle bg-elevated p-2 text-text-secondary hover:text-primary"
+                  >
+                    {showNew ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewPassword(suggestPassword());
+                      setShowNew(true);
+                    }}
+                    className="shrink-0 rounded-control border border-border-subtle bg-elevated px-2.5 py-2 text-3xs font-bold text-text-secondary hover:text-primary"
+                  >
+                    Suggest
+                  </button>
+                </div>
+              </div>
+              <label className="flex items-start gap-2 cursor-pointer text-xs">
+                <input type="checkbox" checked={requireChange} onChange={(e) => setRequireChange(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-border-subtle" />
+                <span>
+                  <span className="text-primary font-semibold">Ask them to choose their own at next sign-in</span>
+                  <span className="block text-text-muted">Recommended. Untick to give them this as a permanent password — no copy is kept for you to look up later.</span>
+                </span>
+              </label>
+            </div>
+          )}
 
           <label className="flex items-start gap-2 cursor-pointer text-xs">
             <input type="checkbox" checked={sendEmail} onChange={(e) => setSendEmail(e.target.checked)} className="mt-0.5 w-3.5 h-3.5 rounded border-border-subtle" />

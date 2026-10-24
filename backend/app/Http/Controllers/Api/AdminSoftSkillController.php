@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\Concerns\ManagesSoftSkillQuestions;
 use App\Http\Controllers\Controller;
 use App\Models\SoftSkillAssessment;
 use App\Services\SoftSkillQuestionSetService;
+use App\Support\BranchAudience;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -44,6 +45,7 @@ class AdminSoftSkillController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'duration_minutes' => ['sometimes', 'integer', 'min:5', 'max:240'],
@@ -61,6 +63,7 @@ class AdminSoftSkillController extends Controller
             'pass_percentage' => $validated['pass_percentage'] ?? 60,
             'max_attempts' => $validated['max_attempts'] ?? null,
             'created_by' => $request->user()->id,
+            'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
         ], $validated);
 
         return response()->json(['assessment' => $assessment], 201);
@@ -71,6 +74,7 @@ class AdminSoftSkillController extends Controller
         $this->guardManagedElsewhere($softSkillAssessment);
 
         $validated = $request->validate([
+            ...BranchAudience::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'status' => ['sometimes', Rule::in(SoftSkillAssessment::STATUSES)],
@@ -85,6 +89,10 @@ class AdminSoftSkillController extends Controller
 
         if (array_key_exists('is_question_set', $validated)) {
             $validated += $this->libraryChange($softSkillAssessment, (bool) $validated['is_question_set']);
+        }
+
+        if (array_key_exists('branch_audience', $validated)) {
+            $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
         }
 
         $softSkillAssessment->update($validated);

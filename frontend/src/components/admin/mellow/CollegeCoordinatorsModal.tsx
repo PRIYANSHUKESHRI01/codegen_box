@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { UserCog, X, Plus, Ban, CheckCircle2, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { sectionIsOpen, type SectionOption } from "@/lib/coordinatorSections";
 
 interface ApiCoordinator {
   id: number;
@@ -11,16 +13,12 @@ interface ApiCoordinator {
   email: string;
   phone: string | null;
   section: string;
+  scope_label?: string;
   is_blocked: boolean;
   managed_student_count: number;
 }
 
-/** One real section at this college, from student data — see SectionCoordinatorService::sectionsFor(). `coordinator_name` is null when the section has no coordinator yet. */
-interface SectionOption {
-  section: string;
-  student_count: number;
-  coordinator_name: string | null;
-}
+const firstError = (err: unknown, fallback: string) => (err instanceof ApiError ? err.errors?.branch_scope?.[0] ?? err.errors?.section?.[0] ?? err.errors?.email?.[0] ?? err.message : fallback);
 
 /**
  * The Ops/superadmin equivalent of a TPO's own "Section Coordinators" tab —
@@ -49,6 +47,7 @@ export function CollegeCoordinatorsModal({
   const [email, setEmail] = useState("");
   const [section, setSection] = useState("");
   const [phone, setPhone] = useState("");
+  const [scope, setScope] = useState<BranchAudience>(EVERYONE);
   const [submitting, setSubmitting] = useState(false);
   const [sectionDrafts, setSectionDrafts] = useState<Record<number, string>>({});
 
@@ -70,7 +69,8 @@ export function CollegeCoordinatorsModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [college]);
 
-  const availableSections = sections.filter((s) => s.coordinator_name === null);
+  // A section can have a coordinator per branch, so every section is choosable; sections with students nobody covers come first.
+  const availableSections = [...sections].sort((a, b) => Number(sectionIsOpen(b)) - Number(sectionIsOpen(a)) || a.section.localeCompare(b.section));
 
   useEffect(() => {
     if (showAddForm && availableSections.length > 0 && !section) {
@@ -90,6 +90,7 @@ export function CollegeCoordinatorsModal({
         name,
         email,
         section,
+        branch_scope: audienceForRequest(scope),
         phone: phone || undefined,
       });
       setShowAddForm(false);
@@ -97,10 +98,11 @@ export function CollegeCoordinatorsModal({
       setEmail("");
       setSection("");
       setPhone("");
+      setScope(EVERYONE);
       triggerToast(`Coordinator "${res.coordinator.name}" added for Section ${res.coordinator.section}.`);
       load(); // re-fetch: that section needs to drop off the "available" list
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to add coordinator.");
+      triggerToast(firstError(err, "Failed to add coordinator."));
     } finally {
       setSubmitting(false);
     }
@@ -128,7 +130,7 @@ export function CollegeCoordinatorsModal({
       triggerToast(`${coordinator.name} reassigned to Section ${res.coordinator.section}.`);
       load(); // re-fetch: the old section frees up, the new one is now taken
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to reassign section.");
+      triggerToast(firstError(err, "Failed to reassign section."));
     }
   };
 
@@ -178,6 +180,7 @@ export function CollegeCoordinatorsModal({
                 </div>
                 <div className="flex items-center gap-2 text-2xs text-text-muted">
                   <span>{c.managed_student_count} students managed</span>
+                  {c.scope_label && c.scope_label !== "All branches" && <span className="rounded-full bg-sky-500/10 px-1.5 py-px font-bold text-sky-600">{c.scope_label} only</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   <select
@@ -185,13 +188,11 @@ export function CollegeCoordinatorsModal({
                     onChange={(e) => setSectionDrafts((prev) => ({ ...prev, [c.id]: e.target.value }))}
                     className="flex-1 px-2 py-1.5 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
                   >
-                    {sections
-                      .filter((s) => s.coordinator_name === null || s.section === c.section)
-                      .map((s) => (
-                        <option key={s.section} value={s.section}>
-                          Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
-                        </option>
-                      ))}
+                    {sections.map((s) => (
+                      <option key={s.section} value={s.section}>
+                        Section {s.section} — {s.student_count} student{s.student_count === 1 ? "" : "s"}
+                      </option>
+                    ))}
                   </select>
                   <button
                     onClick={() => handleReassignSection(c)}
@@ -242,7 +243,7 @@ export function CollegeCoordinatorsModal({
                 ) : (
                   <div className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-2xs text-text-muted flex items-center gap-1.5">
                     <Users className="w-3.5 h-3.5 shrink-0" />
-                    <span>{sections.length === 0 ? "No sections yet" : "All sections covered"}</span>
+                    <span>No sections yet</span>
                   </div>
                 )}
                 <input
@@ -253,6 +254,7 @@ export function CollegeCoordinatorsModal({
                   className="px-3 py-2 rounded-control bg-surface border border-border-subtle text-xs text-primary outline-none focus:border-accent-primary"
                 />
               </div>
+              <BranchAudienceField value={scope} onChange={setScope} title="Which branches of the section?" everyoneLabel="All branches" emptyHint="Pick at least one branch, or switch back to All branches." />
               <div className="flex justify-end gap-2 pt-1">
                 <button
                   type="button"

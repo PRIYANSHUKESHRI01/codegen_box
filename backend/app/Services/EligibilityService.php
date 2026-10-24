@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Support\BranchCatalog;
 
 /**
  * Checks a drive's eligibility requirements against one student's own
@@ -61,15 +62,16 @@ class EligibilityService
         }
 
         if (! empty($eligibility['eligible_branches'])) {
-            if ($user->branch === null) {
+            $verdict = self::branchVerdict($user, $eligibility['eligible_branches']);
+
+            if ($verdict === 'unknown') {
                 $unknown = true;
-                $criteria['branch'] = 'unknown';
-            } elseif (! in_array($user->branch, $eligibility['eligible_branches'], true)) {
-                $reasons[] = 'Open to '.implode(', ', $eligibility['eligible_branches'])." — your branch on file is {$user->branch}.";
-                $criteria['branch'] = 'fail';
-            } else {
-                $criteria['branch'] = 'pass';
+            } elseif ($verdict === 'fail') {
+                $reasons[] = 'Open to '.self::describeBranches($eligibility['eligible_branches'])
+                    .' — your branch on file is '.(self::studentBranchLabel($user) ?? 'not recognised').'.';
             }
+
+            $criteria['branch'] = $verdict;
         }
 
         $status = $reasons !== [] ? 'not_eligible' : ($unknown ? 'unknown' : 'eligible');
@@ -79,5 +81,126 @@ class EligibilityService
             'reasons' => $reasons,
             'criteria' => $criteria,
         ];
+    }
+
+    /** Prefix of a stored `eligible_branches` token that means a whole family ("family:mech" = every Mechanical branch). */
+    public const FAMILY_PREFIX = 'family:';
+
+    /** Prefix of a token that means a whole department ("department:commerce" = every programme of Commerce & Accounting). */
+    public const DEPARTMENT_PREFIX = 'department:';
+
+    /**
+     * pass / fail / unknown for the branch requirement.
+     *
+     * Tokens in a drive's `eligible_branches` are canonical branch codes ("ece"), family tokens
+     * ("family:mech"), or — on drives created before the branch catalogue — whatever label the
+     * TPO picked ("MECH", "EE"); the catalogue turns those into codes at READ time, so stored
+     * drives are never rewritten. A student whose branch we cannot identify is "unknown" (their
+     * TPO can map it), never a false "not eligible".
+     */
+    private static function branchVerdict(User $user, array $tokens): string
+    {
+        $catalog = BranchCatalog::instance();
+        $codes = [];
+        $families = [];
+        $departments = [];
+        $rawTokens = [];
+        $hasUnreadableToken = false;
+
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+
+            if (str_starts_with($token, self::FAMILY_PREFIX)) {
+                $families[substr($token, strlen(self::FAMILY_PREFIX))] = true;
+            } elseif (str_starts_with($token, self::DEPARTMENT_PREFIX)) {
+                $departments[substr($token, strlen(self::DEPARTMENT_PREFIX))] = true;
+            } elseif (($code = $catalog->canonical($token, $user->college_id)) !== null) {
+                $codes[$code] = true;
+            } elseif ($token !== '') {
+                $rawTokens[mb_strtolower($token)] = true;
+                $hasUnreadableToken = true;
+            }
+        }
+
+        $department = $user->getAttributes()['department'] ?? null;
+
+        if ($user->branch_code !== null) {
+            $discipline = $user->discipline ?? $catalog->disciplineOf($user->branch_code);
+            $department ??= $catalog->departmentOfDiscipline($discipline);
+
+            return isset($codes[$user->branch_code])
+                || ($discipline !== null && isset($families[$discipline]))
+                || ($department !== null && isset($departments[$department])) ? 'pass' : 'fail';
+        }
+
+        if ($user->branch === null || trim($user->branch) === '') {
+            return self::departmentRuledOut($catalog, $department, $codes, $families, $departments, $hasUnreadableToken) ? 'fail' : 'unknown';
+        }
+
+        // A label we do not recognise: it can still equal a token the drive was written with.
+        if (isset($rawTokens[mb_strtolower(trim($user->branch))])) {
+            return 'pass';
+        }
+
+        return self::departmentRuledOut($catalog, $department, $codes, $families, $departments, $hasUnreadableToken) ? 'fail' : 'unknown';
+    }
+
+    /**
+     * A student whose branch we cannot place but whose DEPARTMENT we know (a roster imported under Commerce) cannot be eligible for a
+     * drive that reaches only other departments: an MBA-only drive is closed to an unplaced Engineering student even though we never
+     * learnt their branch. Unreadable tokens (a college's own old labels) keep the answer "unknown" — we cannot say where they point.
+     *
+     * @param  array<string, true>  $codes
+     * @param  array<string, true>  $families
+     * @param  array<string, true>  $departments
+     */
+    private static function departmentRuledOut(BranchCatalog $catalog, ?string $department, array $codes, array $families, array $departments, bool $hasUnreadableToken): bool
+    {
+        if ($department === null || $hasUnreadableToken) {
+            return false;
+        }
+
+        $reached = array_keys($departments);
+
+        foreach (array_keys($families) as $family) {
+            $reached[] = $catalog->departmentOfDiscipline($family);
+        }
+
+        foreach (array_keys($codes) as $code) {
+            $reached[] = $catalog->departmentOf($code);
+        }
+
+        $reached = array_values(array_unique(array_filter($reached)));
+
+        return $reached !== [] && ! in_array($department, $reached, true);
+    }
+
+    /** "Mechanical Engineering, all Civil branches, Production" — words for a requirement, for the student/TPO. */
+    public static function describeBranches(array $tokens): string
+    {
+        $catalog = BranchCatalog::instance();
+        $parts = [];
+
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+
+            if (str_starts_with($token, self::FAMILY_PREFIX)) {
+                $family = $catalog->discipline(substr($token, strlen(self::FAMILY_PREFIX)));
+                $parts[] = $family ? 'all '.$family['name'].' branches' : $token;
+            } elseif (str_starts_with($token, self::DEPARTMENT_PREFIX)) {
+                $department = $catalog->department(substr($token, strlen(self::DEPARTMENT_PREFIX)));
+                $parts[] = $department ? 'every '.$department['name'].' programme' : $token;
+            } else {
+                $code = $catalog->canonical($token);
+                $parts[] = $code !== null ? $catalog->labelOf($code) : $token;
+            }
+        }
+
+        return implode(', ', array_unique($parts));
+    }
+
+    private static function studentBranchLabel(User $user): ?string
+    {
+        return BranchCatalog::instance()->labelOf($user->branch_code) ?? ($user->branch !== null && trim($user->branch) !== '' ? $user->branch : null);
     }
 }

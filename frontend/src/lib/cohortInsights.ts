@@ -1,4 +1,5 @@
 import type { CohortStudent, Engagement } from "@/types/cohort";
+import type { BranchCatalog } from "@/lib/branches";
 
 /** What each engagement is called wherever it is written down — the roster pills, filters, and the Excel export. */
 export const ENGAGEMENT_LABEL: Record<Engagement, string> = {
@@ -91,6 +92,67 @@ export function branchOptions(students: readonly CohortStudent[]): string[] {
   return Array.from(new Set(students.map((s) => s.branch?.trim()).filter((b): b is string => !!b))).sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * The branch filter's value is one of: ALL · `family:<discipline>` (every branch in a family) ·
+ * `code:<branch_code>` (one recognised branch) · `raw:<label>` (a label we don't recognise yet).
+ * A bare string is the pre-catalogue form (a restored session filter) and still means "this exact label".
+ */
+export function matchesBranchFilter(student: CohortStudent, value: string): boolean {
+  if (value.startsWith("family:")) return student.discipline === value.slice(7);
+  if (value.startsWith("code:")) return student.branch_code === value.slice(5);
+  if (value.startsWith("raw:")) return !student.branch_code && student.branch?.trim() === value.slice(4);
+  return student.branch === value;
+}
+
+export interface BranchFilterGroup {
+  label: string;
+  options: { value: string; label: string; count: number }[];
+}
+
+/**
+ * The branch filter's choices, from the branches actually in the roster: a family-wide choice
+ * ("All Mechanical (42)") and one per recognised branch, grouped by family; labels the platform
+ * doesn't recognise yet are listed last, as written, so they can still be filtered.
+ */
+export function branchFilterGroups(students: readonly CohortStudent[], catalog: BranchCatalog | null): BranchFilterGroup[] {
+  const groups: BranchFilterGroup[] = [];
+  const disciplines = catalog?.disciplines ?? [];
+
+  for (const discipline of disciplines) {
+    const inFamily = students.filter((s) => s.discipline === discipline.code);
+    if (inFamily.length === 0) continue;
+
+    const byCode = new Map<string, number>();
+    for (const s of inFamily) if (s.branch_code) byCode.set(s.branch_code, (byCode.get(s.branch_code) ?? 0) + 1);
+
+    groups.push({
+      label: discipline.name,
+      options: [
+        { value: `family:${discipline.code}`, label: `All ${discipline.short}`, count: inFamily.length },
+        ...Array.from(byCode.entries())
+          .sort((a, b) => b[1] - a[1])
+          .map(([code, count]) => ({ value: `code:${code}`, label: catalog?.branches.find((b) => b.code === code)?.name ?? code, count })),
+      ],
+    });
+  }
+
+  const unrecognised = new Map<string, number>();
+  for (const s of students) {
+    const label = s.branch?.trim();
+    if (!s.branch_code && label) unrecognised.set(label, (unrecognised.get(label) ?? 0) + 1);
+  }
+  if (unrecognised.size > 0) {
+    groups.push({
+      label: "Not recognised yet",
+      options: Array.from(unrecognised.entries())
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([label, count]) => ({ value: `raw:${label}`, label, count })),
+    });
+  }
+
+  return groups;
+}
+
 /* ── Filtering ────────────────────────────────────────────────────────── */
 
 export const ALL = "ALL" as const;
@@ -132,7 +194,7 @@ export function matchesFilters(student: CohortStudent, filters: CohortFilters): 
     const haystack = [student.name, student.roll_number ?? "", student.email].map((v) => v.toLowerCase());
     if (!haystack.some((v) => v.includes(needle))) return false;
   }
-  if (filters.branch !== ALL && student.branch !== filters.branch) return false;
+  if (filters.branch !== ALL && !matchesBranchFilter(student, filters.branch)) return false;
   if (filters.section !== ALL && student.section !== filters.section) return false;
   if (filters.tier !== ALL && student.readiness_tier !== filters.tier) return false;
   if (filters.engagement !== ALL && student.activity.engagement !== filters.engagement) return false;

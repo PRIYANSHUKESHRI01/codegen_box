@@ -66,6 +66,6 @@ class PhoneVerificationController extends Controller
             'phone_verified_at' => now(),
         ])->save();
 
-        return response()->json(['user' => $user->fresh()->load(['college', 'company'])]);
+        return response()->json(['user' => $user->fresh()->load(['college.collegeDepartments', 'company'])]);
     }
 }

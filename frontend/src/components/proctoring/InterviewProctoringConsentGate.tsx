@@ -3,7 +3,10 @@
 import { motion } from "framer-motion";
 import { AlertTriangle, Camera, CheckCircle2, Clock3, Maximize, Mic, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { checksPass, useIntegrityUi } from "@/lib/integrity/store";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
+import { IntegrityChecklist } from "./IntegrityChecklist";
+import { IntegrityDisclosure } from "./IntegrityDisclosure";
 
 /**
  * Shown BEFORE any interview question is ever revealed — mirrors
@@ -32,6 +35,9 @@ export function InterviewProctoringConsentGate({
 }) {
   const starting = phase === "starting";
   const blocked = phase === "blocked";
+  const ui = useIntegrityUi();
+  const integrity = ui.policy !== null;
+  const ready = !integrity || checksPass(ui.checks);
 
   return (
     <div className="flex-1 flex items-center justify-center p-6">
@@ -65,31 +71,44 @@ export function InterviewProctoringConsentGate({
           </div>
         </div>
 
+        <IntegrityChecklist onEnableDevices={onEnableDevices} />
+
         <ul className="space-y-2.5 text-xs text-text-secondary">
           <li className="flex items-start gap-2.5">
             <Maximize className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
             <span>Your screen will switch to fullscreen for the duration of the interview. Exiting it is logged as a violation.</span>
           </li>
-          <li className="flex items-start gap-2.5">
-            <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-            <span>
-              Your camera stays on and visible in a small preview the whole time, like a video call — it&apos;s never
-              uploaded or stored anywhere.
-            </span>
-          </li>
-          <li className="flex items-start gap-2.5">
-            <Mic className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-            <span>Your microphone records alongside the camera, separate from the answer recording you submit per question.</span>
-          </li>
+          {integrity ? (
+            <li className="flex items-start gap-2.5">
+              <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+              <span>Your camera stays on and visible in a small preview the whole time, like a video call.</span>
+            </li>
+          ) : (
+            <>
+              <li className="flex items-start gap-2.5">
+                <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+                <span>
+                  Your camera stays on and visible in a small preview the whole time, like a video call — it&apos;s never
+                  uploaded or stored anywhere.
+                </span>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <Mic className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
+                <span>Your microphone records alongside the camera, separate from the answer recording you submit per question.</span>
+              </li>
+            </>
+          )}
           <li className="flex items-start gap-2.5">
             <Clock3 className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
             <span>Each question gives you a moment to prepare, then a set time to answer — a countdown keeps you on pace, same as a real interview.</span>
           </li>
           <li className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-            <span>Switching tabs, exiting fullscreen, or opening developer tools counts as a strike. You get 2 warnings — a 3rd strike ends your attempt. Whoever invited you to this interview can reinstate it if this was a mistake.</span>
+            <span>Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike ends your attempt. Whoever invited you to this interview can reinstate it if this was a mistake.</span>
           </li>
         </ul>
+
+        <IntegrityDisclosure interview />
 
         {consentError && (
           <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-2xs text-status-danger">
@@ -98,8 +117,8 @@ export function InterviewProctoringConsentGate({
         )}
 
         {devicePreviewReady ? (
-          <Button onClick={onConsent} isLoading={starting} fullWidth>
-            {starting ? "Starting..." : "Start Proctored Interview"}
+          <Button onClick={onConsent} isLoading={starting} disabled={!ready} fullWidth>
+            {starting ? "Starting..." : ready ? "Start Proctored Interview" : "Finish the system check to start"}
           </Button>
         ) : (
           <Button onClick={onEnableDevices} fullWidth>

@@ -1,0 +1,339 @@
+[
+  {
+    "asked_year": 2025,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Reading Section] Read the following passage aloud into your microphone with natural pacing, clear articulation, and accurate punctuation pauses: \"Modern enterprise consulting demands agile adaptability as cloud architectures, microservices, and automated continuous delivery pipelines replace monolithic software frameworks across distributed engineering teams.\"",
+    "answer_notes": "Evaluation criteria: Pronunciation, Fluency, and Punctuation Pauses.\n1. Pace: Speak at an even tempo (approx. 120-140 words per minute).\n2. Punctuation: Pause briefly (~0.2s) at commas and lower your voice pitch slightly at the concluding period.\n3. Stress & Articulation: Clearly articulate multi-syllable terms ('adaptability', 'architectures', 'monolithic') without clipping word endings.\n4. Golden Rule: Never backtrack, apologize, or repeat a word if you stumble; automated speech assessment algorithms penalize disfluencies heavily.",
+    "display_order": 1
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Listening & Repeating] Listen carefully to the audio sentence and repeat it immediately after the tone with identical phrasing: \"The automated integration test suite verified the payment service before deploying to the staging server.\"",
+    "answer_notes": "Evaluation criteria: Aural Retention and Cadence Mimicry.\n1. Focus on syntactic chunks: [The automated integration test suite] + [verified the payment service] + [before deploying to the staging server].\n2. Begin speaking within 1 second after the beep.\n3. Maintain identical word stress on 'automated' and 'staging'.\n4. Avoid filler sounds like 'um', 'uh', or 'let me repeat'.",
+    "display_order": 2
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Sentence Builds / Jumbled Phrases] Listen to the audio fragments and speak the complete, grammatically correct sentence: \"on the distributed cluster / the analytics pipeline / processed incoming telemetry data\"",
+    "answer_notes": "Correct Output: \"The analytics pipeline processed incoming telemetry data on the distributed cluster.\"\nAlternative accepted: \"On the distributed cluster, the analytics pipeline processed incoming telemetry data.\"\nCore Grammar: Subject ('The analytics pipeline') + Verb ('processed') + Direct Object ('incoming telemetry data') + Prepositional Phrase of Location ('on the distributed cluster'). Speak smoothly without mid-sentence hesitation.",
+    "display_order": 3
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Short Answer Question] Answer the question immediately in one or two clear words: \"Would a database administrator query a relational table using SQL or using a microscope?\"",
+    "answer_notes": "Correct Spoken Answer: \"SQL\" (or \"Using SQL\").\nTip: Respond within 2 seconds. Do not explain your answer or provide lengthy conversational filler; speed, voice clarity, and concise accuracy determine the score in this sub-section.",
+    "display_order": 4
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Communication Assessment",
+    "category": "Behavioral",
+    "question": "[Extempore / Open Speaking Topic] Speak for 45 to 60 seconds on the following topic: \"Should generative AI code assistants be embraced in enterprise software development, or do they undermine foundational problem-solving skills for junior engineers?\"",
+    "answer_notes": "Structured Model Response (3-part framework):\n1. Opening (10s): \"Generative AI assistants like GitHub Copilot are transformative productivity multipliers rather than replacements for foundational critical thinking.\"\n2. Supporting Argument (30s): \"In an enterprise environment like Accenture, AI tools handle boilerplate code, automate unit test generation, and speed up syntax lookups. However, junior developers must still understand core algorithmic complexity, system architecture, and security implications to audit AI suggestions and prevent vulnerabilities.\"\n3. Conclusion (10s): \"Therefore, pairing rigorous foundational training with AI assistance produces faster, higher-quality engineering outcomes.\"",
+    "display_order": 5
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Soft Skills & HR Round",
+    "category": "Behavioral",
+    "question": "Tell me about a situation in your final-year project or internship where a teammate was not delivering their assigned module on time. How did you resolve the situation without damaging team collaboration?",
+    "answer_notes": "STAR Framework Model Answer:\n• Situation: In our 4th-year IoT healthcare monitoring project, our teammate responsible for the Bluetooth sensor data ingestion module fell a week behind schedule, jeopardizing our milestone submission.\n• Task: As team lead, I needed to get the data ingestion pipeline operational while understanding why my teammate was struggling, without causing interpersonal friction.\n• Action: I scheduled a private, informal 1-on-1 sync. I discovered they were stuck debugging asynchronous socket connections in Python. Instead of taking over, we pair-programmed for two evenings to isolate the socket buffer overflow. I also restructured our Git backlog, breaking their module into smaller daily commits.\n• Result: We integrated the module two days before the submission deadline and achieved full sensor data throughput during the live faculty demo. It reinforced that proactive empathy and peer troubleshooting resolve bottlenecks faster than blame.",
+    "display_order": 6
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Soft Skills & HR Round",
+    "category": "HR",
+    "question": "Why do you specifically want to begin your career at Accenture, and how do you see yourself contributing to our Technology Consulting practice over the next three years?",
+    "answer_notes": "Key Dimensions to Address:\n1. Global Scale & Learning: Highlight Accenture's massive investment in continuous upskilling (e.g. LearnVantage, Cloud & AI academies) and collaborative global delivery network.\n2. Breadth of Projects: Express enthusiasm for solving end-to-end digital transformation challenges across Fortune 500 clients in banking, telecom, or retail.\n3. 3-Year Vision: \"In my first year, my goal is to master enterprise development standards, agile teamwork, and client delivery best practices. By year two, I aim to lead module ownership and obtain cloud architecture certifications. By year three, I aspire to mentor incoming associate software engineers and bridge technical design with business outcomes.\"",
+    "display_order": 7
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Operations on Binary String\n\nThe binary string `str` consists of digits '0' and '1' and uppercase letters:\n• 'A' denotes the bitwise AND operation.\n• 'B' denotes the bitwise OR operation.\n• 'C' denotes the bitwise XOR operation.\n\nEvaluation is performed strictly from left to right. You are given the string `str`. Calculate and return the final binary result (as an integer: 0 or 1). If the string is null or empty, return -1.\n\nExample 1:\nInput: str = \"1C0C1C1A0B1\"\nOutput: 1\nExplanation: \n1 XOR 0 = 1\n1 XOR 1 = 0\n0 XOR 1 = 1\n1 AND 0 = 0\n0 OR 1 = 1",
+    "answer_notes": "Optimal Solution (Linear Scan in O(N) Time, O(1) Auxiliary Space):\n\n```python\ndef operations_binary_string(s: str) -> int:\n    if not s:\n        return -1\n    res = int(s[0])\n    i = 1\n    while i < len(s):\n        op = s[i]\n        val = int(s[i + 1])\n        if op == 'A':\n            res = res & val\n        elif op == 'B':\n            res = res | val\n        elif op == 'C':\n            res = res ^ val\n        i += 2\n    return res\n```\n\n```cpp\nint operationsBinaryString(const string& str) {\n    if (str.empty()) return -1;\n    int res = str[0] - '0';\n    for (size_t i = 1; i + 1 < str.length(); i += 2) {\n        char op = str[i];\n        int val = str[i + 1] - '0';\n        if (op == 'A') res &= val;\n        else if (op == 'B') res |= val;\n        else if (op == 'C') res ^= val;\n    }\n    return res;\n}\n```\nComplexity: O(N) Time, O(1) Space.",
+    "display_order": 8
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Move Hyphens to Front\n\nGiven a string `str` of length `n` containing alphabetic characters and hyphens ('-'), write an algorithm to move all hyphens to the beginning of the string while preserving the original relative order of all alphabetic characters.\n\nExample 1:\nInput: str = \"FacePrep-Accenture-Drive\"\nOutput: \"--FacePrepAccentureDrive\"\n\nExample 2:\nInput: str = \"Code-Run-Debug-Test\"\nOutput: \"---CodeRunDebugTest\"\n\nConstraints: Return null if the input string is null.",
+    "answer_notes": "Optimal Solution (Single Pass or Two Pointer O(N) Time, O(N) Space):\n\n```python\ndef move_hyphens(s: str) -> str:\n    if s is None:\n        return None\n    hyphens = s.count('-')\n    chars = [c for c in s if c != '-']\n    return ('-' * hyphens) + ''.join(chars)\n```\n\n```cpp\nstring moveHyphens(string s) {\n    int hyphenCount = 0;\n    string chars = \"\";\n    for (char c : s) {\n        if (c == '-') hyphenCount++;\n        else chars += c;\n    }\n    return string(hyphenCount, '-') + chars;\n}\n```\nComplexity: O(N) Time, O(N) Space (In-place C++ string shift is also possible with O(1) extra memory).",
+    "display_order": 9
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "What will be the output of the following pseudocode for input values a = 12 and b = 5?\n\n```text\nFunction calculate(Integer a, Integer b)\n    Integer c = a ^ b\n    Integer d = (a & b) << 1\n    Return c + d\nEnd Function\n```\nOptions: A) 12, B) 15, C) 17, D) 24",
+    "answer_notes": "Correct Answer: C) 17\n\nStep-by-step Execution:\n1. Binary representation:\n   • a = 12 = 1100 (in binary)\n   • b = 5  = 0101 (in binary)\n2. Bitwise XOR (`a ^ b`):\n   • 1100 ^ 0101 = 1001 (in binary) = 9 decimal.\n   • So, c = 9.\n3. Bitwise AND (`a & b`):\n   • 1100 & 0101 = 0100 (in binary) = 4 decimal.\n4. Left Shift (`d = (a & b) << 1`):\n   • 4 << 1 = 8 decimal.\n   • So, d = 8.\n5. Return `c + d`:\n   • 9 + 8 = 17.\n\nAlgorithmic Insight: This pseudocode implements the logic of a binary half-adder without using direct addition: `(a ^ b) + ((a & b) << 1) == a + b` (12 + 5 = 17).",
+    "display_order": 10
+  },
+  {
+    "asked_year": 2025,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "Under the cloud computing Shared Responsibility Model, which layer is the client responsible for securing and configuring when utilizing an Infrastructure as a Service (IaaS) offering such as AWS EC2 or Azure Virtual Machines?\n\nA) Physical datacenter security\nB) Hypervisor and host virtualization\nC) Operating System patches, application runtime, and network firewall rules\nD) Server hardware maintenance and replacement",
+    "answer_notes": "Correct Answer: C) Operating System patches, application runtime, and network firewall rules\n\nExplanation:\n• In IaaS (Infrastructure as a Service), the cloud service provider (CSP) manages the physical infrastructure, power, cooling, hardware maintenance, and the hypervisor virtualization layer.\n• The customer retains full responsibility for the guest operating system (including security patches and user accounts), installed software runtimes, application code, data encryption, and virtual network firewall rules (Security Groups / Network ACLs).\n• In PaaS, the CSP manages the OS and runtime as well; in SaaS, the CSP manages everything up to the application layer.",
+    "display_order": 11
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Reading Section] Read aloud clearly: \"Effective client collaboration in global IT delivery relies heavily on transparent status reporting, active listening, and unambiguous documentation across cross-functional scrum teams.\"",
+    "answer_notes": "Key Guidance:\n• Enunciate consonants cleanly, especially in consonant clusters ('client', 'transparent', 'cross-functional').\n• Maintain a confident, conversational volume without shouting.\n• Keep your head steady and microphone positioned approximately two finger-widths away from the side of your mouth to prevent breath plosives.",
+    "display_order": 12
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Listening & Repeating] Listen and repeat immediately: \"The security audit identified two critical vulnerabilities in the user authentication workflow.\"",
+    "answer_notes": "Key Guidance:\n• Retain the exact phrase: \"The security audit identified two critical vulnerabilities in the user authentication workflow.\"\n• Clear pronunciation on 'authentication' (/ɔːˌθen.tɪˈkeɪ.ʃən/) and 'vulnerabilities'.\n• Do not pause after 'identified' or 'in'.",
+    "display_order": 13
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Sentence Builds / Jumbled Phrases] Form the correct sentence from these spoken parts: \"to reduce server response latency / cached frequently accessed queries / the backend service\"",
+    "answer_notes": "Correct Output: \"The backend service cached frequently accessed queries to reduce server response latency.\"\nStructure: Subject ('The backend service') + Verb ('cached') + Object ('frequently accessed queries') + Inifinitive purpose clause ('to reduce server response latency'). Speak steadily and fluidly.",
+    "display_order": 14
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Story Retelling] Listen to the passage and retell the key events in your own words in 30 seconds:\n\n\"Pooja was tasked with optimizing the checkout loading time for an e-commerce platform ahead of a major holiday sale. She discovered that uncompressed hero images on the landing page accounted for sixty percent of network payload. Working with the design team, Pooja converted the asset library to WebP format and configured an automated Content Delivery Network cache rule. Consequently, page load times dropped by seventy percent, leading to a record day of sales without any server timeouts.\"",
+    "answer_notes": "Expected Retell Points (Summary to deliver in 30 seconds):\n1. Character & Goal: Pooja needed to optimize e-commerce checkout speed for a holiday sale.\n2. Root Cause: High-resolution, uncompressed images were taking 60% of the payload.\n3. Action: Converted image formats to WebP and enabled automated CDN caching.\n4. Result: Load times improved by 70% and the company had record sales without server crashes.",
+    "display_order": 15
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Communication Assessment",
+    "category": "Behavioral",
+    "question": "[Extempore / Open Speaking Topic] Speak for 45 to 60 seconds on: \"Is a hybrid workplace model more beneficial than purely in-office or purely remote setups for young IT graduates?\"",
+    "answer_notes": "Model Response Structure:\n1. Hook: \"A hybrid working model offers the ideal synthesis of in-person mentorship and remote focused productivity for fresh engineering graduates.\"\n2. In-Office Value: \"Being on-site two to three days a week accelerates organic learning through informal technical huddles, cultural immersion, and direct pairing with senior architects.\"\n3. Remote Value: \"Meanwhile, remote days eliminate long commutes, giving engineers uninterrupted blocks of time for deep coding, automated testing, and self-directed upskilling.\"\n4. Conclusion: \"For an organization with global reach like Accenture, hybrid work builds both interpersonal rapport and flexible autonomy.\"",
+    "display_order": 16
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Soft Skills & HR Round",
+    "category": "Behavioral",
+    "question": "Tell me about a time when you received harsh or critical feedback on a technical project. How did you react and what changes did you make?",
+    "answer_notes": "STAR Framework Model Answer:\n• Situation: During our 6th-semester database lab evaluation, our professor criticized my normalized schema design for a hospital booking system, noting that complex five-table joins would cause high latency during concurrent appointments.\n• Task: I had to accept the critique professionally, redesign the schema to optimize query read performance, and re-present within 48 hours.\n• Action: Instead of being defensive, I thanked the professor for the feedback and asked for clarification on expected query load patterns. I researched denormalization strategies for read-heavy tables, implemented read replicas, and added composite indexes on appointment timestamps and doctor IDs. I also ran Apache JMeter load tests to benchmark latency before and after.\n• Result: Query response times dropped by 65% under concurrent load simulations. Our professor awarded our revised project the highest viva grade in the batch, teaching me to view critical reviews as design optimization opportunities.",
+    "display_order": 17
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Soft Skills & HR Round",
+    "category": "HR",
+    "question": "Accenture serves clients globally across varied time zones and project requirements. Are you comfortable with flexible working hours or relocating to any Accenture delivery center across India?",
+    "answer_notes": "Ideal Answer Blueprint:\n• Decisive Affirmation: \"Yes, I am fully open and enthusiastic about relocating to any of Accenture's major technology centers—such as Bengaluru, Hyderabad, Pune, Gurugram, or Chennai—as well as working across flexible shifts.\"\n• Professional Justification: \"At this initial stage of my career, my primary focus is gaining maximum exposure to enterprise-scale systems, collaborating with global teams, and learning industry best practices. I understand that global delivery models require flexibility during sprint releases and client handover windows, and I view relocation as a valuable personal and professional growth opportunity.\"",
+    "display_order": 18
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Difference of Sums\n\nWrite a function that accepts two integers `n` and `m`. Calculate and return the difference between two sums:\n• `sum1`: The sum of all integers from 1 to `m` that are NOT divisible by `n`.\n• `sum2`: The sum of all integers from 1 to `m` that ARE divisible by `n`.\nReturn `(sum1 - sum2)`.\n\nExample:\nInput: n = 4, m = 20\nOutput: 90\nExplanation:\n• Numbers divisible by 4 up to 20: 4, 8, 12, 16, 20. sum2 = 4 + 8 + 12 + 16 + 20 = 60.\n• Total sum from 1 to 20 = 20 * 21 / 2 = 210.\n• sum1 = 210 - 60 = 150.\n• sum1 - sum2 = 150 - 60 = 90.",
+    "answer_notes": "Mathematical Solution (O(1) Time and O(1) Space via Arithmetic Progressions):\n\n```python\ndef difference_of_sums(n: int, m: int) -> int:\n    total_sum = m * (m + 1) // 2\n    k = m // n  # count of numbers divisible by n\n    sum2 = n * (k * (k + 1) // 2)\n    sum1 = total_sum - sum2\n    return sum1 - sum2\n```\n\n```cpp\nint differenceOfSums(int n, int m) {\n    long long total_sum = 1LL * m * (m + 1) / 2;\n    int k = m / n;\n    long long sum2 = 1LL * n * (1LL * k * (k + 1) / 2);\n    long long sum1 = total_sum - sum2;\n    return (int)(sum1 - sum2);\n}\n```\nComplexity: Closed-form O(1) Time and O(1) Space. (Linear simulation in O(M) time is also accepted during drives).",
+    "display_order": 19
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Rat Count House\n\nYou are given:\n• `r`: Integer representing the number of rats.\n• `unit`: Integer representing the amount of food each rat consumes.\n• `arr`: An array of `n` positive integers representing the food units available in each house from left to right.\n\nReturn the minimum number of houses needed (from left to right) to feed all the rats. \n• If the array is empty, return 0.\n• If total food in all houses is insufficient to feed all rats, return -1.\n\nExample 1:\nInput: r = 7, unit = 2, arr = [2, 8, 3, 5, 7, 4, 1, 2]\nOutput: 4\nExplanation: Total food needed = 7 * 2 = 14.\nHouse 0: 2 (total = 2 < 14)\nHouse 1: 8 (total = 10 < 14)\nHouse 2: 3 (total = 13 < 14)\nHouse 3: 5 (total = 18 >= 14). Total 4 houses required.",
+    "answer_notes": "Optimal Solution (Linear Scan in O(N) Time, O(1) Space):\n\n```python\ndef rat_count_house(r: int, unit: int, arr: list[int]) -> int:\n    if not arr:\n        return 0\n    total_needed = r * unit\n    accumulated = 0\n    for idx, food in enumerate(arr):\n        accumulated += food\n        if accumulated >= total_needed:\n            return idx + 1\n    return -1\n```\n\n```cpp\nint ratCountHouse(int r, int unit, const vector<int>& arr) {\n    if (arr.empty()) return 0;\n    int needed = r * unit;\n    int current = 0;\n    for (int i = 0; i < (int)arr.size(); i++) {\n        current += arr[i];\n        if (current >= needed) return i + 1;\n    }\n    return -1;\n}\n```\nComplexity: O(N) Time, O(1) Space.",
+    "display_order": 20
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "What is the return value of `solve(6)` in the following recursive pseudocode?\n\n```text\nInteger solve(Integer n)\n    If (n <= 1)\n        Return 1\n    End If\n    If (n mod 2 == 0)\n        Return n + solve(n / 2)\n    Else\n        Return solve(n - 1)\n    End If\nEnd Function\n```\nOptions: A) 7, B) 9, C) 11, D) 15",
+    "answer_notes": "Correct Answer: B) 9\n\nStep-by-step Trace:\n1. Call `solve(6)`:\n   • 6 > 1 and 6 mod 2 == 0.\n   • Returns `6 + solve(3)`.\n2. Call `solve(3)`:\n   • 3 > 1 and 3 mod 2 != 0.\n   • Returns `solve(3 - 1)` = `solve(2)`.\n3. Call `solve(2)`:\n   • 2 > 1 and 2 mod 2 == 0.\n   • Returns `2 + solve(1)`.\n4. Call `solve(1)`:\n   • Base condition `1 <= 1` is True.\n   • Returns `1`.\n5. Unwinding Stack:\n   • `solve(2) = 2 + 1 = 3`.\n   • `solve(3) = solve(2) = 3`.\n   • `solve(6) = 6 + solve(3) = 6 + 3 = 9`.",
+    "display_order": 21
+  },
+  {
+    "asked_year": 2024,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "In relational database transactions, which anomaly occurs when a transaction re-executes a query seeking a range of rows and finds additional rows that were inserted and committed by another transaction, and which isolation level prevents it?\n\nA) Dirty Read; prevented by Read Committed\nB) Non-Repeatable Read; prevented by Read Uncommitted\nC) Phantom Read; prevented by Serializable\nD) Lost Update; prevented by Read Committed",
+    "answer_notes": "Correct Answer: C) Phantom Read; prevented by Serializable\n\nExplanation:\n• Dirty Read: Reading uncommitted data from another concurrent transaction (prevented by Read Committed).\n• Non-Repeatable Read: A transaction re-reads the same row and finds modified values committed by another transaction (prevented by Repeatable Read).\n• Phantom Read: A transaction re-runs a search criteria query (`SELECT ... WHERE salary > 50000`) and finds brand new rows that another transaction committed in the interim. The only ANSI SQL isolation level that guarantees prevention of phantom reads is SERIALIZABLE (using range locks or snapshot serializability).",
+    "display_order": 22
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Reading Section] Read aloud clearly: \"Security compliance standards require continuous encryption of data at rest and data in transit across enterprise hybrid-cloud deployments.\"",
+    "answer_notes": "Key Guidance:\n• Pay attention to the pronunciation of 'compliance' (/kəmˈplaɪ.əns/) and 'hybrid' (/ˈhaɪ.brɪd/).\n• Maintain smooth airflow; avoid jerky pauses between words.\n• Do not add extraneous words like 'the' or omit 'at'.",
+    "display_order": 23
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Listening & Repeating] Listen and repeat immediately: \"Please ensure that all unit tests pass before submitting the pull request.\"",
+    "answer_notes": "Key Guidance:\n• Accurately repeat: \"Please ensure that all unit tests pass before submitting the pull request.\"\n• Natural inflection on 'pull request'.\n• Zero hesitation before speaking.",
+    "display_order": 24
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Short Answer Question] Answer directly in one or two words: \"If you want to view a web page on the internet, would you open a web browser or a spreadsheet program?\"",
+    "answer_notes": "Correct Spoken Answer: \"A web browser\" (or \"Web browser\").\nTip: Respond crisply and immediately. Automated voice engines prioritize immediate, confident acoustic recognition over elaboration.",
+    "display_order": 25
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Communication Assessment",
+    "category": "Behavioral",
+    "question": "[Extempore / Open Speaking Topic] Speak for 45 to 60 seconds on: \"Describe a leader or role model who has influenced your personal or professional philosophy.\"",
+    "answer_notes": "Model Response Structure:\n1. Introduction (10s): \"A leader who deeply influences my professional outlook is Satya Nadella, due to his emphasis on empathy and transforming organizational culture from a 'know-it-all' to a 'learn-it-all' mindset.\"\n2. Specific Trait (25s): \"When Nadella took over Microsoft, he pivoted the company from defensive platform competition toward cloud collaboration, open-source adoption, and mutual trust. In my academic projects, I adopted this 'learn-it-all' approach by treating failed builds as learning signals rather than personal deficits.\"\n3. Impact (15s): \"This philosophy reinforces that continuous curiosity, humility, and collaborative empathy matter just as much as raw technical prowess in modern engineering.\"",
+    "display_order": 26
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Soft Skills & HR Round",
+    "category": "Behavioral",
+    "question": "Tell me about a time you had to learn a completely new programming language, framework, or technology stack in a very short timeframe. How did you structure your learning?",
+    "answer_notes": "STAR Framework Model Answer:\n• Situation: In my 5th semester web hackathon, our problem statement required integrating an interactive data dashboard using React and Tailwind CSS, tools our syllabus had not yet covered.\n• Task: I had 36 hours to learn React state management basics, build four responsive chart components, and integrate them with our teammate's Flask API.\n• Action: I avoided getting trapped in 10-hour tutorial videos. Instead, I spent 2 hours reading the official React documentation on components and props. I built a minimal counter app locally to verify useState and useEffect hooks, then referenced component libraries for responsive layout patterns. When an asynchronous rendering bug arose, I isolated the API response shape in Postman.\n• Result: We delivered a functional dashboard on schedule and won the runner-up prize for best UI. The experience proved that goal-driven, hands-on experimentation accelerates practical learning far faster than passive reading.",
+    "display_order": 27
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Soft Skills & HR Round",
+    "category": "HR",
+    "question": "Where do you envision yourself five years from now in your software engineering career?",
+    "answer_notes": "Strategic Alignment Blueprint:\n• Technical Progression: \"In five years, I envision myself having evolved from a dependable associate engineer into a Senior Software Engineer / Lead Technical Specialist at Accenture, with deep expertise in cloud architectures and scalable system design.\"\n• Value Creation: \"I want to be the engineer that project managers and clients rely on to architect high-impact solutions, navigate complex production deployments, and optimize distributed services.\"\n• Mentorship & Leadership: \"Additionally, I want to actively mentor campus freshers joining Accenture, guiding them through the exact same transition from college concepts to enterprise excellence that I am beginning today.\"",
+    "display_order": 28
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Product of Smallest Pair\n\nGiven an integer array `arr` of size `n` and an integer `sum`. Write an algorithm to find the two smallest elements in `arr`. If the sum of these two smallest elements is strictly less than `sum`, return their product. Otherwise, return 0.\n\nNote:\n• If `n < 2`, return -1.\n• Array elements are positive integers.\n\nExample:\nInput: sum = 9, arr = [5, 2, 4, 3, 9, 7, 1]\nOutput: 2\nExplanation: The two smallest elements in the array are 1 and 2. Their sum = 1 + 2 = 3. Since 3 < 9, return their product: 1 * 2 = 2.",
+    "answer_notes": "Optimal Solution (Single Pass Tracking Two Minima in O(N) Time, O(1) Space):\n\n```python\ndef product_smallest_pair(sum_val: int, arr: list[int]) -> int:\n    if len(arr) < 2:\n        return -1\n    first_min = float('inf')\n    second_min = float('inf')\n    for x in arr:\n        if x < first_min:\n            second_min = first_min\n            first_min = x\n        elif x < second_min:\n            second_min = x\n    if first_min + second_min < sum_val:\n        return first_min * second_min\n    return 0\n```\n\n```cpp\nint productSmallestPair(int sumVal, const vector<int>& arr) {\n    if (arr.size() < 2) return -1;\n    int firstMin = INT_MAX, secondMin = INT_MAX;\n    for (int x : arr) {\n        if (x < firstMin) {\n            secondMin = firstMin;\n            firstMin = x;\n        } else if (x < secondMin) {\n            secondMin = x;\n        }\n    }\n    if (firstMin + secondMin < sumVal) return firstMin * secondMin;\n    return 0;\n}\n```\nComplexity: O(N) Time, O(1) Space.",
+    "display_order": 29
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Password Validator\n\nAccenture system credentials require password validation according to these strict rules:\n1. Length must be at least 4 characters.\n2. Must contain at least one numeric digit (0-9).\n3. Must contain at least one uppercase letter (A-Z).\n4. Must NOT contain any whitespace (' ') or slash ('/').\n5. The starting character (index 0) must NOT be a numeric digit.\n\nWrite a function that returns 1 if the password string is valid, and 0 otherwise.\n\nExample 1:\nInput: str = \"aA1_67\"\nOutput: 1\n\nExample 2:\nInput: str = \"a987 abC012\"\nOutput: 0 (contains whitespace)\n\nExample 3:\nInput: str = \"1aA_67\"\nOutput: 0 (starts with digit)",
+    "answer_notes": "Optimal Solution (Single Pass Boolean Checks in O(N) Time, O(1) Space):\n\n```python\ndef check_password(s: str) -> int:\n    if not s or len(s) < 4:\n        return 0\n    if s[0].isdigit():\n        return 0\n    has_digit = False\n    has_upper = False\n    for ch in s:\n        if ch == ' ' or ch == '/':\n            return 0\n        if ch.isdigit():\n            has_digit = True\n        elif ch.isupper():\n            has_upper = True\n    return 1 if (has_digit and has_upper) else 0\n```\n\n```cpp\nint checkPassword(const string& str) {\n    if (str.length() < 4 || isdigit(str[0])) return 0;\n    bool hasDigit = false, hasCap = false;\n    for (char c : str) {\n        if (c == ' ' || c == '/') return 0;\n        if (isdigit(c)) hasDigit = true;\n        else if (isupper(c)) hasCap = true;\n    }\n    return (hasDigit && hasCap) ? 1 : 0;\n}\n```\nComplexity: O(N) Time, O(1) Space.",
+    "display_order": 30
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "What is the final value of `arr[0] + arr[3]` after running the following pseudocode on `arr = [2, 4, 6, 8]` with `n = 4`?\n\n```text\nInteger processArray(Integer arr[], Integer n)\n    Integer left = 0, right = n - 1\n    While (left < right)\n        arr[left] = arr[left] + arr[right]\n        left = left + 1\n        right = right - 1\n    End While\n    Return arr[0] + arr[n - 1]\nEnd Function\n```\nOptions: A) 10, B) 14, C) 18, D) 20",
+    "answer_notes": "Correct Answer: C) 18\n\nExecution Step-by-Step:\nInitial: arr = [2, 4, 6, 8], n = 4.\n• Iteration 1: left = 0, right = 3 (0 < 3 is True).\n  arr[0] = arr[0] + arr[3] = 2 + 8 = 10.\n  left becomes 1, right becomes 2.\n  arr state: [10, 4, 6, 8].\n• Iteration 2: left = 1, right = 2 (1 < 2 is True).\n  arr[1] = arr[1] + arr[2] = 4 + 6 = 10.\n  left becomes 2, right becomes 1.\n  arr state: [10, 10, 6, 8].\n• Iteration 3: left = 2, right = 1 (2 < 1 is False). Loop ends.\n• Return value: arr[0] + arr[3] = 10 + 8 = 18.",
+    "display_order": 31
+  },
+  {
+    "asked_year": 2023,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "Why does the Transport Layer Security (TLS/HTTPS) handshake utilize asymmetric public-key cryptography initially, but switches to symmetric session key cryptography for encrypting the actual application data transfer?\n\nA) Asymmetric cryptography is mathematically faster but lacks security.\nB) Symmetric cryptography allows secure key negotiation without any pre-shared secret.\nC) Asymmetric cryptography enables secure identity verification and key exchange, while symmetric cryptography provides computationally efficient, high-throughput data encryption.\nD) Web browsers do not support symmetric encryption algorithms.",
+    "answer_notes": "Correct Answer: C) Asymmetric cryptography enables secure identity verification and key exchange, while symmetric cryptography provides computationally efficient, high-throughput data encryption.\n\nExplanation:\n• Asymmetric algorithms (like RSA or ECDHE) use public-private key pairs, allowing two unknown parties to negotiate a secret over an untrusted channel. However, asymmetric cryptography is computationally demanding and slow for bulk data.\n• Symmetric algorithms (like AES-GCM or ChaCha20) require both parties to share the same key, but they are hundreds of times faster and supported by CPU hardware acceleration (AES-NI).\n• TLS hybrid cryptography uses asymmetric cryptography once during the handshake to authenticate the server certificate and securely exchange a random symmetric 'session key', and then encrypts all subsequent HTTP payload using symmetric encryption.",
+    "display_order": 32
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Reading Section] Read aloud clearly: \"Digital transformation initiatives allow legacy organizations to migrate data workloads to resilient, cost-effective cloud platforms without service disruption.\"",
+    "answer_notes": "Key Guidance:\n• Pronounce 'initiatives' (/ɪˈnɪʃ.ə.tɪvz/) and 'resilient' (/rɪˈzɪl.jənt/) distinctly.\n• Keep breathing regular; pause after 'initiatives' and 'platforms'.",
+    "display_order": 33
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Sentence Builds / Jumbled Phrases] Unscramble and speak the correct sentence: \"across all departments / the new security policy / was implemented\"",
+    "answer_notes": "Correct Output: \"The new security policy was implemented across all departments.\"\nAlternative: \"Across all departments, the new security policy was implemented.\"\nGrammar: Passive voice construction. Speak smoothly without hesitation.",
+    "display_order": 34
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Soft Skills & HR Round",
+    "category": "Behavioral",
+    "question": "Describe a project experience where the requirements or scope changed unexpectedly halfway through your development. How did you adapt your plan and deliverables?",
+    "answer_notes": "STAR Framework Model Answer:\n• Situation: Halfway through developing an automated campus event management portal, our faculty committee decided that external non-college participants also needed guest registration and payment QR integration.\n• Task: We had two weeks left before the campus symposium and our existing architecture strictly assumed internal student roll-number authentication.\n• Action: I led an emergency sprint planning meeting with my two teammates. We isolated the database schema change: instead of altering the core student table, we abstracted a shared 'UserAccount' model with polymorphic roles. I integrated Razorpay's standard web checkout for guest payments and created a simplified guest ticket generation route.\n• Result: We deployed the expanded portal three days before the symposium. Over 450 internal and 180 guest participants registered without payment failures, teaching me the value of decoupling architecture from rigid business assumptions.",
+    "display_order": 35
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Large Small Sum\n\nWrite a function that accepts an integer array `arr` of size `n`.\n• Find the second largest element in the even-indexed positions of the array.\n• Find the second smallest element in the odd-indexed positions of the array.\n• Return the sum of these two elements.\n\nRules:\n• Return 0 if array length `n <= 3`.\n• Assume 0-based indexing (0, 2, 4... are even; 1, 3, 5... are odd).\n\nExample:\nInput: arr = [3, 2, 1, 7, 5, 4]\nOutput: 7\nExplanation:\n• Even-indexed elements: arr[0]=3, arr[2]=1, arr[4]=5. Sorted: [1, 3, 5]. Second largest is 3.\n• Odd-indexed elements: arr[1]=2, arr[3]=7, arr[5]=4. Sorted: [2, 4, 7]. Second smallest is 4.\n• Sum = 3 + 4 = 7.",
+    "answer_notes": "Optimal Solution (O(N) Selection or O(N log N) Sorting):\n\n```python\ndef large_small_sum(arr: list[int]) -> int:\n    if len(arr) <= 3:\n        return 0\n    evens = [arr[i] for i in range(0, len(arr), 2)]\n    odds = [arr[i] for i in range(1, len(arr), 2)]\n    if len(evens) < 2 or len(odds) < 2:\n        return 0\n    evens.sort()\n    odds.sort()\n    second_largest_even = evens[-2]\n    second_smallest_odd = odds[1]\n    return second_largest_even + second_smallest_odd\n```\n\n```cpp\nint largeSmallSum(const vector<int>& arr) {\n    if (arr.size() <= 3) return 0;\n    vector<int> evens, odds;\n    for (size_t i = 0; i < arr.size(); i++) {\n        if (i % 2 == 0) evens.push_back(arr[i]);\n        else odds.push_back(arr[i]);\n    }\n    sort(evens.begin(), evens.end());\n    sort(odds.begin(), odds.end());\n    return evens[evens.size() - 2] + odds[1];\n}\n```\nComplexity: O(N log N) Time with sorting, O(N) Space. (Can be optimized to O(N) Time, O(1) Space using two-min / two-max tracking).",
+    "display_order": 36
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Replace Character in String\n\nGiven a string `str` and two distinct characters `ch1` and `ch2`. Write an algorithm to replace every occurrence of `ch1` with `ch2`, and every occurrence of `ch2` with `ch1` in the string.\n\nExample:\nInput: str = \"apples\", ch1 = 'a', ch2 = 'p'\nOutput: \"paales\"\nExplanation: 'a' becomes 'p', and each 'p' becomes 'a'.",
+    "answer_notes": "Optimal Solution (Linear Pass in O(N) Time, O(N) or In-Place Space):\n\n```python\ndef replace_chars(s: str, ch1: str, ch2: str) -> str:\n    if not s or ch1 == ch2:\n        return s\n    res = []\n    for c in s:\n        if c == ch1:\n            res.append(ch2)\n        elif c == ch2:\n            res.append(ch1)\n        else:\n            res.append(c)\n    return ''.join(res)\n```\n\n```cpp\nstring replaceChar(string str, char ch1, char ch2) {\n    for (char &c : str) {\n        if (c == ch1) c = ch2;\n        else if (c == ch2) c = ch1;\n    }\n    return str;\n}\n```\nComplexity: O(N) Time, O(1) Auxiliary Space for in-place string modification.",
+    "display_order": 37
+  },
+  {
+    "asked_year": 2022,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "What is the Big-O time complexity of the following nested loop pseudocode?\n\n```text\nInteger sum = 0\nFor i = 1 to n\n    For j = 1 to i\n        sum = sum + 1\n    End For\nEnd For\n```\nOptions: A) O(n), B) O(n log n), C) O(n^2), D) O(1)",
+    "answer_notes": "Correct Answer: C) O(n^2)\n\nMathematical Derivation:\n• When i = 1, inner loop runs 1 time.\n• When i = 2, inner loop runs 2 times.\n• ...\n• When i = n, inner loop runs n times.\nTotal operations = 1 + 2 + 3 + ... + n = n(n + 1) / 2 = (n^2 + n) / 2.\nAs n grows large, the dominant quadratic term n^2 governs asymptotic growth. Discarding constants and lower-order terms yields O(n^2).",
+    "display_order": 38
+  },
+  {
+    "asked_year": 2021,
+    "round_name": "Communication Assessment",
+    "category": "Aptitude",
+    "question": "[Reading Section] Read aloud clearly: \"Professional engineers must communicate technical design decisions clearly to cross-functional stakeholders who do not possess a computer science background.\"",
+    "answer_notes": "Key Guidance:\n• Articulate 'cross-functional' and 'stakeholders' crisply.\n• Keep intonation measured; avoid trailing off into a whisper at the end of the sentence.",
+    "display_order": 39
+  },
+  {
+    "asked_year": 2021,
+    "round_name": "Soft Skills & HR Round",
+    "category": "Behavioral",
+    "question": "How do you manage stress and prioritize tasks when you have multiple competing deadlines simultaneously (such as university semester exams, major project submissions, and placement preparation)?",
+    "answer_notes": "STAR Framework Model Answer:\n• Approach: \"I manage high-pressure periods by replacing mental anxiety with structured Eisenhower Matrix task triage.\"\n• Method: \"During my 7th semester, university practical exams and campus hiring drives overlapped in the same two-week window. I created a daily priority roadmap: early morning blocks (7 AM - 10 AM) were reserved for deep algorithmic coding problems, afternoon hours were devoted to laboratory project reports, and evenings were split between academic theory revision and mock technical viva practice.\"\n• Mindset: \"I also maintained physical pacing—taking short 10-minute walks between focus blocks and strictly sleeping 7 hours nightly to avoid cognitive burnout. Approaching heavy workloads with structured scheduling rather than multitasking allowed me to maintain a 8.8 CGPA while clearing our recruitment assessments.\"",
+    "display_order": 40
+  },
+  {
+    "asked_year": 2021,
+    "round_name": "Coding Assessment",
+    "category": "Coding",
+    "question": "Problem: Automorphic Number Check\n\nAn automorphic number is an integer whose square ends with the given integer itself.\n• For example, 25 is automorphic because 25^2 = 625 (ends with 25).\n• 76 is automorphic because 76^2 = 5776 (ends with 76).\n• 7 is NOT automorphic because 7^2 = 49 (does not end with 7).\n\nWrite a function to determine whether a given positive integer `n` is automorphic. Return 1 if automorphic, 0 otherwise.",
+    "answer_notes": "Optimal Solution (Modulo 10^k in O(log N) Time, O(1) Space):\n\n```python\ndef is_automorphic(n: int) -> int:\n    if n < 0:\n        return 0\n    sq = n * n\n    temp = n\n    mod = 1\n    while temp > 0:\n        mod *= 10\n        temp //= 10\n    return 1 if (sq % mod == n) else 0\n```\n\n```cpp\nint isAutomorphic(int n) {\n    if (n < 0) return 0;\n    long long sq = 1LL * n * n;\n    long long mod = 1;\n    int temp = n;\n    while (temp > 0) {\n        mod *= 10;\n        temp /= 10;\n    }\n    return (sq % mod == n) ? 1 : 0;\n}\n```\nComplexity: O(log10 N) Time (number of digits in N), O(1) Space.",
+    "display_order": 41
+  },
+  {
+    "asked_year": 2021,
+    "round_name": "Technical Assessment & Pseudocode",
+    "category": "Technical",
+    "question": "What will be the output of `convertBase(85)` in the following pseudocode?\n\n```text\nFunction convertBase(Integer n)\n    Integer res = 0, p = 1\n    While (n > 0)\n        Integer rem = n mod 8\n        res = res + (rem * p)\n        p = p * 10\n        n = n / 8\n    End While\n    Return res\nEnd Function\n```\nOptions: A) 105, B) 125, C) 145, D) 85",
+    "answer_notes": "Correct Answer: B) 125\n\nStep-by-step Trace (Decimal to Octal conversion):\n1. Iteration 1:\n   • rem = 85 mod 8 = 5\n   • res = 0 + (5 * 1) = 5\n   • p = 1 * 10 = 10\n   • n = 85 / 8 = 10\n2. Iteration 2:\n   • rem = 10 mod 8 = 2\n   • res = 5 + (2 * 10) = 25\n   • p = 10 * 10 = 100\n   • n = 10 / 8 = 1\n3. Iteration 3:\n   • rem = 1 mod 8 = 1\n   • res = 25 + (1 * 100) = 125\n   • p = 100 * 10 = 1000\n   • n = 1 / 8 = 0\n4. Loop terminates because n = 0.\n   • Returns res = 125.",
+    "display_order": 42
+  }
+]
+

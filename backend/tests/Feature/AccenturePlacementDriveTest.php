@@ -9,6 +9,7 @@ use App\Models\PlacementDrive;
 use App\Models\Plan;
 use App\Models\Problem;
 use App\Models\User;
+use App\Services\SubscriptionService;
 use Database\Seeders\AccenturePlacementSeeder;
 use Database\Seeders\PlanSeeder;
 use Database\Seeders\ProblemSeeder;
@@ -96,15 +97,15 @@ class AccenturePlacementDriveTest extends TestCase
             'branch' => 'CSE',
         ]);
 
-        $expertPlan = Plan::where('code', 'expert')->first();
-        if ($expertPlan) {
-            $student->subscriptions()->create([
-                'plan_id' => $expertPlan->id,
-                'starts_at' => now()->subDay(),
-                'expires_at' => now()->addMonth(),
-                'status' => 'active',
-            ]);
-        }
+        // Drive access is an Expert feature. A new student already holds a Coder subscription, and the newest base
+        // subscription wins, so the plan is granted the way the product does it rather than back-dating a second row.
+        $expertPlan = Plan::where('code', 'expert')->firstOrFail();
+        app(SubscriptionService::class)->grantIndividualPlan(
+            $student,
+            $expertPlan,
+            User::factory()->create(['role' => User::ROLE_SUPERADMIN]),
+            ['days' => (int) $expertPlan->duration_days, 'kind' => 'complimentary', 'reason' => 'Test: drive access'],
+        );
 
         $this->seed(AccenturePlacementSeeder::class);
 
@@ -137,6 +138,10 @@ class AccenturePlacementDriveTest extends TestCase
 
     public function test_master_accenture_question_sets_seeder_runs_all_round_seeders(): void
     {
+        // The mock interview is authored by Mellow's superadmin (the full DatabaseSeeder creates one first); without
+        // an author the interview seeder deliberately creates nothing.
+        User::factory()->create(['role' => User::ROLE_SUPERADMIN]);
+
         $this->seed(\Database\Seeders\AccentureQuestionSetsSeeder::class);
 
         // 1. Placement catalog

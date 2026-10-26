@@ -43,7 +43,9 @@ return new class extends Migration
                     continue;
                 }
 
-                $numeric = $q['type'] === 'numeric';
+                // Rows written as plain single-answer questions carry no "type" (ArtsQuestionSeeder reads them the same way).
+                $type = $q['type'] ?? 'mcq_single';
+                $numeric = $type === 'numeric';
                 $options = $numeric ? null : array_map(
                     fn (string $id) => ['id' => $id, 'text' => $q["option_{$id}"]],
                     array_values(array_filter(['a', 'b', 'c', 'd', 'e', 'f'], fn (string $id) => isset($q["option_{$id}"]) && trim((string) $q["option_{$id}"]) !== ''))
@@ -55,7 +57,7 @@ return new class extends Migration
                     'discipline_code' => $q['discipline'],
                     'subject_id' => $subjectId,
                     'topic_id' => $topics[$subjectId][mb_strtolower($q['topic'] ?? '')] ?? null,
-                    'type' => $q['type'],
+                    'type' => $type,
                     'stem' => $q['question'],
                     'options' => $options === null ? null : json_encode($options, JSON_UNESCAPED_UNICODE),
                     'correct' => $numeric ? null : json_encode([strtolower($q['correct'])]),

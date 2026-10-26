@@ -197,9 +197,10 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('guardian-beat', function (Request $request) {
             return Limit::perMinute(150)->by('guardian-beat:'.hash('sha256', (string) $request->bearerToken()));
         });
-        // The installer is a 6 MB file served to anyone: per address, enough for a lab behind one NAT address to fetch it in turn.
+        // The installer is a 6 MB file served to anyone: per address, and generous, because a whole college lab sits behind ONE public
+        // address and an exam-eve "everyone install it now" must not turn half the class away with a "too many requests".
         RateLimiter::for('guardian-download', function (Request $request) {
-            return Limit::perMinute(60)->by('guardian-download:'.$request->ip());
+            return Limit::perMinute(240)->by('guardian-download:'.$request->ip());
         });
         RateLimiter::for('guardian-pair', function (Request $request) {
             return Limit::perMinute(240)->by('guardian-pair:'.($request->user()?->id ?? $request->ip()));

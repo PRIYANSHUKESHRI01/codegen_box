@@ -70,3 +70,23 @@ The packages above are clean, so look at the server: unknown files in the web ro
 unfamiliar cron jobs, high CPU from a process you did not start, spam mail. Then: change the hosting/cPanel/SSH/DB
 passwords, rotate every secret that was ever in a `.env` you uploaded or emailed (APP_KEY, DB, Gemini, WhatsApp, AWS,
 mail, SUPERADMIN_PASSWORD), update PHP, and restore from a fresh package rather than cleaning in place.
+
+## 6. The Guardian (the Windows program students run during proctored exams)
+
+It runs on each **student's own PC**, not on your server. What you deploy is two files that the backend hands out, plus a few `.env` lines.
+`guardian/dist-prod/` holds the build for `https://aptrun.com/api` (rebuild with `guardian/build.ps1 -Version x.y.z -Api <your api> -Out dist-prod` if the address changes).
+
+1. Copy the two files to the server (they are not in the deploy zip, and a redeploy that replaces the backend folder removes them):
+   ```
+   scp guardian/dist-prod/aptrun-guardian.exe guardian/dist-prod/aptrun-guardian.json user@server:/var/www/<site>/backend/storage/app/guardian/
+   ```
+   The folder must exist and the web user (`www-data`) must be able to read both files: `chown -R www-data:www-data storage/app/guardian`.
+2. Add the lines in `guardian/dist-prod/server.env.txt` to the server `.env` (the `GUARDIAN_ALLOWED_BUILDS` hash is the build above), then `php artisan config:cache`.
+3. PHP must have the **sodium** extension (Ubuntu: `sudo apt install php-sodium` or it is built in; check `php -m | grep sodium` for BOTH the CLI and PHP-FPM, then `sudo systemctl reload php*-fpm`). Without it the pairing endpoint answers 503.
+4. The current backend must be deployed (`php artisan migrate --force` and `php artisan route:cache`) and the scheduler cron must be running.
+5. Check it from your PC: `powershell -ExecutionPolicy Bypass -File infra/deploy/verify-guardian.ps1 -Api https://aptrun.com/api`. Every line must say PASS.
+6. Tell students to install it **the day before**, not at the exam: open the exam page → *Download for Windows* → double-click once → enter the code. Windows may say
+   "Windows protected your PC" (More info → Run anyway) because the program is not code-signed yet; Chrome may ask to *Keep* the download.
+   Signing it with a code-signing certificate removes both warnings, and is the one thing worth paying for before a large roll-out.
+
+A new release: build it, add its hash to `GUARDIAN_ALLOWED_BUILDS` (comma-separated) **before** students download it, copy the two files over the old ones.

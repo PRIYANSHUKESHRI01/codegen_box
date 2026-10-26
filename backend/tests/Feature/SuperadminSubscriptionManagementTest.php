@@ -469,6 +469,64 @@ class SuperadminSubscriptionManagementTest extends TestCase
         $this->assertSame(1, $summary['ending_7_days'], 'the 5-day plan');
     }
 
+    public function test_the_accounts_filter_bar_counts_follow_a_chosen_plan(): void
+    {
+        $payer = $this->student(['name' => 'Pia Payer']);
+        $this->student(['name' => 'Fred Free']);
+        $this->student(['name' => 'Gina Free']);
+        $this->buy($payer, 'expert');
+        User::factory()->create(['role' => User::ROLE_ADMIN_INTERNAL]);
+
+        Sanctum::actingAs($this->superadmin());
+
+        $totalOf = fn (string $q) => $this->getJson("/api/superadmin/users?{$q}")->assertOk()->json('total');
+        $facets = fn (string $q) => $this->getJson("/api/superadmin/users/facets?{$q}")->assertOk();
+
+        $everyone = $facets('')->json();
+        $this->assertSame($totalOf(''), $everyone['total'], 'the All chip equals the whole directory');
+        $this->assertSame($everyone['total'], array_sum($everyone['roles']));
+
+        foreach (['paid', 'free', 'none'] as $plan) {
+            $f = $facets("role=user&plan={$plan}");
+            $expected = $totalOf("role=user&plan={$plan}");
+
+            $this->assertSame($expected, $f->json('roles.user'), "Students chip, plan {$plan}");
+            $this->assertSame($expected, $f->json('total'), "All chip, plan {$plan} (only the students on it are listed)");
+        }
+
+        $this->assertSame(1, $facets('role=user&plan=paid')->json('total'));
+        $this->assertSame(2, $facets('role=user&plan=free')->json('total'));
+        $this->assertSame(1, $facets('role=user&plan=paid')->json('roles.user'));
+        $this->assertSame(1, $facets('role=user&plan=paid')->json('roles.admin_internal'), 'other roles are untouched — choosing their chip clears the plan');
+    }
+
+    public function test_a_plan_left_behind_by_a_deleted_account_is_not_running_and_is_not_counted(): void
+    {
+        $live = $this->college();
+        $gone = $this->college();
+        $goneStudent = $this->student(['name' => 'Gone Student']);
+        $this->buy($goneStudent, 'expert');
+        $this->buy($this->student(['name' => 'Still Here']), 'expert');
+
+        // Deleted the way older code and one-off clean-ups did: the account goes, its subscription rows stay behind
+        // (polymorphic owner: there is no foreign key to cascade).
+        $gone->delete();
+        $goneStudent->delete();
+
+        Sanctum::actingAs($this->superadmin());
+        $names = fn (string $query) => collect($this->getJson("/api/superadmin/subscriptions?{$query}")->assertOk()->json('subscriptions'))
+            ->pluck('subscriber.name')->sort()->values()->all();
+
+        $this->assertSame([$live->name, 'Still Here'], $names('state=active'), 'only plans that still govern an account are running');
+        $this->assertContains('Deleted account', $names('state=all&include_free=1'), 'the history is still there under All');
+        $this->assertNotContains('Deleted account', $names('state=active&include_free=1'));
+        $this->assertNotContains('Deleted account', $names('ending_within=365'));
+
+        $summary = $this->getJson('/api/superadmin/subscriptions')->assertOk()->json('summary');
+        $this->assertSame(1, $summary['colleges'], 'the deleted college is not a college "with a running plan"');
+        $this->assertSame(1, $summary['paid_individual'], 'nor is the deleted student a paying one');
+    }
+
     public function test_a_mellow_academy_enrolment_runs_three_years_and_shows_up_wherever_paid_plans_do(): void
     {
         $student = $this->student(['name' => 'Anika Academy']);

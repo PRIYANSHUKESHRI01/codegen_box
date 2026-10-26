@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { useBranchCatalog } from "@/lib/branches";
+import { type ToastTrigger } from "@/lib/toast";
 
 const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && [...a].sort().join("|") === [...b].sort().join("|");
 
@@ -16,7 +17,7 @@ const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.l
  * provided it) and, for non-CS branches, what they lead with. Saved to the account; the dashboard, the
  * practice the product suggests and the TPO's branch-wise views all follow it.
  */
-export function BranchTrackSection({ user, onToast }: { user: AuthUser; onToast: (message: string) => void }) {
+export function BranchTrackSection({ user, onToast }: { user: AuthUser; onToast: ToastTrigger }) {
   const { login } = useAuth();
   const catalog = useBranchCatalog();
   const [answers, setAnswers] = useState<BranchAnswers>(() => initialBranchAnswers(user));

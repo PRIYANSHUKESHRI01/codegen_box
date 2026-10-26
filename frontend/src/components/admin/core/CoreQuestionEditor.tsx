@@ -9,6 +9,8 @@ import { DISCIPLINE_LABEL, FLAG_LABEL, NEGATIVE_PRESETS, negativeFor, STATUS_BAD
 import { MathMarkdown } from "@/components/core/MathMarkdown";
 import { DisciplineOptions } from "@/components/admin/core/DisciplineOptions";
 import { type CoreAudit, type CoreDifficulty, type CoreDiscipline, type CoreOption, type CoreQuestion, type CoreStatus, type CoreTaxonomyResponse, type CoreType, type CoreUsage } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const OPTION_IDS = ["a", "b", "c", "d", "e", "f"];
 const input = "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-xs disabled:opacity-60";
@@ -82,7 +84,7 @@ interface Props {
   /** After any successful change (the list refreshes from this). */
   onSaved: (question: CoreQuestion) => void;
   onDeleted: () => void;
-  onToast: (message: string) => void;
+  onToast: ToastTrigger;
 }
 
 /**
@@ -210,7 +212,7 @@ export function CoreQuestionEditor({ question: initial, taxonomy, defaultDiscipl
   };
 
   const remove = async () => {
-    if (!question || !window.confirm("Delete this draft? This can't be undone.")) return;
+    if (!question || !(await confirmDialog({ title: "Delete this draft?", message: "This can't be undone.", tone: "danger", confirmLabel: "Delete draft" }))) return;
     setBusy("delete");
     try {
       await api.delete(`/admin/core/questions/${question.id}`);
@@ -306,7 +308,9 @@ export function CoreQuestionEditor({ question: initial, taxonomy, defaultDiscipl
           </button>
         )}
         {status === "published" && (
-          <button type="button" disabled={busy !== null} onClick={() => window.confirm("Retire this question? Students will no longer see it.") && move("retired", "Question retired.")} className="rounded-control border border-border-strong bg-elevated px-3 py-2 text-2xs font-bold text-primary disabled:opacity-50">
+          <button type="button" disabled={busy !== null} onClick={async () => {
+            if (await confirmDialog({ title: "Retire this question?", message: "Students will no longer see it.", tone: "warning", confirmLabel: "Retire" })) move("retired", "Question retired.");
+          }} className="rounded-control border border-border-strong bg-elevated px-3 py-2 text-2xs font-bold text-primary disabled:opacity-50">
             Retire
           </button>
         )}
@@ -386,8 +390,8 @@ export function CoreQuestionEditor({ question: initial, taxonomy, defaultDiscipl
 
   return (
     <Modal
-      onClose={() => {
-        if (!dirty || window.confirm("Discard your unsaved changes?")) onClose();
+      onClose={async () => {
+        if (!dirty || (await confirmDialog({ title: "Discard your unsaved changes?", message: "What you changed in this question will be lost.", tone: "warning", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) onClose();
       }}
       title={question ? `Edit question${question.external_id ? ` · ${question.external_id}` : ""}` : "New question"}
       subtitle={question ? `${DISCIPLINE_LABEL[question.discipline_code]} · version ${question.version}` : "Starts as a draft — nothing reaches students until it is published"}

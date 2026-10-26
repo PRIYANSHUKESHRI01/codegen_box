@@ -1,3 +1,11 @@
+/** One (round, category, year) combination of a company's PYQs and how many questions sit in it. */
+export interface CompanyPrepBreakdownRow {
+  round: string | null;
+  category: string;
+  year: number;
+  count: number;
+}
+
 export interface CompanyPrepSummary {
   id: number;
   name: string;
@@ -11,6 +19,12 @@ export interface CompanyPrepSummary {
   years: number[];
   rounds: string[];
   categories: string[];
+  /**
+   * Exact (round x category x year) combinations. Lets the hub answer "Technical Interview in 2024" per company
+   * instead of guessing from three independent lists. Absent on an API that hasn't been updated yet — the hub
+   * then falls back to matching each filter on its own.
+   */
+  breakdown?: CompanyPrepBreakdownRow[];
   has_live_drive: boolean;
   live_drive_id: number | null;
 }
@@ -40,7 +54,10 @@ export interface CompanyPrepDetail {
     priority: number;
     title: string | null;
     difficulty: string | null;
+    /** False when the slug names no problem in the catalogue — the card can't open an editor. */
     available: boolean;
+    /** This student has an accepted submission. Absent on an API that hasn't been updated yet. */
+    solved?: boolean;
   }[];
   live_drive: {
     id: number;
@@ -50,4 +67,3 @@ export interface CompanyPrepDetail {
     drive_date: string;
   } | null;
 }
-

@@ -47,7 +47,6 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpBtn,
   hpEase,
   hpInput,
@@ -56,6 +55,7 @@ import {
   type HpTone,
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect, HpSwitch } from "@/components/portal/pipeline-kit";
+import { useToast } from "@/lib/toast";
 
 type DriveStatus = "draft" | "published" | "completed" | "cancelled";
 
@@ -111,15 +111,11 @@ export default function JobOpeningsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [proposingDrive, setProposingDrive] = useState<ApiDrive | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [editingInterviewDateId, setEditingInterviewDateId] = useState<number | null>(null);
   const [interviewDateInput, setInterviewDateInput] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadDrives = useCallback(async () => {
     setDataLoading(true);
@@ -157,7 +153,7 @@ export default function JobOpeningsPage() {
       triggerToast(`"${drive.title}" is now ${STATUS_META[newStatus].label.toLowerCase()}.`);
       await loadDrives();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update this opening.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update this opening.", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -174,7 +170,7 @@ export default function JobOpeningsPage() {
       );
       await loadDrives();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update this opening's audience.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update this opening's audience.", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -190,7 +186,7 @@ export default function JobOpeningsPage() {
       triggerToast(interviewDateInput ? `Interview date set for "${drive.title}".` : `Interview date cleared for "${drive.title}".`);
       await loadDrives();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to save the interview date.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to save the interview date.", "error");
     } finally {
       setUpdatingId(null);
     }
@@ -227,8 +223,6 @@ export default function JobOpeningsPage() {
       subtitle={`Post and manage ${companyName}'s hiring pipelines.`}
       actionButton={{ label: "Post a Job Opening", icon: Plus, onClick: () => setShowCreateModal(true) }}
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {showStats && (
           <HpItem>

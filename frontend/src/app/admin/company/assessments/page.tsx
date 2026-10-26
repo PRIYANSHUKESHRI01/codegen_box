@@ -47,7 +47,6 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpInput,
   hpLabel,
   type HpTone,
@@ -63,6 +62,7 @@ import {
   formatRelative,
   formatSpan,
 } from "@/components/portal/screeningKit";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 
 interface CompanyContest {
   id: number;
@@ -146,7 +146,6 @@ export default function AssessmentsPage() {
   const { status } = useAuthGuard(["admin_company"]);
   const [contests, setContests] = useState<CompanyContest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managingContest, setManagingContest] = useState<CompanyContest | null>(null);
   const [invitingContest, setInvitingContest] = useState<CompanyContest | null>(null);
@@ -155,10 +154,7 @@ export default function AssessmentsPage() {
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadContests = useCallback(async () => {
     setLoading(true);
@@ -166,7 +162,7 @@ export default function AssessmentsPage() {
       const res = await api.get<{ contests: CompanyContest[] }>("/company/contests");
       setContests(res.contests);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load assessments.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load assessments.", "error");
     } finally {
       setLoading(false);
     }
@@ -188,7 +184,7 @@ export default function AssessmentsPage() {
       triggerToast(res.already_finalized ? "Already finalized." : `Finalized — ${res.participants_ranked} candidate(s) ranked.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.", "error");
     }
   };
 
@@ -198,7 +194,7 @@ export default function AssessmentsPage() {
       triggerToast(`"${contest.title}" is now published.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
@@ -232,8 +228,6 @@ export default function AssessmentsPage() {
       subtitle="Proctored coding assessments tied to your job openings — candidates only see one once you invite them."
       actionButton={{ label: "New Assessment", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {(loading || hasAny) && (
           <HpItem>
@@ -686,7 +680,7 @@ function ManageAssessmentProblemsModal({
 }: {
   contest: CompanyContest;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [problems, setProblems] = useState<CompanyContestProblem[]>([]);
   const [catalog, setCatalog] = useState<ProblemSummary[]>([]);
@@ -705,7 +699,7 @@ function ManageAssessmentProblemsModal({
       setProblems(problemsRes.problems);
       setCatalog(catalogRes.problems);
     } catch {
-      onToast("Failed to load problems.");
+      onToast("Failed to load problems.", "error");
     } finally {
       setLoading(false);
     }
@@ -725,7 +719,7 @@ function ManageAssessmentProblemsModal({
       });
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to add problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to add problem.", "error");
     } finally {
       setAddingId(null);
     }
@@ -736,7 +730,7 @@ function ManageAssessmentProblemsModal({
       await api.delete(`/company/contests/${contest.slug}/problems/${contestProblemId}`);
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.", "error");
     }
   };
 

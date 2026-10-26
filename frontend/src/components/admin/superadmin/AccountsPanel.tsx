@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog, FilterX } from "lucide-react";
+import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog, FilterX, RefreshCw, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
@@ -10,9 +10,10 @@ import { ResetPasswordModal } from "./ResetPasswordModal";
 import { UserManageDrawer } from "./UserManageDrawer";
 import { CredentialLockBar, PasswordReveal } from "./CredentialUi";
 import { ROLES_WITHOUT_UNIVERSITY, RoleChips, UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface AccountsPanelProps {
-  triggerToast: (msg: string) => void;
+  triggerToast: ToastTrigger;
 }
 
 /** How often the table quietly re-reads what is on screen, so a password the owner just changed stops looking viewable. */
@@ -48,11 +49,16 @@ function planCell(account: ApiPlatformUser) {
  */
 export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const [accounts, setAccounts] = useState<ApiPlatformUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  // `loaded` flips on the first answer; afterwards a new filter keeps the old rows on screen, dimmed (see StudentsPanel).
+  const [loaded, setLoaded] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [slow, setSlow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [answeredFiltered, setAnsweredFiltered] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
-  const [total, setTotal] = useState(0);
+  const [total, setTotal] = useState<number | null>(null);
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
@@ -61,7 +67,7 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const [resetTarget, setResetTarget] = useState<ApiPlatformUser | null>(null);
   const [managedId, setManagedId] = useState<number | null>(null);
 
-  const facets = useDirectoryFacets({ role: roleFilter, collegeId, search: searchDebounced });
+  const facets = useDirectoryFacets({ role: roleFilter, collegeId, search: searchDebounced, plan: planFilter });
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 350);
@@ -90,38 +96,62 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const currentFilterKey = useRef(filterKey);
   currentFilterKey.current = filterKey;
 
+  // Only the newest request may write to the screen.
+  const latest = useRef(0);
+  const filtered = !!(searchDebounced || roleFilter || collegeId || planFilter);
+
   const load = useCallback(() => {
-    setLoading(true);
-    const requestedFor = buildParams().toString();
+    const ticket = ++latest.current;
+    const askedFiltered = !!(searchDebounced || roleFilter || collegeId || planFilter);
+    setFetching(true);
+    setError(null);
     api
-      .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${requestedFor}`)
+      .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${buildParams().toString()}`)
       .then((res) => {
-        if (requestedFor !== currentFilterKey.current) return;
+        if (ticket !== latest.current) return;
         setAccounts(res.data);
         setPage(res.current_page);
         setHasMore(res.current_page < res.last_page);
         setTotal(res.total);
+        setAnsweredFiltered(askedFiltered);
+        setLoaded(true);
       })
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load accounts."))
-      .finally(() => setLoading(false));
-  }, [buildParams, triggerToast]);
+      .catch((err) => {
+        if (ticket !== latest.current) return;
+        const message = err instanceof ApiError ? err.message : "Failed to load accounts.";
+        setError(message);
+        triggerToast(message, "error");
+      })
+      .finally(() => {
+        if (ticket === latest.current) setFetching(false);
+      });
+  }, [buildParams, searchDebounced, roleFilter, collegeId, planFilter, triggerToast]);
 
   useEffect(() => {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!fetching) {
+      setSlow(false);
+      return;
+    }
+    const t = setTimeout(() => setSlow(true), 4_000);
+    return () => clearTimeout(t);
+  }, [fetching]);
+
   const loadMore = () => {
     setLoadingMore(true);
-    const requestedFor = buildParams().toString();
+    const ticket = latest.current;
     api
       .get<ApiPage<ApiPlatformUser>>(`/superadmin/users?${buildParams({ page: String(page + 1) }).toString()}`)
       .then((res) => {
-        if (requestedFor !== currentFilterKey.current) return;
+        if (ticket !== latest.current) return;
         setAccounts((prev) => [...prev, ...res.data]);
         setPage(res.current_page);
         setHasMore(res.current_page < res.last_page);
       })
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more accounts."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more accounts.", "error"))
       .finally(() => setLoadingMore(false));
   };
 
@@ -136,8 +166,7 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
         if (requestedFor !== currentFilterKey.current) return;
         const fresh = new Map(results.flatMap((r) => r.data).map((row) => [row.id, row]));
         setAccounts((prev) => prev.map((row) => fresh.get(row.id) ?? row));
-        setTotal(results[0].total);
-      })
+        setTotal(results[0].total);      })
       .catch(() => {
         // A missed refresh is invisible; the next one catches up.
       });
@@ -165,7 +194,6 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
     if (value && value !== "user") setPlanFilter("");
   };
 
-  const filtered = !!(searchDebounced || roleFilter || collegeId || planFilter);
   const clearFilters = () => {
     setSearch("");
     setSearchDebounced("");
@@ -179,8 +207,15 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
       <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-primary">Accounts &amp; Logins</h2>
-          <p className="text-xs text-text-muted max-w-2xl">
-            {total.toLocaleString()} account(s){filtered ? " match" : ""}. Unlock to see the temporary password an account was issued — it&apos;s available until the owner chooses their own, which then
+          <p className="text-xs text-text-muted max-w-2xl" aria-live="polite">
+            {total === null ? (error ? "Couldn't load the accounts." : "Loading accounts…") : `${total.toLocaleString()} account(s)${answeredFiltered ? " match" : ""}.`}
+            {loaded && fetching && (
+              <span className="ml-1.5 inline-flex items-center gap-1 text-accent-primary">
+                <RefreshCw className="h-3 w-3 animate-spin" aria-hidden />
+                Updating…
+              </span>
+            )}{" "}
+            Unlock to see the temporary password an account was issued — it&apos;s available until the owner chooses their own, which then
             stays private. <strong className="text-text-secondary">Change password</strong> sets a new one you can read. This list refreshes by itself.
           </p>
         </div>
@@ -226,14 +261,42 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
 
       <CredentialLockBar />
 
-      {loading ? (
-        <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">Loading accounts...</div>
+      {!loaded && !error ? (
+        <div role="status" aria-label="Loading accounts" className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
+          <div className="divide-y divide-border-subtle" aria-hidden>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-4 py-3.5">
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 w-40 animate-pulse rounded bg-elevated" />
+                  <div className="h-2.5 w-24 animate-pulse rounded-full bg-elevated" />
+                </div>
+                <div className="hidden h-3 w-48 animate-pulse rounded bg-elevated sm:block" />
+                <div className="hidden h-3 w-32 animate-pulse rounded bg-elevated md:block" />
+                <div className="h-6 w-36 animate-pulse rounded bg-elevated" />
+              </div>
+            ))}
+          </div>
+          {slow && <p className="border-t border-border-subtle px-4 py-3 text-center text-xs text-text-muted">Still working — this is taking longer than usual. The server may be busy.</p>}
+        </div>
+      ) : !loaded && error ? (
+        <div role="alert" className="flex flex-col items-center gap-3 rounded-panel border border-status-danger/30 bg-status-danger/5 p-8 text-center">
+          <AlertTriangle className="h-5 w-5 text-status-danger" aria-hidden />
+          <p className="text-xs font-semibold text-primary">{error}</p>
+          <button onClick={load} className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-surface px-3 py-1.5 text-xs font-bold text-primary hover:bg-surface-hover">
+            <RefreshCw className="h-3.5 w-3.5" aria-hidden /> Try again
+          </button>
+        </div>
       ) : accounts.length === 0 ? (
-        <div className="p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          {filtered ? "No accounts match this filter." : "No accounts found."}
+        <div className="space-y-3 p-8 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
+          <p>{answeredFiltered ? "No accounts match this filter." : "No accounts found."}</p>
+          {answeredFiltered && (
+            <button onClick={clearFilters} className="rounded-control border border-border-strong bg-elevated px-3 py-1.5 text-xs font-bold text-primary hover:bg-surface-hover">
+              Clear filters
+            </button>
+          )}
         </div>
       ) : (
-        <div className="rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle">
+        <div className={cn("rounded-panel bg-surface border border-border-subtle overflow-hidden shadow-subtle transition-opacity", fetching && "opacity-60")} aria-busy={fetching}>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
@@ -324,14 +387,19 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
             </table>
           </div>
           {hasMore && (
-            <div className="p-3 border-t border-border-subtle flex justify-center">
+            <div className="p-3 border-t border-border-subtle flex flex-col items-center gap-1">
               <button
                 onClick={loadMore}
-                disabled={loadingMore}
+                disabled={loadingMore || fetching}
                 className="px-4 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
               >
                 {loadingMore ? "Loading..." : "Load more"}
               </button>
+              {total !== null && (
+                <span className="text-3xs text-text-muted">
+                  Showing {accounts.length.toLocaleString()} of {total.toLocaleString()}
+                </span>
+              )}
             </div>
           )}
         </div>

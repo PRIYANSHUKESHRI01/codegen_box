@@ -6,6 +6,8 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { DISCIPLINE_LABEL } from "@/lib/core";
 import type { CoreSubjectRow, CoreTaxonomyResponse } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
+import { confirmDialog, promptDialog } from "@/lib/dialogs";
 
 const inp = "px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-2xs";
 const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^[0-9]+/, "");
@@ -15,7 +17,7 @@ const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(
  * syllabi for EC, EE, ME and CE); add your own, rename, or hide. A subject or topic that already has questions
  * cannot be deleted — hide it instead.
  */
-export function CoreTaxonomyPanel({ taxonomy, onChanged, onToast }: { taxonomy: CoreTaxonomyResponse; onChanged: () => void; onToast: (m: string) => void }) {
+export function CoreTaxonomyPanel({ taxonomy, onChanged, onToast }: { taxonomy: CoreTaxonomyResponse; onChanged: () => void; onToast: ToastTrigger }) {
   const [open, setOpen] = useState<string | null>(taxonomy.disciplines[0]?.code ?? null);
   const [adding, setAdding] = useState<{ kind: "subject" | "topic"; parent: string | number } | null>(null);
   const [name, setName] = useState("");
@@ -29,7 +31,7 @@ export function CoreTaxonomyPanel({ taxonomy, onChanged, onToast }: { taxonomy: 
       onChanged();
       return true;
     } catch (err) {
-      onToast(err instanceof ApiError ? err.errors?.code?.[0] ?? err.errors?.subject?.[0] ?? err.errors?.topic?.[0] ?? err.message : "That didn't work.");
+      onToast(err instanceof ApiError ? err.errors?.code?.[0] ?? err.errors?.subject?.[0] ?? err.errors?.topic?.[0] ?? err.message : "That didn't work.", "error");
       return false;
     } finally {
       setBusy(false);
@@ -50,8 +52,8 @@ export function CoreTaxonomyPanel({ taxonomy, onChanged, onToast }: { taxonomy: 
     }
   };
 
-  const rename = (kind: "subjects" | "topics", id: number, current: string) => {
-    const next = window.prompt("Rename to:", current)?.trim();
+  const rename = async (kind: "subjects" | "topics", id: number, current: string) => {
+    const next = (await promptDialog({ title: `Rename ${kind === "subjects" ? "subject" : "topic"}`, label: "New name", defaultValue: current, confirmLabel: "Rename", maxLength: 120, validate: (v) => (v.trim() ? null : "Enter a name.") }))?.trim();
     if (next && next !== current) void run(() => api.put(`/admin/core/${kind}/${id}`, { name: next }), "Renamed.");
   };
 
@@ -76,7 +78,9 @@ export function CoreTaxonomyPanel({ taxonomy, onChanged, onToast }: { taxonomy: 
                     <div className="ml-auto flex items-center gap-2 text-2xs font-semibold">
                       <button disabled={busy} onClick={() => rename("subjects", s.id, s.name)} className="text-accent-primary hover:underline">Rename</button>
                       <button disabled={busy} onClick={() => hide("subjects", s.id, s.is_active)} className="inline-flex items-center gap-1 text-text-muted hover:text-primary">{s.is_active ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />} {s.is_active ? "Hide" : "Show"}</button>
-                      {s.questions === 0 && <button disabled={busy} onClick={() => window.confirm(`Delete “${s.name}”?`) && run(() => api.delete(`/admin/core/subjects/${s.id}`), "Subject deleted.")} className="text-status-danger hover:underline">Delete</button>}
+                      {s.questions === 0 && <button disabled={busy} onClick={async () => {
+                        if (await confirmDialog({ title: `Delete “${s.name}”?`, tone: "danger", confirmLabel: "Delete subject" })) await run(() => api.delete(`/admin/core/subjects/${s.id}`), "Subject deleted.");
+                      }} className="text-status-danger hover:underline">Delete</button>}
                     </div>
                   </div>
                   <ul className="mt-2 flex flex-wrap gap-1.5">

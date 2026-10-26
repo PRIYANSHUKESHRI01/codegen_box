@@ -26,6 +26,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { codesAtAll } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import type { DriveStatus, MyDriveApplication, PlacementDriveDetail, PrepQuestionCategory } from "@/types/placement";
 import { BranchChips } from "@/components/branches/BranchChips";
 
@@ -246,7 +247,7 @@ function PlacementDrivePreparePageContent() {
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
           <div className="flex items-start gap-4 min-w-0">
-            <span className="text-4xl shrink-0">{company.logo ?? "🏢"}</span>
+            <CompanyLogo name={company.name} slug={company.slug} logo={company.logo} size="lg" />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
                 <h2 className="text-lg font-bold text-primary">{company.name}</h2>

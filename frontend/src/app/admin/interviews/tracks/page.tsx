@@ -15,6 +15,8 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { InterviewRoleTemplate, InterviewTrackSummary, TrackRound } from "@/types/interviewTrack";
 import { Modal } from "@/components/ui/Modal";
+import { useToast, type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const TRACKS_PATH = "/admin/interview-tracks";
 const TEMPLATES_PATH = "/admin/interview-role-templates";
@@ -40,7 +42,6 @@ export default function AdminInterviewTracksPage() {
   const [templates, setTemplates] = useState<InterviewRoleTemplate[]>([]);
   const [tracks, setTracks] = useState<InterviewTrackSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<InterviewRoleTemplate | null>(null);
@@ -48,10 +49,7 @@ export default function AdminInterviewTracksPage() {
   const [visibilityTrack, setVisibilityTrack] = useState<InterviewTrackSummary | null>(null);
   const [reviewingRound, setReviewingRound] = useState<{ track: InterviewTrackSummary; round: TrackRound } | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,7 +61,7 @@ export default function AdminInterviewTracksPage() {
       setTemplates(templatesRes.templates);
       setTracks(tracksRes.tracks);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load Final Interview data.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load Final Interview data.", "error");
     } finally {
       setLoading(false);
     }
@@ -89,18 +87,18 @@ export default function AdminInterviewTracksPage() {
       triggerToast(`"${track.title}" published — all 3 rounds are live.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish this track.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish this track.", "error");
     }
   };
 
   const handleDeleteTrack = async (track: InterviewTrackSummary) => {
-    if (!window.confirm(`Delete "${track.title}"? This can't be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete "${track.title}"?`, message: "This can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`${TRACKS_PATH}/${track.slug}`);
       triggerToast(`"${track.title}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete this track.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete this track.", "error");
     }
   };
 
@@ -110,12 +108,6 @@ export default function AdminInterviewTracksPage() {
       title="Final Interviews"
       subtitle="Reusable role templates and the 3-round Interview Tracks built from them."
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -319,7 +311,7 @@ function ManageTrackVisibilityModal({
 }: {
   track: InterviewTrackSummary;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<number[]>(track.college_ids ?? []);
   const [saving, setSaving] = useState(false);
@@ -331,7 +323,7 @@ function ManageTrackVisibilityModal({
       onToast("College targeting updated.");
       onClose();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.");
+      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.", "error");
     } finally {
       setSaving(false);
     }

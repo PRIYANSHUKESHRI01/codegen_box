@@ -53,7 +53,6 @@ import {
   HpSkeletonRows,
   HpStagger,
   HpStatCard,
-  HpToast,
   hpBtn,
   hpEase,
   hpInput,
@@ -61,6 +60,8 @@ import {
   type HpTone,
 } from "@/components/portal/kit";
 import { HpSelect } from "@/components/portal/pipeline-kit";
+import { useToast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 interface ApiDrive {
   id: number;
@@ -113,17 +114,13 @@ function CandidatesPageContent() {
   const [appsLoading, setAppsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportPanel, setShowImportPanel] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [movingAppId, setMovingAppId] = useState<number | null>(null);
   const [ctcPrompt, setCtcPrompt] = useState<{ app: DriveApplication; newStage: DriveApplicationStage; value: string } | null>(null);
   // View-only filters over the loaded pipeline (never sent to the API).
   const [stageFilter, setStageFilter] = useState<StageFilter>("all");
   const [candidateSearch, setCandidateSearch] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -144,7 +141,7 @@ function CandidatesPageContent() {
       const res = await api.get<{ applications: DriveApplication[] }>(`/company/drives/${selectedDriveId}/candidates`);
       setApplications(res.applications);
     } catch {
-      triggerToast("Failed to load candidates for this opening.");
+      triggerToast("Failed to load candidates for this opening.", "error");
     } finally {
       setAppsLoading(false);
     }
@@ -183,13 +180,13 @@ function CandidatesPageContent() {
       triggerToast(`${app.user.name} moved to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}.`);
       setCtcPrompt(null);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update this candidate's stage.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update this candidate's stage.", "error");
     } finally {
       setMovingAppId(null);
     }
   };
 
-  const handleStageSelect = (app: DriveApplication, newStage: DriveApplicationStage) => {
+  const handleStageSelect = async (app: DriveApplication, newStage: DriveApplicationStage) => {
     if (newStage === app.stage) return;
 
     if (newStage === "offer_extended" || newStage === "offer_accepted") {
@@ -198,7 +195,7 @@ function CandidatesPageContent() {
     }
 
     if (DRIVE_APPLICATION_TERMINAL_STAGES.includes(newStage)) {
-      if (!window.confirm(`Move ${app.user.name} to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}? This closes their application.`)) {
+      if (!(await confirmDialog({ title: `Move ${app.user.name} to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}?`, message: "This closes their application.", tone: "warning", confirmLabel: "Move" }))) {
         return;
       }
     }
@@ -235,8 +232,6 @@ function CandidatesPageContent() {
           : undefined
       }
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {/* Opening picker */}
         <HpItem>

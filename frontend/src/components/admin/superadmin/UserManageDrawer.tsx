@@ -11,6 +11,7 @@ import { ActivitySection } from "./manage/ActivitySection";
 import { OverviewSection, type StudentDetail } from "./manage/OverviewSection";
 import { PlanSection } from "./manage/PlanSection";
 import { SecuritySection } from "./manage/SecuritySection";
+import { type ToastTrigger } from "@/lib/toast";
 
 type Tab = "overview" | "plan" | "security" | "activity";
 
@@ -26,7 +27,7 @@ interface UserManageDrawerProps {
   onClose: () => void;
   /** Something about this account changed (or it was deleted): the list behind the drawer should re-read itself. */
   onChanged: () => void;
-  triggerToast: (msg: string) => void;
+  triggerToast: ToastTrigger;
   initialTab?: Tab;
 }
 

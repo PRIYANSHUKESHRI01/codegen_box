@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   AlertTriangle,
   Award,
@@ -23,6 +23,7 @@ import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { AdminVaultProfile, AdminVaultSummary, AdminVaultSyncEvent, Paginated, VaultStatus } from "@/types/vault";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 
 const STATUS_LABEL: Record<VaultStatus, string> = {
   not_ready: "Not ready",
@@ -69,18 +70,7 @@ export default function AdminVaultPage() {
   const hasAccess = userHasPermission(user, "vault");
 
   const [tab, setTab] = useState<Tab>("overview");
-  const [toast, setToast] = useState<string | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), 3500);
-  }, []);
-
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
+  const showToast = useToast();
 
   if (status !== "ready") return <SessionLoader />;
 
@@ -90,12 +80,6 @@ export default function AdminVaultPage() {
       title="Vault"
       subtitle="Students whose readiness says they're ready to be hired — who is live, and the hand-off to Mellow Vault."
     >
-      {toast && (
-        <div role="status" className="fixed right-6 top-20 z-50 max-w-sm rounded-panel border border-accent-primary/40 bg-surface px-4 py-3 text-xs font-semibold text-primary shadow-card">
-          {toast}
-        </div>
-      )}
-
       {!hasAccess ? (
         <AccessDeniedNotice section="the Vault" />
       ) : (
@@ -128,14 +112,14 @@ export default function AdminVaultPage() {
 
 // ───────────────────────────── overview ─────────────────────────────
 
-function OverviewTab({ onToast, onGo }: { onToast: (msg: string) => void; onGo: (tab: Tab) => void }) {
+function OverviewTab({ onToast, onGo }: { onToast: ToastTrigger; onGo: (tab: Tab) => void }) {
   const [summary, setSummary] = useState<AdminVaultSummary | null>(null);
 
   useEffect(() => {
     api
       .get<AdminVaultSummary>("/admin/vault/summary")
       .then(setSummary)
-      .catch((err) => onToast(err instanceof ApiError ? err.message : "Failed to load the Vault summary."));
+      .catch((err) => onToast(err instanceof ApiError ? err.message : "Failed to load the Vault summary.", "error"));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,7 +225,7 @@ function Fact({ label, value, tone }: { label: string; value: number; tone?: "wa
 
 // ───────────────────────────── students ─────────────────────────────
 
-function StudentsTab({ onToast }: { onToast: (msg: string) => void }) {
+function StudentsTab({ onToast }: { onToast: ToastTrigger }) {
   const [result, setResult] = useState<Paginated<AdminVaultProfile> | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -261,7 +245,7 @@ function StudentsTab({ onToast }: { onToast: (msg: string) => void }) {
       const res = await api.get<{ profiles: Paginated<AdminVaultProfile> }>(`/admin/vault/profiles?${params.toString()}`);
       setResult(res.profiles);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load students.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load students.", "error");
     } finally {
       setLoading(false);
     }
@@ -279,7 +263,7 @@ function StudentsTab({ onToast }: { onToast: (msg: string) => void }) {
       onToast("Profile unhidden.");
       void load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to unhide.");
+      onToast(err instanceof ApiError ? err.message : "Failed to unhide.", "error");
     }
   };
 
@@ -289,7 +273,7 @@ function StudentsTab({ onToast }: { onToast: (msg: string) => void }) {
       onToast("Queued to be sent to Mellow Vault again.");
       void load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to re-sync.");
+      onToast(err instanceof ApiError ? err.message : "Failed to re-sync.", "error");
     }
   };
 
@@ -481,7 +465,7 @@ function HideModal({ row, onClose, onDone }: { row: AdminVaultProfile; onClose: 
 
 // ───────────────────────────── sync log ─────────────────────────────
 
-function SyncTab({ onToast }: { onToast: (msg: string) => void }) {
+function SyncTab({ onToast }: { onToast: ToastTrigger }) {
   const [result, setResult] = useState<Paginated<AdminVaultSyncEvent> | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
@@ -497,7 +481,7 @@ function SyncTab({ onToast }: { onToast: (msg: string) => void }) {
       const res = await api.get<{ events: Paginated<AdminVaultSyncEvent> }>(`/admin/vault/sync-events?${params.toString()}`);
       setResult(res.events);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load the sync log.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load the sync log.", "error");
     } finally {
       setLoading(false);
     }
@@ -515,7 +499,7 @@ function SyncTab({ onToast }: { onToast: (msg: string) => void }) {
       onToast(res.requeued > 0 ? `${res.requeued} update${res.requeued === 1 ? "" : "s"} queued to retry.` : "Nothing to retry.");
       void load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to retry.");
+      onToast(err instanceof ApiError ? err.message : "Failed to retry.", "error");
     } finally {
       setBusy(false);
     }

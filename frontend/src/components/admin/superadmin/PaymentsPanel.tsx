@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { formatInr } from "@/lib/pricing";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import type { AdminPayment, AdminPaymentsResponse, PaymentStatus } from "@/types/payments";
+import { type ToastTrigger } from "@/lib/toast";
 
 const STATUS_STYLE: Record<PaymentStatus, { label: string; className: string }> = {
   paid: { label: "Paid", className: "bg-status-success/15 text-status-success border-status-success/30" },
@@ -63,7 +64,7 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "da
  * Refunds are issued from the gateway's own dashboard and flow back here (and into the student's access)
  * by webhook. Orders from both gateways (PayU, Razorpay) share this list, so switching gateways loses nothing.
  */
-export function PaymentsPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function PaymentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [data, setData] = useState<AdminPaymentsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [status, setStatus] = useState("");
@@ -104,7 +105,7 @@ export function PaymentsPanel({ triggerToast }: { triggerToast: (msg: string) =>
       );
       await load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Couldn't re-check that payment.");
+      triggerToast(err instanceof ApiError ? err.message : "Couldn't re-check that payment.", "error");
     } finally {
       setChecking(null);
     }

@@ -14,6 +14,7 @@ import {
   type BankQuestion,
   type QuestionCategory,
 } from "@/types/interview";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface ManageInterviewQuestionsModalProps {
   /** e.g. "/tpo/interviews", "/company/interviews", "/admin/interviews" — the role-scoped controller base. */
@@ -27,7 +28,7 @@ interface ManageInterviewQuestionsModalProps {
   /** Pre-fills the AI panel's role field, e.g. the linked drive's role/job title. */
   defaultRole?: string;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }
 
 /**
@@ -67,7 +68,7 @@ export function ManageInterviewQuestionsModal({
       setAttached(attachedRes.questions);
       setBank(bankRes.questions);
     } catch {
-      onToast("Failed to load interview questions.");
+      onToast("Failed to load interview questions.", "error");
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ export function ManageInterviewQuestionsModal({
       });
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to add question.");
+      onToast(err instanceof ApiError ? err.message : "Failed to add question.", "error");
     } finally {
       setAddingBankId(null);
     }
@@ -104,7 +105,7 @@ export function ManageInterviewQuestionsModal({
       await api.delete(`${basePath}/${interviewSlug}/questions/${interviewQuestionId}`);
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove question.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove question.", "error");
     }
   };
 

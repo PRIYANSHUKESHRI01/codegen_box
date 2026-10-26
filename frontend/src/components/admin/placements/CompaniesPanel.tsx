@@ -5,6 +5,8 @@ import { Building2, Plus, X, ExternalLink, Loader2, Lock, Unlock, Briefcase } fr
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { getCompanyBrand } from "@/lib/companyBrands";
 import { AdminCompanyRow, inputClass } from "./types";
 
 interface CompaniesPanelProps {
@@ -147,7 +149,7 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
           {companies.map((c) => (
             <div key={c.id} className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-2.5">
               <div className="flex items-center gap-2.5">
-                <span className="text-2xl shrink-0">{c.logo ?? "🏢"}</span>
+                <CompanyLogo name={c.name} slug={c.slug} logo={c.logo} size="sm" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5">
                     <h4 className="text-sm font-bold text-primary truncate">{c.name}</h4>
@@ -229,13 +231,18 @@ export function CompaniesPanel({ companies, onChanged }: CompaniesPanelProps) {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-text-secondary mb-1">Logo (emoji)</label>
+                  <label className="block font-semibold text-text-secondary mb-1">Logo (emoji, optional)</label>
                   <input
                     value={form.logo}
                     onChange={(e) => setForm({ ...form, logo: e.target.value })}
                     placeholder="🏢"
                     className={inputClass}
                   />
+                  {getCompanyBrand(form.slug, form.name) && (
+                    <p className="mt-1 text-3xs font-semibold text-status-success">
+                      The real {getCompanyBrand(form.slug, form.name)?.name} logo is matched automatically — no emoji needed.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

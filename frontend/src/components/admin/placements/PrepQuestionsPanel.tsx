@@ -5,6 +5,8 @@ import { Plus, Trash2, Loader2 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AdminCompanyRow, AdminPrepQuestionRow, PREP_CATEGORIES, inputClass } from "./types";
+import { confirmDialog } from "@/lib/dialogs";
+import { toast } from "@/lib/toast";
 
 interface PrepQuestionsPanelProps {
   companies: AdminCompanyRow[];
@@ -66,13 +68,13 @@ export function PrepQuestionsPanel({ companies, onCompaniesChanged }: PrepQuesti
   };
 
   const handleDelete = async (id: number) => {
-    if (!window.confirm("Delete this prep question?")) return;
+    if (!(await confirmDialog({ title: "Delete this prep question?", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`/admin/prep-questions/${id}`);
       await loadQuestions(companyId);
       onCompaniesChanged();
     } catch (err) {
-      window.alert(err instanceof ApiError ? err.message : "Failed to delete question.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to delete question.");
     }
   };
 

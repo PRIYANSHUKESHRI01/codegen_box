@@ -17,6 +17,7 @@ import {
   type QuestionDifficulty,
 } from "@/types/interview";
 import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/lib/toast";
 
 interface BankRow {
   id: number;
@@ -41,14 +42,10 @@ export default function InterviewQuestionBankPage() {
   const hasAccess = userHasPermission(user, "interviews");
   const [questions, setQuestions] = useState<BankRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<QuestionCategory | "">("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,7 +55,7 @@ export default function InterviewQuestionBankPage() {
       );
       setQuestions(res.questions.data);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load the question bank.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load the question bank.", "error");
     } finally {
       setLoading(false);
     }
@@ -83,7 +80,7 @@ export default function InterviewQuestionBankPage() {
       await api.post(`/admin/interview-question-bank/${q.id}`, { is_active: !q.is_active });
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update.", "error");
     }
   };
 
@@ -94,12 +91,6 @@ export default function InterviewQuestionBankPage() {
       subtitle="The shared bank every AI Interview draws questions from — no LLM generation, real content only."
       actionButton={{ label: "New Question", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       <div className="flex items-center gap-2 flex-wrap">
         <button
           onClick={() => setCategoryFilter("")}

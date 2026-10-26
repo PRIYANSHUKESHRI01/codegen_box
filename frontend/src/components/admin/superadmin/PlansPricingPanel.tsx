@@ -10,6 +10,7 @@ import { PriceTag } from "@/components/pricing/PriceTag";
 import { formatInr, previewSalePrice } from "@/lib/pricing";
 import { notifyPricingChanged } from "@/lib/usePublicPlans";
 import type { AdminPlan, AdminPlansResponse, PlanLimits, PlanPricing } from "@/types/pricing";
+import { type ToastTrigger } from "@/lib/toast";
 
 const DISCOUNT_PRESETS = [0, 10, 20, 30, 40, 50];
 
@@ -72,7 +73,7 @@ function formatWhen(iso: string | null): string {
  * has no online price at all — the team quotes it — so it shows its limits and
  * its subscribers here but no price fields.
  */
-export function PlansPricingPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [data, setData] = useState<AdminPlansResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});

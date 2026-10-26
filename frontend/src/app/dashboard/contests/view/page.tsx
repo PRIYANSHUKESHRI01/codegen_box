@@ -14,6 +14,7 @@ import { ContestProblemRow, contestProblemHref } from "@/components/contests/Con
 import { prefetchContestProblem } from "@/lib/contestProblemPrefetch";
 import { warmUpEditor } from "@/lib/editorWarmup";
 import type { ContestDetail, ContestLeaderboard } from "@/types/liveContest";
+import { useToast } from "@/lib/toast";
 
 type Tab = "problems" | "leaderboard";
 
@@ -36,14 +37,10 @@ function ContestDetailPageContent() {
   const [tab, setTab] = useState<Tab>("problems");
   const [leaderboard, setLeaderboard] = useState<ContestLeaderboard | null>(null);
   const [registering, setRegistering] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   // The problem being opened (a contest problem id, or "start" for the big button): pressing answers at once, then the screen follows.
   const [opening, setOpening] = useState<number | "start" | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadContest = () => {
     api
@@ -107,7 +104,7 @@ function ContestDetailPageContent() {
       triggerToast("You're registered!");
       loadContest();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to register.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to register.", "error");
     } finally {
       setRegistering(false);
     }
@@ -120,7 +117,7 @@ function ContestDetailPageContent() {
       triggerToast("Unregistered.");
       loadContest();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to unregister.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to unregister.", "error");
     } finally {
       setRegistering(false);
     }
@@ -138,12 +135,6 @@ function ContestDetailPageContent() {
 
   return (
     <DashboardShell role="user" title={contest.title} subtitle={contest.description ?? undefined}>
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       {/* Header card */}
       <div className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="flex items-center gap-4">

@@ -29,6 +29,8 @@ vi.mock("@/components/dashboard/DashboardShell", () => ({
 }));
 
 import StudentVaultPage from "@/app/dashboard/vault/page";
+import { Toaster } from "@/components/ui/Toaster";
+import { resetToasts } from "@/lib/toast";
 import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
 
@@ -80,7 +82,10 @@ beforeEach(() => {
   post.mockReset();
   del.mockReset();
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  resetToasts();
+});
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -137,7 +142,12 @@ describe("ReadinessBreakdown", () => {
 describe("StudentVaultPage", () => {
   const open = async (data: StudentVaultResponse) => {
     get.mockResolvedValue(data);
-    render(<StudentVaultPage />);
+    render(
+      <>
+        <StudentVaultPage />
+        <Toaster />
+      </>
+    );
     await screen.findByText("Your readiness score");
   };
 
@@ -324,7 +334,12 @@ describe("StudentVaultPage", () => {
 
   it("says when the page could not load rather than spinning forever", async () => {
     get.mockRejectedValue(new ApiError("Server unavailable", 503));
-    render(<StudentVaultPage />);
+    render(
+      <>
+        <StudentVaultPage />
+        <Toaster />
+      </>
+    );
     await flush();
 
     await screen.findByText("Server unavailable");

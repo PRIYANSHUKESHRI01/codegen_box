@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import {
   AlertTriangle,
   ArrowUpRight,
@@ -24,7 +25,6 @@ import {
 import {
   HpAvatar,
   HpCard,
-  HpCompanyLogo,
   HpEmptyState,
   HpFunnel,
   HpHero,
@@ -119,7 +119,7 @@ export function CompanyCommandCenter({ user, drives, reports, loading }: Props) 
 
   const hero = (
     <HpHero
-      leading={<HpCompanyLogo name={company?.name ?? "Your Company"} logo={company?.logo} size="xl" />}
+      leading={<CompanyLogo name={company?.name ?? "Your Company"} logo={company?.logo} size="lg" />}
       eyebrow={
         <>
           <span>Your company</span>

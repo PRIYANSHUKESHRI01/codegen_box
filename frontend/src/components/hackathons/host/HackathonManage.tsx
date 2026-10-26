@@ -29,11 +29,12 @@ import {
 } from "lucide-react";
 import { CoverArt } from "@/components/arena/primitives";
 import { HostShell, PhasePill, useHostAccess, whenLabel } from "@/components/hackathons/host/hostKit";
-import { HpButton, HpCard, HpEmptyState, HpPill, HpSearch, HpSkeleton, HpStatCard, HpTabs, HpToast, hpBtn, hpInput, hpLabel, hpTh } from "@/components/portal/kit";
+import { HpButton, HpCard, HpEmptyState, HpPill, HpSearch, HpSkeleton, HpStatCard, HpTabs, hpBtn, hpInput, hpLabel, hpTh } from "@/components/portal/kit";
 import { Modal } from "@/components/ui/Modal";
 import { accentVars, compactMoney, errorMessage, formatDateTime, formatRange, hackathonHref } from "@/lib/hackathon";
 import { hostApi, hostPaths } from "@/lib/hackathonHost";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { HackathonCriterion, HostHackathonDetail, HostRegistration, HostScope, HostSubmission } from "@/types/hackathon";
 
@@ -49,7 +50,6 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
 
   const [h, setH] = useState<HostHackathonDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "cancel" | "delete" | "publish-results">(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -69,12 +69,6 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
     if (status === "ready" && hasAccess && id) refresh();
   }, [status, hasAccess, id, refresh]);
 
-  useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), 3600);
-    return () => window.clearTimeout(t);
-  }, [toast]);
-
   const goTab = (next: Tab) => router.replace(`${pathname}?id=${id}&tab=${next}`, { scroll: false });
 
   const act = async (fn: () => Promise<{ hackathon: HostHackathonDetail }>, done: string) => {
@@ -82,7 +76,7 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
     setActionError(null);
     try {
       setH((await fn()).hackathon);
-      setToast(done);
+      toast.success(done);
       setDialog(null);
     } catch (err) {
       setActionError(errorMessage(err, "That didn't work. Please try again."));
@@ -130,7 +124,7 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
           {tab === "overview" && <Overview h={h} editHref={paths.edit(h.id)} />}
           {tab === "registrations" && <Registrations h={h} api={api} />}
           {tab === "judging" && <Judging h={h} api={api} onChanged={refresh} onPublish={() => setDialog("publish-results")} />}
-          {tab === "updates" && <Updates h={h} api={api} onChanged={refresh} notify={setToast} />}
+          {tab === "updates" && <Updates h={h} api={api} onChanged={refresh} notify={toast.success} />}
         </>
       )}
 
@@ -213,7 +207,7 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
                   try {
                     const res = await api.publishResults(h.id);
                     setH(res.hackathon);
-                    setToast(`Results published — ${res.outcome.ranked} project${res.outcome.ranked === 1 ? "" : "s"} ranked.`);
+                    toast.success(`Results published — ${res.outcome.ranked} project${res.outcome.ranked === 1 ? "" : "s"} ranked.`);
                     setDialog(null);
                   } catch (err) {
                     setActionError(errorMessage(err, "Couldn't publish results."));
@@ -236,8 +230,6 @@ export function HackathonManage({ scope, id }: { scope: HostScope; id: number })
           </ul>
         </Modal>
       )}
-
-      <HpToast message={toast} />
     </HostShell>
   );
 }

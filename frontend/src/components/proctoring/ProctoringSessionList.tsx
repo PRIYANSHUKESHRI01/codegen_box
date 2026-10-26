@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import type { ProctoringSessionSummary, ProctoringViolationDetail } from "@/types/proctoring";
 import { HP_TONES, HpAvatar, HpButton, HpCard, HpEmptyState, HpPill, HpSkeleton, type HpTone } from "@/components/portal/kit";
 import { ScCollapse, ScMeta, ScReveal, ScRiskMeter, formatRelative } from "@/components/portal/screeningKit";
+import { type ToastTrigger } from "@/lib/toast";
 
 const STATUS_STYLE: Record<ProctoringSessionSummary["status"], string> = {
   active: "bg-status-warning/15 text-status-warning",
@@ -46,7 +47,7 @@ export function ProctoringSessionList({
 }: {
   sessions: ProctoringSessionSummary[];
   apiBasePath: string;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
   onReinstated: () => void;
   /** "premium" is the hiring-portal look (avatar rows, severity meter, animated timeline). Default leaves the TPO/coordinator markup exactly as before. */
   variant?: "default" | "premium";
@@ -70,7 +71,7 @@ export function ProctoringSessionList({
       const res = await api.get<{ violations: ProctoringViolationDetail[] }>(`${apiBasePath}/${session.id}`);
       setViolations((prev) => ({ ...prev, [session.id]: res.violations }));
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load the violation timeline.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load the violation timeline.", "error");
     } finally {
       setLoadingId(null);
     }
@@ -83,7 +84,7 @@ export function ProctoringSessionList({
       onToast(`${session.student.name}'s contest access has been reinstated.`);
       onReinstated();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to reinstate this session.");
+      onToast(err instanceof ApiError ? err.message : "Failed to reinstate this session.", "error");
     } finally {
       setReinstatingId(null);
     }

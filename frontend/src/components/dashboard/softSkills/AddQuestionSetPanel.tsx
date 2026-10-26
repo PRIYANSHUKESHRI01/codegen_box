@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { AppliedQuestionSet, QuestionSetItem } from "@/types/softSkill";
 import { QuestionSetPicker } from "./QuestionSetPicker";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface AddQuestionSetPanelProps {
   /** The caller's own question-set library endpoint. */
@@ -18,7 +19,7 @@ interface AddQuestionSetPanelProps {
   /** Why no more questions can be added (candidates have started, or the test is cancelled); null when open. */
   lockedReason: string | null;
   onAdded: (result: { added: number; skipped: number; setLabel: string; appliedSets: AppliedQuestionSet[] }) => void;
-  onToast: (message: string) => void;
+  onToast: ToastTrigger;
 }
 
 /**

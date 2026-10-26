@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/Button";
 import { DepartmentIcon } from "@/components/branches/DepartmentIcon";
 import { resetDepartmentCounts } from "@/components/branches/DepartmentScopeBar";
 import type { DepartmentOption } from "@/components/branches/DepartmentPicker";
+import { type ToastTrigger } from "@/lib/toast";
 
 /**
  * Settings → Departments (a college's TPO): which departments the college runs. Turning one on adds it to the switcher on every
@@ -21,7 +22,7 @@ export function CollegeDepartmentsSection({
   bare = false,
   onSaved,
 }: {
-  onToast: (message: string) => void;
+  onToast: ToastTrigger;
   /** Without its own card, for use inside a dialog. */
   bare?: boolean;
   /** Called once a change has been saved (a dialog closes itself on it). */

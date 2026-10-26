@@ -65,6 +65,7 @@ import { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscripti
 import { BranchTrackSection } from "@/components/settings/BranchTrackSection";
 import { CollegeDepartmentsSection } from "@/components/settings/CollegeDepartmentsSection";
 import { branchName, useBranchCatalog } from "@/lib/branches";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 
 type TabId = "profile" | "security" | "preferences" | "notifications" | "billing" | "departments";
 
@@ -123,7 +124,7 @@ const inputClass =
  * completion helps break ties in the Vault search ranking, lives in
  * CompanyVaultController on the backend.
  */
-function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (msg: string) => void }) {
+function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: ToastTrigger }) {
   const { login } = useAuth();
   const [bio, setBio] = useState(user.bio ?? "");
   const [linkedinUrl, setLinkedinUrl] = useState(user.linkedin_url ?? "");
@@ -167,7 +168,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
       if (token) login(token, res.user);
       onToast("Resume uploaded.");
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to upload your resume — make sure it's a PDF under 5MB.");
+      onToast(err instanceof ApiError ? err.message : "Failed to upload your resume — make sure it's a PDF under 5MB.", "error");
     } finally {
       setResumeUploading(false);
       if (resumeInputRef.current) resumeInputRef.current.value = "";
@@ -182,7 +183,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
       if (token) login(token, res.user);
       onToast("Resume removed.");
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove your resume.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove your resume.", "error");
     } finally {
       setResumeUploading(false);
     }
@@ -201,7 +202,7 @@ function RecruiterProfileSection({ user, onToast }: { user: AuthUser; onToast: (
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      onToast("Failed to download your resume.");
+      onToast("Failed to download your resume.", "error");
     } finally {
       setDownloadingResume(false);
     }
@@ -359,7 +360,6 @@ export default function SettingsPage() {
   const { login } = useAuth();
   const branchCatalog = useBranchCatalog();
   const [tab, setTab] = useState<TabId>("profile");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Deep links such as /settings?tab=preferences (the dashboard's "Steady pace" chip and the
   // Language focus card point here). Read once on mount from the address bar instead of
@@ -458,10 +458,7 @@ export default function SettingsPage() {
     );
   }
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const handleProfileSave = async () => {
     setProfileSaving(true);
@@ -567,7 +564,7 @@ export default function SettingsPage() {
       if (token) login(token, res.user);
       triggerToast("Profile photo updated.");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to upload your photo.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to upload your photo.", "error");
     } finally {
       setAvatarUploading(false);
       if (avatarInputRef.current) avatarInputRef.current.value = "";
@@ -582,7 +579,7 @@ export default function SettingsPage() {
       if (token) login(token, res.user);
       triggerToast("Profile photo removed.");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to remove your photo.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to remove your photo.", "error");
     } finally {
       setAvatarUploading(false);
     }
@@ -627,7 +624,7 @@ export default function SettingsPage() {
       setSessions((prev) => prev.filter((s) => s.id !== id));
       triggerToast("Session revoked.");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to revoke that session.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to revoke that session.", "error");
     } finally {
       setRevokingId(null);
     }
@@ -650,20 +647,6 @@ export default function SettingsPage() {
       title="Profile Settings"
       subtitle="Manage your identity, security, workspace preferences and notifications."
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <Check className="w-4 h-4 text-status-success shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Identity header */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col sm:flex-row sm:items-center gap-5">
         <div className="relative shrink-0">

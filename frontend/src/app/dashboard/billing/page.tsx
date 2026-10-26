@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Check, RefreshCw } from "lucide-react";
+import { useCallback } from "react";
+import { RefreshCw } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { PricingPlans } from "@/components/pricing/PricingPlans";
@@ -14,6 +13,7 @@ import { BillingFaq } from "@/components/billing/BillingFaq";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useMyPlan } from "@/lib/useMyPlan";
 import { SubscriptionCoverage } from "@/types/subscription";
+import { useToast } from "@/lib/toast";
 
 /**
  * "Plans & Billing" — the student's one page for everything about their plan:
@@ -29,12 +29,8 @@ import { SubscriptionCoverage } from "@/types/subscription";
 export default function BillingPage() {
   const { status } = useAuthGuard(["user"]);
   const { plan: subscription, loading, refresh } = useMyPlan(status === "ready");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = useCallback((msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
-  }, []);
+  const triggerToast = useToast();
 
   const handleSubscribed = useCallback(
     (_coverage: SubscriptionCoverage, planName: string) => {
@@ -51,21 +47,6 @@ export default function BillingPage() {
 
   return (
     <DashboardShell role="user" title="Plans & Billing" subtitle="Your plan, what it includes, and how to upgrade">
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            role="status"
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <Check className="w-4 h-4 text-status-success shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {loading ? (
         <div className="space-y-4" aria-busy="true" aria-label="Loading your plan">
           <div className="h-44 animate-pulse rounded-panel border border-border-subtle bg-surface" />

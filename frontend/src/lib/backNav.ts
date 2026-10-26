@@ -209,6 +209,46 @@ export function resolveBack(pathname: string | null | undefined, portal: PortalI
   return { href: withCarried(node.parent, node.carry, search), label: node.backLabel ?? parent?.title ?? portal.label };
 }
 
+/**
+ * "Back" normally goes UP the tree, not to wherever you came from. The one exception is a page that was opened FROM
+ * somewhere specific and says so: a problem opened from a company's PYQ page carries `?from=<that page>`, and both
+ * back arrows on the problem screen then lead back there — to the same company, with the same filters — instead of up to
+ * the Practice Arena.
+ *
+ * The value arrives in the address bar, so it is never trusted as a URL: only these in-app pages are accepted
+ * (anything else — another site, `//host`, `javascript:`, `/admin`, a `..` path — is ignored and the normal "up" applies).
+ */
+export const RETURN_TO_PARAM = "from";
+
+const RETURN_TO_PATHS: readonly string[] = ["/dashboard/company-prep", "/dashboard/company-prep/view"];
+
+/** Fragment (#section) a return address may carry, so the student lands where they left. Letters, digits, - and _ only. */
+const FRAGMENT = /^#[A-Za-z0-9_-]{1,40}$/;
+
+export function safeReturnTo(raw: string | null | undefined): BackTarget | null {
+  if (!raw || raw.length > 400) return null;
+  // Must be a plain absolute in-app path: one leading slash, no backslashes, control characters or spaces.
+  if (!raw.startsWith("/") || raw.startsWith("//") || /[\\\u0000-\u0020\u007f]/.test(raw)) return null;
+
+  const hashAt = raw.indexOf("#");
+  const beforeHash = hashAt === -1 ? raw : raw.slice(0, hashAt);
+  const fragment = hashAt === -1 ? "" : raw.slice(hashAt);
+  if (fragment && !FRAGMENT.test(fragment)) return null;
+
+  const queryAt = beforeHash.indexOf("?");
+  const path = queryAt === -1 ? beforeHash : beforeHash.slice(0, queryAt);
+  if (!RETURN_TO_PATHS.includes(path)) return null;
+
+  const node = ROUTE_TREE[path];
+  return node ? { href: raw, label: node.title } : null;
+}
+
+/** `href` plus `from=<returnTo>` — what a page adds to a link when it wants the destination's Back to lead back to it. */
+export function withReturnTo(href: string, returnTo?: string | null): string {
+  if (!returnTo) return href;
+  return `${href}${href.includes("?") ? "&" : "?"}${RETURN_TO_PARAM}=${encodeURIComponent(returnTo)}`;
+}
+
 /** `href` plus the carried parameters found in `search` (a `?a=b` string or URLSearchParams); unchanged when there is nothing to carry. */
 function withCarried(href: string, carry: readonly string[] | undefined, search: string | URLSearchParams): string {
   if (!carry || carry.length === 0) return href;

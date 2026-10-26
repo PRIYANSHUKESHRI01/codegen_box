@@ -2,8 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { ShieldCheck, Users2, Download, Eye, FileText, CheckCircle2, Loader2 } from "lucide-react";
+import { ShieldCheck, Users2, Download, Eye, FileText, Loader2 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -12,6 +11,7 @@ import type { CohortStudent } from "@/types/cohort";
 import type { ReportPreview } from "@/lib/generateTpoReports";
 import type { CoordinatorReportsData } from "@/lib/generateCoordinatorReports";
 import { Modal } from "@/components/ui/Modal";
+import { useToast } from "@/lib/toast";
 
 const AT_RISK_THRESHOLD = 60;
 
@@ -107,7 +107,6 @@ function downloadBlob(blob: Blob, filename: string) {
  */
 export default function CoordinatorReportsPage() {
   const { user, status } = useAuthGuard(["section_coordinator"]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [students, setStudents] = useState<CohortStudent[]>([]);
   const [section, setSection] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,10 +115,7 @@ export default function CoordinatorReportsPage() {
   const [previewReport, setPreviewReport] = useState<{ name: string; preview: ReportPreview } | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -181,7 +177,7 @@ export default function CoordinatorReportsPage() {
       const preview = await report.preview(data);
       setPreviewReport({ name: report.name, preview });
     } catch {
-      triggerToast(`Couldn't load "${report.name}". Please try again.`);
+      triggerToast(`Couldn't load "${report.name}". Please try again.`, "error");
     } finally {
       setBusyId(null);
     }
@@ -195,7 +191,7 @@ export default function CoordinatorReportsPage() {
       downloadBlob(blob, filename);
       triggerToast(`"${report.name}" downloaded.`);
     } catch {
-      triggerToast(`Couldn't generate "${report.name}". Please try again.`);
+      triggerToast(`Couldn't generate "${report.name}". Please try again.`, "error");
     } finally {
       setBusyId(null);
     }
@@ -211,20 +207,6 @@ export default function CoordinatorReportsPage() {
           : "Real, live reports generated from your section's current roster — view or download any time."
       }
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <CheckCircle2 className="w-4 h-4 text-status-success shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {loadError && (
         <div className="p-4 rounded-panel bg-status-danger/10 border border-status-danger/25 text-xs text-status-danger flex items-center justify-between">
           <span>{loadError}</span>

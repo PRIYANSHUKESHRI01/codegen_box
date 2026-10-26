@@ -214,6 +214,11 @@ const config: Config = {
           from: { opacity: "0", transform: "scale(0.96) translateY(8px)" },
           to: { opacity: "1", transform: "scale(1) translateY(0)" },
         },
+        // The countdown hairline along the bottom of a feedback toast (components/ui/Toaster.tsx); its duration is set inline per toast.
+        "toast-progress": {
+          from: { transform: "scaleX(1)" },
+          to: { transform: "scaleX(0)" },
+        },
         // The notification bell ringing when something arrives (components/notifications/NotificationBell.tsx).
         wiggle: {
           "0%, 100%": { transform: "rotate(0deg)" },
@@ -231,6 +236,7 @@ const config: Config = {
         "fade-in": "fade-in 0.15s ease-out",
         "modal-in": "modal-in 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
         wiggle: "wiggle 0.9s ease-in-out 2",
+        "toast-progress": "toast-progress 4s linear forwards",
       },
     },
   },

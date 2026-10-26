@@ -8,6 +8,8 @@ import { DISCIPLINE_LABEL } from "@/lib/core";
 import { resetBranchCatalog } from "@/lib/branches";
 import type { CoverageCollege, CoverageDiscipline, CoverageSubject } from "@/types/core";
 import { CorePilotColleges } from "./CorePilotColleges";
+import { type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 /** Colour a cell by how it compares with the bar a subject needs to carry tests. */
 const cell = (n: number, bar: number) => (n === 0 ? "bg-status-danger/10 text-status-danger" : n < bar ? "bg-status-warning/10 text-status-warning" : "bg-status-success/10 text-status-success");
@@ -21,7 +23,7 @@ const cell = (n: number, bar: number) => (n === 0 ? "bg-status-danger/10 text-st
  * branch off hides Core Prep from its students again immediately. Before going live, a branch can be piloted at
  * chosen colleges (CorePilotColleges) — the stage badge says which of live / pilot / hidden a branch is in.
  */
-export function CoreCoveragePanel({ isSuperadmin, onToast }: { isSuperadmin: boolean; onToast: (m: string) => void }) {
+export function CoreCoveragePanel({ isSuperadmin, onToast }: { isSuperadmin: boolean; onToast: ToastTrigger }) {
   const [data, setData] = useState<CoverageDiscipline[] | null>(null);
   const [colleges, setColleges] = useState<CoverageCollege[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +53,11 @@ export function CoreCoveragePanel({ isSuperadmin, onToast }: { isSuperadmin: boo
       await load();
     } catch (err) {
       const reasons = err instanceof ApiError ? err.errors?.live : undefined;
-      if (live && !force && reasons && window.confirm(`${reasons.join("\n")}\n\nSwitch it on anyway? Students would see a thin bank.`)) {
+      if (live && !force && reasons && (await confirmDialog({ title: "Switch it on anyway?", message: "Students would see a thin bank.", items: reasons, tone: "warning", confirmLabel: "Switch on anyway" }))) {
         setBusy(null);
         return setLive(d, true, true);
       }
-      if (!reasons) onToast(err instanceof ApiError ? err.message : "That didn't work.");
+      if (!reasons) onToast(err instanceof ApiError ? err.message : "That didn't work.", "error");
     } finally {
       setBusy(null);
     }

@@ -5,6 +5,7 @@ import { Cpu, Server, RefreshCw, Sliders, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { Toggle } from "@/components/ui/Toggle";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface JudgeNodeStatus {
   name: string;
@@ -57,7 +58,7 @@ interface FeatureFlag {
  * "clusters" that implied capacity the platform never had. Feature flags are
  * real, persisted toggles; application code does not branch on them yet.
  */
-export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function InfrastructurePanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [telemetry, setTelemetry] = useState<JudgeTelemetry | null>(null);
   const [nodesLoading, setNodesLoading] = useState(true);
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
@@ -71,7 +72,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
         .get<JudgeTelemetry>("/superadmin/judge-nodes")
         .then(setTelemetry)
         .catch((err) => {
-          if (!silent) triggerToast(err instanceof ApiError ? err.message : "Failed to load judge telemetry.");
+          if (!silent) triggerToast(err instanceof ApiError ? err.message : "Failed to load judge telemetry.", "error");
         })
         .finally(() => setNodesLoading(false));
     },
@@ -83,7 +84,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
     api
       .get<{ flags: FeatureFlag[] }>("/superadmin/feature-flags")
       .then((res) => setFlags(res.flags))
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load feature flags."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load feature flags.", "error"))
       .finally(() => setFlagsLoading(false));
   }, [triggerToast]);
 
@@ -104,7 +105,7 @@ export function InfrastructurePanel({ triggerToast }: { triggerToast: (msg: stri
       const res = await api.post<{ flag: FeatureFlag }>(`/superadmin/feature-flags/${flag.id}/toggle`);
       setFlags((prev) => prev.map((f) => (f.id === flag.id ? res.flag : f)));
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update flag.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update flag.", "error");
     } finally {
       setTogglingId(null);
     }

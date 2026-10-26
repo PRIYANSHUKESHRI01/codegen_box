@@ -5,6 +5,7 @@ import { Search, FileCode2, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { CompanyBadgeList } from "@/components/problems/CompanyBadge";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface ApiProblem {
   id: number;
@@ -57,7 +58,7 @@ function formatDate(iso: string) {
  * didn't actually work would be the same kind of fabrication this panel
  * replaces.
  */
-export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function ProblemBankPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [problems, setProblems] = useState<ApiProblem[]>([]);
   const [counts, setCounts] = useState<ProblemsResponse["counts"] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,7 +88,7 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
           setPage(res.problems.current_page);
           setHasMore(res.problems.current_page < res.problems.last_page);
         })
-        .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load the problem catalog."))
+        .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load the problem catalog.", "error"))
         .finally(() => setLoading(false));
     },
     [triggerToast]
@@ -109,7 +110,7 @@ export function ProblemBankPanel({ triggerToast }: { triggerToast: (msg: string)
         setPage(res.problems.current_page);
         setHasMore(res.problems.current_page < res.problems.last_page);
       })
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more problems."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more problems.", "error"))
       .finally(() => setLoadingMore(false));
   };
 

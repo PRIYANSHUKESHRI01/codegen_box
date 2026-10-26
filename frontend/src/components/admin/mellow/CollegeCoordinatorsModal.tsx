@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 import { sectionIsOpen, type SectionOption } from "@/lib/coordinatorSections";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface ApiCoordinator {
   id: number;
@@ -37,7 +38,7 @@ export function CollegeCoordinatorsModal({
 }: {
   college: { id: number; name: string } | null;
   onClose: () => void;
-  triggerToast: (msg: string) => void;
+  triggerToast: ToastTrigger;
 }) {
   const [coordinators, setCoordinators] = useState<ApiCoordinator[]>([]);
   const [sections, setSections] = useState<SectionOption[]>([]);
@@ -60,7 +61,7 @@ export function CollegeCoordinatorsModal({
         setCoordinators(res.coordinators);
         setSections(res.sections);
       })
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load coordinators."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load coordinators.", "error"))
       .finally(() => setLoading(false));
   }, [college, triggerToast]);
 
@@ -102,7 +103,7 @@ export function CollegeCoordinatorsModal({
       triggerToast(`Coordinator "${res.coordinator.name}" added for Section ${res.coordinator.section}.`);
       load(); // re-fetch: that section needs to drop off the "available" list
     } catch (err) {
-      triggerToast(firstError(err, "Failed to add coordinator."));
+      triggerToast(firstError(err, "Failed to add coordinator."), "error");
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +115,7 @@ export function CollegeCoordinatorsModal({
       setCoordinators((prev) => prev.map((c) => (c.id === coordinator.id ? res.coordinator : c)));
       triggerToast(res.coordinator.is_blocked ? `${coordinator.name} blocked.` : `${coordinator.name} unblocked.`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update coordinator.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update coordinator.", "error");
     }
   };
 
@@ -130,7 +131,7 @@ export function CollegeCoordinatorsModal({
       triggerToast(`${coordinator.name} reassigned to Section ${res.coordinator.section}.`);
       load(); // re-fetch: the old section frees up, the new one is now taken
     } catch (err) {
-      triggerToast(firstError(err, "Failed to reassign section."));
+      triggerToast(firstError(err, "Failed to reassign section."), "error");
     }
   };
 

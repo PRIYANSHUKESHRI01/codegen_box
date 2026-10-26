@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { cn } from "@/lib/utils";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
@@ -64,7 +65,6 @@ import {
   HpSkeletonCards,
   HpStagger,
   HpTabs,
-  HpToast,
   hpBtn,
   hpEase,
   hpTh,
@@ -73,6 +73,7 @@ import {
 import { HpErrorCard } from "@/components/portal/pipeline-kit";
 import { rollupLanguages } from "@/lib/cohortInsights";
 import { languageLabel } from "@/lib/judgeLanguages";
+import { useToast } from "@/lib/toast";
 
 // jsPDF + jspdf-autotable + ExcelJS (~500kB combined) live behind this one
 // dynamic import instead of a top-level one — every REPORTS entry below
@@ -299,7 +300,6 @@ export default function PlacementReportsPage() {
   const { scope: deptScope } = useDepartmentScope();
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
   const [sectionFilter, setSectionFilter] = useState<string | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [rawData, setData] = useState<TpoReportsData | null>(null);
   const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
   // The branch switcher narrows the STUDENT side of every report (rosters, readiness, who fails a drive).
@@ -317,10 +317,7 @@ export default function PlacementReportsPage() {
   const [previewReport, setPreviewReport] = useState<{ name: string; preview: ReportPreview } | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -397,7 +394,7 @@ export default function PlacementReportsPage() {
       const preview = await report.preview(data, report.sectionAware ? sectionFilter : null);
       setPreviewReport({ name: report.name, preview });
     } catch {
-      triggerToast(`Couldn't load "${report.name}". Please try again.`);
+      triggerToast(`Couldn't load "${report.name}". Please try again.`, "error");
     } finally {
       setBusyId(null);
     }
@@ -411,7 +408,7 @@ export default function PlacementReportsPage() {
       downloadBlob(blob, filename);
       triggerToast(`"${report.name}" downloaded.`);
     } catch {
-      triggerToast(`Couldn't generate "${report.name}". Please try again.`);
+      triggerToast(`Couldn't generate "${report.name}". Please try again.`, "error");
     } finally {
       setBusyId(null);
     }
@@ -430,8 +427,6 @@ export default function PlacementReportsPage() {
       title="Placement Reports"
       subtitle="Real, live reports generated from your current student cohort and mapped drives — view or download any time."
     >
-      <HpToast message={toastMessage} tone={toastMessage?.startsWith("Couldn't") ? "rose" : "emerald"} />
-
       {loadError && <HpErrorCard message={loadError} onRetry={loadData} />}
 
       {loading ? (
@@ -952,7 +947,7 @@ function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
                   <tr key={d.id} className="transition-colors duration-200 hover:bg-indigo-500/[0.035]">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
-                        <HpCompanyLogo name={d.company.name} logo={d.company.logo} size="sm" />
+                        <CompanyLogo name={d.company.name} logo={d.company.logo} size="sm" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="max-w-[11rem] truncate text-xs font-bold text-primary 2xl:max-w-[15rem]" title={d.title}>

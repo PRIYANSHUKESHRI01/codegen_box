@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, CheckCircle2, Info, Megaphone, RefreshCw, Rocket, ScrollText, SearchX, CalendarClock, Sparkles, Trophy, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Info, Megaphone, RefreshCw, Rocket, ScrollText, SearchX, CalendarClock, Sparkles, Trophy, TriangleAlert } from "lucide-react";
 import { ArenaShell } from "@/components/arena/ArenaShell";
 import { ActionCard } from "@/components/arena/detail/ActionCard";
 import { OverviewTab, PrizesTab, RulesTab, ScheduleTab, UpdatesTab } from "@/components/arena/detail/ContentTabs";
@@ -23,6 +23,7 @@ import { ApiError } from "@/lib/api";
 import { accentVars, arenaApi, errorMessage } from "@/lib/hackathon";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useEntitlements } from "@/lib/useEntitlements";
+import { toast } from "@/lib/toast";
 import type { HackathonDetail } from "@/types/hackathon";
 import "@/app/arena/detail.css";
 
@@ -109,7 +110,6 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
 
   const [registering, setRegistering] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
 
   const { top: topbar, bottom: bottomNav } = useShellChrome();
   const heroRef = useRef<HTMLElement>(null);
@@ -121,12 +121,6 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
   useEffect(() => {
     document.title = `${h.title} · Hack Arena`;
   }, [h.title]);
-
-  useEffect(() => {
-    if (!toast) return;
-    const id = window.setTimeout(() => setToast(null), 4200);
-    return () => window.clearTimeout(id);
-  }, [toast]);
 
   const isStudent = userRole === "user";
 
@@ -270,7 +264,7 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
                       onChange={setH}
                       onLeft={(updated) => {
                         setH(updated);
-                        setToast("You've left the hackathon.");
+                        toast.success("You've left the hackathon.");
                         openTab("overview");
                       }}
                     />
@@ -302,30 +296,11 @@ function DetailBody({ h, setH, userRole }: { h: HackathonDetail; setH: (h: Hacka
             onRegistered={(updated) => {
               setRegistering(false);
               setH(updated);
-              setToast(`You're in! Welcome to ${updated.title}.`);
+              toast.success(`You're in! Welcome to ${updated.title}.`);
               openTab("project");
             }}
           />
         )}
-
-        <AnimatePresence>
-          {toast && (
-            <motion.div
-              role="status"
-              initial={{ opacity: 0, y: 24, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-              style={{ bottom: "calc(var(--ar-bottom-nav, 0px) + 24px)" }}
-              className="ar-float fixed left-1/2 z-[80] flex max-w-[calc(100vw-32px)] -translate-x-1/2 items-center gap-3 rounded-full py-2.5 pl-2.5 pr-5 text-[14px] font-semibold text-white"
-            >
-              <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-300/40">
-                <CheckCircle2 className="h-4 w-4 text-emerald-300" aria-hidden />
-              </span>
-              <span className="min-w-0">{toast}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
     </MotionConfig>
   );

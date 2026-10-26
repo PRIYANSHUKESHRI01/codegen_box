@@ -5,6 +5,7 @@ import { GitBranch, Loader2, Plus, RefreshCw, Trash2, TriangleAlert } from "luci
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { disciplineStyle, resetBranchCatalog, type DisciplineCode } from "@/lib/branches";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface AdminDiscipline {
   code: DisciplineCode;
@@ -52,7 +53,7 @@ interface BranchesResponse {
  * at once. Labels nobody recognises yet are listed first so they can be mapped in one click.
  * (A TPO can also map labels for their own college only, from the Student Cohort.)
  */
-export function BranchesPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function BranchesPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [data, setData] = useState<BranchesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function BranchesPanel({ triggerToast }: { triggerToast: (msg: string) =>
       triggerToast(done(res.students_updated ?? 0));
       await load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.errors?.label?.[0] ?? err.message : "That didn't work.");
+      triggerToast(err instanceof ApiError ? err.errors?.label?.[0] ?? err.message : "That didn't work.", "error");
     } finally {
       setBusy(false);
     }

@@ -45,12 +45,13 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpInput,
   hpLabel,
   type HpTone,
 } from "@/components/portal/kit";
 import { ScIconButton, ScMeta, ScMetric, ScNotice, ScReveal } from "@/components/portal/screeningKit";
+import { useToast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const BASE_PATH = "/company/interviews";
 
@@ -80,7 +81,6 @@ function CompanyInterviewsPageContent() {
   const searchParams = useSearchParams();
   const [interviews, setInterviews] = useState<InterviewSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<InterviewSummary | null>(null);
   const [inviting, setInviting] = useState<InterviewSummary | null>(null);
@@ -103,10 +103,7 @@ function CompanyInterviewsPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkDriveId, deepLinkMock]);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,7 +111,7 @@ function CompanyInterviewsPageContent() {
       const res = await api.get<{ interviews: InterviewSummary[] }>(BASE_PATH);
       setInterviews(res.interviews);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load interviews.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load interviews.", "error");
     } finally {
       setLoading(false);
     }
@@ -132,18 +129,18 @@ function CompanyInterviewsPageContent() {
       triggerToast(`"${interview.title}" is now published.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
   const handleDelete = async (interview: InterviewSummary) => {
-    if (!window.confirm(`Delete "${interview.title}"? This can't be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete "${interview.title}"?`, message: "This can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`${BASE_PATH}/${interview.slug}`);
       triggerToast(`"${interview.title}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete interview.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete interview.", "error");
     }
   };
 
@@ -173,8 +170,6 @@ function CompanyInterviewsPageContent() {
       subtitle="Voice interviews tied to your job openings — candidates only see one once you shortlist them."
       actionButton={{ label: "New Interview", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {(loading || hasAny) && (
           <HpItem>

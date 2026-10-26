@@ -9,6 +9,8 @@ import { localDatetimeInputToUtcIso, utcIsoToLocalDatetimeInput } from "@/lib/da
 import { AdminCompanyRow, AdminDriveRow, DRIVE_STATUSES, inputClass } from "./types";
 import { MapCollegesModal } from "./MapCollegesModal";
 import { BranchPicker } from "@/components/branches/BranchPicker";
+import { useToast } from "@/lib/toast";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 
 interface DrivesPanelProps {
   companies: AdminCompanyRow[];
@@ -40,12 +42,8 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [mappingDrive, setMappingDrive] = useState<AdminDriveRow | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4000);
-  };
+  const triggerToast = useToast();
 
   const loadDrives = useCallback(async () => {
     setLoading(true);
@@ -170,7 +168,7 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
                 className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle flex items-center justify-between gap-4 flex-wrap"
               >
                 <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xl shrink-0">{d.company?.logo ?? "🏢"}</span>
+                  <CompanyLogo name={d.company?.name ?? d.title} logo={d.company?.logo} size="sm" />
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="text-sm font-bold text-primary">{d.title}</h4>
@@ -440,12 +438,6 @@ export function DrivesPanel({ companies }: DrivesPanelProps) {
         />
       )}
 
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-[60] px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm">
-          <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
     </div>
   );
 }

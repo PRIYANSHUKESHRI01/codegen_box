@@ -1,10 +1,10 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
   Flame,
@@ -51,6 +51,19 @@ import { buildActivityWeeks } from "@/lib/activityGrid";
 import { RatingHistoryPoint } from "@/types/studentStats";
 import type { UpcomingPlacementDrive, MyDriveApplication } from "@/types/placement";
 import type { ContestSummary } from "@/types/liveContest";
+
+/** The company packs shown as shortcuts on the PYQ card (slug = the catalogue slug; the logo comes from the company's name/slug). */
+const PYQ_SHORTCUTS = [
+  { slug: "tcs-digital", name: "TCS", tag: "42 Questions · NQT" },
+  { slug: "infosys", name: "Infosys", tag: "42 Questions · SP/DSE" },
+  { slug: "accenture", name: "Accenture", tag: "42 Questions · 4 Rounds" },
+  { slug: "wipro", name: "Wipro", tag: "42 Questions · Elite NTH" },
+  { slug: "cognizant", name: "Cognizant", tag: "42 Questions · GenC" },
+  { slug: "capgemini", name: "Capgemini", tag: "42 Questions · Exceller" },
+  { slug: "hcltech", name: "HCLTech", tag: "42 Questions · GET" },
+  { slug: "tech-mahindra", name: "Tech Mahindra", tag: "42 Questions · ASE" },
+  { slug: "ltimindtree", name: "LTIMindtree", tag: "42 Questions · Spark" },
+] as const;
 
 interface ApiDriveSummary {
   id: number;
@@ -113,7 +126,6 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
   const lean = layout === "core" || layout === "general";
   const codes = layout !== "general";
   const caps = capabilitiesOf(user);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [placementDrives, setPlacementDrives] = useState<DashboardDriveCard[]>([]);
   const [driveAccess, setDriveAccess] = useState(true);
   const [drivesLoading, setDrivesLoading] = useState(true);
@@ -125,10 +137,6 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
   const { stats, loading: statsLoading } = useMyStats(status === "ready", user?.weekly_pace ?? "");
   const activityWeeks = useMemo(() => buildActivityWeeks(stats?.activity ?? []), [stats]);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -295,20 +303,6 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
             : undefined
       }
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {extraTop}
 
       {/* ------------------------------------------------------------ */}
@@ -759,7 +753,7 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-2xl shrink-0">{drive.company.logo ?? "🏢"}</span>
+                    <CompanyLogo name={drive.company.name} slug={drive.company.slug} logo={drive.company.logo} size="sm" />
                     <div className="min-w-0">
                       <h4 className="text-sm font-bold text-primary truncate">{drive.company.name}</h4>
                       <p className="text-2xs text-text-muted truncate">{drive.roleTitle}</p>
@@ -849,166 +843,39 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
           </Link>
         </div>
 
-        {/* Quick Company Badges / Previews */}
+        {/* Quick company shortcuts — each with its real logo */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 pt-1">
-          <Link
-            href="/dashboard/company-prep/view?company=tcs-digital"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🟦</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  TCS
+          {PYQ_SHORTCUTS.map((c) => (
+            <Link
+              key={c.slug}
+              href={`/dashboard/company-prep/view?company=${c.slug}`}
+              className="group flex flex-col gap-2.5 rounded-control border border-border-subtle bg-elevated/60 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-elevated hover:shadow-subtle"
+            >
+              <CompanyLogo name={c.name} slug={c.slug} size="sm" className="h-11 w-full rounded-xl" />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">{c.name}</div>
+                  <div className="text-3xs text-text-muted truncate">{c.tag}</div>
                 </div>
-                <div className="text-3xs text-text-muted">42 Questions · NQT</div>
+                <ArrowRight className="w-3 h-3 shrink-0 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
               </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=infosys"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🔷</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Infosys
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · SP/DSE</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=accenture"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🟣</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Accenture
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · 4 Rounds</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=wipro"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🟩</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Wipro
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · Elite NTH</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=cognizant"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">💠</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Cognizant
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · GenC</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=capgemini"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🔷</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Capgemini
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · Exceller</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=hcltech"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🔷</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  HCLTech
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · GET</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=tech-mahindra"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🟥</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  Tech Mahindra
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · ASE</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
-
-          <Link
-            href="/dashboard/company-prep/view?company=ltimindtree"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🟨</span>
-              <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  LTIMindtree
-                </div>
-                <div className="text-3xs text-text-muted">42 Questions · Spark</div>
-              </div>
-            </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
-          </Link>
+            </Link>
+          ))}
 
           <Link
             href="/dashboard/company-prep"
-            className="p-3 rounded-control bg-elevated/60 border border-border-subtle hover:border-border-strong hover:bg-elevated transition-all flex items-center justify-between group"
+            className="group flex flex-col gap-2.5 rounded-control border border-border-subtle bg-elevated/60 p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:bg-elevated hover:shadow-subtle"
           >
-            <div className="flex items-center gap-2.5 min-w-0">
-              <span className="text-xl shrink-0 font-bold">🏢</span>
+            <span className="flex h-11 w-full items-center justify-center rounded-xl bg-accent-primary/10 text-accent-primary transition-colors group-hover:bg-accent-primary/15">
+              <Building2 className="w-5 h-5" />
+            </span>
+            <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">
-                  All Companies
-                </div>
-                <div className="text-3xs text-text-muted">9 Hiring Giants Live</div>
+                <div className="text-xs font-bold text-primary truncate group-hover:text-accent-primary transition-colors">All Companies</div>
+                <div className="text-3xs text-text-muted truncate">{PYQ_SHORTCUTS.length} Hiring Giants Live</div>
               </div>
+              <ArrowRight className="w-3 h-3 shrink-0 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
             </div>
-            <ArrowRight className="w-3 h-3 text-text-muted group-hover:text-accent-primary group-hover:translate-x-0.5 transition-all" />
           </Link>
         </div>
       </section>

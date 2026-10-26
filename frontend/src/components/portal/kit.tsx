@@ -23,7 +23,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, MotionConfig, motion, useReducedMotion, type Variants } from "framer-motion";
-import { AlertCircle, CheckCircle2, Loader2, Search, type LucideIcon } from "lucide-react";
+import { Loader2, Search, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 
@@ -737,30 +737,6 @@ export function HpSkeletonRows({ rows = 5, className }: { rows?: number; classNa
         </div>
       ))}
     </HpCard>
-  );
-}
-
-/* ── Toast ──────────────────────────────────────────────────────────────── */
-
-export function HpToast({ message, tone = "emerald" }: { message: string | null; tone?: "emerald" | "rose" | "indigo" }) {
-  const ring = tone === "rose" ? "text-rose-500" : tone === "indigo" ? "text-indigo-500" : "text-emerald-500";
-  const ToastIcon = tone === "rose" ? AlertCircle : CheckCircle2;
-  return (
-    <AnimatePresence>
-      {message && (
-        <motion.div
-          role="status"
-          initial={{ opacity: 0, y: -16, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -12, scale: 0.97 }}
-          transition={{ duration: 0.28, ease: hpEase }}
-          className="fixed right-4 top-20 z-[60] flex max-w-sm items-start gap-3 rounded-2xl border border-border-strong bg-[rgb(var(--bg-surface-rgb))]/95 px-4 py-3 text-13 font-semibold text-primary shadow-[0_18px_50px_-12px_rgba(39,47,92,0.35)] backdrop-blur-xl sm:right-6"
-        >
-          <ToastIcon className={cn("mt-px h-[18px] w-[18px] shrink-0", ring)} />
-          <span className="leading-snug">{message}</span>
-        </motion.div>
-      )}
-    </AnimatePresence>
   );
 }
 

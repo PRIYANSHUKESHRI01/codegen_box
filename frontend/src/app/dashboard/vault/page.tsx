@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Award,
   Briefcase,
@@ -25,6 +25,7 @@ import { UpgradePanel } from "@/components/billing/UpgradePanel";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { StudentVaultProfile, StudentVaultResponse, VaultInquiry } from "@/types/vault";
 
@@ -78,24 +79,13 @@ export default function StudentVaultPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirmingHide, setConfirmingHide] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 4000);
-  }, []);
-
-  useEffect(() => () => {
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-  }, []);
+  const showToast = useToast();
 
   const load = useCallback(async () => {
     try {
       setData(await api.get<StudentVaultResponse>("/me/vault"));
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Couldn't load your Vault.");
+      showToast(err instanceof ApiError ? err.message : "Couldn't load your Vault.", "error");
     } finally {
       setLoading(false);
     }
@@ -115,7 +105,7 @@ export default function StudentVaultPage() {
       else await load();
       showToast(success);
     } catch (err) {
-      showToast(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+      showToast(err instanceof ApiError ? err.message : "Something went wrong. Please try again.", "error");
     } finally {
       setBusy(false);
       setConfirmingHide(false);
@@ -141,12 +131,6 @@ export default function StudentVaultPage() {
       title="Vault"
       subtitle="Reach a readiness score of 60 and get hired directly by employers on Mellow Vault — only if you say yes."
     >
-      {toast && (
-        <div role="status" className="fixed right-6 top-20 z-50 max-w-sm rounded-panel border border-emerald-500/40 bg-surface px-4 py-3 text-xs font-semibold text-primary shadow-card">
-          {toast}
-        </div>
-      )}
-
       {loading || !data || !readiness ? (
         <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-10 text-xs text-text-muted">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />

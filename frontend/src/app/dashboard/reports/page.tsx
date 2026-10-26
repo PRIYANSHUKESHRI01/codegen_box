@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Download,
   Trophy,
@@ -44,6 +43,7 @@ import { RatingHistoryPoint } from "@/types/studentStats";
 import { languageLabel } from "@/lib/judgeLanguages";
 import type { SubmissionHistoryRow, StudentReportInterview } from "@/types/studentReport";
 import type { SoftSkillHistoryEntry } from "@/types/softSkill";
+import { useToast } from "@/lib/toast";
 
 interface ApiDriveSummary {
   company: { name: string };
@@ -63,7 +63,6 @@ const TOPIC_MASTERY_COLLAPSED_COUNT = 20;
 
 export default function PerformanceReportPage() {
   const { user, status } = useAuthGuard(["user"]);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [ratingHistory, setRatingHistory] = useState<RatingHistoryPoint[]>([]);
   const [drives, setDrives] = useState<ApiDriveSummary[]>([]);
   const [submissions, setSubmissions] = useState<SubmissionHistoryRow[]>([]);
@@ -76,10 +75,7 @@ export default function PerformanceReportPage() {
   // A programme without coding practice (Management, Commerce, Arts …) has no solved history, rating or code to report.
   const codes = codesAtAll(user);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -131,7 +127,7 @@ export default function PerformanceReportPage() {
       setViewingCode((prev) => (prev ? { ...prev, code: res.submission.code } : prev));
     } catch (err) {
       setViewingCode(null);
-      window.alert(err instanceof ApiError ? err.message : "Failed to load submitted code.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load submitted code.", "error");
     }
   };
 
@@ -232,20 +228,6 @@ export default function PerformanceReportPage() {
       }
       actionButton={{ label: "Download PDF", icon: Download, onClick: handleDownload }}
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {!codes && (

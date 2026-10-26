@@ -17,7 +17,27 @@ export const NO_UNIVERSITY = "none";
  * university under the chosen role (and search). One small request; the previous answer stays on screen while
  * the next loads so the chips don't flicker, and a slow answer to an old filter never overwrites a newer one.
  */
-export function useDirectoryFacets({ role, collegeId, search }: { role: string; collegeId: string; search: string }): DirectoryFacets | null {
+export function useDirectoryFacets({
+  role,
+  collegeId,
+  search,
+  department = "",
+  hasCollege,
+  plan = "",
+  refreshKey = 0,
+}: {
+  role: string;
+  collegeId: string;
+  search: string;
+  /** Narrows the university counts to one department's students — pass whatever the list itself is filtered by. */
+  department?: string;
+  /** Mirrors the list's `has_college` so the department counts cover the same students the list does. */
+  hasCollege?: boolean;
+  /** A student plan filter: narrows the students, the university counts and the "All" total to those on it. */
+  plan?: string;
+  /** Bump to re-read the counts after the list itself changed (an account was created or removed). */
+  refreshKey?: number;
+}): DirectoryFacets | null {
   const [facets, setFacets] = useState<DirectoryFacets | null>(null);
   const latest = useRef(0);
 
@@ -28,6 +48,9 @@ export function useDirectoryFacets({ role, collegeId, search }: { role: string; 
     else if (role) params.set("role", role);
     if (collegeId) params.set("college_id", collegeId);
     if (search) params.set("search", search);
+    if (department) params.set("department", department);
+    if (hasCollege !== undefined) params.set("has_college", hasCollege ? "1" : "0");
+    if (plan) params.set("plan", plan);
 
     api
       .get<DirectoryFacets>(`/superadmin/users/facets?${params.toString()}`)
@@ -38,7 +61,7 @@ export function useDirectoryFacets({ role, collegeId, search }: { role: string; 
       .catch(() => {
         // The filters still work without counts.
       });
-  }, [role, collegeId, search]);
+  }, [role, collegeId, search, department, hasCollege, plan, refreshKey]);
 
   return facets;
 }
@@ -49,9 +72,9 @@ export interface RoleChoice {
 }
 
 /** Sum of the facet counts a chip stands for ("admin_internal,admin_marketing" is one chip). */
-function chipCount(value: string, roles: Record<string, number> | undefined): number | null {
+function chipCount(value: string, roles: Record<string, number> | undefined, total?: number): number | null {
   if (!roles) return null;
-  if (value === "") return Object.values(roles).reduce((a, b) => a + b, 0);
+  if (value === "") return total ?? Object.values(roles).reduce((a, b) => a + b, 0);
   return value.split(",").reduce((sum, r) => sum + (roles[r] ?? 0), 0);
 }
 
@@ -60,7 +83,7 @@ export function RoleChips({ choices, value, onChange, facets }: { choices: RoleC
   return (
     <div role="group" aria-label="Filter by account type" className="flex flex-wrap gap-1.5">
       {choices.map((c) => {
-        const count = chipCount(c.value, facets?.roles);
+        const count = chipCount(c.value, facets?.roles, facets?.total);
         const active = value === c.value;
         return (
           <button

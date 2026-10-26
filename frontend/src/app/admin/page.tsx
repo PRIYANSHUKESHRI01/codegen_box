@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   FileCode2,
   Plus,
@@ -23,6 +23,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { userHasPermission } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { CompanyReportsData } from "@/types/hiring";
+import { useToast } from "@/lib/toast";
 
 type MellowTab = "overview" | "colleges" | "users" | "problems";
 
@@ -97,11 +98,7 @@ function AdminPageContent() {
   }, [status, userRole, mellowTab, user?.permissions]);
 
   // Toast notification
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   // TPO VIEW: its real cohort + placement pipeline data, subscription status
   // and placement-target editor now live in TpoCommandCenter (rendered
@@ -181,21 +178,6 @@ function AdminPageContent() {
       }
     >
       {/* Toast Notification */}
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            // z-[100]: must sit above the panels' modal overlays (z-50) or a failed
-            // action's message is drawn underneath the dark backdrop and never seen.
-            className="fixed top-20 right-6 z-[100] px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Mellow Internal Staff: a lightweight "who's signed in" status strip.
           TPOs don't get an equivalent banner here — their institution/name/

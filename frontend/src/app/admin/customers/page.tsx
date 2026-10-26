@@ -2,7 +2,6 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Search, Users2, UserPlus, CheckCircle2, StickyNote } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CustomerDetailDrawer } from "@/components/customers/CustomerDetailDrawer";
@@ -42,12 +41,7 @@ export default function InternalCustomersPage() {
   const [search, setSearch] = useState("");
   const [searchDebounced, setSearchDebounced] = useState("");
   const [activeCustomerId, setActiveCustomerId] = useState<number | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 350);
@@ -95,20 +89,6 @@ export default function InternalCustomersPage() {
       title="My Customers"
       subtitle="Converted Mellow Direct leads handed off from the Marketing team — real subscribers, now yours to onboard and support."
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-panel bg-surface border border-border-subtle shadow-subtle">

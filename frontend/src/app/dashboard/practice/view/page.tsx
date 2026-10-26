@@ -18,6 +18,7 @@ import { invalidateProblem, loadProblem } from "@/lib/problemPrefetch";
 import { useJudgedRun } from "@/lib/useJudgedRun";
 import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { RETURN_TO_PARAM, safeReturnTo } from "@/lib/backNav";
 import { pickInitialLanguage, recallLastLanguage, rememberLastLanguage } from "@/lib/studentPreferences";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,12 @@ function ProblemSolvePageContent() {
   const slug = searchParams.get("slug") ?? "";
   // Back must never leave the student staring at the old screen if the Practice Arena's data is slow to arrive.
   const nav = useResilientNavigation();
+
+  // A problem opened from a company's PYQ page (…&from=/dashboard/company-prep/view?company=…) goes back THERE — the same company,
+  // the same filters — not up to the Practice Arena. Only allow-listed in-app pages are honoured (see safeReturnTo).
+  const returnTo = safeReturnTo(searchParams.get(RETURN_TO_PARAM));
+  const backHref = returnTo?.href ?? "/dashboard/practice";
+  const backLabel = `Back to ${returnTo?.label ?? "Practice Arena"}`;
 
   const [problem, setProblem] = useState<ProblemDetail | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not_found" | "error">("loading");
@@ -166,7 +173,7 @@ function ProblemSolvePageContent() {
   }
 
   return (
-    <DashboardShell role="user" title="Practice Arena" fullBleed defaultSidebarCollapsed>
+    <DashboardShell role="user" title="Practice Arena" fullBleed defaultSidebarCollapsed back={returnTo ?? undefined}>
       <div className="flex flex-col flex-1 min-h-0">
         {loadState === "loading" && <SolveScreenSkeleton />}
 
@@ -174,7 +181,8 @@ function ProblemSolvePageContent() {
           <CenteredNotice
             heading="Problem not found"
             body={`"${slug}" doesn't match any problem in the catalog.`}
-            onBack={() => nav.go("/dashboard/practice")}
+            onBack={() => nav.go(backHref)}
+            backLabel={backLabel}
           />
         )}
 
@@ -190,7 +198,8 @@ function ProblemSolvePageContent() {
           <div className="workspace-in flex flex-col flex-1 min-h-0">
             <ProblemHeaderBar
               problem={problem}
-              onBack={() => nav.go("/dashboard/practice")}
+              onBack={() => nav.go(backHref)}
+              backLabel={backLabel}
               backPending={nav.pending}
               onRun={handleRun}
               onSubmit={handleSubmit}
@@ -385,11 +394,13 @@ function CenteredNotice({
   heading,
   body,
   onBack,
+  backLabel = "Back to Practice Arena",
   retry,
 }: {
   heading: string;
   body: string;
   onBack?: () => void;
+  backLabel?: string;
   retry?: boolean;
 }) {
   return (
@@ -404,7 +415,7 @@ function CenteredNotice({
         ) : (
           onBack && (
             <Button variant="outline" size="sm" onClick={onBack}>
-              Back to Practice Arena
+              {backLabel}
             </Button>
           )
         )}

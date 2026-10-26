@@ -1,5 +1,6 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -32,7 +33,6 @@ import {
   HpAvatar,
   HpButton,
   HpCard,
-  HpCompanyLogo,
   HpFunnel,
   HpIconTile,
   HpItem,
@@ -44,11 +44,11 @@ import {
   HpSkeletonRows,
   HpStagger,
   HpStatCard,
-  HpToast,
   hpBtn,
   hpEase,
   hpTh,
 } from "@/components/portal/kit";
+import { useToast } from "@/lib/toast";
 
 /** Action-item type → glyph (types come from HiringReportService::actionItems on the backend). */
 const ACTION_ICON: Record<string, LucideIcon> = {
@@ -79,12 +79,8 @@ export default function HiringReportsPage() {
   const [data, setData] = useState<CompanyReportsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -92,7 +88,7 @@ export default function HiringReportsPage() {
     api
       .get<CompanyReportsData>("/company/reports/data")
       .then(setData)
-      .catch(() => triggerToast("Failed to load hiring reports."))
+      .catch(() => triggerToast("Failed to load hiring reports.", "error"))
       .finally(() => setLoading(false));
   }, [status]);
 
@@ -107,7 +103,7 @@ export default function HiringReportsPage() {
       const { generateHiringReportExcel } = await import("@/lib/generateHiringReports");
       await generateHiringReportExcel(data.hiring, data.company.name);
     } catch {
-      triggerToast("Failed to generate the export.");
+      triggerToast("Failed to generate the export.", "error");
     } finally {
       setExporting(false);
     }
@@ -130,8 +126,6 @@ export default function HiringReportsPage() {
       subtitle="Real funnel, time-to-hire and offer metrics — derived entirely from your own candidate pipeline."
       actionButton={{ label: exporting ? "Exporting..." : "Export Excel", icon: Download, onClick: handleExport }}
     >
-      <HpToast message={toastMessage} tone="rose" />
-
       {loading ? (
         <ReportsSkeleton />
       ) : !data ? (
@@ -184,7 +178,7 @@ function ReportsBody({
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_160%_at_0%_0%,rgba(20,184,166,0.10),transparent_60%),radial-gradient(50%_160%_at_100%_0%,rgba(99,102,241,0.10),transparent_60%)]" />
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3.5">
-              <HpCompanyLogo name={data.company.name} logo={data.company.logo} size="md" />
+              <CompanyLogo name={data.company.name} logo={data.company.logo} size="md" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="truncate text-[15px] font-bold tracking-tight text-primary">{data.company.name}</span>

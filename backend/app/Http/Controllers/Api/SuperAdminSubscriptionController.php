@@ -89,7 +89,8 @@ class SuperAdminSubscriptionController extends Controller
         if (! empty($validated['ending_within'])) {
             $query->where('status', Subscription::STATUS_ACTIVE)
                 ->whereNotNull('current_period_end')
-                ->whereBetween('current_period_end', [now(), now()->addDays((int) $validated['ending_within'])]);
+                ->whereBetween('current_period_end', [now(), now()->addDays((int) $validated['ending_within'])])
+                ->tap($this->holderStillExists(...));
         }
 
         if (! empty($validated['q'])) {
@@ -223,22 +224,36 @@ class SuperAdminSubscriptionController extends Controller
     {
         $inDate = fn (Builder $q) => $q->where(fn ($w) => $w->whereNull('current_period_end')->orWhere('current_period_end', '>', now()));
 
+        // Running / Ended / Cancelled are about plans that govern (or governed) an account that still exists. A row whose college,
+        // company or student has since been deleted is leftover history — it was never swept (there is no foreign key to cascade
+        // a polymorphic owner), and listing it as "Running" made a deleted college look like it still had a plan. It stays
+        // reachable under All.
         match ($state) {
-            'active' => $query->where('status', Subscription::STATUS_ACTIVE)->tap($inDate),
-            'canceled' => $query->where('status', Subscription::STATUS_CANCELED),
+            'active' => $query->where('status', Subscription::STATUS_ACTIVE)->tap($inDate)->tap($this->holderStillExists(...)),
+            'canceled' => $query->where('status', Subscription::STATUS_CANCELED)->tap($this->holderStillExists(...)),
             // Ended on its own: swept by the nightly job, or still marked active but past its date.
             'expired' => $query->where(fn ($w) => $w->where('status', Subscription::STATUS_EXPIRED)
-                ->orWhere(fn ($x) => $x->where('status', Subscription::STATUS_ACTIVE)->where('current_period_end', '<=', now()))),
+                ->orWhere(fn ($x) => $x->where('status', Subscription::STATUS_ACTIVE)->where('current_period_end', '<=', now())))
+                ->tap($this->holderStillExists(...)),
             default => null,
         };
+    }
+
+    /** @param  Builder<Subscription>  $query */
+    private function holderStillExists(Builder $query): void
+    {
+        $query->whereHasMorph('subscriber', [User::class, College::class, Company::class]);
     }
 
     /** @return array<string, int> */
     private function summary(): array
     {
+        // Only plans whose holder still exists: the cards must say what the "Running" list shows (a deleted college's leftover row
+        // used to be counted as a college "with a running plan").
         $running = fn () => Subscription::query()
             ->where('status', Subscription::STATUS_ACTIVE)
-            ->where(fn ($w) => $w->whereNull('current_period_end')->orWhere('current_period_end', '>', now()));
+            ->where(fn ($w) => $w->whereNull('current_period_end')->orWhere('current_period_end', '>', now()))
+            ->tap($this->holderStillExists(...));
 
         $paidIndividual = fn () => $running()
             ->where('subscriber_type', User::class)

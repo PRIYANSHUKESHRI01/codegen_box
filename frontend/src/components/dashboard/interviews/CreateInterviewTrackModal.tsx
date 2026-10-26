@@ -11,6 +11,7 @@ import { RoundQuestionTargetChecklist } from "@/components/dashboard/interviews/
 import { audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 import type { AttachedInterviewQuestion, BankQuestion } from "@/types/interview";
 import type { InterviewRoleTemplate, InterviewTrackSummary, TrackRound } from "@/types/interviewTrack";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface CreateInterviewTrackModalProps {
   role: "admin" | "tpo" | "company";
@@ -22,7 +23,7 @@ interface CreateInterviewTrackModalProps {
   interviewsBasePath: string;
   onClose: () => void;
   onDone: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }
 
 interface CompanyOption {
@@ -356,7 +357,7 @@ function GenerateRoundsStep({
   tracksBasePath: string;
   onClose: () => void;
   onDone: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const rounds = (track.rounds ?? []).slice().sort((a, b) => a.round_number - b.round_number);
   const [attachedByRound, setAttachedByRound] = useState<Record<number, AttachedInterviewQuestion[]>>({});
@@ -388,7 +389,7 @@ function GenerateRoundsStep({
       onToast(`"${track.title}" is now published — all 3 rounds are live.`);
       onDone();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to publish this track.");
+      onToast(err instanceof ApiError ? err.message : "Failed to publish this track.", "error");
     } finally {
       setPublishing(false);
     }

@@ -9,6 +9,7 @@ import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { codesAtAll } from "@/lib/departments";
 import { careerGoalsFor, focusAreasFor, paceHint, skillLevelsFor, WEEKLY_PACES, type CareerGoal, type FocusArea, type SkillLevel, type WeeklyPace } from "@/lib/studentPreferences";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface Form {
   primary: string | null;
@@ -49,7 +50,7 @@ function savedForm(user: AuthUser): Form {
  * values — so a stale cache can never show old answers or overwrite fresh ones
  * on Save. Once they've started editing, their edits are left alone.
  */
-export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; onToast: (message: string) => void }) {
+export function CodingPreferencesSection({ user, onToast }: { user: AuthUser; onToast: ToastTrigger }) {
   const { login } = useAuth();
   // A programme without coding (Management, Commerce, Arts …) is not asked about languages; it may switch coding on for itself instead.
   const codes = codesAtAll(user);

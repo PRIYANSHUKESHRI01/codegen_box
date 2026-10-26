@@ -68,6 +68,40 @@ class StudentStatsService
     }
 
     /**
+     * solvedScore() for a whole page of people in ONE grouped query. A list that calls solvedScore() per row pays,
+     * for every row, a distinct-count query AND a read of the entire problem catalogue (just to fill in `total`, which
+     * a score does not use) — hundreds of queries and thousands of hydrated problems for a 50-row page.
+     *
+     * @param  iterable<int, User>  $users
+     * @return array<int, int>  user id => the same number solvedScore() returns for them
+     */
+    public function solvedScoresFor(iterable $users): array
+    {
+        $ids = collect($users)->pluck('id')->filter()->unique()->values()->all();
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $scores = array_fill_keys($ids, 0);
+
+        $rows = DB::table('submissions')
+            ->join('problems', 'problems.id', '=', 'submissions.problem_id')
+            ->whereIn('submissions.user_id', $ids)
+            ->where('submissions.status', Submission::STATUS_ACCEPTED)
+            ->select('submissions.user_id', 'problems.difficulty')
+            ->selectRaw('COUNT(DISTINCT submissions.problem_id) as count')
+            ->groupBy('submissions.user_id', 'problems.difficulty')
+            ->get();
+
+        foreach ($rows as $row) {
+            $scores[(int) $row->user_id] += (int) $row->count * (self::DIFFICULTY_POINTS[$row->difficulty] ?? 0);
+        }
+
+        return $scores;
+    }
+
+    /**
      * Current streak only counts if the most recent accepted day is today
      * or yesterday — otherwise it's broken, not "paused." Max streak is the
      * longest run ever, independent of whether it's still active.

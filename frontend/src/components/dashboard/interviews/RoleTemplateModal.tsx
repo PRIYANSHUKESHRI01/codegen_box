@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
 import { RoundConfigEditor } from "@/components/dashboard/interviews/RoundConfigEditor";
 import { categoryWeightsSum, type InterviewRoleTemplate, type RoundConfig } from "@/types/interviewTrack";
+import { type ToastTrigger } from "@/lib/toast";
 
 const DEFAULT_ROUNDS: RoundConfig[] = [
   { round_number: 1, round_name: "Screening", question_count: 10, difficulty: "medium", category_weights: { technical: 60, aptitude: 40 }, qualifying_score_percent: 60 },
@@ -19,7 +20,7 @@ interface RoleTemplateModalProps {
   template?: InterviewRoleTemplate;
   onClose: () => void;
   onSaved: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }
 
 /**

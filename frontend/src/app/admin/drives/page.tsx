@@ -46,6 +46,7 @@ import {
   type DriveApplicationStage,
 } from "@/types/placement";
 import { cn } from "@/lib/utils";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import {
@@ -53,7 +54,6 @@ import {
   HpAvatar,
   HpButton,
   HpCard,
-  HpCompanyLogo,
   HpEmptyState,
   HpIconTile,
   HpItem,
@@ -62,7 +62,6 @@ import {
   HpSkeleton,
   HpStagger,
   HpStatCard,
-  HpToast,
   hpBtn,
   hpEase,
   hpInput,
@@ -72,6 +71,8 @@ import {
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 import { ScCollapse, ScDateTile, ScInlineEmpty, ScMeta, formatRelative } from "@/components/portal/screeningKit";
 import { BranchChips } from "@/components/branches/BranchChips";
+import { useToast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 type DriveTab = "mapped" | "available" | "pending";
 
@@ -192,7 +193,6 @@ export default function CampusDrivesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [pendingDriveId, setPendingDriveId] = useState<number | null>(null);
   const [respondingMappingId, setRespondingMappingId] = useState<number | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -216,10 +216,7 @@ export default function CampusDrivesPage() {
   const [movingAppId, setMovingAppId] = useState<number | null>(null);
   const [ctcPrompt, setCtcPrompt] = useState<CtcPrompt | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadDrives = useCallback(async () => {
     setDataLoading(true);
@@ -252,7 +249,7 @@ export default function CampusDrivesPage() {
       const res = await api.get<{ applications: DriveApplication[] }>(`/tpo/drives/${driveId}/applications`);
       setApplicationsByDrive((prev) => ({ ...prev, [driveId]: res.applications }));
     } catch {
-      triggerToast("Failed to load applicants for this drive.");
+      triggerToast("Failed to load applicants for this drive.", "error");
     } finally {
       setLoadingApplications((prev) => {
         const next = new Set(prev);
@@ -279,14 +276,14 @@ export default function CampusDrivesPage() {
       await loadDrives();
       setActiveTab("mapped");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to map this drive.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to map this drive.", "error");
     } finally {
       setPendingDriveId(null);
     }
   };
 
   const handleUnmap = async (drive: DriveRow) => {
-    if (!window.confirm(`Unmap ${drive.companyName}'s drive from ${collegeName}? Students will no longer see it.`)) {
+    if (!(await confirmDialog({ title: `Unmap ${drive.companyName}'s drive from ${collegeName}?`, message: "Students will no longer see it.", tone: "warning", confirmLabel: "Unmap" }))) {
       return;
     }
     setPendingDriveId(drive.driveId);
@@ -295,7 +292,7 @@ export default function CampusDrivesPage() {
       triggerToast(`${drive.companyName} unmapped from ${collegeName}.`);
       await loadDrives();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to unmap this drive.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to unmap this drive.", "error");
     } finally {
       setPendingDriveId(null);
     }
@@ -309,7 +306,7 @@ export default function CampusDrivesPage() {
   };
 
   const handleRespond = async (row: PendingRow, decision: "approve" | "decline") => {
-    if (decision === "decline" && !window.confirm(`Decline ${row.companyName}'s drive for ${collegeName}? Mellow can re-propose it later, but it won't map now.`)) {
+    if (decision === "decline" && !(await confirmDialog({ title: `Decline ${row.companyName}'s drive for ${collegeName}?`, message: "Mellow can re-propose it later, but it won't map now.", tone: "warning", confirmLabel: "Decline" }))) {
       return;
     }
     setRespondingMappingId(row.mappingId);
@@ -323,7 +320,7 @@ export default function CampusDrivesPage() {
       await loadDrives();
       if (decision === "approve") setActiveTab("mapped");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to respond to this proposal.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to respond to this proposal.", "error");
     } finally {
       setRespondingMappingId(null);
     }
@@ -347,7 +344,7 @@ export default function CampusDrivesPage() {
       triggerToast(res.message);
       await loadApplications(drive.driveId);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to register eligible students.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to register eligible students.", "error");
     } finally {
       setRegisteringDriveId(null);
     }
@@ -377,13 +374,13 @@ export default function CampusDrivesPage() {
       triggerToast(`${app.user.name} moved to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}.`);
       setCtcPrompt(null);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update this application's stage.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update this application's stage.", "error");
     } finally {
       setMovingAppId(null);
     }
   };
 
-  const handleStageSelect = (app: DriveApplication, newStage: DriveApplicationStage) => {
+  const handleStageSelect = async (app: DriveApplication, newStage: DriveApplicationStage) => {
     if (newStage === app.stage) return;
 
     if (newStage === "offer_extended" || newStage === "offer_accepted") {
@@ -392,7 +389,7 @@ export default function CampusDrivesPage() {
     }
 
     if (DRIVE_APPLICATION_TERMINAL_STAGES.includes(newStage)) {
-      if (!window.confirm(`Move ${app.user.name} to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}? This closes their application.`)) {
+      if (!(await confirmDialog({ title: `Move ${app.user.name} to ${DRIVE_APPLICATION_STAGE_LABELS[newStage]}?`, message: "This closes their application.", tone: "warning", confirmLabel: "Move" }))) {
         return;
       }
     }
@@ -454,7 +451,6 @@ export default function CampusDrivesPage() {
   const nextDrive = mappedDrives.find((d) => !d.isPast) ?? null;
   const upcomingMapped = filteredMapped.filter((d) => !d.isPast);
   const completedMapped = filteredMapped.filter((d) => d.isPast);
-  const toastTone = toastMessage && /^(Failed|No applicants|Enter a valid)/.test(toastMessage) ? "rose" : "emerald";
 
   const tabItems: DriveFilterItem[] = [
     { id: "mapped", label: "Mapped", count: initialLoading ? undefined : mappedDrives.length, icon: Link2 },
@@ -524,8 +520,6 @@ export default function CampusDrivesPage() {
         onClick: () => setActiveTab("available"),
       }}
     >
-      <HpToast message={toastMessage} tone={toastTone} />
-
       <HpStagger className="space-y-6">
         {showStats && (
           <HpItem>
@@ -950,7 +944,7 @@ function PendingNudge({ rows, collegeName, onReview }: { rows: PendingRow[]; col
         <span className="flex -space-x-2" aria-hidden>
           {rows.slice(0, 3).map((r) => (
             <span key={r.mappingId} className="inline-flex rounded-[11px] ring-2 ring-surface">
-              <HpCompanyLogo name={r.companyName} logo={logoOf(r)} size="sm" className="h-8 w-8 text-base" />
+              <CompanyLogo name={r.companyName} logo={logoOf(r)} size="sm" className="h-8 w-16 rounded-[11px]" />
             </span>
           ))}
         </span>
@@ -1024,11 +1018,11 @@ function MappedDriveCard({
     >
       {/* Header — the company name is the disclosure button; its ::after stretches over the whole header. */}
       <div className="group/hdr relative flex items-start gap-4 px-5 pt-5 sm:px-6 sm:pt-6">
-        <HpCompanyLogo
+        <CompanyLogo
           name={drv.companyName}
           logo={logoOf(drv)}
           size="lg"
-          className="h-11 w-11 rounded-[14px] text-xl transition-transform duration-300 group-hover/hdr:-rotate-3 group-hover/hdr:scale-105 sm:h-14 sm:w-14 sm:rounded-2xl sm:text-2xl"
+          className="h-11 w-24 rounded-[14px] transition-transform duration-300 group-hover/hdr:-rotate-3 group-hover/hdr:scale-105 sm:h-14 sm:w-32 sm:rounded-2xl"
         />
         <div className="min-w-0 flex-1 pt-0.5">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -1376,7 +1370,7 @@ function AvailableDriveCard({
       <HpCard className="flex h-full flex-col overflow-hidden hover:border-indigo-500/25">
         <div className="flex-1 p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <HpCompanyLogo name={drv.companyName} logo={logoOf(drv)} size="lg" className="h-11 w-11 rounded-[14px] text-xl sm:h-14 sm:w-14 sm:rounded-2xl sm:text-2xl" />
+            <CompanyLogo name={drv.companyName} logo={logoOf(drv)} size="lg" className="h-11 w-24 rounded-[14px] sm:h-14 sm:w-32 sm:rounded-2xl" />
             <div className="min-w-0 flex-1 pt-0.5">
               <h3 className="truncate text-base font-bold tracking-tight text-primary">{drv.companyName}</h3>
               <p className="mt-0.5 truncate text-13 text-text-secondary">{drv.role}</p>
@@ -1432,7 +1426,7 @@ function PendingDriveCard({
       <div aria-hidden className="h-1 w-full bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500" />
       <div className="p-5 sm:p-6">
         <div className="flex items-start gap-4">
-          <HpCompanyLogo name={row.companyName} logo={logoOf(row)} size="lg" className="h-11 w-11 rounded-[14px] text-xl sm:h-14 sm:w-14 sm:rounded-2xl sm:text-2xl" />
+          <CompanyLogo name={row.companyName} logo={logoOf(row)} size="lg" className="h-11 w-24 rounded-[14px] sm:h-14 sm:w-32 sm:rounded-2xl" />
           <div className="min-w-0 flex-1 pt-0.5">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <h3 className="min-w-0 text-base font-bold tracking-tight text-primary">{row.companyName}</h3>

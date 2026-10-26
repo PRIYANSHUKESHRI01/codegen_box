@@ -10,6 +10,7 @@ import { DeleteCollegeModal } from "@/components/admin/superadmin/DeleteCollegeM
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { credentialsEmailNote } from "@/lib/credentialsEmail";
+import { type ToastTrigger } from "@/lib/toast";
 
 type CollegeTier = "Academic Enterprise" | "Pro Campus" | "Standard" | "Custom";
 
@@ -89,7 +90,7 @@ const PLAN_CODE_BY_TIER: Record<"Academic Enterprise" | "Pro Campus" | "Standard
  * nothing fabricated.
  */
 interface PartnerCollegesPanelProps {
-  triggerToast: (msg: string) => void;
+  triggerToast: ToastTrigger;
   /**
    * Show "Delete" on each university. Only the superadmin page passes this: the panel is shared with
    * the Mellow Ops page, where staff must never be offered a permanent delete. The server enforces the
@@ -141,7 +142,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
     api
       .get<{ colleges: ApiCollege[] }>("/admin/colleges")
       .then((res) => setColleges(res.colleges.map(mapCollegeFromApi)))
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load partner universities."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load partner universities.", "error"))
       .finally(() => setCollegesLoading(false));
   }, [triggerToast]);
 
@@ -221,7 +222,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
       setSeatsModalCollege(null);
       setSeatsValue("");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to adjust seat limit.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to adjust seat limit.", "error");
     } finally {
       setAdjustingSeats(false);
     }
@@ -245,7 +246,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
       setPlanAnnualPrice("");
       triggerToast(`${planModalCollege.name} is now on the ${selectedPlanTier} plan.`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update the plan.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update the plan.", "error");
     } finally {
       setAssigningPlan(false);
     }
@@ -260,7 +261,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false }
       );
       triggerToast(college.tpoBlocked ? `TPO account for ${college.name} unblocked.` : `TPO account for ${college.name} blocked.`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update TPO account.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update TPO account.", "error");
     }
   };
 

@@ -4,10 +4,14 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { prefetchProblem } from "@/lib/problemPrefetch";
 import { warmUpEditor } from "@/lib/editorWarmup";
+import { withReturnTo } from "@/lib/backNav";
 import { cn } from "@/lib/utils";
 
-/** Where a problem is solved. One place, so the prefetch and the navigation can never disagree about the address. */
-export const solveHref = (slug: string) => `/dashboard/practice/view?slug=${slug}`;
+/**
+ * Where a problem is solved. One place, so the prefetch and the navigation can never disagree about the address.
+ * `returnTo` (an in-app page, see safeReturnTo) makes the problem screen's Back lead there instead of up to the Arena.
+ */
+export const solveHref = (slug: string, returnTo?: string | null) => withReturnTo(`/dashboard/practice/view?slug=${slug}`, returnTo);
 
 interface SolveButtonProps {
   slug: string;

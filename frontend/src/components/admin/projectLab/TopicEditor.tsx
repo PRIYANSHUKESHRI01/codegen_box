@@ -8,6 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { SOW_TEMPLATE } from "@/lib/sowTemplate";
 import { cn } from "@/lib/utils";
 import type { AdminTopicFull, Difficulty, TopicStatus } from "@/types/projectLab";
+import { confirmDialog } from "@/lib/dialogs";
 
 interface MilestoneForm {
   /** Stable React key; also how a row is tracked while being reordered. */
@@ -397,8 +398,8 @@ export function TopicEditor({ topic }: TopicEditorProps) {
             <span className="text-2xs font-semibold text-text-secondary">{wordCount} words</span>
             <button
               type="button"
-              onClick={() => {
-                if (sow.trim() === "" || window.confirm("Replace the SOW with the blank template? Your current text will be lost.")) set("sow_markdown", SOW_TEMPLATE);
+              onClick={async () => {
+                if (sow.trim() === "" || (await confirmDialog({ title: "Replace the SOW with the blank template?", message: "Your current text will be lost.", tone: "warning", confirmLabel: "Replace" }))) set("sow_markdown", SOW_TEMPLATE);
               }}
               className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-elevated px-2.5 py-1.5 text-2xs font-bold text-primary hover:bg-surface-hover"
             >

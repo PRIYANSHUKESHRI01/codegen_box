@@ -99,12 +99,12 @@ import {
   HpSectionHeader,
   HpStagger,
   HpStatCard,
-  HpToast,
   hpBtn,
   hpEase,
   hpTh,
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
+import { useToast } from "@/lib/toast";
 
 const TIERS = ["ALL", "Placement Ready", "In Progress", "Needs Training"] as const;
 
@@ -156,7 +156,6 @@ export default function StudentCohortPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeStudent, setActiveStudent] = useState<CohortStudent | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [notifyConfirm, setNotifyConfirm] = useState<{ ids: number[]; label: string; students: CohortStudent[] } | null>(
     null
   );
@@ -174,10 +173,7 @@ export default function StudentCohortPage() {
 
   const setFilter = <K extends keyof CohortFilters>(key: K, value: CohortFilters[K]) => setFilters((prev) => ({ ...prev, [key]: value }));
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   /**
    * `background` refreshes the numbers in place (the roster stays on screen)
@@ -392,8 +388,6 @@ export default function StudentCohortPage() {
         onClick: () => document.getElementById("bulk-import")?.scrollIntoView({ behavior: "smooth" }),
       }}
     >
-      <HpToast message={toastMessage} tone="indigo" />
-
       <HpStagger className="space-y-6">
         {/* KPI strip */}
         <HpItem>

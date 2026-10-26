@@ -19,6 +19,7 @@ use App\Services\CollegePurgeService;
 use App\Services\IssuedCredentialVault;
 use App\Services\Judge\JudgeStatusService;
 use App\Services\LeadAssignmentService;
+use App\Services\ReadinessScoreService;
 use App\Services\StudentStatsService;
 use App\Support\SingleMail;
 use Illuminate\Database\Eloquent\Builder;
@@ -76,31 +77,26 @@ class SuperAdminController extends Controller
 
         // One department's students (Engineering, Management, Commerce, Arts …); a student never classified counts as engineering.
         if (($department = $request->query('department')) && is_string($department)) {
-            $query->where('role', User::ROLE_USER)->inDepartment($department);
+            $this->applyDepartment($query, $department);
         }
 
         // The plan a student holds THEMSELVES (not their college's): a plan code, `paid` for any
         // paid one, `free` for Coder, or `none` for no running plan at all. This is the filter the
         // "who is on what" question needs — a college-covered student's own plan is what lapses
         // if the college does.
-        if ($plan = $request->query('plan')) {
-            $running = fn ($s) => $s->where('status', Subscription::STATUS_ACTIVE)
-                ->where(fn ($q) => $q->whereNull('current_period_end')->orWhere('current_period_end', '>', now()))
-                ->whereHas('plan', fn ($p) => $p->where('kind', Plan::KIND_BASE));
-
-            match ($plan) {
-                'none' => $query->whereDoesntHave('subscriptions', $running),
-                'paid' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->paidTier())),
-                'free' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('list_price', 0))),
-                default => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('code', $plan))),
-            };
-        }
+        $this->applyPlan($query, $request->query('plan'));
 
         $page = $query->latest()->paginate(50);
 
         // Whether a superadmin could look up the temporary password this account was issued — a presence check on one
         // page of ids, never the password and never a hash comparison (see IssuedCredentialVault::statesFor()).
         $credentialStates = app(IssuedCredentialVault::class)->statesFor($page->getCollection());
+
+        // The readiness tier on each student row is the expensive part of this list: scored one student at a time it is
+        // a dozen queries and a pile of PHP per row, which made a 50-row page take several seconds (and, on the
+        // single-threaded dev server, held every other request up behind it). Scored for the whole page at once it is
+        // a handful of queries — the same bulk pass the TPO roster and the placement reports use.
+        app(ReadinessScoreService::class)->prime($page->getCollection()->filter(fn (User $u) => $u->role === User::ROLE_USER));
 
         // Real, cheap-per-row enrichment bounded to this one page (≤50 rows)
         // — same bounded-loop precedent as AdminController::colleges() and
@@ -165,28 +161,73 @@ class SuperAdminController extends Controller
 
     /**
      * What the directory's filter bar needs to be honest: how many accounts of each ROLE the current university + search
-     * leaves (so picking a university shows "TPOs 1 · Coordinators 4 · Students 230" before you click anything), and how
-     * many accounts each UNIVERSITY has for the current role + search (so the list can say which universities have any).
-     * Two grouped counts — never row data, so it stays cheap on a table of thousands.
+     * leaves (so picking a university shows "TPOs 1 · Coordinators 4 · Students 230" before you click anything), how
+     * many accounts each UNIVERSITY has for the current role + search (so the list can say which universities have any),
+     * and — for the Students tab — how many students each DEPARTMENT has under the current university + search.
+     * Grouped counts only, never row data, so it stays cheap on a table of thousands.
+     *
+     * Every filter the list itself understands narrows these numbers the same way it narrows the list, so a count on a
+     * chip or in the university picker is exactly what clicking it will show: `department` narrows the university
+     * counts (students of that department only), `has_college` narrows the department counts.
      */
     public function directoryFacets(Request $request)
     {
+        $department = $request->query('department');
+        $department = is_string($department) && $department !== '' ? $department : null;
+        // A plan only exists for students: choosing one narrows the students, the university counts and the "All" total to them.
+        $plan = $request->query('plan');
+        $plan = is_string($plan) && $plan !== '' ? $plan : null;
+
         $byRole = User::query();
         $this->applySearch($byRole, $request);
         $this->applyCollege($byRole, $request);
         $roles = $byRole->selectRaw('role, COUNT(*) as accounts')->groupBy('role')->pluck('accounts', 'role');
 
+        // What the "All" chip would list: every account — or, with a plan chosen, only the students on it.
+        $total = (int) $roles->sum();
+        if ($plan !== null) {
+            $students = User::query()->where('role', User::ROLE_USER);
+            $this->applySearch($students, $request);
+            $this->applyCollege($students, $request);
+            $this->applyPlan($students, $plan);
+            $total = $students->count();
+            $roles = $roles->put(User::ROLE_USER, $total);
+        }
+
         $byCollege = User::query()->whereNotNull('college_id');
         $this->applySearch($byCollege, $request);
         $this->applyRoles($byCollege, $request);
+        $this->applyDepartment($byCollege, $department);
+        $this->applyPlanToStudents($byCollege, $plan);
         $perCollege = $byCollege->selectRaw('college_id, COUNT(*) as accounts')->groupBy('college_id')->pluck('accounts', 'college_id');
 
         $noCollege = User::query()->whereNull('college_id');
         $this->applySearch($noCollege, $request);
         $this->applyRoles($noCollege, $request);
+        $this->applyDepartment($noCollege, $department);
+        $this->applyPlanToStudents($noCollege, $plan);
+
+        // Students per department under the chosen university (and search). A student never classified counts under the
+        // fallback department, exactly as User::scopeInDepartment() treats them, so these add up to the student total.
+        $byDepartment = User::query()->where('role', User::ROLE_USER);
+        $this->applySearch($byDepartment, $request);
+        $this->applyCollege($byDepartment, $request);
+        if ($request->has('has_college')) {
+            $request->boolean('has_college')
+                ? $byDepartment->whereNotNull('college_id')
+                : $byDepartment->whereNull('college_id');
+        }
+        $fallback = (string) config('departments.fallback', 'engineering');
+        $departments = [];
+        foreach ($byDepartment->selectRaw('department, COUNT(*) as accounts')->groupBy('department')->get() as $row) {
+            $code = $row->department ?: $fallback;
+            $departments[$code] = ($departments[$code] ?? 0) + (int) $row->accounts;
+        }
 
         return response()->json([
             'roles' => $roles,
+            'total' => $total,
+            'departments' => (object) $departments,
             'colleges' => College::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'short_code', 'city'])
@@ -200,6 +241,45 @@ class SuperAdminController extends Controller
                 ->values(),
             'without_college' => $noCollege->count(),
         ]);
+    }
+
+    /**
+     * The plan a student holds THEMSELVES (not their college's): a plan code, `paid` for any paid one, `free` for Coder, or
+     * `none` for no running plan at all. One definition, used by the list and by the counts beside its filters.
+     */
+    private function applyPlan(Builder $query, mixed $plan): void
+    {
+        if (! is_string($plan) || $plan === '') {
+            return;
+        }
+
+        $running = fn ($s) => $s->where('status', Subscription::STATUS_ACTIVE)
+            ->where(fn ($q) => $q->whereNull('current_period_end')->orWhere('current_period_end', '>', now()))
+            ->whereHas('plan', fn ($p) => $p->where('kind', Plan::KIND_BASE));
+
+        match ($plan) {
+            'none' => $query->whereDoesntHave('subscriptions', $running),
+            'paid' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->paidTier())),
+            'free' => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('list_price', 0))),
+            default => $query->whereHas('subscriptions', fn ($s) => $running($s)->whereHas('plan', fn ($p) => $p->where('code', $plan))),
+        };
+    }
+
+    /** A chosen plan narrows a count to the students on it (staff and companies have no plan of their own). */
+    private function applyPlanToStudents(Builder $query, ?string $plan): void
+    {
+        if ($plan !== null) {
+            $query->where('role', User::ROLE_USER);
+            $this->applyPlan($query, $plan);
+        }
+    }
+
+    /** One department's students — the same narrowing the list applies, kept in one place so counts and rows cannot disagree. */
+    private function applyDepartment(Builder $query, ?string $department): void
+    {
+        if ($department !== null) {
+            $query->where('role', User::ROLE_USER)->inDepartment($department);
+        }
     }
 
     /**

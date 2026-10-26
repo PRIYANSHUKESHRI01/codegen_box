@@ -38,6 +38,15 @@ export function useShellChrome(fallbackTop = 60): { top: number; bottom: number 
     };
   }, [fallbackTop]);
 
+  // The app-wide toast stack (components/ui/Toaster) must ride above that bottom tab bar, not underneath it.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty("--toast-offset-bottom", `${chrome.bottom}px`);
+    return () => {
+      root.style.removeProperty("--toast-offset-bottom");
+    };
+  }, [chrome.bottom]);
+
   return chrome;
 }
 

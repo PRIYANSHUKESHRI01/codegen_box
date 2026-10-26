@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Briefcase, Search, Loader2, Building2, Check, Lock, Plus, RotateCcw } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import { Modal } from "@/components/ui/Modal";
-import { HpButton, HpCompanyLogo, hpEase, hpInput, hpLabel } from "@/components/portal/kit";
+import { HpButton, hpEase, hpInput, hpLabel } from "@/components/portal/kit";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
+import { matchCompanyBrand, suggestCompanyName } from "@/lib/companyBrands";
 import { HpCallout, HpCheckboxBox, HpFormError } from "@/components/portal/pipeline-kit";
 import { BranchPicker } from "@/components/branches/BranchPicker";
 
@@ -24,6 +26,8 @@ interface SearchCompany {
   logo: string | null;
   industry: string | null;
   overview: string | null;
+  /** `similar` = the name only looks like what was typed (a typo, a different spelling) — shown as a suggestion, not a hit. */
+  match?: "exact" | "similar";
 }
 
 /** Small numbered section heading inside the form. */
@@ -113,6 +117,11 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [companyQuery, selectedCompany, addingNewCompany]);
+
+  // The real logo is found from the NAME as it is typed — even misspelled ("capegemni") — so nobody has to pick or paste one.
+  const typedName = companyQuery.trim();
+  const brandMatch = useMemo(() => (typedName.length >= 3 ? matchCompanyBrand(null, typedName) : null), [typedName]);
+  const suggestedName = useMemo(() => suggestCompanyName(typedName), [typedName]);
 
   const pickCompany = (company: SearchCompany) => {
     setSelectedCompany(company);
@@ -211,7 +220,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
 
             {selectedCompany ? (
               <div className="flex items-center gap-3 rounded-2xl border border-indigo-500/40 bg-indigo-500/[0.06] p-3 shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
-                <HpCompanyLogo name={selectedCompany.name} logo={selectedCompany.logo} size="md" />
+                <CompanyLogo name={selectedCompany.name} slug={selectedCompany.slug} logo={selectedCompany.logo} size="md" />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
                     <span className="truncate text-13 font-bold text-primary">{selectedCompany.name}</span>
@@ -238,7 +247,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                     setAddingNewCompany(false);
                   }}
                   placeholder="Search for a company (e.g. Infosys)..."
-                  className={cn(hpInput, "pl-10 pr-10")}
+                  className={cn(hpInput, "pl-10", brandMatch && !searching ? "pr-28" : "pr-10")}
                   autoComplete="off"
                   aria-expanded={showResults}
                   aria-controls="cd-company-results"
@@ -246,6 +255,15 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                 />
                 {searching && (
                   <Loader2 className="absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-text-muted" aria-label="Searching" />
+                )}
+                {brandMatch && !searching && (
+                  <span
+                    title={`${brandMatch.brand.name} logo found automatically`}
+                    className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2"
+                    data-testid="company-logo-detected"
+                  >
+                    <CompanyLogo name={typedName} size="sm" className="h-8 w-[5.5rem] rounded-[10px]" />
+                  </span>
                 )}
 
                 <AnimatePresence>
@@ -258,8 +276,23 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                       transition={{ duration: 0.18, ease: hpEase }}
                       className="absolute z-10 mt-2 max-h-64 w-full overflow-hidden overflow-y-auto rounded-2xl border border-border-strong bg-[rgb(var(--bg-surface-rgb))] p-1.5 shadow-[0_18px_50px_-12px_rgba(39,47,92,0.35)]"
                     >
+                      {suggestedName && !searchResults.some((c) => c.name.trim().toLowerCase() === suggestedName.toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => setCompanyQuery(suggestedName)}
+                          className="mb-1 flex w-full items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] px-2.5 py-2 text-left transition-colors hover:bg-amber-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+                        >
+                          <CompanyLogo name={suggestedName} size="sm" />
+                          <span className="min-w-0">
+                            <span className="block truncate text-13 font-semibold text-primary">Did you mean &ldquo;{suggestedName}&rdquo;?</span>
+                            <span className="block truncate text-3xs text-text-muted">Looks like a spelling slip — click to use it</span>
+                          </span>
+                        </button>
+                      )}
                       {searchResults.length > 0 && (
-                        <p className="px-2.5 pb-1 pt-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">In the catalog</p>
+                        <p className="px-2.5 pb-1 pt-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                          {searchResults.every((c) => c.match === "similar") ? "Similar companies in the catalog" : "In the catalog"}
+                        </p>
                       )}
                       {searchResults.map((c) => (
                         <button
@@ -268,11 +301,16 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                           onClick={() => pickCompany(c)}
                           className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-indigo-500/[0.06] focus-visible:bg-indigo-500/[0.08] focus-visible:outline-none"
                         >
-                          <HpCompanyLogo name={c.name} logo={c.logo} size="sm" />
-                          <span className="min-w-0">
+                          <CompanyLogo name={c.name} slug={c.slug} logo={c.logo} size="sm" />
+                          <span className="min-w-0 flex-1">
                             <span className="block truncate text-13 font-semibold text-primary">{c.name}</span>
                             {c.industry && <span className="block truncate text-3xs text-text-muted">{c.industry}</span>}
                           </span>
+                          {c.match === "similar" && (
+                            <span className="shrink-0 rounded-full bg-amber-500/10 px-2 py-0.5 text-3xs font-bold text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300">
+                              Similar
+                            </span>
+                          )}
                         </button>
                       ))}
                       <button
@@ -309,10 +347,23 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                 <div className="space-y-3.5 rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
                   <div className="flex items-center gap-3">
                     {/* Live preview of how the company mark will render across the portal. */}
-                    <HpCompanyLogo name={companyQuery.trim() || "New company"} logo={newCompanyLogo || null} size="md" />
+                    <CompanyLogo name={typedName || "New company"} logo={newCompanyLogo || null} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">New company</p>
-                      <p className="truncate text-13 font-bold text-primary">{companyQuery.trim()}</p>
+                      <p className="truncate text-13 font-bold text-primary">{typedName}</p>
+                      {brandMatch && <p className="text-3xs font-semibold text-emerald-600 dark:text-emerald-300">Real {brandMatch.brand.name} logo attached automatically</p>}
+                      {suggestedName && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCompanyQuery(suggestedName);
+                            setAddingNewCompany(false);
+                          }}
+                          className="mt-0.5 cursor-pointer text-3xs font-bold text-amber-700 underline-offset-2 hover:underline dark:text-amber-300"
+                        >
+                          Looks like a misspelling — use &ldquo;{suggestedName}&rdquo; instead
+                        </button>
+                      )}
                     </div>
                     <HpButton type="button" variant="ghost" size="sm" onClick={clearCompanyChoice} leftIcon={<RotateCcw className="h-3.5 w-3.5" />}>
                       Change

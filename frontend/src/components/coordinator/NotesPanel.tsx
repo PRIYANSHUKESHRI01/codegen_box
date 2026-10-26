@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { HpPill, hpBtn } from "@/components/portal/kit";
 import type { CoordinatorNote, NoteKind } from "@/types/coordinator";
+import { confirmDialog } from "@/lib/dialogs";
 
 export const NOTE_KINDS: { id: NoteKind; label: string; icon: LucideIcon }[] = [
   { id: "call", label: "Call", icon: Phone },
@@ -185,7 +186,7 @@ export function NotesPanel({
   };
 
   const remove = async (note: CoordinatorNote) => {
-    if (!notePath || !window.confirm("Delete this note? This can't be undone.")) return;
+    if (!notePath || !(await confirmDialog({ title: "Delete this note?", message: "This can't be undone.", tone: "danger", confirmLabel: "Delete note" }))) return;
     setBusyId(note.id);
     try {
       await api.delete(`${notePath}/${note.id}`);

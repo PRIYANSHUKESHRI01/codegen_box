@@ -42,12 +42,12 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpInput,
   hpLabel,
 } from "@/components/portal/kit";
 import { HpErrorCard, HpFormError, HpSelect } from "@/components/portal/pipeline-kit";
 import { ScInlineEmpty, ScMeta, ScMetric, ScReveal } from "@/components/portal/screeningKit";
+import { useToast } from "@/lib/toast";
 
 export interface Coordinator {
   id: number;
@@ -217,16 +217,12 @@ export default function SectionCoordinatorsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [editing, setEditing] = useState<Coordinator | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   // View-only list controls (client-side filtering of the already-loaded list).
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,7 +263,7 @@ export default function SectionCoordinatorsPage() {
       setCoordinators((prev) => prev.map((c) => (c.id === coordinator.id ? res.coordinator : c)));
       triggerToast(`${coordinator.name} ${res.coordinator.is_blocked ? "blocked" : "unblocked"}.`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update this coordinator.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update this coordinator.", "error");
     } finally {
       setBusyId(null);
     }
@@ -297,8 +293,6 @@ export default function SectionCoordinatorsPage() {
       subtitle="Delegate visibility over one section at a time — they can view full profiles, download reports, and block/unblock accounts, but never edit a student's record or add/import new ones."
       actionButton={{ label: "Add Coordinator", icon: UserCog, onClick: () => setShowAdd(true) }}
     >
-      <HpToast message={toastMessage} />
-
       <AddCoordinatorModal
         open={showAdd}
         sections={sections}

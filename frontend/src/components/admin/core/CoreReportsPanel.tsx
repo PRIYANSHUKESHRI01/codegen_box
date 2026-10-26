@@ -6,11 +6,12 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { DISCIPLINE_SHORT, questionLabel } from "@/lib/core";
 import type { CoreDiscipline, CoreQuestion, CoreReport } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
 
 const REASON: Record<string, string> = { wrong_answer: "Wrong answer", unclear: "Unclear question", typo: "Typo", out_of_syllabus: "Out of syllabus", other: "Other" };
 
 /** Core Prep → Reports: students saying "this question looks wrong". Open one to fix it, then resolve or dismiss the report. */
-export function CoreReportsPanel({ onToast, onOpen }: { onToast: (m: string) => void; onOpen: (q: CoreQuestion) => void }) {
+export function CoreReportsPanel({ onToast, onOpen }: { onToast: ToastTrigger; onOpen: (q: CoreQuestion) => void }) {
   const [reports, setReports] = useState<CoreReport[] | null>(null);
   const [status, setStatus] = useState<"open" | "all">("open");
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export function CoreReportsPanel({ onToast, onOpen }: { onToast: (m: string) => 
       onToast(to === "resolved" ? "Marked resolved." : "Dismissed.");
       await load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "That didn't work.");
+      onToast(err instanceof ApiError ? err.message : "That didn't work.", "error");
     }
   };
 
@@ -43,7 +44,7 @@ export function CoreReportsPanel({ onToast, onOpen }: { onToast: (m: string) => 
     try {
       onOpen((await api.get<{ question: CoreQuestion }>(`/admin/core/questions/${r.question.id}`)).question);
     } catch {
-      onToast("Couldn't open that question.");
+      onToast("Couldn't open that question.", "error");
     }
   };
 

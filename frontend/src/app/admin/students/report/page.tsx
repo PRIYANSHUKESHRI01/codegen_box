@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -53,7 +54,6 @@ import {
   HP_TONES,
   HpAvatar,
   HpCard,
-  HpCompanyLogo,
   HpEmptyState,
   HpIconTile,
   HpItem,
@@ -89,6 +89,7 @@ import type {
   StudentReportInterview,
   SubmissionHistoryRow,
 } from "@/types/studentReport";
+import { toast } from "@/lib/toast";
 
 const TIER_STYLE: Record<string, string> = {
   "Placement Ready": "bg-status-success/10 text-status-success border-status-success/25",
@@ -270,7 +271,7 @@ function StudentReportPageContent() {
       setViewingCode((prev) => (prev ? { ...prev, code: res.submission.code } : prev));
     } catch (err) {
       setViewingCode(null);
-      window.alert(err instanceof ApiError ? err.message : "Failed to load submitted code.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to load submitted code.");
     }
   };
 
@@ -293,7 +294,7 @@ function StudentReportPageContent() {
       setViewingCode((prev) => (prev ? { ...prev, code: res.submission.code } : prev));
     } catch (err) {
       setViewingCode(null);
-      window.alert(err instanceof ApiError ? err.message : "Failed to load submitted code.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to load submitted code.");
     }
   };
 
@@ -1732,7 +1733,7 @@ function DrivesPanel({ drives }: { drives: StudentReportDriveApplication[] }) {
             const ctc = d.ctc_offered ?? d.ctc_range;
             return (
               <li key={d.application_id} className="flex items-start gap-3 px-4 py-3.5 transition-colors duration-200 hover:bg-sky-500/[0.035] sm:items-center sm:px-6">
-                <HpCompanyLogo name={d.company_name ?? d.drive_title} size="sm" />
+                <CompanyLogo name={d.company_name ?? d.drive_title} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-13 font-bold text-primary">{d.drive_title}</p>
                   {(d.company_name || d.role_title || ctc) && (

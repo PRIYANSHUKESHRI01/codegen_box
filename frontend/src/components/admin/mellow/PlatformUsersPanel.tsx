@@ -6,6 +6,7 @@ import { Search, Plus, Users2, X, Filter, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { credentialsEmailNote } from "@/lib/credentialsEmail";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface ApiUser {
   id: number;
@@ -30,7 +31,7 @@ interface ApiPage<T> {
  * self-contained-per-panel convention superadmin's MellowStaffPanel already
  * uses for the identical need.
  */
-export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function PlatformUsersPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [platformUsers, setPlatformUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -65,7 +66,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
           setPage(res.current_page);
           setHasMore(res.current_page < res.last_page);
         })
-        .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load platform users."))
+        .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load platform users.", "error"))
         .finally(() => setLoading(false));
     },
     [triggerToast]
@@ -103,7 +104,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
         setPage(res.current_page);
         setHasMore(res.current_page < res.last_page);
       })
-      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more users."))
+      .catch((err) => triggerToast(err instanceof ApiError ? err.message : "Failed to load more users.", "error"))
       .finally(() => setLoadingMore(false));
   };
 
@@ -127,7 +128,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
       setNewCollegeId("");
       triggerToast(`Account for "${res.user.name}" created! Temporary password: ${res.temporary_password}.${credentialsEmailNote(res.credentials_email_sent, res.user.email)}`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to create user account.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to create user account.", "error");
     }
   };
 
@@ -137,7 +138,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: (msg: strin
       setPlatformUsers((prev) => prev.map((u) => (u.id === target.id ? { ...u, is_blocked: !u.is_blocked } : u)));
       triggerToast(target.is_blocked ? `${target.name}'s account unblocked.` : `${target.name}'s account blocked.`);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update user account.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update user account.", "error");
     }
   };
 

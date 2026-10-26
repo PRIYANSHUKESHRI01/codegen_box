@@ -9,6 +9,7 @@ import { CoreAiDraftModal } from "./CoreAiDraftModal";
 import { CoreQuestionEditor } from "./CoreQuestionEditor";
 import { DisciplineOptions } from "@/components/admin/core/DisciplineOptions";
 import { type CoreDiscipline, type CoreQuestion, type CoreQuestionList, type CoreStatus, type CoreTaxonomyResponse } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
 
 const STATUSES: (CoreStatus | "all")[] = ["all", "draft", "in_review", "published", "retired"];
 const sel = "px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-2xs";
@@ -17,7 +18,7 @@ const sel = "px-2.5 py-1.5 rounded-control bg-elevated border border-border-subt
  * Core Prep → Questions: the bank. Filter by branch family / subject / status / difficulty, search the
  * text or id, open any question in the editor, and move several through review at once.
  */
-export function CoreQuestionsPanel({ taxonomy, onToast, initialDiscipline = "ece" }: { taxonomy: CoreTaxonomyResponse; onToast: (m: string) => void; initialDiscipline?: CoreDiscipline }) {
+export function CoreQuestionsPanel({ taxonomy, onToast, initialDiscipline = "ece" }: { taxonomy: CoreTaxonomyResponse; onToast: ToastTrigger; initialDiscipline?: CoreDiscipline }) {
   const [discipline, setDiscipline] = useState<CoreDiscipline>(initialDiscipline);
   const [subjectId, setSubjectId] = useState("");
   const [status, setStatus] = useState<CoreStatus | "all">("all");
@@ -79,7 +80,7 @@ export function CoreQuestionsPanel({ taxonomy, onToast, initialDiscipline = "ece
       onToast(`Analysed ${res.analysed} question${res.analysed === 1 ? "" : "s"} — ${res.flagged} flagged for review.`);
       await load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Couldn't run the analysis.");
+      onToast(err instanceof ApiError ? err.message : "Couldn't run the analysis.", "error");
     } finally {
       setAnalysing(false);
     }
@@ -106,7 +107,7 @@ export function CoreQuestionsPanel({ taxonomy, onToast, initialDiscipline = "ece
       onToast(res.failed.length === 0 ? `${res.moved} question${res.moved === 1 ? "" : "s"} moved to ${STATUS_LABEL[to].toLowerCase()}.` : `${res.moved} moved; ${res.failed.length} could not — e.g. ${res.failed[0].external_id ?? `#${res.failed[0].id}`}: ${res.failed[0].message}`);
       await load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "That didn't work.");
+      onToast(err instanceof ApiError ? err.message : "That didn't work.", "error");
     } finally {
       setBulkBusy(false);
     }

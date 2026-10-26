@@ -80,3 +80,13 @@ export interface LeadPage {
   last_page: number;
   total: number;
 }
+
+/**
+ * What the lead filter bar needs to be honest — how many leads each status chip would list under the current search and
+ * owner filter, and how many unassigned ones there are under the current search and status. Absent from an older API.
+ */
+export interface LeadFacets {
+  total: number;
+  by_status: Record<LeadStatus, number>;
+  unassigned: number;
+}

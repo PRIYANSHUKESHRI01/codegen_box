@@ -13,6 +13,8 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { TOPIC_COLORS, TOPIC_ICON_NAMES, type ArticleTopicSummary, type AdminArticleSummary, type TopicColor, type TopicIconName } from "@/types/article";
 import { Modal } from "@/components/ui/Modal";
+import { useToast, type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const COLORS: TopicColor[] = ["indigo", "emerald", "amber", "sky", "rose"];
 
@@ -24,14 +26,10 @@ export default function AdminArticlesPage() {
   const [topics, setTopics] = useState<ArticleTopicSummary[]>([]);
   const [articles, setArticles] = useState<AdminArticleSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [topicFilter, setTopicFilter] = useState<string>("");
   const [showTopicModal, setShowTopicModal] = useState<ArticleTopicSummary | "new" | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,7 +41,7 @@ export default function AdminArticlesPage() {
       setTopics(topicsRes.topics);
       setArticles(articlesRes.articles);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load articles.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load articles.", "error");
     } finally {
       setLoading(false);
     }
@@ -70,29 +68,29 @@ export default function AdminArticlesPage() {
       triggerToast(nextStatus === "published" ? `"${article.title}" is now published.` : `"${article.title}" moved back to draft.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update status.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update status.", "error");
     }
   };
 
   const handleDeleteArticle = async (article: AdminArticleSummary) => {
-    if (!window.confirm(`Delete "${article.title}"? This can't be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete "${article.title}"?`, message: "This can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`/admin/articles/${article.slug}`);
       triggerToast(`"${article.title}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete article.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete article.", "error");
     }
   };
 
   const handleDeleteTopic = async (topic: ArticleTopicSummary) => {
-    if (!window.confirm(`Delete the "${topic.name}" topic?`)) return;
+    if (!(await confirmDialog({ title: `Delete the "${topic.name}" topic?`, tone: "danger", confirmLabel: "Delete topic" }))) return;
     try {
       await api.delete(`/admin/article-topics/${topic.slug}`);
       triggerToast(`"${topic.name}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete topic.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete topic.", "error");
     }
   };
 
@@ -103,12 +101,6 @@ export default function AdminArticlesPage() {
       subtitle="The Articles knowledge base — organized into topics, read topic-by-topic by every student."
       actionButton={{ label: "New Article", icon: Plus, onClick: () => router.push("/admin/articles/new") }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-bold text-text-secondary uppercase tracking-wide">Topics</h3>
@@ -255,7 +247,7 @@ function TopicModal({
   topic: ArticleTopicSummary | null;
   onClose: () => void;
   onSaved: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [name, setName] = useState(topic?.name ?? "");
   const [description, setDescription] = useState(topic?.description ?? "");

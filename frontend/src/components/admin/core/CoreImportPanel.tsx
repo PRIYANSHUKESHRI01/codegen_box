@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { DISCIPLINE_LABEL } from "@/lib/core";
 import { DisciplineOptions } from "@/components/admin/core/DisciplineOptions";
 import { type CoreDiscipline, type CoreImport } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const sel = "px-2.5 py-1.5 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-2xs";
 const STATUS_TONE: Record<CoreImport["status"], string> = {
@@ -37,7 +39,7 @@ const fmt = (iso: string) => new Date(iso).toLocaleString("en-IN", { day: "numer
  * 3. Read the report, fix the file if rows failed, and import. Re-uploading a corrected sheet UPDATES questions by
  *    their id instead of duplicating them.
  */
-export function CoreImportPanel({ onToast, onImported }: { onToast: (m: string) => void; onImported: () => void }) {
+export function CoreImportPanel({ onToast, onImported }: { onToast: ToastTrigger; onImported: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [zip, setZip] = useState<File | null>(null);
   const [discipline, setDiscipline] = useState<CoreDiscipline | "">("");
@@ -90,7 +92,7 @@ export function CoreImportPanel({ onToast, onImported }: { onToast: (m: string) 
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      onToast("Couldn't download the template.");
+      onToast("Couldn't download the template.", "error");
     }
   };
 
@@ -117,7 +119,7 @@ export function CoreImportPanel({ onToast, onImported }: { onToast: (m: string) 
 
   const commit = async () => {
     if (!current) return;
-    if (current.has_failures && !window.confirm(`${current.failed_rows} row(s) with errors will be skipped and only the ${current.valid_rows} valid row(s) imported. Continue?`)) return;
+    if (current.has_failures && !(await confirmDialog({ title: "Import the valid rows only?", message: `${current.failed_rows} row(s) with errors will be skipped and only the ${current.valid_rows} valid row(s) imported.`, tone: "warning", confirmLabel: "Import valid rows" }))) return;
     setBusy("commit");
     setError(null);
     try {

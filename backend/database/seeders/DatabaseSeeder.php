@@ -205,6 +205,12 @@ class DatabaseSeeder extends Seeder
         $this->call(ProjectLabContentSeeder::class);
         // Hack Arena demo: five hackathons in five different states, with a student cohort.
         $this->call(HackathonSeeder::class);
+        // Management domain questions for BBA, MBA, MBA Marketing, MBA Finance, MBA HR (177 questions).
+        $this->call(ManagementQuestionSeeder::class);
+        // Commerce domain questions for B.Com, M.Com, and Professional Courses CA, CS, CMA, ACCA/CFA/CPA (177 questions).
+        $this->call(CommerceQuestionSeeder::class);
+        // Arts & Humanities domain questions across all 11 disciplines (177 questions).
+        $this->call(ArtsQuestionSeeder::class);
 
         $this->subscribeSeededDemoData();
     }

@@ -19,8 +19,8 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
 } from "@/components/portal/kit";
+import { useToast } from "@/lib/toast";
 
 type FilterId = "all" | ProctoringSessionSummary["status"];
 
@@ -36,15 +36,11 @@ export default function CompanyProctoringPage() {
   const { status } = useAuthGuard(["admin_company"]);
   const [sessions, setSessions] = useState<ProctoringSessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   // View-only list controls (client-side filtering of the already-loaded list).
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -52,7 +48,7 @@ export default function CompanyProctoringPage() {
       const res = await api.get<{ sessions: ProctoringSessionSummary[] }>("/company/proctoring");
       setSessions(res.sessions);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.", "error");
     } finally {
       setLoading(false);
     }
@@ -91,8 +87,6 @@ export default function CompanyProctoringPage() {
       title="Proctoring Activity"
       subtitle="Every assessment attempt flagged for a fullscreen exit, tab switch, or blocked action — across your own hiring assessments."
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {(loading || hasAny) && (
           <HpItem>

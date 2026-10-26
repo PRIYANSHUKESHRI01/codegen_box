@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import type { InterviewSummary, InterviewType } from "@/types/interview";
 import { Modal } from "@/components/ui/Modal";
 import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { useToast, type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const BASE_PATH = "/admin/interviews";
 
@@ -64,15 +66,11 @@ export default function AdminInterviewsPage() {
   const hasAccess = userHasPermission(user, "interviews");
   const [interviews, setInterviews] = useState<AdminInterview[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<AdminInterview | null>(null);
   const [visibilityInterview, setVisibilityInterview] = useState<AdminInterview | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,7 +78,7 @@ export default function AdminInterviewsPage() {
       const res = await api.get<{ interviews: AdminInterview[] }>(BASE_PATH);
       setInterviews(res.interviews);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load interviews.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load interviews.", "error");
     } finally {
       setLoading(false);
     }
@@ -106,18 +104,18 @@ export default function AdminInterviewsPage() {
       triggerToast(`"${interview.title}" is now published.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
   const handleDelete = async (interview: AdminInterview) => {
-    if (!window.confirm(`Delete "${interview.title}"? This can't be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete "${interview.title}"?`, message: "This can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`${BASE_PATH}/${interview.slug}`);
       triggerToast(`"${interview.title}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete interview.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete interview.", "error");
     }
   };
 
@@ -128,12 +126,6 @@ export default function AdminInterviewsPage() {
       subtitle="Create and curate platform-run voice interviews — students only ever see published ones."
       actionButton={{ label: "New Interview", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       <div className="flex justify-end gap-2">
         <Link
           href="/admin/interviews/tracks"
@@ -309,7 +301,7 @@ function ManageVisibilityModal({
 }: {
   interview: AdminInterview;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<number[]>(interview.college_ids ?? []);
   const [saving, setSaving] = useState(false);
@@ -321,7 +313,7 @@ function ManageVisibilityModal({
       onToast("College targeting updated.");
       onClose();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.");
+      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.", "error");
     } finally {
       setSaving(false);
     }
@@ -369,7 +361,7 @@ function CreateInterviewModal({
 }: {
   onClose: () => void;
   onCreated: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [interviewType, setInterviewType] = useState<"general" | "company">("general");
   const [isMock, setIsMock] = useState(false);

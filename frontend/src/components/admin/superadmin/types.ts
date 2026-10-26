@@ -55,10 +55,14 @@ export type CredentialState = "viewable" | "owner_set" | "not_recorded" | "prote
 export interface DirectoryFacets {
   /** Accounts per role under the current university + search. */
   roles: Record<string, number>;
+  /** What the "All" chip lists: every account under the current university + search (only the students on a chosen plan, when one is). Absent from an older API. */
+  total?: number;
   /** Every university, with how many accounts it has under the current role + search. */
   colleges: { id: number; name: string; short_code: string | null; city: string | null; accounts: number }[];
   /** Accounts under the current role + search that belong to no university. */
   without_college: number;
+  /** Students per department under the current university + search (Students tab only; absent from an older API). */
+  departments?: Record<string, number>;
 }
 
 /** Laravel's default paginate() envelope — only the fields actually used. */

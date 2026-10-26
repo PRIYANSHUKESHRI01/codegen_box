@@ -3,7 +3,6 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -35,6 +34,7 @@ import { PlansPricingPanel } from "@/components/admin/superadmin/PlansPricingPan
 import { PaymentsPanel } from "@/components/admin/superadmin/PaymentsPanel";
 import { SubscriptionsPanel } from "@/components/admin/superadmin/SubscriptionsPanel";
 import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";
+import { useToast } from "@/lib/toast";
 
 type Tab = "overview" | "students" | "leads" | "marketing" | "colleges" | "departments" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
@@ -100,11 +100,7 @@ function SuperAdminPageContent() {
     if (!isTab(tabParam)) router.replace("/superadmin?tab=overview", { scroll: false });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4500);
-  };
+  const triggerToast = useToast();
 
   if (status !== "ready" || !me) {
     return (
@@ -118,22 +114,6 @@ function SuperAdminPageContent() {
       title="Superadmin Master Control"
       subtitle="Complete bird's-eye management of users, partner universities, infrastructure, and security."
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            // z-[100]: must sit above the panels' modal overlays (z-50) or a failed
-            // action's message is drawn underneath the dark backdrop and never seen.
-            className="fixed top-20 right-6 z-[100] px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="flex items-center gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit flex-wrap">
         {TABS.map((tab) => {
           const Icon = tab.icon;

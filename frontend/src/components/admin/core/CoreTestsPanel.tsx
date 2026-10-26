@@ -9,6 +9,8 @@ import { DIFFICULTY_BADGE, DISCIPLINE_LABEL, plainPreview } from "@/lib/core";
 import { AudienceChip, audienceForRequest, audienceFrom, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
 import { DisciplineOptions } from "@/components/admin/core/DisciplineOptions";
 import { type CoreCandidate, type CoreDiscipline, type CorePoolSubject, type CoreTestRow } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 const input = "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-xs";
 const label = "block text-2xs font-semibold text-text-secondary mb-1";
@@ -23,7 +25,7 @@ const toIso = (v: string) => (v ? new Date(v).toISOString() : null);
  * of one of Mellow's papers — and never sees the question bank itself. The paths are the only difference: the
  * server's tenancy rule (scopeOwnTests) decides what each caller can reach.
  */
-export function CoreTestsPanel({ mode, onToast }: { mode: "admin" | "tpo"; onToast: (m: string) => void }) {
+export function CoreTestsPanel({ mode, onToast }: { mode: "admin" | "tpo"; onToast: ToastTrigger }) {
   const base = mode === "admin" ? "/admin/core/tests" : "/tpo/core-tests";
   const [tests, setTests] = useState<CoreTestRow[] | null>(null);
   const [papers, setPapers] = useState<CoreTestRow[]>([]);
@@ -54,7 +56,7 @@ export function CoreTestsPanel({ mode, onToast }: { mode: "admin" | "tpo"; onToa
       await load();
       setOpen(res.test.slug);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Couldn't copy that paper.");
+      onToast(err instanceof ApiError ? err.message : "Couldn't copy that paper.", "error");
     } finally {
       setCopying(null);
     }
@@ -135,7 +137,7 @@ export function CoreTestsPanel({ mode, onToast }: { mode: "admin" | "tpo"; onToa
 
 // ─────────────────────────────────── details form ───────────────────────────────────
 
-function TestForm({ base, test, onClose, onSaved, onToast }: { base: string; test: CoreTestRow | null; onClose: () => void; onSaved: (t: CoreTestRow) => void; onToast: (m: string) => void }) {
+function TestForm({ base, test, onClose, onSaved, onToast }: { base: string; test: CoreTestRow | null; onClose: () => void; onSaved: (t: CoreTestRow) => void; onToast: ToastTrigger }) {
   const [title, setTitle] = useState(test?.title ?? "");
   const [description, setDescription] = useState(test?.description ?? "");
   const [discipline, setDiscipline] = useState<CoreDiscipline>(test?.discipline_code ?? "ece");
@@ -165,7 +167,7 @@ function TestForm({ base, test, onClose, onSaved, onToast }: { base: string; tes
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.errors ?? {});
-        if (!err.errors) onToast(err.message);
+        if (!err.errors) onToast(err.message, "error");
       }
     } finally {
       setSaving(false);
@@ -206,7 +208,7 @@ function TestForm({ base, test, onClose, onSaved, onToast }: { base: string; tes
 
 // ─────────────────────────────────── editor ───────────────────────────────────
 
-function TestEditor({ slug, base, mode, onClose, onToast }: { slug: string; base: string; mode: "admin" | "tpo"; onClose: () => void; onToast: (m: string) => void }) {
+function TestEditor({ slug, base, mode, onClose, onToast }: { slug: string; base: string; mode: "admin" | "tpo"; onClose: () => void; onToast: ToastTrigger }) {
   const [test, setTest] = useState<CoreTestRow | null>(null);
   const [pool, setPool] = useState<CorePoolSubject[]>([]);
   const [rows, setRows] = useState<{ subject_id: string; count: string; difficulty: string }[]>([{ subject_id: "", count: "5", difficulty: "mixed" }]);
@@ -223,7 +225,7 @@ function TestEditor({ slug, base, mode, onClose, onToast }: { slug: string; base
   }, [base, slug]);
 
   useEffect(() => {
-    void load().catch(() => onToast("Couldn't open that test."));
+    void load().catch(() => onToast("Couldn't open that test.", "error"));
   }, [load, onToast]);
 
   const frozen = (test?.sessions_count ?? 0) > 0;
@@ -248,8 +250,8 @@ function TestEditor({ slug, base, mode, onClose, onToast }: { slug: string; base
 
   const setStatus = (status: "published" | "cancelled" | "draft") => run(status, () => api.put(`${base}/${slug}`, { status }), status === "published" ? "Published — students of this branch can see it now." : status === "cancelled" ? "Test cancelled." : "Moved back to draft.");
 
-  const remove = () => {
-    if (!window.confirm("Delete this draft test?")) return;
+  const remove = async () => {
+    if (!(await confirmDialog({ title: "Delete this draft test?", message: "This can't be undone.", tone: "danger", confirmLabel: "Delete test" }))) return;
     void run("delete", async () => { await api.delete(`${base}/${slug}`); onClose(); }, "Test deleted.");
   };
 
@@ -328,7 +330,7 @@ function TestEditor({ slug, base, mode, onClose, onToast }: { slug: string; base
 
 // ─────────────────────────────────── hand-pick (Mellow Ops) ───────────────────────────────────
 
-function HandPicker({ base, test, onClose, onSaved, onToast }: { base: string; test: CoreTestRow; onClose: () => void; onSaved: () => void; onToast: (m: string) => void }) {
+function HandPicker({ base, test, onClose, onSaved, onToast }: { base: string; test: CoreTestRow; onClose: () => void; onSaved: () => void; onToast: ToastTrigger }) {
   const [chosen, setChosen] = useState<CoreCandidate[]>([]);
   const [results, setResults] = useState<CoreCandidate[]>([]);
   const [q, setQ] = useState("");
@@ -353,7 +355,7 @@ function HandPicker({ base, test, onClose, onSaved, onToast }: { base: string; t
       onToast("Paper saved.");
       onSaved();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.errors?.question_ids?.[0] ?? err.message : "Couldn't save the paper.");
+      onToast(err instanceof ApiError ? err.errors?.question_ids?.[0] ?? err.message : "Couldn't save the paper.", "error");
     } finally {
       setSaving(false);
     }

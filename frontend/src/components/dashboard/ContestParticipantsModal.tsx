@@ -7,6 +7,7 @@ import { cn, withMinDelay } from "@/lib/utils";
 import { CodeViewModal, type CodeViewData } from "./CodeViewModal";
 import type { ContestParticipantRow, ContestParticipantSubmission } from "@/types/studentReport";
 import { Modal } from "@/components/ui/Modal";
+import { toast } from "@/lib/toast";
 
 interface ContestParticipantsModalProps {
   /** "/tpo/contests" or "/admin/contests" — the role-scoped controller base, same convention ReviewSessionsModal uses for interviews. */
@@ -161,7 +162,7 @@ function ParticipantSubmissions({
       setViewingCode((prev) => (prev ? { ...prev, code: res.submission.code } : prev));
     } catch (err) {
       setViewingCode(null);
-      window.alert(err instanceof ApiError ? err.message : "Failed to load submitted code.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to load submitted code.");
     }
   };
 

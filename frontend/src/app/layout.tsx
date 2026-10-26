@@ -5,6 +5,8 @@ import { AuthProvider } from "@/lib/AuthContext";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { NotificationRuntime } from "@/components/notifications/NotificationRuntime";
 import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
+import { Toaster } from "@/components/ui/Toaster";
+import { DialogHost } from "@/components/ui/DialogHost";
 import "./globals.css";
 
 // Inter + JetBrains Mono are self-hosted (the latin-subset variable woff2
@@ -124,6 +126,10 @@ export default function RootLayout({
           {/* The notification poll and the "it just happened" toasts, for whoever is signed in, on any page. */}
           <NotificationRuntime />
         </AuthProvider>
+        {/* The app's feedback toasts and confirm/prompt dialogs (lib/toast, lib/dialogs): mounted once, above every page,
+            modal and drawer, so any handler anywhere can raise one without owning the markup. */}
+        <Toaster />
+        <DialogHost />
       </body>
     </html>
   );

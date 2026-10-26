@@ -41,6 +41,7 @@ import {
   type LeadSummary,
   type LeadPage,
 } from "@/types/lead";
+import { useToast } from "@/lib/toast";
 
 interface LeadsResponse {
   leads: LeadPage;
@@ -106,7 +107,6 @@ function MarketingLeadsPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeLeadId, setActiveLeadId] = useState<number | null>(null);
   const [notifyConfirmOpen, setNotifyConfirmOpen] = useState(false);
   const [sendingNotify, setSendingNotify] = useState(false);
@@ -115,10 +115,7 @@ function MarketingLeadsPageContent() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [movingIds, setMovingIds] = useState<Set<number>>(new Set());
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadLeads = useCallback(
     async (opts?: { silent?: boolean }) => {
@@ -211,7 +208,7 @@ function MarketingLeadsPageContent() {
       triggerToast(res.message);
       setSelectedIds(new Set());
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to send the notification.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to send the notification.", "error");
     } finally {
       setSendingNotify(false);
       setNotifyConfirmOpen(false);
@@ -236,7 +233,7 @@ function MarketingLeadsPageContent() {
       await loadLeads({ silent: true });
     } catch (err) {
       setLeads(previous);
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update status.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update status.", "error");
     } finally {
       setMovingIds((prev) => {
         const next = new Set(prev);
@@ -261,20 +258,6 @@ function MarketingLeadsPageContent() {
           : "Mellow Direct leads assigned to you — track progress, log outreach, and convert."
       }
     >
-      <AnimatePresence>
-        {toastMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card flex items-center gap-3 text-xs font-semibold text-primary max-w-sm"
-          >
-            <div className="w-2 h-2 rounded-full bg-accent-primary animate-ping shrink-0" />
-            <span>{toastMessage}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       <div className="space-y-6">
         {/* KPI strip — real aggregates from the backend, not derived from the current page */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

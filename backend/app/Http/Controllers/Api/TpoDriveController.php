@@ -7,6 +7,7 @@ use App\Models\ActivityLog;
 use App\Models\Company;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
+use App\Support\CompanyNameMatcher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -131,10 +132,11 @@ class TpoDriveController extends Controller
             return response()->json(['companies' => []]);
         }
 
-        $companies = Company::where('name', 'like', "%{$query}%")
-            ->orderBy('name')
-            ->limit(10)
-            ->get(['id', 'name', 'slug', 'logo', 'industry', 'overview']);
+        // Names containing the text first, then ones that merely look like it ("capegemni" finds Capgemini) — marked
+        // `match: similar` so the picker can say "similar to what you typed" instead of presenting a guess as a hit.
+        $companies = collect((new CompanyNameMatcher)->search($query, 10))
+            ->map(fn (array $hit) => [...$hit['company']->toArray(), 'match' => $hit['match']])
+            ->values();
 
         return response()->json(['companies' => $companies]);
     }
@@ -180,9 +182,9 @@ class TpoDriveController extends Controller
             if (! empty($validated['company_id'])) {
                 $company = Company::findOrFail($validated['company_id']);
             } else {
-                // Exact-name safety net: two TPOs typing "Infosys" a week
-                // apart should land on the same company record, not two.
-                $company = Company::whereRaw('LOWER(name) = ?', [Str::lower($validated['company_name'])])->first();
+                // Safety net: two TPOs typing "Infosys" a week apart — or "Infosys Limited", or "Infosis" — should land on the same
+                // company record (and its prep content and logo), not two. Strict on purpose; see CompanyNameMatcher::findMatch.
+                $company = (new CompanyNameMatcher)->findMatch($validated['company_name']);
 
                 if (! $company) {
                     $company = Company::create([

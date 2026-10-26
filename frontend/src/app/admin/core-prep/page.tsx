@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { BarChart3, ClipboardList, FileUp, Flag, ListChecks, Network } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -15,6 +15,7 @@ import { CoreTestsPanel } from "@/components/admin/core/CoreTestsPanel";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { userHasPermission } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { useToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import type { CoreQuestion, CoreTaxonomyResponse } from "@/types/core";
 
@@ -40,16 +41,10 @@ export default function CorePrepAdminPage() {
 
   const [tab, setTab] = useState<Tab>("questions");
   const [taxonomy, setTaxonomy] = useState<CoreTaxonomyResponse | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [opened, setOpened] = useState<CoreQuestion | null>(null);
   const [version, setVersion] = useState(0);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const showToast = useCallback((message: string) => {
-    setToast(message);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), 4000);
-  }, []);
+  const showToast = useToast();
 
   const loadTaxonomy = useCallback(async () => {
     try {
@@ -63,10 +58,6 @@ export default function CorePrepAdminPage() {
     if (status === "ready" && hasAccess) void loadTaxonomy();
   }, [status, hasAccess, loadTaxonomy]);
 
-  useEffect(() => () => {
-    if (timer.current) clearTimeout(timer.current);
-  }, []);
-
   if (status !== "ready") return <SessionLoader />;
 
   return (
@@ -75,12 +66,6 @@ export default function CorePrepAdminPage() {
       title="Domain Prep"
       subtitle="Subject questions and tests for every department — Core Prep for engineering, Management, Commerce and Arts prep — written, reviewed and bulk-imported here."
     >
-      {toast && (
-        <div role="status" className="fixed right-6 top-20 z-[100] max-w-sm rounded-panel border border-accent-primary/40 bg-surface px-4 py-3 text-xs font-semibold text-primary shadow-card">
-          {toast}
-        </div>
-      )}
-
       {!hasAccess ? (
         <AccessDeniedNotice section="Core Prep" />
       ) : (

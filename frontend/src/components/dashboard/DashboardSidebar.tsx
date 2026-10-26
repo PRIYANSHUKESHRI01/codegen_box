@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
@@ -999,7 +1000,7 @@ export function DashboardSidebar({
                   aria-hidden
                   className="pointer-events-none absolute -right-6 -top-8 h-20 w-20 rounded-full bg-teal-400/20 blur-2xl transition-opacity group-hover:opacity-100"
                 />
-                <HpCompanyLogo name={storedUser.company.name} logo={storedUser.company.logo} size="sm" />
+                <CompanyLogo name={storedUser.company.name} logo={storedUser.company.logo} size="sm" className="h-9 w-16 rounded-[10px]" />
                 <div className="relative min-w-0 flex-1">
                   <p className="truncate text-13 font-bold leading-tight text-sidebar-strong">{storedUser.company.name}</p>
                   <p className="mt-0.5 flex items-center gap-1.5 truncate text-2xs font-medium text-sidebar-dim">

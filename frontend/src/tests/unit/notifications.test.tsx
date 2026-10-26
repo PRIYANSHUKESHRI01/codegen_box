@@ -458,7 +458,8 @@ describe("preferences", () => {
 
     fireEvent.click(await screen.findByRole("switch", { name: "Placement drives" }));
 
-    await waitFor(() => expect(toast).toHaveBeenCalledWith("Couldn't save that. Try again."));
+    // Said as an error, so it shows as one (red, announced assertively) rather than as another success.
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Couldn't save that. Try again.", "error"));
     expect(screen.getByRole("switch", { name: "Placement drives" }).getAttribute("aria-checked")).toBe("true");
   });
 });

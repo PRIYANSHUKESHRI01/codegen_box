@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Loader2, Plus, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface DriveMapping {
   id: number;
@@ -47,7 +48,7 @@ export function DriveVisibilityPanel({
   onLiveCollegeIdsLoaded,
 }: {
   driveId: number;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
   targeting?: ContestTargeting;
   /** Fired once per successful load with the drive's current live college ids — lets a create-flow parent default a fresh contest to "all live colleges" without this panel owning that policy itself. */
   onLiveCollegeIdsLoaded?: (liveCollegeIds: number[]) => void;
@@ -72,7 +73,7 @@ export function DriveVisibilityPanel({
         onLiveCollegeIdsLoaded?.(liveIds);
       }
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load drive visibility.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load drive visibility.", "error");
     } finally {
       setLoading(false);
     }
@@ -90,7 +91,7 @@ export function DriveVisibilityPanel({
       const res = await api.get<{ colleges: PartnerCollege[] }>("/admin/partner-colleges");
       setPartnerColleges(res.colleges);
     } catch {
-      onToast("Failed to load partner colleges.");
+      onToast("Failed to load partner colleges.", "error");
     }
   };
 
@@ -113,7 +114,7 @@ export function DriveVisibilityPanel({
       setShowAdd(false);
       loadMappings();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to propose colleges.");
+      onToast(err instanceof ApiError ? err.message : "Failed to propose colleges.", "error");
     } finally {
       setProposing(false);
     }

@@ -27,13 +27,13 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpBtn,
   hpEase,
   type HpTabItem,
   type HpTone,
 } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
+import { useToast } from "@/lib/toast";
 
 // Same tier→colour convention PartnerCollegesPanel.tsx already uses on the
 // Mellow Ops side (purple / cyan / amber) — reused rather than invented, so a
@@ -80,12 +80,8 @@ export default function PartnerCollegesPage() {
   const [tierFilter, setTierFilter] = useState<TierFilter>("all");
   const [selectedDriveId, setSelectedDriveId] = useState<number | "">("");
   const [proposingCollegeId, setProposingCollegeId] = useState<number | null>(null);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -146,8 +142,6 @@ export default function PartnerCollegesPage() {
       title="Partner Colleges"
       subtitle={`Every college on AptRun — pick one to propose one of ${companyName}'s job openings to their campus.`}
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {!(loadError && colleges.length === 0) && (
           <HpItem>

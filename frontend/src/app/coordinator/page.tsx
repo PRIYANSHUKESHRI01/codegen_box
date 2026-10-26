@@ -12,7 +12,7 @@ import { CoordinatorRoster } from "@/components/coordinator/CoordinatorRoster";
 import { BlockStudentModal, FollowUpModal, UnblockStudentModal } from "@/components/coordinator/CoordinatorModals";
 import { NotesPanel } from "@/components/coordinator/NotesPanel";
 import { AttentionQueue, ReadinessMix, SectionKpis } from "@/components/coordinator/SectionOverview";
-import { HP_TONES, HpButton, HpCard, HpEmptyState, HpIconTile, HpItem, HpPill, HpSearch, HpSkeletonCards, HpStagger, HpToast } from "@/components/portal/kit";
+import { HP_TONES, HpButton, HpCard, HpEmptyState, HpIconTile, HpItem, HpPill, HpSearch, HpSkeletonCards, HpStagger } from "@/components/portal/kit";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -36,6 +36,7 @@ import {
 } from "@/lib/cohortInsights";
 import { DEFAULT_EXTRA_FILTERS, attentionById, buildCallList, hasExtraFilters, matchesExtraFilters, type CoordinatorExtraFilters } from "@/lib/coordinatorView";
 import type { CohortStudent } from "@/types/cohort";
+import { useToast } from "@/lib/toast";
 import type { CoordinatorRoster as RosterResponse, CoordinatorStudent } from "@/types/coordinator";
 
 const AT_RISK_THRESHOLD = 60;
@@ -91,12 +92,7 @@ export default function CoordinatorDashboardPage() {
   const [blockFor, setBlockFor] = useState<CoordinatorStudent | null>(null);
   const [unblockFor, setUnblockFor] = useState<CoordinatorStudent | null>(null);
   const [notify, setNotify] = useState<{ ids: number[]; label: string; students: CohortStudent[] } | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const say = useCallback((message: string) => {
-    setToast(message);
-    setTimeout(() => setToast(null), 3500);
-  }, []);
+  const say = useToast();
 
   const load = useCallback(async ({ silent = false }: { silent?: boolean } = {}) => {
     if (silent) setRefreshing(true);
@@ -219,7 +215,6 @@ export default function CoordinatorDashboardPage() {
       title={roster?.section ? `Section ${roster.section}` : "Your section"}
       subtitle={`The students you look after at ${user?.college?.name ?? "your college"} — see who needs a call this week, keep every follow-up on track, and check how the section is doing. Profile data is view-only; your TPO changes it.`}
     >
-      <HpToast message={toast} tone={toast?.startsWith("Couldn't") ? "rose" : "emerald"} />
 
       {loadError && <HpErrorCard message={loadError} onRetry={() => load()} />}
 

@@ -9,6 +9,7 @@ import { ProctoringSessionList } from "@/components/proctoring/ProctoringSession
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import type { ProctoringSessionSummary } from "@/types/proctoring";
+import { useToast } from "@/lib/toast";
 
 /**
  * Section Coordinator view of flagged proctoring sessions — scoped to
@@ -20,12 +21,8 @@ export default function CoordinatorProctoringPage() {
   const { status } = useAuthGuard(["section_coordinator"]);
   const [sessions, setSessions] = useState<ProctoringSessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -33,7 +30,7 @@ export default function CoordinatorProctoringPage() {
       const res = await api.get<{ sessions: ProctoringSessionSummary[] }>("/coordinator/proctoring");
       setSessions(res.sessions);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.", "error");
     } finally {
       setLoading(false);
     }
@@ -57,12 +54,6 @@ export default function CoordinatorProctoringPage() {
       title="Proctoring Activity"
       subtitle="Every contest attempt flagged for a fullscreen exit, tab switch, or blocked action — in your section only."
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       {lockedCount > 0 && (
         <div className="p-3.5 rounded-panel bg-status-danger/10 border border-status-danger/25 flex items-center gap-2.5 text-xs text-status-danger font-semibold">
           <ShieldAlert className="w-4 h-4 shrink-0" />

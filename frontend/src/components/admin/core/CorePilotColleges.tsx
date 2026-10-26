@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { DISCIPLINE_LABEL } from "@/lib/core";
 import type { CorePilotCollege, CoverageCollege, CoverageDiscipline } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
 
 /**
  * Staged rollout for one branch family: the colleges whose students see its Core Prep before it is live for everyone.
@@ -27,7 +28,7 @@ export function CorePilotColleges({
   colleges: CoverageCollege[] | null;
   editable: boolean;
   onSaved: () => Promise<void> | void;
-  onToast: (message: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [query, setQuery] = useState("");
   const [saving, setSaving] = useState(false);
@@ -48,7 +49,7 @@ export function CorePilotColleges({
       onToast(done);
       await onSaved();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Couldn't update the pilot colleges.");
+      onToast(err instanceof ApiError ? err.message : "Couldn't update the pilot colleges.", "error");
     } finally {
       setSaving(false);
     }

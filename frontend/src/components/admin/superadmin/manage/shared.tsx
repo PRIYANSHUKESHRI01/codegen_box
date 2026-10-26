@@ -1,12 +1,13 @@
 import { cn } from "@/lib/utils";
 import type { ManagedUserResponse } from "@/types/adminSubscriptions";
+import { type ToastTrigger } from "@/lib/toast";
 
 /** What every section of the manage drawer is given. */
 export interface SectionProps {
   data: ManagedUserResponse;
   /** Re-read this account from the server (and tell the list behind the drawer it changed). */
   reload: () => Promise<void>;
-  triggerToast: (msg: string) => void;
+  triggerToast: ToastTrigger;
 }
 
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {

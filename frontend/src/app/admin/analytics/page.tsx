@@ -27,6 +27,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BarChart } from "@/components/dashboard/tpo/BarChart";
 import { CoreHeatmapCard } from "@/components/dashboard/tpo/CoreHeatmapCard";
 import { cn } from "@/lib/utils";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
@@ -629,7 +630,7 @@ function CompanyTable({ rows }: { rows: TpoReportsData["placements"]["company_su
                 <tr key={c.company} className="group transition-colors duration-200 hover:bg-indigo-500/[0.035]">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-3">
-                      <HpCompanyLogo name={c.company} size="sm" />
+                      <CompanyLogo name={c.company} size="sm" />
                       <span className="max-w-[18rem] truncate text-13 font-bold text-primary">{c.company}</span>
                     </div>
                   </td>

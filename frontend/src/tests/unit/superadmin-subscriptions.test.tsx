@@ -188,6 +188,74 @@ describe("Superadmin → Subscriptions", () => {
   });
 });
 
+describe("Superadmin → Subscriptions — paging and racing requests", () => {
+  const listCalls = () => get.mock.calls.map((c) => String(c[0])).filter((p) => p.startsWith("/superadmin/subscriptions"));
+
+  const paged = (current: number, rows: AdminSubscriptionRow[] = [row({ id: 1 })]): AdminSubscriptionsResponse => ({
+    ...LIST(rows),
+    pagination: { current_page: current, last_page: 4, total: 100 },
+  });
+
+  it("starts again from page 1 with ONE request when a filter changes from a later page", async () => {
+    get.mockImplementation((path: string) => Promise.resolve(path.startsWith("/superadmin/subscriptions") ? paged(path.includes("page=3") ? 3 : 1, [row({ id: path.includes("page=3") ? 33 : 1 })]) : {}));
+    render(<SubscriptionsPanel triggerToast={toast} />);
+    await screen.findByText("Student 1");
+
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(listCalls().some((p) => p.includes("page=2"))).toBe(true));
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    await waitFor(() => expect(listCalls().some((p) => p.includes("page=3"))).toBe(true));
+    await screen.findByText("Student 33");
+
+    get.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Ended" }));
+    await screen.findByText("Student 1");
+
+    // The old behaviour: a request for page 3 under the new filter, then a second for page 1 — and whichever answered last won.
+    expect(listCalls()).toEqual(["/superadmin/subscriptions?state=expired"]);
+  });
+
+  it("does not let a slow answer for an old filter land on top of the current one", async () => {
+    const pending: Record<string, (v: unknown) => void> = {};
+    get.mockImplementation((path: string) => {
+      if (!path.startsWith("/superadmin/subscriptions")) return Promise.resolve({});
+      if (path === "/superadmin/subscriptions?state=active") return Promise.resolve(LIST([row({ id: 1 })]));
+      return new Promise((resolve) => (pending[new URL(path, "http://x").searchParams.get("state") ?? ""] = resolve));
+    });
+    render(<SubscriptionsPanel triggerToast={toast} />);
+    await screen.findByText("Student 1");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancelled" }));
+    await waitFor(() => expect(pending["canceled"]).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "Ended" }));
+    await waitFor(() => expect(pending["expired"]).toBeTruthy());
+
+    pending["expired"](LIST([row({ id: 5, state: "expired" })]));
+    await screen.findByText("Student 5");
+    pending["canceled"](LIST([row({ id: 6, state: "canceled" })]));
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(screen.getByText("Student 5")).toBeTruthy();
+    expect(screen.queryByText("Student 6")).toBeNull();
+  });
+
+  it("switches 'Ending in 7 days' off when Ended or Cancelled is chosen — it lists running plans only and could only be empty", async () => {
+    await open();
+
+    fireEvent.click(screen.getByRole("button", { name: /ending in 7 days/i }));
+    await waitFor(() => expect(lastListUrl()).toContain("ending_within=7"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Ended" }));
+    await waitFor(() => expect(lastListUrl()).toBe("/superadmin/subscriptions?state=expired"));
+    expect(screen.getByRole("button", { name: /ending in 7 days/i }).getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("says how many subscriptions there are even when they fit on one page", async () => {
+    await open();
+    expect(screen.getByText("3 subscriptions")).toBeTruthy();
+  });
+});
+
 describe("Give a plan", () => {
   const openGrant = async () => {
     await open();

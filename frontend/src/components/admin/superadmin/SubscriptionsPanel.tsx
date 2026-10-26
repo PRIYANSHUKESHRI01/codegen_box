@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, BadgeCheck, Ban, CalendarPlus, ChevronLeft, ChevronRight, Gift, RefreshCw, Search, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
@@ -11,6 +11,7 @@ import { GrantPlanModal, type GrantTarget } from "./GrantPlanModal";
 import { PlanActionModal } from "./PlanActionModal";
 import { SourceBadge, StateBadge, describeEnd } from "./planUi";
 import { UserManageDrawer } from "./UserManageDrawer";
+import { type ToastTrigger } from "@/lib/toast";
 
 const STATE_FILTERS: { value: string; label: string }[] = [
   { value: "active", label: "Running" },
@@ -59,7 +60,7 @@ function Stat({ label, value, hint, onClick, active, tone }: { label: string; va
  * The free Coder plan every student starts on is hidden by default (there would be
  * thousands of them); "Show free plans" brings them back.
  */
-export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function SubscriptionsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [data, setData] = useState<AdminSubscriptionsResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,14 +71,26 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
   const [endingSoon, setEndingSoon] = useState(false);
   const [includeFree, setIncludeFree] = useState(false);
   const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
   const debouncedSearch = useDebouncedValue(search, 350);
+
+  // The page number belongs to the filters it was chosen under: change any filter (or the search) and it is page 1 again
+  // in the SAME render. Resetting it from an effect instead sent one request for the old page number under the new
+  // filters and then a second for page 1, and whichever answered last won.
+  const filterKey = [state, audience, source, endingSoon, includeFree, debouncedSearch.trim()].join("|");
+  const [pageAt, setPageAt] = useState<{ key: string; page: number }>({ key: filterKey, page: 1 });
+  const page = pageAt.key === filterKey ? pageAt.page : 1;
+  const goToPage = (next: number) => setPageAt({ key: filterKey, page: next });
 
   const [granting, setGranting] = useState(false);
   const [action, setAction] = useState<{ mode: "extend" | "cancel"; row: AdminSubscriptionRow } | null>(null);
   const [managedUserId, setManagedUserId] = useState<number | null>(null);
 
+  // Only the newest request may write to the screen: a slow answer to an old filter must never land on top of the
+  // answer to the current one.
+  const latest = useRef(0);
+
   const load = useCallback(async () => {
+    const ticket = ++latest.current;
     setLoadError(null);
     setRefreshing(true);
 
@@ -90,11 +103,12 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
     if (page > 1) params.set("page", String(page));
 
     try {
-      setData(await api.get<AdminSubscriptionsResponse>(`/superadmin/subscriptions?${params}`));
+      const res = await api.get<AdminSubscriptionsResponse>(`/superadmin/subscriptions?${params}`);
+      if (ticket === latest.current) setData(res);
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : "Couldn't load the subscriptions.");
+      if (ticket === latest.current) setLoadError(err instanceof ApiError ? err.message : "Couldn't load the subscriptions.");
     } finally {
-      setRefreshing(false);
+      if (ticket === latest.current) setRefreshing(false);
     }
   }, [state, audience, source, endingSoon, includeFree, debouncedSearch, page]);
 
@@ -102,13 +116,10 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
     void load();
   }, [load]);
 
-  // A new filter or search always starts from the first page.
-  useEffect(() => setPage(1), [state, audience, source, endingSoon, includeFree, debouncedSearch]);
-
   const granted = (result: SubscriptionChangeResponse, student: GrantTarget) => {
     setGranting(false);
     triggerToast(`${student.name} is now on ${result.subscription.plan?.name ?? "the plan"}${result.subscription.current_period_end ? ` until ${new Date(result.subscription.current_period_end).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}.`);
-    if (result.warning) triggerToast(result.warning);
+    if (result.warning) triggerToast(result.warning, "warning");
     void load();
   };
 
@@ -204,7 +215,11 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
             <button
               key={f.value}
               type="button"
-              onClick={() => setState(f.value)}
+              onClick={() => {
+                setState(f.value);
+                // "Ending in 7 days" lists RUNNING plans only — keeping it on under Ended / Cancelled could only ever be empty.
+                if (f.value !== "active") setEndingSoon(false);
+              }}
               aria-pressed={state === f.value}
               className={cn("rounded-control px-3 py-1 text-2xs font-bold transition-all", state === f.value ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary")}
             >
@@ -342,7 +357,7 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
         </table>
       </div>
 
-      {data.pagination.last_page > 1 && (
+      {data.pagination.last_page > 1 ? (
         <div className="flex items-center justify-between text-2xs text-text-muted">
           <span>
             Page {data.pagination.current_page} of {data.pagination.last_page} · {data.pagination.total} subscriptions
@@ -350,22 +365,26 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: (msg: strin
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
+              onClick={() => goToPage(Math.max(1, page - 1))}
+              disabled={page <= 1 || refreshing}
               className="inline-flex items-center gap-1 rounded-control border border-border-strong bg-elevated px-2.5 py-1.5 font-bold text-primary disabled:opacity-50"
             >
               <ChevronLeft className="h-3.5 w-3.5" /> Previous
             </button>
             <button
               type="button"
-              onClick={() => setPage((p) => Math.min(data.pagination.last_page, p + 1))}
-              disabled={page >= data.pagination.last_page}
+              onClick={() => goToPage(Math.min(data.pagination.last_page, page + 1))}
+              disabled={page >= data.pagination.last_page || refreshing}
               className="inline-flex items-center gap-1 rounded-control border border-border-strong bg-elevated px-2.5 py-1.5 font-bold text-primary disabled:opacity-50"
             >
               Next <ChevronRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
+      ) : (
+        <p className="text-2xs text-text-muted" aria-live="polite">
+          {data.pagination.total.toLocaleString()} subscription{data.pagination.total === 1 ? "" : "s"}
+        </p>
       )}
 
       {granting && <GrantPlanModal onClose={() => setGranting(false)} onGranted={granted} />}

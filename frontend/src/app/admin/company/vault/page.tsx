@@ -44,6 +44,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import { Modal } from "@/components/ui/Modal";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 import type { ReadinessComponent } from "@/types/studentStats";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import {
@@ -64,7 +65,6 @@ import {
   HpSkeletonRows,
   HpStagger,
   HpTabs,
-  HpToast,
   hpBtn,
   hpEase,
   hpInput,
@@ -181,8 +181,6 @@ const SCORE_PRESETS = [
   { value: "90", label: "90+" },
 ];
 
-type ToastTone = "emerald" | "rose";
-
 /** Hairline dividers for the 2×2 (mobile) → 1×4 (sm+) engagement strip. */
 const STRIP_CELL_BORDERS = ["border-b border-r sm:border-b-0", "border-b sm:border-b-0 sm:border-r", "border-r", ""] as const;
 
@@ -215,15 +213,9 @@ function trackSpotlight(e: MouseEvent<HTMLElement>) {
 export default function CompanyVaultPage() {
   const { status } = useAuthGuard(["admin_company"]);
   const [tab, setTab] = useState<"browse" | "engagements">("browse");
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastTone, setToastTone] = useState<ToastTone>("emerald");
   const [viewingCandidateId, setViewingCandidateId] = useState<number | null>(null);
 
-  const triggerToast = (msg: string, tone: ToastTone = "emerald") => {
-    setToastTone(tone);
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   if (status !== "ready") return <SessionLoader />;
 
@@ -234,8 +226,6 @@ export default function CompanyVaultPage() {
       subtitle="Students whose readiness says they're ready to be hired — browse, express interest, schedule an HR interview, or hire directly."
     >
       <MotionConfig reducedMotion="user">
-        <HpToast message={toastMessage} tone={toastTone} />
-
         <HpStagger className="space-y-6">
           <HpItem>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -288,7 +278,7 @@ export default function CompanyVaultPage() {
 
 /* ── Browse ─────────────────────────────────────────────────────────────── */
 
-function BrowseTab({ onToast, onView }: { onToast: (msg: string, tone?: ToastTone) => void; onView: (id: number) => void }) {
+function BrowseTab({ onToast, onView }: { onToast: ToastTrigger; onView: (id: number) => void }) {
   const [result, setResult] = useState<Paginated<VaultCandidateCard> | null>(null);
   const [colleges, setColleges] = useState<CollegeOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -312,7 +302,7 @@ function BrowseTab({ onToast, onView }: { onToast: (msg: string, tone?: ToastTon
       const res = await api.get<{ profiles: Paginated<VaultCandidateCard> }>(`/company/vault?${params.toString()}`);
       setResult(res.profiles);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load the Vault.", "rose");
+      onToast(err instanceof ApiError ? err.message : "Failed to load the Vault.", "error");
     } finally {
       setLoading(false);
     }
@@ -903,7 +893,7 @@ function ProfileSkeleton() {
 
 /* ── Profile modal ──────────────────────────────────────────────────────── */
 
-function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId: number; onClose: () => void; onToast: (msg: string, tone?: ToastTone) => void }) {
+function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId: number; onClose: () => void; onToast: ToastTrigger }) {
   const [detail, setDetail] = useState<{
     profile: VaultCandidateDetail;
     readiness: { score: number; tier: string; components: ReadinessComponent[] };
@@ -923,7 +913,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       const res = await api.get<typeof detail>(`/company/vault/${candidateId}`);
       setDetail(res);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load candidate profile.", "rose");
+      onToast(err instanceof ApiError ? err.message : "Failed to load candidate profile.", "error");
       onClose();
     } finally {
       setLoading(false);
@@ -942,7 +932,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       onToast("Marked interest — the candidate has been notified.");
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to express interest.", "rose");
+      onToast(err instanceof ApiError ? err.message : "Failed to express interest.", "error");
     } finally {
       setBusy(false);
     }
@@ -961,7 +951,7 @@ function CandidateProfileModal({ candidateId, onClose, onToast }: { candidateId:
       a.remove();
       URL.revokeObjectURL(url);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to download resume.", "rose");
+      onToast(err instanceof ApiError ? err.message : "Failed to download resume.", "error");
     } finally {
       setDownloadingResume(false);
     }

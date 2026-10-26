@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Company;
+use App\Models\CompanyPrepQuestion;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Models\Problem;
+use App\Models\Submission;
 use Illuminate\Http\Request;
 
 class CompanyPrepController extends Controller
@@ -24,24 +26,42 @@ class CompanyPrepController extends Controller
             ->withCount(['prepQuestions', 'recommendedProblems'])
             ->get()
             ->filter(fn (Company $c) => $c->prep_questions_count > 0 || $c->recommended_problems_count > 0)
-            ->map(function (Company $company) use ($collegeId) {
-                $years = $company->prepQuestions()
-                    ->distinct()
-                    ->pluck('asked_year')
-                    ->sortDesc()
-                    ->values()
-                    ->all();
+            ->values();
 
-                $rounds = $company->prepQuestions()
-                    ->whereNotNull('round_name')
-                    ->distinct()
+        // One grouped query for the whole catalogue (years / rounds / categories used to be three queries per
+        // company). It is also what the hub's filters run on: a company's rounds, years and categories are not
+        // independent, so "Technical Interview" + "2024" can only be answered from the combinations themselves.
+        $groups = CompanyPrepQuestion::query()
+            ->whereIn('company_id', $companies->pluck('id'))
+            ->selectRaw('company_id, round_name, category, asked_year, COUNT(*) as total, MIN(display_order) as first_order')
+            ->groupBy('company_id', 'round_name', 'category', 'asked_year')
+            ->get()
+            ->groupBy('company_id');
+
+        $companies = $companies
+            ->map(function (Company $company) use ($collegeId, $groups) {
+                $rows = $groups->get($company->id, collect());
+
+                $years = $rows->pluck('asked_year')->map(fn ($y) => (int) $y)->unique()->sortDesc()->values()->all();
+
+                // Rounds in the order the questions were authored (which is the order of the drive), not alphabetically.
+                $rounds = $rows
+                    ->filter(fn ($r) => trim((string) $r->round_name) !== '')
+                    ->sortBy([['first_order', 'asc'], ['round_name', 'asc']])
                     ->pluck('round_name')
+                    ->unique()
                     ->values()
                     ->all();
 
-                $categories = $company->prepQuestions()
-                    ->distinct()
-                    ->pluck('category')
+                $categories = $rows->pluck('category')->unique()->values()->all();
+
+                $breakdown = $rows
+                    ->map(fn ($r) => [
+                        'round' => trim((string) $r->round_name) !== '' ? $r->round_name : null,
+                        'category' => $r->category,
+                        'year' => (int) $r->asked_year,
+                        'count' => (int) $r->total,
+                    ])
                     ->values()
                     ->all();
 
@@ -76,6 +96,7 @@ class CompanyPrepController extends Controller
                     'years' => $years,
                     'rounds' => $rounds,
                     'categories' => $categories,
+                    'breakdown' => $breakdown,
                     'has_live_drive' => $hasLiveDrive,
                     'live_drive_id' => $liveDriveId,
                 ];
@@ -104,10 +125,18 @@ class CompanyPrepController extends Controller
             ->get(['problem_slug', 'topic_tag', 'priority']);
 
         $realProblems = Problem::whereIn('slug', $recommended->pluck('problem_slug'))
-            ->get(['slug', 'title', 'difficulty'])
+            ->get(['id', 'slug', 'title', 'difficulty'])
             ->keyBy('slug');
 
-        $recommendedProblems = $recommended->map(function ($rec) use ($realProblems) {
+        // Same meaning as ProblemController: an accepted submission, any day. One query for the whole pack.
+        $solvedIds = $user
+            ? Submission::where('user_id', $user->id)
+                ->where('status', Submission::STATUS_ACCEPTED)
+                ->whereIn('problem_id', $realProblems->pluck('id'))
+                ->pluck('problem_id')
+            : collect();
+
+        $recommendedProblems = $recommended->map(function ($rec) use ($realProblems, $solvedIds) {
             $problem = $realProblems->get($rec->problem_slug);
 
             return [
@@ -117,6 +146,7 @@ class CompanyPrepController extends Controller
                 'title' => $problem?->title,
                 'difficulty' => $problem?->difficulty,
                 'available' => $problem !== null,
+                'solved' => $problem !== null && $solvedIds->contains($problem->id),
             ];
         })->all();
 

@@ -15,6 +15,7 @@ import { localDatetimeInputToUtcIso } from "@/lib/datetime";
 import type { ProblemSummary } from "@/types/problem";
 import { Modal } from "@/components/ui/Modal";
 import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 
 type ContestType = "general" | "daily" | "company" | "tpo_mock";
 
@@ -78,16 +79,12 @@ export default function AdminContestsPage() {
   const hasAccess = userHasPermission(user, "contests");
   const [contests, setContests] = useState<AdminContest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managingContest, setManagingContest] = useState<AdminContest | null>(null);
   const [viewingParticipantsOf, setViewingParticipantsOf] = useState<AdminContest | null>(null);
   const [visibilityContest, setVisibilityContest] = useState<AdminContest | null>(null);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadContests = useCallback(async () => {
     setLoading(true);
@@ -95,7 +92,7 @@ export default function AdminContestsPage() {
       const res = await api.get<{ contests: AdminContest[] }>("/admin/contests");
       setContests(res.contests);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load contests.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load contests.", "error");
     } finally {
       setLoading(false);
     }
@@ -127,7 +124,7 @@ export default function AdminContestsPage() {
       triggerToast(res.already_finalized ? "Already finalized." : `Finalized — ${res.participants_ranked} participant(s) ranked.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.", "error");
     }
   };
 
@@ -137,7 +134,7 @@ export default function AdminContestsPage() {
       triggerToast(`"${contest.title}" is now published.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
@@ -148,12 +145,6 @@ export default function AdminContestsPage() {
       subtitle="Create and curate platform-run rated contests — students only ever see published ones."
       actionButton={{ label: "New Contest", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -334,7 +325,7 @@ function ManageVisibilityModal({
 }: {
   contest: AdminContest;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [selectedCollegeIds, setSelectedCollegeIds] = useState<number[]>(contest.college_ids ?? []);
   const [saving, setSaving] = useState(false);
@@ -346,7 +337,7 @@ function ManageVisibilityModal({
       onToast("College targeting updated.");
       onClose();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.");
+      onToast(err instanceof ApiError ? err.message : "Failed to save college targeting.", "error");
     } finally {
       setSaving(false);
     }
@@ -399,7 +390,7 @@ function CreateContestModal({
 }: {
   onClose: () => void;
   onCreated: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [contestType, setContestType] = useState<"general" | "company">("general");
   const [title, setTitle] = useState("");
@@ -630,7 +621,7 @@ function ManageProblemsModal({
 }: {
   contest: AdminContest;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [problems, setProblems] = useState<AdminContestProblem[]>([]);
   const [catalog, setCatalog] = useState<ProblemSummary[]>([]);
@@ -664,7 +655,7 @@ function ManageProblemsModal({
         setCatalog(catalogRes.problems);
       }
     } catch {
-      onToast("Failed to load problems.");
+      onToast("Failed to load problems.", "error");
     } finally {
       setLoading(false);
     }
@@ -684,7 +675,7 @@ function ManageProblemsModal({
       });
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to add problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to add problem.", "error");
     } finally {
       setAddingId(null);
     }
@@ -695,7 +686,7 @@ function ManageProblemsModal({
       await api.delete(`/admin/contests/${contest.slug}/problems/${contestProblemId}`);
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.", "error");
     }
   };
 

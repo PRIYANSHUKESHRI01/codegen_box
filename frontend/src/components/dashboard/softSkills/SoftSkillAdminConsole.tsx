@@ -15,7 +15,6 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   type HpTone,
 } from "@/components/portal/kit";
 import { ScIconButton, ScMetric, ScNotice, ScReveal } from "@/components/portal/screeningKit";
@@ -31,6 +30,8 @@ import type { DashboardRole } from "@/components/dashboard/DashboardSidebar";
 import { AudienceChip } from "@/components/branches/BranchAudienceField";
 import { audienceTouchesDepartment, useBranchCatalog } from "@/lib/branches";
 import { useDepartmentScope } from "@/lib/departments";
+import { useToast } from "@/lib/toast";
+import { confirmDialog } from "@/lib/dialogs";
 
 interface SoftSkillAdminConsoleProps {
   allowedRoles: DashboardRole[];
@@ -111,7 +112,6 @@ export function SoftSkillAdminConsole({
   const { scope: deptScope } = useDepartmentScope();
   const [assessments, setAssessments] = useState<AdminSoftSkillAssessment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<AdminSoftSkillAssessment | null>(null);
   const [kind, setKind] = useState<"tests" | "sets">("tests");
@@ -120,10 +120,7 @@ export function SoftSkillAdminConsole({
   const [filter, setFilter] = useState<PremiumFilter>("all");
   const [query, setQuery] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 4500);
-  };
+  const triggerToast = useToast();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,7 +128,7 @@ export function SoftSkillAdminConsole({
       const res = await api.get<{ assessments: AdminSoftSkillAssessment[] }>(libraryAdmin ? `${basePath}?kind=${kind}` : basePath);
       setAssessments(res.assessments);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load Soft Skills tests.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load Soft Skills tests.", "error");
     } finally {
       setLoading(false);
     }
@@ -149,18 +146,18 @@ export function SoftSkillAdminConsole({
       triggerToast(`"${assessment.title}" is now published.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
   const handleDelete = async (assessment: AdminSoftSkillAssessment) => {
-    if (!window.confirm(`Delete "${assessment.title}"? This can't be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete "${assessment.title}"?`, message: "This can't be undone.", tone: "danger", confirmLabel: "Delete" }))) return;
     try {
       await api.delete(`${basePath}/${assessment.slug}`);
       triggerToast(`"${assessment.title}" deleted.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to delete.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete.", "error");
     }
   };
 
@@ -170,7 +167,7 @@ export function SoftSkillAdminConsole({
       triggerToast(listed ? `"${assessment.title}" is now in the question-set library.` : `"${assessment.title}" left the question-set library.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Could not change the library listing.");
+      triggerToast(err instanceof ApiError ? err.message : "Could not change the library listing.", "error");
     }
   };
 
@@ -214,8 +211,6 @@ export function SoftSkillAdminConsole({
         subtitle={subtitle}
         actionButton={{ label: "New Soft Skills Test", icon: Plus, onClick: () => setShowCreate(true) }}
       >
-        <HpToast message={toastMessage} />
-
         <HpStagger className="space-y-6">
           {(loading || hasAny) && (
             <HpItem>
@@ -410,12 +405,6 @@ export function SoftSkillAdminConsole({
       subtitle={subtitle}
       actionButton={{ label: "New Soft Skills Test", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-50 px-4 py-3 rounded-panel bg-surface border border-accent-primary/40 shadow-card text-xs font-semibold text-primary max-w-sm">
-          {toastMessage}
-        </div>
-      )}
-
       {libraryAdmin && (
         <div role="tablist" aria-label="What to list" className="mb-4 inline-flex items-center gap-1 rounded-control border border-border-subtle bg-elevated p-1">
           {(

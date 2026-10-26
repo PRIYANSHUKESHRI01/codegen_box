@@ -6,13 +6,14 @@ import { Toggle } from "@/components/ui/Toggle";
 import { ApiError } from "@/lib/api";
 import { fetchPreferences, savePreferences, type NotificationCategory, type NotificationPreference } from "@/lib/notifications";
 import { CATEGORY_META } from "./notificationUi";
+import { type ToastTrigger } from "@/lib/toast";
 
 /**
  * Settings → Notifications: one switch per kind of notification, saved the moment it is flipped (and put back if the
  * server refuses). Plan/payment and account/security notifications are about the person's own access and money, so
  * those show as always on rather than as a switch that would let them miss "your plan ended".
  */
-export function NotificationPreferences({ onToast }: { onToast: (message: string) => void }) {
+export function NotificationPreferences({ onToast }: { onToast: ToastTrigger }) {
   const [prefs, setPrefs] = useState<NotificationPreference[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState<NotificationCategory | null>(null);
@@ -37,7 +38,7 @@ export function NotificationPreferences({ onToast }: { onToast: (message: string
       onToast(`${pref.label} notifications ${enabled ? "on" : "off"}.`);
     } catch (err) {
       setPrefs(prefs);
-      onToast(err instanceof ApiError ? err.message : "Couldn't save that. Try again.");
+      onToast(err instanceof ApiError ? err.message : "Couldn't save that. Try again.", "error");
     } finally {
       setSaving(null);
     }

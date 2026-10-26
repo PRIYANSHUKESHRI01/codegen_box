@@ -1,94 +1,201 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import {
-  BookOpen,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  Code2,
-  FileQuestion,
-  Layers,
-  ListChecks,
-  MessageSquare,
-  Search,
-  Sparkles,
-  ArrowRight,
-  ShieldCheck,
-  AlertCircle,
-} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { AlertCircle, RefreshCw, SearchX } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { SessionLoader } from "@/components/ui/SessionLoader";
+import { HpSkeleton, hpEase } from "@/components/portal/kit";
+import { CompanyCard } from "@/components/company-prep/CompanyCard";
+import { PyqFilters } from "@/components/company-prep/PyqFilters";
+import { PyqHero } from "@/components/company-prep/PyqHero";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
+import {
+  DEFAULT_SORT,
+  NO_FILTERS,
+  facetCounts,
+  facetOptions,
+  filterCompanies,
+  filterSearch,
+  hasActiveFilters,
+  matchingQuestionCount,
+  parseFilterSearch,
+  sanitizeFilters,
+  sortCompanies,
+  summarizeCatalogue,
+  type PrepFilters,
+  type PrepSort,
+} from "@/lib/companyPrep";
 import type { CompanyPrepSummary } from "@/types/companyPrep";
 
-const ROUND_FILTER_ALL = "All";
+type LoadState = "loading" | "ready" | "error";
+
+/** The URL the page was opened with ("?round=…&year=…") — read once, so Back from a company lands on the same filtered view. */
+const fromUrl = () => parseFilterSearch(typeof window === "undefined" ? "" : window.location.search);
+
+function CardSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-border-subtle bg-surface shadow-[var(--hp-edge),var(--hp-shadow)]" aria-hidden>
+      <HpSkeleton className="h-[92px] w-full rounded-none" />
+      <div className="space-y-4 px-6 pb-6">
+        <HpSkeleton className="-mt-9 h-16 w-36 rounded-2xl" />
+        <div className="space-y-2">
+          <HpSkeleton className="h-5 w-1/2" />
+          <HpSkeleton className="h-3 w-1/3" />
+        </div>
+        <HpSkeleton className="h-3 w-full" />
+        <HpSkeleton className="h-3 w-4/5" />
+        <div className="grid grid-cols-3 gap-2.5">
+          <HpSkeleton className="h-[70px] rounded-2xl" />
+          <HpSkeleton className="h-[70px] rounded-2xl" />
+          <HpSkeleton className="h-[70px] rounded-2xl" />
+        </div>
+        <div className="flex gap-2">
+          <HpSkeleton className="h-6 w-20 rounded-full" />
+          <HpSkeleton className="h-6 w-24 rounded-full" />
+          <HpSkeleton className="h-6 w-16 rounded-full" />
+        </div>
+        <div className="flex justify-between border-t border-border-subtle pt-4">
+          <HpSkeleton className="h-5 w-28" />
+          <HpSkeleton className="h-9 w-32 rounded-xl" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Notice({
+  icon: Icon,
+  tone,
+  title,
+  children,
+  actions,
+}: {
+  icon: typeof SearchX;
+  tone: "indigo" | "rose";
+  title: string;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  const ring = tone === "rose" ? "border-rose-500/20 bg-rose-500/[0.04]" : "border-border-subtle bg-surface";
+  const tile = tone === "rose" ? "from-rose-400 to-red-600 shadow-[0_10px_24px_-8px_rgba(244,63,94,0.7)]" : "from-indigo-500 to-violet-600 shadow-[0_10px_24px_-8px_rgba(99,102,241,0.7)]";
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: hpEase }}
+      role={tone === "rose" ? "alert" : undefined}
+      className={`relative overflow-hidden rounded-[24px] border px-6 py-14 text-center shadow-[var(--hp-edge),var(--hp-shadow)] ${ring}`}
+    >
+      <div aria-hidden className="hp-dots pointer-events-none absolute inset-0 opacity-30 [mask-image:radial-gradient(55%_70%_at_50%_30%,#000,transparent)]" />
+      <div className="relative mx-auto flex max-w-md flex-col items-center">
+        <div className="relative mb-6 flex items-center justify-center">
+          <span aria-hidden className="absolute h-28 w-28 rounded-full border border-indigo-500/10" />
+          <span aria-hidden className="absolute h-20 w-20 rounded-full border border-indigo-500/15 bg-indigo-500/[0.04]" />
+          <span className={`relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br text-white ring-1 ring-inset ring-white/25 ${tile}`}>
+            <Icon className="h-6 w-6" strokeWidth={2.2} aria-hidden />
+          </span>
+        </div>
+        <h3 className="text-lg font-bold tracking-tight text-primary">{title}</h3>
+        {children && <div className="mt-2 text-13 leading-relaxed text-text-muted">{children}</div>}
+        {actions && <div className="mt-6 flex flex-wrap items-center justify-center gap-2.5">{actions}</div>}
+      </div>
+    </motion.div>
+  );
+}
+
+const PRIMARY_BTN =
+  "hp-btn-sheen inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl bg-gradient-to-b from-indigo-500 to-violet-600 px-4 text-13 font-semibold text-white shadow-[0_1px_0_rgba(255,255,255,0.25)_inset,0_8px_20px_-8px_rgba(79,70,229,0.75)] transition-all duration-200 hover:-translate-y-px active:scale-[0.97]";
+const GHOST_BTN =
+  "inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-border-strong bg-surface px-4 text-13 font-semibold text-primary transition-all duration-200 hover:-translate-y-px hover:border-indigo-500/40 active:scale-[0.97]";
 
 export default function CompanyPrepHubPage() {
   const { status: authStatus } = useAuthGuard(["user"]);
-  const [loading, setLoading] = useState(true);
+
+  const [state, setState] = useState<LoadState>("loading");
   const [companies, setCompanies] = useState<CompanyPrepSummary[]>([]);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedRound, setSelectedRound] = useState(ROUND_FILTER_ALL);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [filters, setFilters] = useState<PrepFilters>(() => fromUrl().filters);
+  const [sort, setSort] = useState<PrepSort>(() => fromUrl().sort);
+
+  const filtersRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (authStatus !== "ready") return;
     let cancelled = false;
+    setState("loading");
 
     api
       .get<{ companies: CompanyPrepSummary[] }>("/company-prep")
       .then((res) => {
         if (cancelled) return;
-        setCompanies(res.companies ?? []);
-        setLoading(false);
+        const list = res.companies ?? [];
+        setCompanies(list);
+        // A link or bookmark can name a round / year this catalogue doesn't have — drop it rather than show an empty page.
+        setFilters((prev) => sanitizeFilters(prev, facetOptions(list)));
+        setState("ready");
       })
       .catch(() => {
         if (cancelled) return;
         setCompanies([]);
-        setLoading(false);
+        setState("error");
       });
 
     return () => {
       cancelled = true;
     };
-  }, [authStatus]);
+  }, [authStatus, reloadKey]);
 
-  // Aggregate all unique round names across all companies
-  const allRounds = useMemo(() => {
-    const roundsSet = new Set<string>();
-    companies.forEach((c) => {
-      c.rounds.forEach((r) => roundsSet.add(r));
-    });
-    return Array.from(roundsSet);
-  }, [companies]);
+  // Keep the address bar in step with the filters (no navigation, no history entries).
+  useEffect(() => {
+    if (state !== "ready" || typeof window === "undefined") return;
+    const next = `${window.location.pathname}${filterSearch(filters, sort)}${window.location.hash}`;
+    const now = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (next !== now) window.history.replaceState(window.history.state, "", next);
+  }, [filters, sort, state]);
 
-  // Total statistics across company catalog
-  const totalQuestions = useMemo(() => {
-    return companies.reduce((sum, c) => sum + c.prep_questions_count, 0);
-  }, [companies]);
+  // "/" jumps to search, the way most search-first sites do.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      e.preventDefault();
+      searchRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
-  const filteredCompanies = useMemo(() => {
-    return companies.filter((c) => {
-      const query = searchQuery.trim().toLowerCase();
-      const matchesSearch =
-        !query ||
-        c.name.toLowerCase().includes(query) ||
-        (c.industry && c.industry.toLowerCase().includes(query)) ||
-        c.rounds.some((r) => r.toLowerCase().includes(query));
+  const patchFilters = useCallback((patch: Partial<PrepFilters>) => setFilters((prev) => ({ ...prev, ...patch })), []);
+  const clearFilters = useCallback(() => setFilters(NO_FILTERS), []);
 
-      const matchesRound =
-        selectedRound === ROUND_FILTER_ALL || c.rounds.includes(selectedRound);
+  const options = useMemo(() => facetOptions(companies), [companies]);
+  const summary = useMemo(() => summarizeCatalogue(companies), [companies]);
+  const results = useMemo(() => sortCompanies(filterCompanies(companies, filters), sort, filters), [companies, filters, sort]);
 
-      return matchesSearch && matchesRound;
-    });
-  }, [companies, searchQuery, selectedRound]);
+  const roundCounts = useMemo(() => facetCounts(companies, filters, "round"), [companies, filters]);
+  const categoryCounts = useMemo(() => facetCounts(companies, filters, "category"), [companies, filters]);
+  const yearCounts = useMemo(() => facetCounts(companies, filters, "year"), [companies, filters]);
 
-  if (authStatus !== "ready" || loading) {
+  const matchingQuestions = useMemo(
+    () => results.reduce((sum, c) => sum + (matchingQuestionCount(c, filters) ?? c.prep_questions_count), 0),
+    [results, filters]
+  );
+
+  const browse = useCallback(() => {
+    filtersRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 450);
+  }, []);
+
+  if (authStatus !== "ready") {
     return <SessionLoader label="Loading company PYQs and prep catalog..." />;
   }
+
+  const ready = state === "ready";
+  const active = hasActiveFilters(filters);
 
   return (
     <DashboardShell
@@ -96,216 +203,116 @@ export default function CompanyPrepHubPage() {
       title="Previous Year Questions (PYQs)"
       subtitle="Authentic company-wise and round-wise question banks from campus recruitment drives"
     >
-      <div className="space-y-6">
-        {/* Hero Banner */}
-        <section className="p-6 sm:p-8 rounded-panel bg-gradient-to-r from-accent-primary/10 via-surface to-accent-secondary/10 border border-border-subtle shadow-subtle relative overflow-hidden">
-          <div className="max-w-2xl space-y-3 relative z-10">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent-primary/15 border border-accent-primary/30 text-accent-primary text-2xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Campus Recruitment Archives</span>
-            </div>
-            <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
-              Master Previous Year Drive Questions
-            </h2>
-            <p className="text-xs sm:text-sm text-text-secondary leading-relaxed">
-              Prepare with verified questions asked in campus recruitment drives over the last 5 years.
-              Practice Communication Versant rounds, STAR-format Soft Skills interviews, Coding challenges, and Technical Pseudocode.
-            </p>
-          </div>
+      <MotionConfig reducedMotion="user">
+        <div className="space-y-6 pb-8">
+          <PyqHero summary={summary} companies={companies} loading={!ready} onBrowse={browse} />
 
-          {/* Quick Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-border-subtle/80">
-            <div>
-              <div className="text-xs text-text-muted">Companies Curated</div>
-              <div className="text-lg font-bold font-mono text-primary mt-0.5">{companies.length}</div>
-            </div>
-            <div>
-              <div className="text-xs text-text-muted">Archived Questions</div>
-              <div className="text-lg font-bold font-mono text-accent-primary mt-0.5">{totalQuestions} PYQs</div>
-            </div>
-            <div>
-              <div className="text-xs text-text-muted">Years Covered</div>
-              <div className="text-lg font-bold font-mono text-accent-secondary mt-0.5">2021 – 2025</div>
-            </div>
-            <div>
-              <div className="text-xs text-text-muted">Verified Rounds</div>
-              <div className="text-lg font-bold font-mono text-status-success mt-0.5">4 Stages</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Filter & Search Bar */}
-        <div className="p-4 sm:p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="w-4 h-4 text-text-muted absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by company name, industry, or round (e.g. Accenture)..."
-                className="w-full pl-9 pr-3 py-2 rounded-control bg-elevated border border-border-subtle text-xs text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-primary transition-colors"
+          <div ref={filtersRef} className="scroll-mt-24">
+            {ready && companies.length > 0 ? (
+              <PyqFilters
+                ref={searchRef}
+                filters={filters}
+                sort={sort}
+                options={options}
+                roundCounts={roundCounts}
+                categoryCounts={categoryCounts}
+                yearCounts={yearCounts}
+                canFilterLive={summary.liveDrives > 0}
+                onChange={patchFilters}
+                onSortChange={setSort}
+                onClear={clearFilters}
               />
-            </div>
-            <div className="text-2xs text-text-muted font-mono self-end sm:self-center">
-              Showing {filteredCompanies.length} of {companies.length} companies
-            </div>
+            ) : state === "loading" ? (
+              <HpSkeleton className="h-[210px] rounded-[24px]" />
+            ) : null}
           </div>
 
-          {/* Round Filter Tabs */}
-          {allRounds.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap pt-1 border-t border-border-subtle/60">
-              <span className="text-3xs font-bold text-text-muted uppercase tracking-wider mr-1 flex items-center gap-1">
-                <Layers className="w-3 h-3" />
-                <span>Round:</span>
-              </span>
-              <button
-                onClick={() => setSelectedRound(ROUND_FILTER_ALL)}
-                className={cn(
-                  "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                  selectedRound === ROUND_FILTER_ALL
-                    ? "bg-accent-primary text-white border-accent-primary"
-                    : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
-                )}
-              >
-                All Rounds
-              </button>
-              {allRounds.map((round) => (
-                <button
-                  key={round}
-                  onClick={() => setSelectedRound(round)}
-                  className={cn(
-                    "px-2.5 py-1 rounded-control text-2xs font-bold border transition-colors",
-                    selectedRound === round
-                      ? "bg-accent-primary text-white border-accent-primary"
-                      : "bg-elevated text-text-secondary border-border-subtle hover:text-primary"
-                  )}
-                >
-                  {round}
-                </button>
+          {state === "loading" && (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3" role="status" aria-label="Loading companies">
+              {[0, 1, 2].map((i) => (
+                <CardSkeleton key={i} />
               ))}
             </div>
           )}
-        </div>
 
-        {/* Company Cards Grid */}
-        {filteredCompanies.length === 0 ? (
-          <div className="p-10 text-center rounded-panel bg-surface border border-border-subtle space-y-3">
-            <Building2 className="w-8 h-8 text-text-muted mx-auto" />
-            <p className="text-sm font-semibold text-primary">No companies match your filters</p>
-            <p className="text-xs text-text-muted max-w-sm mx-auto">
-              Try adjusting your search query or selecting &ldquo;All Rounds&rdquo; to see all available company prep packs.
-            </p>
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedRound(ROUND_FILTER_ALL);
-              }}
-              className="px-3 py-1.5 rounded-control bg-accent-primary text-white text-xs font-semibold hover:bg-accent-primary/90 transition-colors"
+          {state === "error" && (
+            <Notice
+              icon={AlertCircle}
+              tone="rose"
+              title="Couldn’t load the PYQ archive"
+              actions={
+                <button type="button" className={PRIMARY_BTN} onClick={() => setReloadKey((k) => k + 1)}>
+                  <RefreshCw className="h-4 w-4" aria-hidden />
+                  Try again
+                </button>
+              }
             >
-              Reset Filters
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filteredCompanies.map((company) => {
-              const yearsSpan =
-                company.years.length > 0
-                  ? `${Math.min(...company.years)} – ${Math.max(...company.years)}`
-                  : null;
+              Check your connection and try again. Nothing is lost — your filters are still in the address bar.
+            </Notice>
+          )}
 
-              return (
-                <div
-                  key={company.id}
-                  className="rounded-panel bg-surface border border-border-subtle hover:border-border-strong shadow-subtle hover:shadow-elevation transition-all flex flex-col justify-between overflow-hidden group"
+          {ready && companies.length === 0 && (
+            <Notice icon={SearchX} tone="indigo" title="No company packs are published yet">
+              Previous year questions appear here as soon as your institution’s catalogue is updated. Check back soon.
+            </Notice>
+          )}
+
+          {ready && companies.length > 0 && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-1" aria-live="polite">
+                <p className="text-xs text-text-secondary">
+                  Showing <strong className="tabular font-bold text-primary">{results.length}</strong> of{" "}
+                  <strong className="tabular font-bold text-primary">{companies.length}</strong> {companies.length === 1 ? "company" : "companies"}
+                  <span className="text-text-muted">
+                    {" "}
+                    · <span className="tabular">{matchingQuestions}</span> {active ? "matching " : ""}PYQs
+                  </span>
+                </p>
+              </div>
+
+              {results.length === 0 ? (
+                <Notice
+                  icon={SearchX}
+                  tone="indigo"
+                  title="No companies match these filters"
+                  actions={
+                    <>
+                      <button type="button" className={PRIMARY_BTN} onClick={clearFilters}>
+                        Reset filters
+                      </button>
+                      {filters.liveOnly && (
+                        <button type="button" className={GHOST_BTN} onClick={() => patchFilters({ liveOnly: false })}>
+                          Show all campuses
+                        </button>
+                      )}
+                    </>
+                  }
                 >
-                  {/* Card Header */}
-                  <div className="p-5 sm:p-6 space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl shrink-0 p-2 rounded-control bg-elevated/70 border border-border-subtle">
-                          {company.logo ?? "🏢"}
-                        </span>
-                        <div>
-                          <h3 className="text-base font-bold text-primary group-hover:text-accent-primary transition-colors">
-                            {company.name}
-                          </h3>
-                          <p className="text-2xs text-text-muted">{company.industry ?? "Technology Services"}</p>
-                        </div>
-                      </div>
-                      {company.has_live_drive && (
-                        <span className="px-2 py-0.5 rounded-full bg-status-success/15 border border-status-success/30 text-status-success text-3xs font-bold whitespace-nowrap inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Campus Drive Live</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Overview snippet */}
-                    {company.overview && (
-                      <p className="text-xs text-text-secondary line-clamp-2 leading-relaxed">
-                        {company.overview}
-                      </p>
-                    )}
-
-                    {/* Stats pills */}
-                    <div className="flex items-center gap-2 flex-wrap text-2xs pt-1">
-                      <span className="px-2.5 py-1 rounded-control bg-accent-primary/10 border border-accent-primary/25 text-accent-primary font-bold font-mono">
-                        {company.prep_questions_count} PYQs Archived
-                      </span>
-                      {yearsSpan && (
-                        <span className="px-2.5 py-1 rounded-control bg-elevated border border-border-subtle text-text-secondary font-mono">
-                          {yearsSpan} ({company.years.length} Yrs)
-                        </span>
-                      )}
-                      {company.recommended_problems_count > 0 && (
-                        <span className="px-2.5 py-1 rounded-control bg-accent-secondary/10 border border-accent-secondary/25 text-accent-secondary font-bold font-mono">
-                          {company.recommended_problems_count} DSA Problems
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Rounds coverage */}
-                    {company.rounds.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="text-3xs font-bold uppercase tracking-wider text-text-muted">
-                          Rounds Covered:
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          {company.rounds.map((r) => (
-                            <span
-                              key={r}
-                              className="px-2 py-0.5 rounded-full bg-elevated border border-border-subtle text-3xs text-text-secondary"
-                            >
-                              {r}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Action Footer */}
-                  <div className="p-4 px-5 sm:px-6 bg-elevated/40 border-t border-border-subtle flex items-center justify-between gap-3">
-                    <span className="text-2xs text-text-muted font-mono">
-                      {company.hiring_process.length > 0
-                        ? `${company.hiring_process.length} Assessment Stages`
-                        : "Full Prep Pack"}
-                    </span>
-                    <Link
-                      href={`/dashboard/company-prep/view?company=${company.slug}`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-accent-primary text-white text-xs font-bold hover:bg-accent-primary/90 transition-colors shadow-subtle"
-                    >
-                      <span>Explore PYQs</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                  Try removing a filter above — the numbers on each chip show how many companies you’d get.
+                </Notice>
+              ) : (
+                <ul className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  <AnimatePresence mode="popLayout" initial>
+                    {results.map((company, i) => (
+                      <motion.li
+                        key={company.id}
+                        layout
+                        initial={{ opacity: 0, y: 22, scale: 0.97 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.18 } }}
+                        transition={{ duration: 0.45, ease: hpEase, delay: Math.min(i, 8) * 0.045 }}
+                        className="min-w-0"
+                      >
+                        <CompanyCard company={company} filters={filters} matchCount={matchingQuestionCount(company, filters)} />
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+      </MotionConfig>
     </DashboardShell>
   );
 }

@@ -6,6 +6,7 @@ import { Modal } from "@/components/ui/Modal";
 import { api, ApiError } from "@/lib/api";
 import { DISCIPLINE_LABEL, TYPE_LABEL } from "@/lib/core";
 import type { CoreDifficulty, CoreDiscipline, CoreTaxonomyResponse, CoreType } from "@/types/core";
+import { type ToastTrigger } from "@/lib/toast";
 
 const field = "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary text-xs";
 const label = "block text-2xs font-semibold text-text-secondary mb-1";
@@ -15,7 +16,7 @@ const label = "block text-2xs font-semibold text-text-secondary mb-1";
  * is saved as a DRAFT labelled "AI draft" and still has to be read, corrected and published by a person — it exists to
  * save typing, never to replace the reviewer.
  */
-export function CoreAiDraftModal({ taxonomy, discipline, onClose, onDone, onToast }: { taxonomy: CoreTaxonomyResponse; discipline: CoreDiscipline; onClose: () => void; onDone: () => void; onToast: (m: string) => void }) {
+export function CoreAiDraftModal({ taxonomy, discipline, onClose, onDone, onToast }: { taxonomy: CoreTaxonomyResponse; discipline: CoreDiscipline; onClose: () => void; onDone: () => void; onToast: ToastTrigger }) {
   const subjects = useMemo(() => taxonomy.disciplines.find((d) => d.code === discipline)?.subjects.filter((s) => s.is_active) ?? [], [taxonomy, discipline]);
   const [subjectId, setSubjectId] = useState<number | "">(subjects[0]?.id ?? "");
   const [topicId, setTopicId] = useState<number | "">("");

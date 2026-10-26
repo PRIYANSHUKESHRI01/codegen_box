@@ -38,7 +38,7 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
       setConfirmSignOut(false);
       await reload();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.errors?.user?.[0] ?? err.message : "Couldn't sign them out.");
+      triggerToast(err instanceof ApiError ? err.errors?.user?.[0] ?? err.message : "Couldn't sign them out.", "error");
     } finally {
       setBusy(null);
     }
@@ -53,7 +53,7 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
       setBlockReason("");
       await reload();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Couldn't update the account.");
+      triggerToast(err instanceof ApiError ? err.message : "Couldn't update the account.", "error");
     } finally {
       setBusy(null);
     }

@@ -20,9 +20,9 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
 } from "@/components/portal/kit";
 import { HpSelect } from "@/components/portal/pipeline-kit";
+import { useToast } from "@/lib/toast";
 
 type FilterId = "all" | ProctoringSessionSummary["status"];
 
@@ -39,16 +39,12 @@ export default function TpoProctoringPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
   const [sessions, setSessions] = useState<ProctoringSessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   // View-only list controls (client-side filtering of the already-loaded list).
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
   const [sectionFilter, setSectionFilter] = useState<string>(ALL_SECTIONS);
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadSessions = useCallback(async () => {
     setLoading(true);
@@ -56,7 +52,7 @@ export default function TpoProctoringPage() {
       const res = await api.get<{ sessions: ProctoringSessionSummary[] }>("/tpo/proctoring");
       setSessions(res.sessions);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load proctoring activity.", "error");
     } finally {
       setLoading(false);
     }
@@ -102,8 +98,6 @@ export default function TpoProctoringPage() {
       title="Proctoring Activity"
       subtitle="Every contest attempt flagged for a fullscreen exit, tab switch, or blocked action — across your whole college."
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {(loading || hasAny) && (
           <HpItem>

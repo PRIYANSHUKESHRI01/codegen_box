@@ -46,7 +46,6 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
-  HpToast,
   hpInput,
   hpLabel,
   type HpTone,
@@ -63,6 +62,7 @@ import {
   formatSpan,
 } from "@/components/portal/screeningKit";
 import { AudienceChip, audienceForRequest, BranchAudienceField, EVERYONE, type BranchAudience } from "@/components/branches/BranchAudienceField";
+import { useToast, type ToastTrigger } from "@/lib/toast";
 
 interface TpoContest {
   id: number;
@@ -134,7 +134,6 @@ export default function MockContestsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
   const [contests, setContests] = useState<TpoContest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [managingContest, setManagingContest] = useState<TpoContest | null>(null);
   const [viewingParticipantsOf, setViewingParticipantsOf] = useState<TpoContest | null>(null);
@@ -142,10 +141,7 @@ export default function MockContestsPage() {
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
 
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const loadContests = useCallback(async () => {
     setLoading(true);
@@ -153,7 +149,7 @@ export default function MockContestsPage() {
       const res = await api.get<{ contests: TpoContest[] }>("/tpo/contests");
       setContests(res.contests);
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to load mock contests.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to load mock contests.", "error");
     } finally {
       setLoading(false);
     }
@@ -177,7 +173,7 @@ export default function MockContestsPage() {
       triggerToast(res.already_finalized ? "Already finalized." : `Finalized — ${res.participants_ranked} participant(s) ranked.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to finalize.", "error");
     }
   };
 
@@ -187,7 +183,7 @@ export default function MockContestsPage() {
       triggerToast(`"${contest.title}" is now published.`);
       loadContests();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
     }
   };
 
@@ -218,8 +214,6 @@ export default function MockContestsPage() {
       subtitle="Private practice rounds for your own students only — never rated, never visible to any other college."
       actionButton={{ label: "New Mock Contest", icon: Plus, onClick: () => setShowCreate(true) }}
     >
-      <HpToast message={toastMessage} />
-
       <HpStagger className="space-y-6">
         {(loading || hasAny) && (
           <HpItem>
@@ -629,7 +623,7 @@ function ManageMockProblemsModal({
 }: {
   contest: TpoContest;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
 }) {
   const [problems, setProblems] = useState<TpoContestProblem[]>([]);
   const [catalog, setCatalog] = useState<ProblemSummary[]>([]);
@@ -648,7 +642,7 @@ function ManageMockProblemsModal({
       setProblems(problemsRes.problems);
       setCatalog(catalogRes.problems);
     } catch {
-      onToast("Failed to load problems.");
+      onToast("Failed to load problems.", "error");
     } finally {
       setLoading(false);
     }
@@ -668,7 +662,7 @@ function ManageMockProblemsModal({
       });
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to add problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to add problem.", "error");
     } finally {
       setAddingId(null);
     }
@@ -679,7 +673,7 @@ function ManageMockProblemsModal({
       await api.delete(`/tpo/contests/${contest.slug}/problems/${contestProblemId}`);
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove problem.", "error");
     }
   };
 

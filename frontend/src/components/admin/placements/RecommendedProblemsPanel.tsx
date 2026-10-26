@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { PROBLEMS_DATA } from "@/data/problems";
 import { AdminCompanyRow, AdminRecommendedProblemRow, inputClass } from "./types";
+import { toast } from "@/lib/toast";
 
 interface RecommendedProblemsPanelProps {
   companies: AdminCompanyRow[];
@@ -82,7 +83,7 @@ export function RecommendedProblemsPanel({ companies, onCompaniesChanged }: Reco
       await loadRows(companyId);
       onCompaniesChanged();
     } catch (err) {
-      window.alert(err instanceof ApiError ? err.message : "Failed to remove problem.");
+      toast.error(err instanceof ApiError ? err.message : "Failed to remove problem.");
     }
   };
 

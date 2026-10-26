@@ -18,6 +18,7 @@ import {
   type SoftSkillCategory,
   type SoftSkillDifficulty,
 } from "@/types/softSkill";
+import { type ToastTrigger } from "@/lib/toast";
 
 interface ManageSoftSkillQuestionsModalProps {
   basePath: string;
@@ -31,7 +32,7 @@ interface ManageSoftSkillQuestionsModalProps {
   /** Why no further questions can be added (candidates already started / test cancelled); null when it is still open. */
   lockedReason?: string | null;
   onClose: () => void;
-  onToast: (msg: string) => void;
+  onToast: ToastTrigger;
   /** "premium" is the hiring-portal look. Default leaves Ops/TPO markup exactly as before. */
   variant?: "default" | "premium";
 }
@@ -86,7 +87,7 @@ export function ManageSoftSkillQuestionsModal({
       setAttached(questionsRes.questions);
       setBankCounts(bankRes.counts);
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to load questions.");
+      onToast(err instanceof ApiError ? err.message : "Failed to load questions.", "error");
     } finally {
       setLoading(false);
     }
@@ -107,7 +108,7 @@ export function ManageSoftSkillQuestionsModal({
       await api.delete(`${basePath}/${assessmentSlug}/questions/${assessmentQuestionId}`);
       setAttached((prev) => prev.filter((a) => a.id !== assessmentQuestionId));
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Failed to remove question.");
+      onToast(err instanceof ApiError ? err.message : "Failed to remove question.", "error");
     }
   };
 
@@ -127,7 +128,7 @@ export function ManageSoftSkillQuestionsModal({
       }
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "Auto-fill failed.");
+      onToast(err instanceof ApiError ? err.message : "Auto-fill failed.", "error");
     } finally {
       setAutoFilling(false);
     }
@@ -144,7 +145,7 @@ export function ManageSoftSkillQuestionsModal({
       onToast(`Generated ${res.questions.length} new ${CATEGORY_LABELS[genCategory]} question(s) into the bank.`);
       load();
     } catch (err) {
-      onToast(err instanceof ApiError ? err.message : "AI generation failed.");
+      onToast(err instanceof ApiError ? err.message : "AI generation failed.", "error");
     } finally {
       setGenerating(false);
     }

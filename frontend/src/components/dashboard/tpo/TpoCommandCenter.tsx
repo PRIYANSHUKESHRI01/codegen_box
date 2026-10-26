@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
+import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { BranchScopeBar } from "@/components/branches/BranchScopeBar";
 import { branchGroupKey, branchShortLabel, inBranchScope, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
 import { departmentCan, useDepartmentScope } from "@/lib/departments";
@@ -74,7 +75,6 @@ import {
   HpSkeletonCards,
   HpStagger,
   HpStatCard,
-  HpToast,
   hpBtn,
   hpEase,
   hpInput,
@@ -89,6 +89,7 @@ import type { TpoReportStudent, TpoReportsData } from "@/lib/generateTpoReports"
 import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
 import type { SubscriptionCoverage } from "@/types/subscription";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/lib/toast";
 
 /* ── Data shapes (moved verbatim from app/admin/page.tsx) ───────────────── */
 
@@ -409,14 +410,7 @@ export function TpoCommandCenter({ user }: Props) {
   const [targetDeadlineInput, setTargetDeadlineInput] = useState("");
   const [savingTarget, setSavingTarget] = useState(false);
 
-  // Toast — same 3.5s lifetime the page-level toast had; tone is cosmetic.
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastTone, setToastTone] = useState<"emerald" | "rose">("emerald");
-  const triggerToast = (msg: string, tone: "emerald" | "rose" = "emerald") => {
-    setToastTone(tone);
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3500);
-  };
+  const triggerToast = useToast();
 
   const handleSaveTarget = async () => {
     setSavingTarget(true);
@@ -430,7 +424,7 @@ export function TpoCommandCenter({ user }: Props) {
       setEditingTarget(false);
       triggerToast("Placement target updated.");
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to update target.", "rose");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update target.", "error");
     } finally {
       setSavingTarget(false);
     }
@@ -587,8 +581,6 @@ export function TpoCommandCenter({ user }: Props) {
 
   /* ── Sections ────────────────────────────────────────────────────────── */
 
-  const toast = <HpToast message={toastMessage} tone={toastTone} />;
-
   const hero = (
     <HpHero
       leading={<HpCompanyLogo name={collegeName} size="xl" />}
@@ -664,8 +656,6 @@ export function TpoCommandCenter({ user }: Props) {
 
   /* ── Loading ─────────────────────────────────────────────────────────── */
 
-  // The toast is always rendered last: it's position:fixed, but as a child of
-  // a space-y stack, mounting it first would push every sibling down.
   if (tpoDataLoading) {
     return (
       <div className="space-y-8">
@@ -713,7 +703,6 @@ export function TpoCommandCenter({ user }: Props) {
           </div>
           <HpSkeletonCards count={3} />
         </div>
-        {toast}
       </div>
     );
   }
@@ -728,7 +717,6 @@ export function TpoCommandCenter({ user }: Props) {
           <HpErrorCard message="Couldn't load your cohort data. Please refresh." />
         </HpItem>
         <HpItem>{quickLinks}</HpItem>
-        {toast}
       </HpStagger>
     );
   }
@@ -1101,7 +1089,7 @@ export function TpoCommandCenter({ user }: Props) {
                       <HpCard interactive className="flex h-full flex-col p-4 sm:p-5">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex min-w-0 items-center gap-3">
-                            <HpCompanyLogo name={d.company.name} logo={d.company.logo} size="md" />
+                            <CompanyLogo name={d.company.name} logo={d.company.logo} size="md" />
                             <div className="min-w-0">
                               <h3 className="truncate text-sm font-bold text-primary">{d.company.name}</h3>
                               <p className="truncate text-2xs text-text-muted">{d.role_title}</p>
@@ -1222,7 +1210,7 @@ export function TpoCommandCenter({ user }: Props) {
               <ul className="-mx-2 mt-4 space-y-0.5">
                 {recruiters.slice(0, 5).map((c) => (
                   <li key={c.company} className="flex items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-elevated/60">
-                    <HpCompanyLogo name={c.company} logo={logoByCompany.get(c.company) ?? null} size="sm" />
+                    <CompanyLogo name={c.company} logo={logoByCompany.get(c.company) ?? null} size="sm" />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-13 font-bold text-primary">{c.company}</div>
                       <div className="tabular truncate text-2xs text-text-muted">{plural(c.offers_accepted, "offer")} accepted</div>
@@ -1562,7 +1550,6 @@ export function TpoCommandCenter({ user }: Props) {
       </HpItem>
 
       <HpItem>{quickLinks}</HpItem>
-      {toast}
     </HpStagger>
   );
 }

@@ -7,6 +7,7 @@ import { api, ApiError } from "@/lib/api";
 import { accentStyle, resetBranchCatalog } from "@/lib/branches";
 import { DepartmentIcon } from "@/components/branches/DepartmentIcon";
 import { BranchesPanel } from "./BranchesPanel";
+import { type ToastTrigger } from "@/lib/toast";
 
 type CapMap = Record<string, boolean>;
 
@@ -115,7 +116,7 @@ const withChoice = (map: CapMap, key: string, choice: Choice): CapMap => {
  * It also shows how well each branch is covered by Domain Prep questions, so the programmes with nothing to practise yet are obvious.
  * Everything here is data: adding a department is not a release.
  */
-export function DepartmentsPanel({ triggerToast }: { triggerToast: (msg: string) => void }) {
+export function DepartmentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [view, setView] = useState<"departments" | "branches">("departments");
   const [data, setData] = useState<DepartmentsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -148,7 +149,7 @@ export function DepartmentsPanel({ triggerToast }: { triggerToast: (msg: string)
       triggerToast(done);
       await load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.errors?.department?.[0] ?? err.errors?.code?.[0] ?? err.message : "That didn't work.");
+      triggerToast(err instanceof ApiError ? err.errors?.department?.[0] ?? err.errors?.code?.[0] ?? err.message : "That didn't work.", "error");
     } finally {
       setBusy(null);
     }

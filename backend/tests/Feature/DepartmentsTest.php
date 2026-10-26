@@ -83,6 +83,32 @@ class DepartmentsTest extends TestCase
         $this->assertSame('arts', $catalog->departmentOf('english'));
     }
 
+    public function test_each_department_offers_exactly_its_five_main_branches(): void
+    {
+        $catalog = app(BranchCatalog::class);
+        $offered = fn (string $department) => collect($catalog->branches())
+            ->filter(fn (array $b) => $catalog->departmentOf($b['code']) === $department)->pluck('code')->sort()->values()->all();
+        $sorted = fn (array $codes) => collect($codes)->sort()->values()->all();
+
+        $this->assertSame($sorted(['cse', 'ece', 'eee', 'mech', 'civil']), $offered('engineering'));
+        $this->assertSame($sorted(['bba', 'mba', 'mba_marketing', 'mba_finance', 'mba_hr']), $offered('management'));
+        $this->assertSame($sorted(['bcom', 'mcom', 'chartered_accountancy', 'company_secretary', 'cma']), $offered('commerce'));
+        $this->assertSame($sorted(['english', 'history', 'political_science', 'economics', 'psychology']), $offered('arts'));
+
+        // Families left with no branch on offer are not offered either …
+        $families = array_column($catalog->disciplines(), 'code');
+        foreach (['other', 'sociology_sw', 'media_comm', 'education', 'geography_env', 'fine_arts', 'other_arts'] as $hidden) {
+            $this->assertNotContains($hidden, $families);
+        }
+        $this->assertNotContains('other', \App\Services\Core\CoreAccess::families());
+
+        // … yet nothing was removed: a student already in a switched-off branch keeps it, and old spellings still resolve to it.
+        $this->assertSame('it', $catalog->resolve('Information Technology'));
+        $this->assertSame('tourism_travel', $catalog->branch('tourism_travel')['code']);
+        $student = User::factory()->create(['role' => User::ROLE_USER, 'branch' => 'E&TC']);
+        $this->assertSame(['engineering', 'ece', 'etc'], [$student->department, $student->discipline, $student->branch_code]);
+    }
+
     public function test_an_ambiguous_label_is_decided_by_the_department_it_is_imported_under(): void
     {
         $catalog = app(BranchCatalog::class);

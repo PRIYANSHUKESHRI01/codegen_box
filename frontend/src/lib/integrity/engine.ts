@@ -29,6 +29,7 @@ import { browserFamily, deviceFingerprint, newInstanceId } from "./fingerprint";
 import { claim, discard, park } from "./keeper";
 import { findAutomation, findExtensionInjection, findTamper } from "./pristine";
 import { checksPass, getIntegrityUi, resetIntegrityUi, setCheck, setIntegrityUi } from "./store";
+import { canRunGuardian, isMac } from "./platform";
 import { IntegrityTransport } from "./transport";
 import type {
   BatchAck,
@@ -43,6 +44,10 @@ import type {
 
 /** What the original (pre-integrity) proctoring understood; used when the server has the layer switched off. */
 const LEGACY_TYPES: ReadonlySet<string> = new Set(["fullscreen_exit", "tab_switch", "devtools_detected", "paste_attempt", "window_blur", "context_menu_blocked", "tab_close_attempt"]);
+
+/** macOS refuses a browser the right to capture the screen until it is switched on in System Settings (and the browser restarted). */
+const MAC_SCREEN_RECORDING_FIX =
+  "On a Mac: open System Settings → Privacy & Security → Screen & System Audio Recording, switch on Google Chrome (or Edge), quit the browser completely (⌘Q), reopen it, then press Share screen again.";
 
 /** Used only if the policy request itself cannot be answered; the start call returns the real one. */
 const FALLBACK_POLICY: IntegrityPolicy = {
@@ -258,7 +263,7 @@ export class IntegrityEngine {
       this.adoptScreen(share.stream, share.surface);
     } catch (err) {
       const message = err instanceof ShareError ? err.message : "Couldn't start screen sharing. Please try again.";
-      setCheck({ ...this.check("screen", "fail"), detail: message });
+      setCheck({ ...this.check("screen", "fail"), detail: message, fix: isMac() && !(err instanceof ShareError && err.kind === "wrong_surface") ? MAC_SCREEN_RECORDING_FIX : undefined });
       this.o.handlers.consentError(message);
     }
   }
@@ -376,7 +381,15 @@ export class IntegrityEngine {
       setCheck(this.check("screen", this.screen ? "ok" : "pending", this.screen ? "Your entire screen is being shared." : undefined));
     }
     if (integrity && this.policy.guardian !== "off") {
-      setCheck(this.check("guardian", "pending", "Install and open the Guardian on this computer."));
+      // The Guardian is a Windows program. Where it cannot run, an optional one is simply not part of this attempt (the
+      // browser checks still apply in full); a required one cannot be met and says so up front instead of nagging.
+      setCheck(
+        canRunGuardian()
+          ? this.check("guardian", "pending", "Install and open the Guardian on this computer.")
+          : this.policy.guardian === "required"
+            ? { ...this.check("guardian", "fail", "The Guardian only runs on Windows."), fix: "This attempt needs a Windows computer. Ask your college which computer to use." }
+            : this.check("guardian", "skipped", isMac() ? "Not needed on a Mac — the other checks still apply." : "Not available on this device — the other checks still apply.")
+      );
     }
 
     // Drop checks the profile does not use.
@@ -388,7 +401,15 @@ export class IntegrityEngine {
   private browserCheck(): PreflightCheck {
     const ok = !!navigator.mediaDevices?.getUserMedia && !!document.documentElement.requestFullscreen;
     if (!ok) return { ...this.check("browser", "fail"), detail: "This browser lacks camera or fullscreen support.", fix: "Use a recent Chrome or Edge on a computer." };
-    if (this.policy.chromium_only && !isChromium()) return { ...this.check("browser", "fail"), detail: "This attempt needs Chrome or Edge.", fix: "Open this page in Google Chrome or Microsoft Edge on a computer." };
+    if (this.policy.chromium_only && !isChromium()) {
+      return {
+        ...this.check("browser", "fail"),
+        detail: isMac() ? "Safari can't confirm which screen you share, so this attempt needs Chrome or Edge." : "This attempt needs Chrome or Edge.",
+        fix: isMac()
+          ? "Install Google Chrome (google.com/chrome), open this page in it and sign in again. Your Mac needs nothing else."
+          : "Open this page in Google Chrome or Microsoft Edge on a computer.",
+      };
+    }
 
     return { ...this.check("browser", "ok"), detail: browserFamily().includes("Edg") ? "Microsoft Edge" : isChromium() ? "Chrome / Chromium" : "Supported" };
   }
@@ -437,7 +458,7 @@ export class IntegrityEngine {
       if (!this.attached || this.phase === "active" || this.ended) return;
       if (this.policy.block_multi_monitor) setCheck(this.displayCheck());
       setCheck(this.tamperCheck());
-      if (this.policy.guardian !== "off") await this.pollGuardian();
+      if (this.policy.guardian !== "off" && canRunGuardian()) await this.pollGuardian();
     };
     void tick();
     const id = window.setInterval(() => void tick(), 2500);

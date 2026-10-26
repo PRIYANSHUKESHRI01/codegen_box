@@ -19,6 +19,11 @@ export interface RouteNode {
   parent: string | null;
   /** What the arrow says when the parent's own title is not the right words ("Review queue" rather than "Projects"). */
   backLabel?: string;
+  /**
+   * Query parameters the PARENT page cannot work without, copied from this page's own address when going up. A contest problem's
+   * parent is the contest, which is identified by `?slug=` — an arrow that dropped it would land on a page that has nothing to show.
+   */
+  carry?: readonly string[];
 }
 
 /** A role's home page. Shown without an arrow. */
@@ -35,7 +40,7 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/company-prep/view": { title: "Company Prep", parent: "/dashboard/company-prep", backLabel: "All Companies" },
   "/dashboard/contests": { title: "Contests", parent: "/dashboard" },
   "/dashboard/contests/view": { title: "Contest", parent: "/dashboard/contests" },
-  "/dashboard/contests/problem": { title: "Contest problem", parent: "/dashboard/contests/view" },
+  "/dashboard/contests/problem": { title: "Contest problem", parent: "/dashboard/contests/view", carry: ["slug"] },
   "/dashboard/core": { title: "Core Prep", parent: "/dashboard" },
   "/dashboard/core/practice": { title: "Core practice", parent: "/dashboard/core" },
   "/dashboard/core/tests": { title: "Core tests", parent: "/dashboard/core" },
@@ -62,7 +67,8 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/practice/view": { title: "Practice Arena", parent: "/dashboard/practice" },
   "/dashboard/projects": { title: "Project Lab", parent: "/dashboard" },
   "/dashboard/projects/view": { title: "Project", parent: "/dashboard/projects" },
-  "/dashboard/projects/workspace": { title: "Project", parent: "/dashboard/projects/view" },
+  // The workspace's address names the enrollment, not the topic, so the topic page cannot be rebuilt from it: up means the project list.
+  "/dashboard/projects/workspace": { title: "Project", parent: "/dashboard/projects" },
   "/dashboard/reports": { title: "Performance Report", parent: "/dashboard" },
   "/dashboard/soft-skills": { title: "Soft Skills", parent: "/dashboard" },
   "/dashboard/soft-skills/session": { title: "Soft Skills", parent: "/dashboard/soft-skills" },
@@ -173,7 +179,7 @@ const normalise = (path: string) => (path.length > 1 && path.endsWith("/") ? pat
  * An unregistered route is not an error here — the arrow simply leads to the role's home — but the coverage test makes
  * sure that never happens for a page that exists.
  */
-export function resolveBack(pathname: string | null | undefined, portal: PortalInfo): BackTarget | null {
+export function resolveBack(pathname: string | null | undefined, portal: PortalInfo, search: string | URLSearchParams = ""): BackTarget | null {
   if (!pathname) return null;
   const path = normalise(pathname);
   const portalPath = normalise(portal.href.split("?")[0]);
@@ -200,5 +206,26 @@ export function resolveBack(pathname: string | null | undefined, portal: PortalI
   // A parent that is a portal root means "home" for the viewer — unless the page asked for a specific spot on it.
   if (parentIsRoot && node.parent === parentPath) return { href: portal.href, label: node.backLabel ?? portal.label };
 
-  return { href: node.parent, label: node.backLabel ?? parent?.title ?? portal.label };
+  return { href: withCarried(node.parent, node.carry, search), label: node.backLabel ?? parent?.title ?? portal.label };
+}
+
+/** `href` plus the carried parameters found in `search` (a `?a=b` string or URLSearchParams); unchanged when there is nothing to carry. */
+function withCarried(href: string, carry: readonly string[] | undefined, search: string | URLSearchParams): string {
+  if (!carry || carry.length === 0) return href;
+
+  const from = typeof search === "string" ? new URLSearchParams(search) : search;
+  const wanted = new URLSearchParams();
+  for (const key of carry) {
+    const value = from.get(key);
+    if (value) wanted.set(key, value);
+  }
+
+  const query = wanted.toString();
+  if (query === "") return href;
+
+  const hash = href.indexOf("#");
+  const base = hash === -1 ? href : href.slice(0, hash);
+  const fragment = hash === -1 ? "" : href.slice(hash);
+
+  return `${base}${base.includes("?") ? "&" : "?"}${query}${fragment}`;
 }

@@ -150,3 +150,23 @@ describe("BackButton", () => {
     expect(push).not.toHaveBeenCalled();
   });
 });
+
+describe("a back arrow whose parent is identified by a parameter", () => {
+  it("carries the contest's slug up from a contest problem, so the contest page has something to show", () => {
+    expect(resolveBack("/dashboard/contests/problem", STUDENT, "?slug=daily-contest-day-2-6ad0bb059fa1a&contestProblemId=23")).toEqual({
+      href: "/dashboard/contests/view?slug=daily-contest-day-2-6ad0bb059fa1a",
+      label: "Contest",
+    });
+    expect(resolveBack("/dashboard/contests/problem", STUDENT, new URLSearchParams("slug=abc&contestProblemId=1"))?.href).toBe("/dashboard/contests/view?slug=abc");
+  });
+
+  it("only carries what the node asks for, and falls back to the plain parent when there is nothing to carry", () => {
+    expect(resolveBack("/dashboard/contests/problem", STUDENT, "?contestProblemId=23&other=1")?.href).toBe("/dashboard/contests/view");
+    expect(resolveBack("/dashboard/contests/problem", STUDENT)?.href).toBe("/dashboard/contests/view");
+    expect(resolveBack("/dashboard/core/practice", STUDENT, "?slug=x")?.href).toBe("/dashboard/core");
+  });
+
+  it("sends a project workspace to the project list, whose address needs nothing", () => {
+    expect(resolveBack("/dashboard/projects/workspace", STUDENT, "?id=9")?.href).toBe("/dashboard/projects");
+  });
+});

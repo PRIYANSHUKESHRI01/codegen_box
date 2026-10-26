@@ -1,10 +1,9 @@
 "use client";
 
-import { AlertTriangle, Camera, CheckCircle2, ClipboardX, Maximize, Mic, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/Button";
-import { checksPass, useIntegrityUi } from "@/lib/integrity/store";
+import { AlertTriangle, Camera, ClipboardX, Maximize, Mic } from "lucide-react";
+import { useIntegrityUi } from "@/lib/integrity/store";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
-import { IntegrityChecklist } from "./IntegrityChecklist";
+import { ConsentScreen, type ConsentRule } from "./ConsentScreen";
 import { IntegrityDisclosure } from "./IntegrityDisclosure";
 import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
 
@@ -24,6 +23,8 @@ import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
  * When the server runs the exam-integrity layer, a system-check list sits between the two: screen sharing,
  * the single-screen check and the Guardian, each with what to do about it — and Start stays disabled until
  * every required row is green. What is recorded and for how long is spelled out from the server's own policy.
+ *
+ * The layout itself (get ready · what to expect · the pinned Start bar) is ConsentScreen, shared with the interview gate.
  */
 export function ProctoringConsentGate({
   phase,
@@ -43,98 +44,39 @@ export function ProctoringConsentGate({
   /** Which kind of attempt this gates — only changes the wording (see proctoringCopy.ts). Defaults to the original contest copy. */
   activity?: ProctoringActivity;
 }) {
-  const starting = phase === "starting";
-  const blocked = phase === "blocked";
   const copy = CONSENT_COPY[activity];
-  const ui = useIntegrityUi();
-  const integrity = ui.policy !== null;
-  const ready = !integrity || checksPass(ui.checks);
+  const integrity = useIntegrityUi().policy !== null;
+
+  const rules: ConsentRule[] = [
+    { icon: Maximize, text: "Your screen will switch to fullscreen for the duration of your attempt. Exiting it is logged as a violation." },
+    ...(!integrity
+      ? [
+          {
+            icon: Camera,
+            text: "Your camera turns on and records for your own attempt only — video stays in your browser and is never uploaded or stored. It won't be shown on screen once your attempt begins.",
+          },
+          { icon: Mic, text: "Your microphone records alongside the camera, for the same reason." },
+        ]
+      : []),
+    { icon: AlertTriangle, tone: "warn", text: copy.strikes },
+    ...(copy.paste ? [{ icon: ClipboardX, text: copy.paste }] : []),
+  ];
 
   return (
-    <div className="flex-1 flex items-center justify-center p-6">
-      <div className="w-full max-w-md rounded-panel bg-surface border border-border-subtle shadow-card p-6 space-y-5">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-control bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
-            <ShieldCheck className="w-5.5 h-5.5" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-primary">{copy.title}</h2>
-            <p className="text-2xs text-text-muted">{copy.subtitle}</p>
-          </div>
-        </div>
-
-        {/* Live self-check preview — mounted from the moment this component
-            renders (shows black until a stream attaches) so enableDevicePreview
-            can attach synchronously with zero ref-timing gymnastics. Only ever
-            visible here; nothing during the actual attempt shows it again. */}
-        <div
-          className={
-            devicePreviewReady
-              ? "rounded-control overflow-hidden border border-border-strong bg-black relative"
-              : "hidden"
-          }
-        >
-          <video ref={previewVideoRef} muted playsInline className="w-full aspect-video object-cover" />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-1 rounded bg-black/70 text-3xs font-bold text-white">
-            <CheckCircle2 className="w-3 h-3 text-status-success" />
-            Make sure your face is clearly visible
-          </div>
-        </div>
-
-        <IntegrityChecklist onEnableDevices={onEnableDevices} />
-
-        <ul className="space-y-2.5 text-xs text-text-secondary">
-          <li className="flex items-start gap-2.5">
-            <Maximize className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-            <span>Your screen will switch to fullscreen for the duration of your attempt. Exiting it is logged as a violation.</span>
-          </li>
-          {!integrity && (
-            <>
-              <li className="flex items-start gap-2.5">
-                <Camera className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-                <span>
-                  Your camera turns on and records for your own attempt only — video stays in your browser and is never
-                  uploaded or stored. It won't be shown on screen once your attempt begins.
-                </span>
-              </li>
-              <li className="flex items-start gap-2.5">
-                <Mic className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-                <span>Your microphone records alongside the camera, for the same reason.</span>
-              </li>
-            </>
-          )}
-          <li className="flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-status-warning shrink-0 mt-0.5" />
-            <span>{copy.strikes}</span>
-          </li>
-          {copy.paste && (
-            <li className="flex items-start gap-2.5">
-              <ClipboardX className="w-4 h-4 text-accent-primary shrink-0 mt-0.5" />
-              <span>{copy.paste}</span>
-            </li>
-          )}
-        </ul>
-
-        <IntegrityDisclosure />
-
-        {consentError && (
-          <div className="p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-2xs text-status-danger">
-            {consentError}
-          </div>
-        )}
-
-        {devicePreviewReady ? (
-          <Button onClick={onConsent} isLoading={starting} disabled={!ready} fullWidth>
-            {starting ? "Starting..." : ready ? "Start Proctored Session" : "Finish the system check to start"}
-          </Button>
-        ) : (
-          <Button onClick={onEnableDevices} fullWidth>
-            {blocked ? "Try Again" : "Enable Camera & Mic to Continue"}
-          </Button>
-        )}
-
-        <p className="text-3xs text-text-muted text-center">{integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}</p>
-      </div>
-    </div>
+    <ConsentScreen
+      title={copy.title}
+      subtitle={copy.subtitle}
+      previewVideoRef={previewVideoRef}
+      devicePreviewReady={devicePreviewReady}
+      onEnableDevices={onEnableDevices}
+      onConsent={onConsent}
+      starting={phase === "starting"}
+      blocked={phase === "blocked"}
+      startLabel="Start Proctored Session"
+      consentError={consentError}
+      rules={rules}
+      disclosure={integrity ? <IntegrityDisclosure /> : null}
+      footer={integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}
+    />
   );
 }

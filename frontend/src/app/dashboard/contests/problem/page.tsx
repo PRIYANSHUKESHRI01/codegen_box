@@ -12,7 +12,7 @@ import { CodeEditorPanel } from "@/components/practice/CodeEditorPanel";
 import { ConsolePanel, ConsoleTab } from "@/components/practice/ConsolePanel";
 import { Button } from "@/components/ui/Button";
 import { ProblemDetail } from "@/types/problem";
-import { api, ApiError } from "@/lib/api";
+import { ApiError } from "@/lib/api";
 import { useJudgedRun } from "@/lib/useJudgedRun";
 import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -20,6 +20,7 @@ import { pickInitialLanguage, recallLastLanguage, rememberLastLanguage } from "@
 import { cn } from "@/lib/utils";
 import { useProctoring } from "@/lib/proctoring/useProctoring";
 import { ProctoringConsentGate } from "@/components/proctoring/ProctoringConsentGate";
+import { loadContestProblem } from "@/lib/contestProblemPrefetch";
 import { ProctoringOverlay } from "@/components/proctoring/ProctoringOverlay";
 import { ProctoringLockedScreen } from "@/components/proctoring/ProctoringLockedScreen";
 
@@ -74,11 +75,16 @@ function ContestProblemSolvePageContent() {
   });
 
   useEffect(() => {
-    if (status !== "ready" || !slug || !contestProblemId) return;
+    if (status !== "ready") return;
+    // No contest problem in the address (a bookmark, an old link): say so instead of showing the loading skeleton for ever.
+    if (!slug || !contestProblemId) {
+      setLoadState("not_found");
+      return;
+    }
     let cancelled = false;
 
-    api
-      .get<{ problem: ProblemDetail; points: number }>(basePath)
+    // Usually already here: the contest's problem list starts this request when the student points at a row.
+    loadContestProblem(slug, contestProblemId)
       .then((res) => {
         if (cancelled) return;
         setProblem(res.problem);
@@ -191,7 +197,7 @@ function ContestProblemSolvePageContent() {
           <CenteredNotice
             heading="Problem not found"
             body="This contest problem doesn't exist."
-            onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
+            onBack={() => nav.go(slug ? `/dashboard/contests/view?slug=${slug}` : "/dashboard/contests")}
           />
         )}
 
@@ -199,7 +205,7 @@ function ContestProblemSolvePageContent() {
           <CenteredNotice
             heading={forbiddenMessage?.toLowerCase().includes("locked out") ? "You've been locked out" : "Not available yet"}
             body={forbiddenMessage ?? "You need to register for this contest before you can open its problems."}
-            onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
+            onBack={() => nav.go(slug ? `/dashboard/contests/view?slug=${slug}` : "/dashboard/contests")}
           />
         )}
 
@@ -219,7 +225,7 @@ function ContestProblemSolvePageContent() {
         )}
 
         {loadState === "ready" && problem && proctoring.phase === "locked" && (
-          <ProctoringLockedScreen session={proctoring.session} onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)} />
+          <ProctoringLockedScreen session={proctoring.session} onBack={() => nav.go(slug ? `/dashboard/contests/view?slug=${slug}` : "/dashboard/contests")} />
         )}
 
         {loadState === "ready" && problem && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost") && (
@@ -235,7 +241,7 @@ function ContestProblemSolvePageContent() {
 
             <ProblemHeaderBar
               problem={problem}
-              onBack={() => nav.go(`/dashboard/contests/view?slug=${slug}`)}
+              onBack={() => nav.go(slug ? `/dashboard/contests/view?slug=${slug}` : "/dashboard/contests")}
               backPending={nav.pending}
               onRun={handleRun}
               onSubmit={handleSubmit}

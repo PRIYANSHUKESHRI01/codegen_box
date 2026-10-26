@@ -6,8 +6,16 @@
 export function canRunGuardian(): boolean {
   if (typeof navigator === "undefined") return true;
 
-  const hint = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
-  if (hint) return /windows/i.test(hint);
+  return /windows/i.test(platformName());
+}
 
-  return /windows/i.test(navigator.userAgent || "");
+/** A Mac computer (macOS), not an iPhone or iPad. */
+export function isMac(): boolean {
+  return typeof navigator !== "undefined" && /mac/i.test(platformName()) && !/iphone|ipad|ipod|mobile/i.test(navigator.userAgent || "");
+}
+
+function platformName(): string {
+  const hint = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform;
+
+  return hint || navigator.userAgent || "";
 }

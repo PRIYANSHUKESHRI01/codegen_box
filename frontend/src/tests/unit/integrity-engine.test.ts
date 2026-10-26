@@ -74,8 +74,9 @@ vi.mock("@/lib/integrity/detectors/media", () => ({
   watchStream: () => () => undefined,
   MediaError: class extends Error { constructor(m: string, readonly kind: string) { super(m); } },
 }));
+let chromium = true;
 vi.mock("@/lib/integrity/detectors/screenShare", () => ({
-  isChromium: () => true,
+  isChromium: () => chromium,
   supportsScreenShare: () => true,
   requestEntireScreen: vi.fn(async () => ({ stream: screenShare.stream, surface: "monitor" })),
   ShareError: class extends Error { constructor(m: string, readonly kind: string) { super(m); } },
@@ -161,7 +162,12 @@ async function startAttempt(engine: IntegrityEngine) {
   await settle();
 }
 
+const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const MAC_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const useDevice = (ua: string) => vi.spyOn(window.navigator, "userAgent", "get").mockReturnValue(ua);
+
 describe("the Guardian card while it waits", () => {
+  beforeEach(() => void useDevice(WINDOWS_UA)); // the Guardian is a Windows program; polling for it only happens there
   const optional = { ...POLICY, guardian: "optional" as const };
   const summary = { mode: "optional", connected: false, version: null, outdated: false, blockers: [], download_url: "" };
 
@@ -237,6 +243,59 @@ describe("the pre-start checklist", () => {
     await engine.shareScreen();
     expect(getIntegrityUi().checks.find((c) => c.id === "screen")?.status).toBe("ok");
     expect(getIntegrityUi().screenShared).toBe(true);
+    engine.destroy({ keep: false });
+  });
+});
+
+describe("on a Mac", () => {
+  const withGuardian = (guardian: "optional" | "required") => {
+    onGet = (path) => (path.startsWith("/integrity/policy") ? { enabled: true, policy: { ...POLICY, guardian } } : {});
+  };
+
+  beforeEach(() => void useDevice(MAC_UA));
+
+  it("does not wait for, or poll, a Guardian that cannot run there — an optional one is skipped", async () => {
+    withGuardian("optional");
+    const { engine } = build();
+    await engine.init();
+    await vi.advanceTimersByTimeAsync(6000);
+
+    expect(getIntegrityUi().checks.find((c) => c.id === "guardian")).toMatchObject({ status: "skipped", required: false });
+    expect(calls.some((c) => c.path.startsWith("/integrity/guardian"))).toBe(false);
+    engine.destroy({ keep: false });
+  });
+
+  it("says up front that a REQUIRED Guardian cannot be met, instead of waiting forever", async () => {
+    withGuardian("required");
+    const { engine } = build();
+    await engine.init();
+
+    const row = getIntegrityUi().checks.find((c) => c.id === "guardian");
+    expect(row).toMatchObject({ status: "fail", required: true });
+    expect(row?.fix).toMatch(/Windows/);
+    engine.destroy({ keep: false });
+  });
+
+  it("takes a proctored attempt end to end with the Guardian optional", async () => {
+    withGuardian("optional");
+    const { engine, phases } = build();
+    await startAttempt(engine);
+
+    expect(phases().at(-1)).toBe("active");
+    expect(calls.some((c) => c.path.endsWith("/proctoring/start"))).toBe(true);
+    engine.destroy({ keep: false });
+  });
+
+  it("tells a Safari user to install Chrome when the profile needs a browser that can prove what is shared", async () => {
+    onGet = (path) => (path.startsWith("/integrity/policy") ? { enabled: true, policy: { ...POLICY, chromium_only: true } } : {});
+    chromium = false; // Safari
+    const { engine } = build();
+    await engine.init();
+
+    const row = getIntegrityUi().checks.find((c) => c.id === "browser");
+    expect(row?.status).toBe("fail");
+    expect(row?.fix).toMatch(/Install Google Chrome/);
+    chromium = true;
     engine.destroy({ keep: false });
   });
 });

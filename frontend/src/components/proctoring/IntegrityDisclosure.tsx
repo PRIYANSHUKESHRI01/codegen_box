@@ -1,6 +1,7 @@
 "use client";
 
-import { Camera, Eye, Fingerprint, Mic, Monitor, ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
+import { Camera, Eye, Fingerprint, Mic, Monitor, ShieldCheck, type LucideIcon } from "lucide-react";
 import { useIntegrityUi } from "@/lib/integrity/store";
 
 /**
@@ -15,10 +16,9 @@ export function IntegrityDisclosure({ interview = false }: { interview?: boolean
   const every = (s: number) => (s >= 60 ? `${Math.round(s / 60)} minute${Math.round(s / 60) === 1 ? "" : "s"}` : `${s} seconds`);
 
   return (
-    <ul className="space-y-2.5 text-xs text-text-secondary" aria-label="What is recorded">
+    <ul className="space-y-3 text-xs leading-relaxed text-text-secondary" aria-label="What is recorded">
       {policy.camera !== "off" && (
-        <li className="flex items-start gap-2.5">
-          <Camera className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+        <Item icon={Camera}>
           <span>
             Your camera is on for the whole attempt.{" "}
             {policy.webcam_snapshot > 0 ? (
@@ -28,47 +28,53 @@ export function IntegrityDisclosure({ interview = false }: { interview?: boolean
             )}
             Your video itself is never uploaded.
           </span>
-        </li>
+        </Item>
       )}
       {policy.screen_share !== "off" && (
-        <li className="flex items-start gap-2.5">
-          <Monitor className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+        <Item icon={Monitor}>
           <span>
             You share your <strong>entire screen</strong> with this page.{" "}
             {policy.screen_snapshot > 0 ? <>A reduced-size picture of it is sent about every {every(policy.screen_snapshot)}. </> : <>It is used to confirm you stay on the exam. </>}
             Stopping the share is a strike.
           </span>
-        </li>
+        </Item>
       )}
       {policy.camera !== "off" && (
-        <li className="flex items-start gap-2.5">
-          <Mic className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+        <Item icon={Mic}>
           <span>
             {interview
               ? "Your microphone records your answers, as in any interview. It is not used for anything else."
               : "Your microphone is only used to notice whether someone is speaking. No audio is recorded or sent."}
           </span>
-        </li>
+        </Item>
       )}
       {policy.guardian !== "off" && (
-        <li className="flex items-start gap-2.5">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+        <Item icon={ShieldCheck}>
           <span>
             The <strong>AptRun Guardian</strong> program on your computer reports which programs and windows are open, how many screens are connected, and your network settings during the attempt. It does not read your files, messages or browsing.
             {policy.guardian === "required" ? " It is required for this attempt." : " It is optional here."}
           </span>
-        </li>
+        </Item>
       )}
-      <li className="flex items-start gap-2.5">
-        <Fingerprint className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+      <Item icon={Fingerprint}>
         <span>Your network address and a device identifier are recorded, and the attempt is tied to this one browser.</span>
-      </li>
-      <li className="flex items-start gap-2.5">
-        <Eye className="mt-0.5 h-4 w-4 shrink-0 text-accent-primary" />
+      </Item>
+      <Item icon={Eye}>
         <span>
           Pictures and the activity log are visible only to authorised reviewers (your TPO / section coordinator, or the organisation that set the attempt). They are deleted after {policy.retention_days} days — {Math.round(policy.flagged_retention_days / 30)} months if the attempt was flagged, so a dispute can be settled.
         </span>
-      </li>
+      </Item>
     </ul>
+  );
+}
+
+function Item({ icon: Icon, children }: { icon: LucideIcon; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-3">
+      <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
+        <Icon className="h-3.5 w-3.5" aria-hidden />
+      </span>
+      {children}
+    </li>
   );
 }

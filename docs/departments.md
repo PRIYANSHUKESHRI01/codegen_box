@@ -16,14 +16,23 @@ that department is selected. A college that never touches any of this is an engi
 
 ## What ships
 
-| Department | Families | Branches | Starter prep questions |
-|---|---|---|---|
-| Engineering & Technology | CSE, ECE, EEE, Mech, Civil, Other (Chemical, Biotech, Aerospace, Agri, Mining) | 24 (existing) | existing Core Prep 647 + 14 for the Other branches |
-| Management & Business Administration | BBA · BBM · BMS (9 branches) · MBA / PGDM (11: Marketing, Finance, HR, Operations, Analytics, International Business, IT, Healthcare, Entrepreneurship, Agri-business, General) | 20 | 23 |
-| Commerce & Accounting | B.Com (9: General, Hons, Accounting & Finance, Taxation, Banking & Insurance, Computer Applications, Professional, International Trade, Analytics) · M.Com (4) · Professional courses — CA, CS, CMA, global (4) | 17 | 19 |
-| Arts, Humanities & Social Sciences | Languages & Literature · History, Heritage & Philosophy · Political Science & Public Administration · Economics · Psychology · Sociology, Anthropology & Social Work · Journalism & Mass Communication · Education · Geography & Environment · Fine & Performing Arts · Other (library, physical education, nutrition, tourism …) | 36 | 43 |
+**For now each department offers five main branches** — the picker a student sees, the roster template a TPO downloads, the audience pickers and
+the department switcher list these and nothing else:
 
-**Every branch that has Domain Prep has at least one real question** (85 for Management, Commerce and Arts; 14 for the Other engineering branches, each of which studies a shared core of four subjects plus its own specialisation — 6 questions apiece; 647 for ECE / EEE / Mech / Civil). CSE and IT-type branches (8 of the 97) have no Domain Prep by design: they practise on the 2,000-problem coding bank, as before. Branches with their own specialisation (e.g. *MBA Finance* → "Security
+| Department | Branches on offer |
+|---|---|
+| Engineering & Technology | CSE · Electrical (EEE) · Electronics (ECE) · Mechanical · Civil |
+| Management & Business Administration | BBA · MBA (General) · MBA Marketing · MBA Finance · MBA HR |
+| Commerce & Accounting | B.Com · M.Com · Chartered Accountancy · Company Secretary · Cost & Management Accountancy |
+| Arts, Humanities & Social Sciences | English · History · Political Science · Economics · Psychology |
+
+The catalogue holds many more (97 in all: IT, AI & ML, E&TC, Production, Chemical, MBA Operations, B.Com Hons, Sociology, Journalism, B.Ed …). They are
+switched **off, not deleted** (migration `2026_11_02_100700`): a student already in one keeps their branch, questions and results; a college's older
+spelling ("IT", "E&TC") still resolves to the branch it always did; drives that name one still match; a family left with no branch on offer is not
+offered either. **Superadmin → Departments → Branches** switches any of them back on, and its family returns with it — the starter questions for all of
+them are already in the database.
+
+**Every branch that has Domain Prep has at least one real question**, including the ones switched off (85 for Management, Commerce and Arts; 14 for the Other engineering branches, each of which studies a shared core of four subjects plus its own specialisation — 6 questions apiece; 647 for ECE / EEE / Mech / Civil). CSE and IT-type branches (8 of the 97) have no Domain Prep by design: they practise on the 2,000-problem coding bank, as before. Branches with their own specialisation (e.g. *MBA Finance* → "Security
 Analysis, Portfolio & Financial Markets") get a question in that specialisation; general branches use their discipline's shared core.
 The questions are original, modelled on what those students actually sit (CAT/CMAT, CA Foundation, CUET/UGC-NET patterns), and every
 answer key and topic was machine-validated — but see *What this does not do*.

@@ -59,7 +59,12 @@ function ProblemSolvePageContent() {
   const [mobileView, setMobileView] = useState<"problem" | "code">("problem");
 
   useEffect(() => {
-    if (status !== "ready" || !slug) return;
+    if (status !== "ready") return;
+    // No problem in the address (a bookmark, an old link): say so instead of showing the loading skeleton for ever.
+    if (!slug) {
+      setLoadState("not_found");
+      return;
+    }
     let cancelled = false;
 
     // Usually already on its way: the Solve button starts this request the moment it is hovered or touched.

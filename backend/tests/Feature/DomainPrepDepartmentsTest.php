@@ -70,7 +70,7 @@ class DomainPrepDepartmentsTest extends TestCase
     public function test_every_branch_of_every_new_department_has_a_real_published_question(): void
     {
         $rows = $this->newBranches();
-        $this->assertGreaterThan(50, count($rows), 'the new departments bring dozens of branches');
+        $this->assertCount(15, $rows, 'five main branches for each of Management, Commerce and Arts');
 
         foreach ($rows as $row) {
             $subjects = CoreSubject::idsVisibleTo($row['discipline'], $row['branch']);
@@ -86,12 +86,15 @@ class DomainPrepDepartmentsTest extends TestCase
         // Biotech, Aerospace, Agri, Mining) and every branch of Management, Commerce and Arts. ECE / EEE / Mech / Civil have 647 questions
         // too, but those are imported from content/core-prep by `core:import`, not shipped by a migration, so a fresh test database has none.
         // CSE and IT-type branches have no Domain Prep at all (their questions are the coding problem bank).
+        // ALL branches, offered or not: switching one back on in Superadmin must find its questions waiting.
         $catalog = app(BranchCatalog::class);
-        $families = \App\Services\Core\CoreAccess::families();
         $checked = 0;
 
-        foreach ($catalog->branches() as $branch) {
-            if (! in_array($branch['discipline_code'], $families, true) || in_array($branch['discipline_code'], ['ece', 'eee', 'mech', 'civil'], true)) {
+        foreach ($catalog->branches(false) as $branch) {
+            $discipline = $branch['discipline_code'];
+            $hasPrep = \App\Support\DepartmentCapabilities::resolve($catalog->departmentOfDiscipline($discipline), $discipline)['domain_prep'];
+
+            if (! $hasPrep || in_array($discipline, ['ece', 'eee', 'mech', 'civil'], true)) {
                 continue;
             }
 
@@ -103,7 +106,7 @@ class DomainPrepDepartmentsTest extends TestCase
         }
 
         $this->assertGreaterThanOrEqual(78, $checked, 'every migration-seeded branch is covered (73 + the 5 other engineering branches)');
-        $this->assertNotContains('cse', $families, 'CSE keeps the coding problem bank, as before');
+        $this->assertNotContains('cse', \App\Services\Core\CoreAccess::families(), 'CSE keeps the coding problem bank, as before');
     }
 
     public function test_the_other_engineering_branches_each_get_their_own_specialisation_and_the_shared_core(): void
@@ -124,7 +127,7 @@ class DomainPrepDepartmentsTest extends TestCase
 
     public function test_every_starter_question_is_well_formed(): void
     {
-        $disciplines = [...array_unique(array_column($this->newBranches(), 'discipline')), 'other'];
+        $disciplines = array_keys(require database_path('data/domain_taxonomy.php'));   // every shipped family, offered or not
         $questions = CoreQuestion::query()->whereIn('discipline_code', $disciplines)->get();
 
         $this->assertGreaterThanOrEqual(99, $questions->count(), '85 for Management, Commerce and Arts, 14 for the other engineering branches');

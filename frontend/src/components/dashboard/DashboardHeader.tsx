@@ -145,7 +145,16 @@ export function DashboardHeader({
   const pathname = usePathname();
   const atPortalRoot = pathname === portal.href.split("?")[0];
   // One level up the page tree, or null at a portal root. Every signed-in page below its home gets this arrow.
-  const backTarget = back === false ? null : back ?? resolveBack(pathname, portal);
+  // The page's own query string, read after mount (this header is also rendered on the server): a back arrow to a page that is
+  // identified by a parameter (a contest's ?slug=) has to carry that parameter along or it lands on an empty screen.
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const read = () => setSearch(window.location.search);
+    read();
+    window.addEventListener("popstate", read);
+    return () => window.removeEventListener("popstate", read);
+  }, [pathname]);
+  const backTarget = back === false ? null : back ?? resolveBack(pathname, portal, search);
 
   // The organisation being operated on, and the only chip left in the header.
   //

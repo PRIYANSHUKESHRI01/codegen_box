@@ -67,10 +67,26 @@ final class BranchCatalog
         return $this->departmentOfDiscipline($this->disciplineOf($branchCode));
     }
 
-    /** @return list<array<string, mixed>> */
-    public function disciplines(?string $department = null): array
+    /**
+     * The branch families on offer — those with at least one active branch. A family whose branches have all been switched off
+     * (Superadmin → Branches) simply is not offered any more; students already in it keep working, since discipline() and branch() still
+     * answer for it. Switching a branch back on brings the family back.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function disciplines(?string $department = null, bool $offeredOnly = true): array
     {
         $rows = array_values($this->load()['disciplines']);
+
+        if ($offeredOnly) {
+            $offered = [];
+            foreach ($this->load()['branches'] as $branch) {
+                if ($branch['is_active']) {
+                    $offered[$branch['discipline_code']] = true;
+                }
+            }
+            $rows = array_values(array_filter($rows, fn (array $d) => isset($offered[$d['code']])));
+        }
 
         return $department === null ? $rows : array_values(array_filter($rows, fn (array $d) => $d['department_code'] === $department));
     }

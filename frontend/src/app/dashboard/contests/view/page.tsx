@@ -10,6 +10,9 @@ import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { ContestProblemRow, contestProblemHref } from "@/components/contests/ContestProblemRow";
+import { prefetchContestProblem } from "@/lib/contestProblemPrefetch";
+import { warmUpEditor } from "@/lib/editorWarmup";
 import type { ContestDetail, ContestLeaderboard } from "@/types/liveContest";
 
 type Tab = "problems" | "leaderboard";
@@ -34,6 +37,8 @@ function ContestDetailPageContent() {
   const [leaderboard, setLeaderboard] = useState<ContestLeaderboard | null>(null);
   const [registering, setRegistering] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  // The problem being opened (a contest problem id, or "start" for the big button): pressing answers at once, then the screen follows.
+  const [opening, setOpening] = useState<number | "start" | null>(null);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -53,10 +58,22 @@ function ContestDetailPageContent() {
   };
 
   useEffect(() => {
-    if (status !== "ready" || !slug) return;
+    if (status !== "ready") return;
+    // An address with no contest in it (a bookmark, an old link) has nothing to load — say so instead of "Loading contest…" for ever.
+    if (!slug) {
+      setLoadState("not_found");
+      return;
+    }
     loadContest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, slug]);
+
+  // If the next screen has not appeared after a while (a dropped connection, a blocked navigation) the press must not stay stuck.
+  useEffect(() => {
+    if (opening === null) return;
+    const id = window.setTimeout(() => setOpening(null), 12_000);
+    return () => window.clearTimeout(id);
+  }, [opening]);
 
   useEffect(() => {
     if (tab !== "leaderboard" || !slug) return;
@@ -107,6 +124,13 @@ function ContestDetailPageContent() {
     } finally {
       setRegistering(false);
     }
+  };
+
+  const openProblem = (contestProblemId: number, key: number | "start" = contestProblemId) => {
+    if (opening !== null) return;
+    setOpening(key);
+    prefetchContestProblem(contest.slug, contestProblemId);
+    router.push(contestProblemHref(contest.slug, contestProblemId));
   };
 
   const minutesFromNow = Math.round((new Date(contest.start_at).getTime() - Date.now()) / 60000);
@@ -164,13 +188,32 @@ function ContestDetailPageContent() {
               // same one the problems tab lists first.
               contest.problems && contest.problems.length > 0 && (
                 <button
-                  onClick={() =>
-                    router.push(`/dashboard/contests/problem?slug=${contest.slug}&contestProblemId=${contest.problems![0].id}`)
-                  }
-                  className="px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap"
+                  onClick={() => openProblem(contest.problems![0].id, "start")}
+                  onPointerEnter={() => {
+                    prefetchContestProblem(contest.slug, contest.problems![0].id);
+                    warmUpEditor();
+                    router.prefetch(contestProblemHref(contest.slug, contest.problems![0].id));
+                  }}
+                  disabled={opening !== null}
+                  aria-busy={opening === "start"}
+                  className={cn(
+                    "px-5 py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-all duration-150 shadow-subtle hover:shadow-glow flex items-center gap-1.5 whitespace-nowrap",
+                    "active:scale-[0.96] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+                    opening === "start" && "scale-[0.97]",
+                    opening !== null && opening !== "start" && "opacity-60"
+                  )}
                 >
-                  <span>Start Contest</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  {opening === "start" ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+                      <span>Opening…</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Start Contest</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </>
+                  )}
                 </button>
               )
             ) : (
@@ -229,34 +272,21 @@ function ContestDetailPageContent() {
             </p>
           </div>
         ) : (
-          <div className="rounded-panel bg-surface border border-border-subtle shadow-subtle overflow-hidden divide-y divide-border-subtle">
-            {contest.problems?.map((cp) => (
-              <button
-                key={cp.id}
-                onClick={() => router.push(`/dashboard/contests/problem?slug=${contest.slug}&contestProblemId=${cp.id}`)}
-                disabled={!contest.has_started}
-                className="w-full p-4 flex items-center justify-between gap-4 hover:bg-surface-hover/60 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span
-                    className={cn(
-                      "px-1.5 py-0.5 text-3xs font-bold rounded capitalize shrink-0",
-                      cp.problem.difficulty === "easy"
-                        ? "bg-status-success/15 text-status-success"
-                        : cp.problem.difficulty === "medium"
-                        ? "bg-status-warning/15 text-status-warning"
-                        : "bg-status-danger/15 text-status-danger"
-                    )}
-                  >
-                    {cp.problem.difficulty}
-                  </span>
-                  <span className="text-sm font-semibold text-primary truncate">{cp.problem.title}</span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs font-mono font-bold text-accent-primary">{cp.points} pts</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-text-muted" />
-                </div>
-              </button>
+          <div className="rounded-panel bg-surface border border-border-subtle shadow-subtle overflow-hidden divide-y divide-border-subtle" role="list" aria-label="Contest problems">
+            {contest.problems?.map((cp, i) => (
+              <div role="listitem" key={cp.id}>
+                <ContestProblemRow
+                  contestSlug={contest.slug}
+                  contestProblemId={cp.id}
+                  index={i}
+                  title={cp.problem.title}
+                  difficulty={cp.problem.difficulty}
+                  points={cp.points}
+                  opening={opening === cp.id}
+                  disabled={!contest.has_started || (opening !== null && opening !== cp.id)}
+                  onOpen={(id) => openProblem(id)}
+                />
+              </div>
             ))}
           </div>
         )

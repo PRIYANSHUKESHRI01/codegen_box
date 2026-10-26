@@ -78,8 +78,10 @@ class BranchTaxonomyTest extends TestCase
     {
         $catalog = app(BranchCatalog::class);
 
-        // The engineering department still holds exactly the families it always had; other departments hold their own.
-        $this->assertSame(['cse', 'ece', 'eee', 'mech', 'civil', 'other'], array_column($catalog->disciplines('engineering'), 'code'));
+        // Engineering offers its five main families (the catch-all "other" family has no active branch, so it is not offered);
+        // the other departments hold their own. Its rows are still in the catalogue for students who were already in them.
+        $this->assertSame(['cse', 'ece', 'eee', 'mech', 'civil'], array_column($catalog->disciplines('engineering'), 'code'));
+        $this->assertSame('other', $catalog->disciplineOf('chem'));
         $this->assertSame(['engineering', 'management', 'commerce', 'arts'], array_column($catalog->departments(), 'code'));
         $this->assertSame('ece', $catalog->disciplineOf('etc'));
         $this->assertSame('eee', $catalog->disciplineOf('ee'));

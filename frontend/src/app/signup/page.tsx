@@ -110,7 +110,7 @@ export default function SignupPage() {
   };
 
   return (
-    <AuthChrome altLabel="Sign In Instead" altHref="/login">
+    <AuthChrome altLabel="Sign In Instead" altLabelShort="Sign in" altHref="/login">
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: value props — 5/7 split and max-w-xl card below,
             matching /login exactly instead of drifting to a narrower 4/8 +

@@ -65,6 +65,9 @@ class AuthController extends Controller
         $validated = $request->validate([
             'email' => ['required', 'string', 'email'],
             'password' => ['required', 'string'],
+            // Which tab of the sign-in page the visitor picked (see User::LOGIN_PORTALS). Optional so a caller that
+            // doesn't have tabs keeps working; the page itself always sends it.
+            'portal' => ['nullable', 'string', Rule::in(array_keys(User::LOGIN_PORTALS))],
         ]);
 
         $user = User::where('email', $validated['email'])->first();
@@ -79,6 +82,14 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['This account has been blocked. Contact an administrator.'],
             ]);
+        }
+
+        // Only after the password is proven — telling a stranger which kind of account an address is would be a leak —
+        // and before anything is issued: no token, and no one-time-password flow either, for the wrong tab.
+        $portal = $validated['portal'] ?? null;
+
+        if ($portal !== null && ! $user->canSignInThrough($portal)) {
+            throw ValidationException::withMessages(['email' => [$this->wrongPortalMessage($user, $portal)]]);
         }
 
         // A password an admin generated on this account's behalf (manual
@@ -105,6 +116,19 @@ class AuthController extends Controller
             'user' => $user->load(['college.collegeDepartments', 'company']),
             'token' => $token,
         ]);
+    }
+
+    /** What to tell someone who signed in on the wrong tab: which tab is theirs, so they are one tap from success. */
+    private function wrongPortalMessage(User $user, string $portal): string
+    {
+        $labels = ['user' => 'Student', 'admin_tpo' => 'College TPO', 'admin_company' => 'Hiring Partner'];
+        $own = $user->ownLoginPortal();
+
+        if ($portal === 'staff' || $own === null || ! isset($labels[$own])) {
+            return 'This sign-in is for Mellow staff accounts only.';
+        }
+
+        return "This is a {$labels[$own]} account. Choose the {$labels[$own]} tab to sign in.";
     }
 
     public function logout(Request $request)

@@ -25,7 +25,7 @@ import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 import { ForcePasswordResetModal } from "@/components/auth/ForcePasswordResetModal";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { AuthUser, homeRouteForRole } from "@/lib/auth";
+import { AuthUser, Role, homeRouteForRole } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 import { takeSignedOutNotice } from "@/lib/sessionEvents";
@@ -38,6 +38,11 @@ import { takeSignedOutNotice } from "@/lib/sessionEvents";
 // to ever audit for "does this leak an internal credential."
 type LoginRole = "user" | "admin_tpo" | "admin_company";
 
+// The tab you pick is a promise about who you are: a Student tab admits students only, and so on. Mellow's own
+// people (superadmin, ops, marketing) are the exception — they may sign in from any tab. The server enforces this
+// (User::LOGIN_PORTALS); this list mirrors it so the page can also refuse, and say which tab to use, on its own.
+const PLATFORM_STAFF_ROLES: Role[] = ["superadmin", "admin_internal", "admin_marketing"];
+
 // Each role gets its own accent so the whole card reacts to the selected
 // tab (pill glow, ambient backdrop, header icon, CTA copy) instead of
 // everything staying one flat indigo regardless of who's signing in —
@@ -49,6 +54,8 @@ const ROLE_TABS: {
   icon: typeof GraduationCap;
   subtitle: string;
   cta: string;
+  /** The account roles this tab signs in (besides platform staff, who are admitted everywhere). */
+  admits: Role[];
   accent: {
     idleIcon: string;
     activeIcon: string;
@@ -65,6 +72,7 @@ const ROLE_TABS: {
     icon: GraduationCap,
     subtitle: "Sign in to practice, compete, and track every placement drive you're eligible for.",
     cta: "Launch Candidate Arena",
+    admits: ["user"],
     accent: {
       idleIcon: "text-emerald-500/60 dark:text-emerald-400/50",
       activeIcon: "text-emerald-700 dark:text-emerald-400",
@@ -79,8 +87,9 @@ const ROLE_TABS: {
     id: "admin_tpo",
     label: "College TPO",
     icon: Building2,
-    subtitle: "Sign in to run your campus placement pipeline, drives, and student readiness.",
+    subtitle: "Sign in to run your campus placement pipeline, drives, and student readiness. Section coordinators sign in here too.",
     cta: "Enter Placement Console",
+    admits: ["admin_tpo", "section_coordinator"],
     accent: {
       idleIcon: "text-indigo-500/60 dark:text-indigo-400/50",
       activeIcon: "text-indigo-600 dark:text-indigo-400",
@@ -97,6 +106,7 @@ const ROLE_TABS: {
     icon: Briefcase,
     subtitle: "Sign in to manage your candidate pipeline, interviews, and hiring drives.",
     cta: "Enter Hiring Console",
+    admits: ["admin_company"],
     accent: {
       idleIcon: "text-amber-500/60 dark:text-amber-400/50",
       activeIcon: "text-amber-700 dark:text-amber-400",
@@ -163,6 +173,8 @@ export default function LoginPage() {
   // (DEMO_LOGINS is null in production, so this is a no-op there).
   const handleTabClick = (role: LoginRole) => {
     setSelectedRole(role);
+    // A "wrong tab" message is about the tab you just left.
+    setError(null);
     if (DEMO_LOGINS) {
       setEmail(DEMO_LOGINS[role].email);
       setPassword(DEMO_LOGINS[role].password);
@@ -177,7 +189,7 @@ export default function LoginPage() {
     try {
       const res = await api.post<
         { user: AuthUser; token: string } | { must_change_password: true; email: string; message: string }
-      >("/login", { email, password });
+      >("/login", { email, password, portal: selectedRole });
 
       // A password an admin/TPO generated on this account's behalf is a
       // one-time credential — the backend refuses to issue a real session
@@ -186,6 +198,20 @@ export default function LoginPage() {
       // rather than treating it as a failed login.
       if ("must_change_password" in res) {
         setForcePasswordResetEmail(res.email);
+        setLoading(false);
+        return;
+      }
+
+      // The server already refuses a wrong-tab sign-in; this is the same rule held on this side too, so the page
+      // never lets someone in through a tab that isn't theirs even if it is talking to an older server.
+      const role = res.user.role;
+      if (!PLATFORM_STAFF_ROLES.includes(role) && !activeTab.admits.includes(role)) {
+        const own = ROLE_TABS.find((tab) => tab.admits.includes(role));
+        setError(
+          own
+            ? `This is a ${own.label} account. Choose the ${own.label} tab to sign in.`
+            : "This account can't sign in here."
+        );
         setLoading(false);
         return;
       }
@@ -203,7 +229,7 @@ export default function LoginPage() {
   const isStudent = selectedRole === "user";
 
   return (
-    <AuthChrome altLabel="Create Account" altHref="/signup">
+    <AuthChrome altLabel="Create Account" altLabelShort="Sign up" altHref="/signup">
       <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: Brand Hero & Platform Credibility (5 cols) */}
         <motion.div
@@ -287,7 +313,7 @@ export default function LoginPage() {
               />
             </AnimatePresence>
 
-            <div className="relative p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6 overflow-hidden">
+            <div className="relative p-5 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-5 sm:space-y-6 overflow-hidden">
               {/* Brand-gradient cap along the top edge, matching the same
                   accent line used on the marketing navbar/footer cards. */}
               <div className="absolute top-0 inset-x-0 h-px gradient-hairline opacity-80 pointer-events-none" />
@@ -311,7 +337,7 @@ export default function LoginPage() {
                       <ActiveIcon className={cn("w-4.5 h-4.5", activeTab.accent.activeIcon)} />
                     </motion.div>
                   </AnimatePresence>
-                  <h2 className="text-2xl font-bold text-primary tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-bold text-primary tracking-tight">
                     Welcome back
                   </h2>
                 </div>
@@ -339,8 +365,9 @@ export default function LoginPage() {
                     <button
                       key={tab.id}
                       type="button"
+                      aria-pressed={isActive}
                       onClick={() => handleTabClick(tab.id)}
-                      className="relative py-2.5 rounded-control text-sm font-semibold transition-colors duration-150"
+                      className="relative min-w-0 px-1 py-2 sm:py-2.5 rounded-control text-xs sm:text-sm font-semibold transition-colors duration-150"
                     >
                       {isActive && (
                         <motion.span
@@ -355,7 +382,9 @@ export default function LoginPage() {
                       )}
                       <span
                         className={cn(
-                          "relative z-10 flex items-center justify-center gap-1.5",
+                          // Icon above the label on a phone — three side-by-side "icon + label" pills
+                          // are wider than the card and ran into each other.
+                          "relative z-10 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5",
                           isActive ? "text-primary" : "text-text-secondary hover:text-primary transition-colors"
                         )}
                       >
@@ -371,7 +400,7 @@ export default function LoginPage() {
                             )}
                           />
                         </motion.span>
-                        <span className="whitespace-nowrap">{tab.label}</span>
+                        <span className="text-center leading-tight sm:whitespace-nowrap">{tab.label}</span>
                       </span>
                     </button>
                   );
@@ -387,9 +416,18 @@ export default function LoginPage() {
                 className="space-y-4 text-sm"
               >
                 <motion.div variants={fieldVariants}>
-                  <FormField label={isStudent ? "Email or Handle *" : "Staff / Institutional Email *"} icon={Mail}>
+                  {/* "Email", not "Email or Handle": the server signs in by email address only, so a handle
+                      typed here could never work. A text input (not type=email) keeps the browser from
+                      second-guessing the address; the keyboard hints below give a phone the right keys and stop
+                      it capitalising the first letter or autocorrecting the address. */}
+                  <FormField label={isStudent ? "Email *" : "Staff / Institutional Email *"} icon={Mail}>
                     <input
                       type="text"
+                      inputMode="email"
+                      autoComplete="username"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -407,7 +445,7 @@ export default function LoginPage() {
                       <button
                         type="button"
                         onClick={() => setShowForgotModal(true)}
-                        className="text-xs text-accent-primary hover:underline font-semibold"
+                        className="text-xs text-accent-primary hover:underline font-semibold py-1.5 -my-1.5"
                       >
                         Forgot password?
                       </button>
@@ -415,16 +453,21 @@ export default function LoginPage() {
                   >
                     <input
                       type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Enter your password"
-                      className={cn(authInputClass, "pl-9 pr-10 font-mono")}
+                      className={cn(authInputClass, "pl-9 pr-11 font-mono")}
                     />
+                    {/* p-2 around the 16px eye: a thumb-sized target, not a 16px one. */}
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-primary transition-colors"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-text-muted hover:text-primary transition-colors"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       <AnimatePresence mode="wait" initial={false}>

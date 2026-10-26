@@ -65,6 +65,26 @@ class User extends Authenticatable
     ];
 
     /**
+     * The tabs on the public /login page ("portals") and which accounts each one admits — what the visitor picked
+     * is a promise about who they are, so the server holds them to it (see AuthController::login). A section
+     * coordinator is college staff the TPO provisions, so they sign in through the College TPO tab. The 'staff'
+     * portal is the unlisted /mellow-internal page: it admits nobody of its own beyond the platform staff below.
+     */
+    public const LOGIN_PORTALS = [
+        'user' => [self::ROLE_USER],
+        'admin_tpo' => [self::ROLE_ADMIN_TPO, self::ROLE_SECTION_COORDINATOR],
+        'admin_company' => [self::ROLE_ADMIN_COMPANY],
+        'staff' => [],
+    ];
+
+    /** Mellow's own people: they may sign in through any portal (they support every kind of customer). */
+    public const PLATFORM_STAFF_ROLES = [
+        self::ROLE_SUPERADMIN,
+        self::ROLE_ADMIN_INTERNAL,
+        self::ROLE_ADMIN_MARKETING,
+    ];
+
+    /**
      * Granular capabilities within the two internal staff roles — a
      * superadmin creating (or later editing) an admin_internal/
      * admin_marketing account picks a subset of the list matching that
@@ -730,6 +750,25 @@ class User extends Authenticatable
     public function isMellowMarketing(): bool
     {
         return $this->role === self::ROLE_ADMIN_MARKETING;
+    }
+
+    /** Whether this account may sign in through the given /login portal (a key of LOGIN_PORTALS). Platform staff may use any. */
+    public function canSignInThrough(string $portal): bool
+    {
+        return in_array($this->role, self::PLATFORM_STAFF_ROLES, true)
+            || in_array($this->role, self::LOGIN_PORTALS[$portal] ?? [], true);
+    }
+
+    /** The /login portal this account belongs to — the tab it signs in through; null for platform staff, who belong to none. */
+    public function ownLoginPortal(): ?string
+    {
+        foreach (self::LOGIN_PORTALS as $portal => $roles) {
+            if (in_array($this->role, $roles, true)) {
+                return $portal;
+            }
+        }
+
+        return null;
     }
 
     public function isPhoneVerified(): bool

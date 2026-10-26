@@ -37,10 +37,14 @@ export async function login(page: Page, role: keyof typeof DEMO) {
   // actually use: the unlisted /mellow-internal sign-in.
   const isInternal = role === "superadmin" || role === "admin_internal";
   await page.goto(isInternal ? "/mellow-internal" : "/login");
+  // The server only admits an account through its own tab (Mellow staff excepted), so pick it first.
+  const tabs: Partial<Record<keyof typeof DEMO, string>> = { user: "Student", admin_tpo: "College TPO", admin_company: "Hiring Partner" };
+  const tab = tabs[role];
+  if (tab) await page.getByRole("button", { name: tab, exact: true }).click();
   await page.getByPlaceholder(isInternal ? "you@mellowvault.com" : "name@domain.com").fill(creds.email);
   await page.getByPlaceholder("Enter your password").fill(creds.password);
   await page
-    .getByRole("button", { name: /Enter Internal Console|Enter Admin Portal|Launch Candidate Arena/ })
+    .getByRole("button", { name: /Enter Internal Console|Enter Placement Console|Enter Hiring Console|Launch Candidate Arena/ })
     .click();
   await page.waitForURL((url) => url.pathname.startsWith(creds.home), { timeout: 15000 });
   await expect(page.locator("body")).toBeVisible();

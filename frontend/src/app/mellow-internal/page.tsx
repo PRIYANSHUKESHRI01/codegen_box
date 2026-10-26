@@ -50,7 +50,8 @@ export default function MellowInternalLoginPage() {
     setLoading(true);
 
     try {
-      const res = await api.post<{ user: AuthUser; token: string }>("/login", { email, password });
+      // portal "staff": the server itself refuses anyone who isn't Mellow staff, before any session is issued.
+      const res = await api.post<{ user: AuthUser; token: string }>("/login", { email, password, portal: "staff" });
 
       if (!["superadmin", "admin_internal", "admin_marketing"].includes(res.user.role)) {
         setError("This sign-in is for Mellow staff accounts only.");
@@ -67,7 +68,7 @@ export default function MellowInternalLoginPage() {
   };
 
   return (
-    <AuthChrome altLabel="Student & Partner Login" altHref="/login">
+    <AuthChrome altLabel="Student & Partner Login" altLabelShort="Customer login" altHref="/login">
       <div className="w-full max-w-md">
         <div className="relative p-6 sm:p-8 rounded-panel bg-surface/90 backdrop-blur-xl border border-border-strong shadow-card space-y-6">
           <div className="space-y-1.5">

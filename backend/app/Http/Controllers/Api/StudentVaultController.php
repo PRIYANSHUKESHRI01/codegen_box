@@ -7,6 +7,7 @@ use App\Jobs\SendVaultInterviewResponseEmail;
 use App\Models\User;
 use App\Models\VaultInquiry;
 use App\Models\VaultProfile;
+use App\Models\VaultInterviewQualification;
 use App\Services\PlanGate;
 use App\Services\ReadinessHistoryService;
 use App\Services\Vault\VaultService;
@@ -165,6 +166,10 @@ class StudentVaultController extends Controller
             'shared_fields' => self::SHARED_FIELDS,
             'never_shared' => self::NEVER_SHARED,
             'mellow_vault_connected' => $sync->isConfigured(),
+            'ai_interview_qualifications' => VaultInterviewQualification::where('user_id', $user->id)
+                ->where('status', 'qualified')
+                ->orderByDesc('series_average')
+                ->get(),
         ];
     }
 
@@ -183,6 +188,13 @@ class StudentVaultController extends Controller
             'qualified_at' => $profile->qualified_at,
             'peak_readiness' => $profile->peak_readiness,
             'legacy_score_percent' => $profile->qualification_source === VaultProfile::SOURCE_LEGACY_CONTEST ? $profile->legacy_score_percent : null,
+            'qualification_source' => $profile->qualification_source,
+            'ai_interview_score' => $profile->ai_interview_score,
+            'ai_interview_stack' => $profile->ai_interview_stack,
+            'ai_interview_role' => $profile->ai_interview_role,
+            'ai_interview_scores' => $profile->ai_interview_scores,
+            'ai_interview_attempt' => $profile->ai_interview_attempt,
+            'ai_interview_qualified_at' => $profile->ai_interview_qualified_at,
             'hired' => $profile->isHired() ? [
                 'at' => $profile->hired_at,
                 'via' => $profile->hired_via,

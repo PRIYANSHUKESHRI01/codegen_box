@@ -10,6 +10,8 @@ import { HpAvatar, HpButton, hpInput, hpLabel } from "@/components/portal/kit";
 import { HpCallout, HpFormError } from "@/components/portal/pipeline-kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
 import { DepartmentPicker, useCollegeDepartments } from "@/components/branches/DepartmentPicker";
+import { YearPicker } from "@/components/dashboard/tpo/YearPicker";
+import { yearName } from "@/lib/studyYear";
 import { disciplinesOfDepartment, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
 import { useDepartmentScope } from "@/lib/departments";
 
@@ -26,6 +28,7 @@ const EMPTY_FORM = {
   roll_number: "",
   branch: "",
   section: "",
+  year: "",
   cgpa: "",
   backlogs: "",
   phone: "",
@@ -80,6 +83,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
 
   const set = (field: keyof typeof EMPTY_FORM) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  const setYear = (year: string) => setForm((prev) => ({ ...prev, year }));
 
   const handleClose = () => {
     if (saving) return;
@@ -100,6 +104,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
         roll_number: form.roll_number || undefined,
         branch: form.branch || undefined,
         section: form.section || undefined,
+        year: form.year === "" ? undefined : Number(form.year),
         cgpa: form.cgpa === "" ? undefined : Number(form.cgpa),
         backlogs: form.backlogs === "" ? undefined : Number(form.backlogs),
         phone: form.phone || undefined,
@@ -117,7 +122,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
 
   if (!open) return null;
 
-  const previewMeta = [form.roll_number.trim(), form.branch.trim(), form.section.trim() && `Sec ${form.section.trim()}`].filter(Boolean).join(" · ");
+  const previewMeta = [form.roll_number.trim(), form.branch.trim(), form.year && yearName(Number(form.year)), form.section.trim() && `Sec ${form.section.trim()}`].filter(Boolean).join(" · ");
 
   return (
     <HpOverlayPortal>
@@ -136,7 +141,7 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
             <HpButton
               type="submit"
               form="add-student-form"
-              disabled={saving || !form.name || !form.email || (needsDepartment && !department)}
+              disabled={saving || !form.name || !form.email || !form.year || (needsDepartment && !department)}
               isLoading={saving}
               leftIcon={<Mail className="h-4 w-4" />}
             >
@@ -214,6 +219,12 @@ export function AddStudentModal({ open, onClose, onAdded }: AddStudentModalProps
             <fieldset className="space-y-3.5">
               <legend className="sr-only">Academics</legend>
               <GroupLabel>Academics</GroupLabel>
+              <YearPicker
+                value={form.year}
+                onChange={setYear}
+                required
+                hint="Their year decides when the Vault AI Interview opens for them (4th year after 45 days on AptRun, 3rd year after 90). It moves up by itself each July."
+              />
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                 <div>
                   <label htmlFor="add-student-roll" className={hpLabel}>

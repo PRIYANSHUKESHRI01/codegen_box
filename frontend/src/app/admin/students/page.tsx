@@ -32,6 +32,8 @@ import {
   Activity,
   ArrowUpDown,
   LifeBuoy,
+  CalendarRange,
+  Pencil,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
@@ -43,6 +45,10 @@ import { departmentCan, useDepartmentScope } from "@/lib/departments";
 import { BulkNotifyModal } from "@/components/dashboard/tpo/BulkNotifyModal";
 import { NotesPanel } from "@/components/coordinator/NotesPanel";
 import { CohortEngagementCard, CohortLanguagesCard, CohortPagination, SortHeader } from "@/components/dashboard/tpo/cohortPanels";
+import { SetYearModal, VaultAiChip, YearBreakdown, YearChip, YearSwitcher } from "@/components/dashboard/tpo/cohortYear";
+import { EditStudentModal, SetSectionModal, UnfiledStudentsPanel } from "@/components/dashboard/tpo/cohortEdit";
+import { ALL_YEARS, YEAR_NOT_SET, departmentBranchBreakdown, inYear, yearName, yearTabs } from "@/lib/studyYear";
+import { confirmDialog } from "@/lib/dialogs";
 import { CoreCell, LanguageChips } from "@/components/dashboard/tpo/cohortProgress";
 import {
   BranchChip,
@@ -134,7 +140,10 @@ function DepartmentTag({ department, catalog }: { department?: string | null; ca
 
 export default function StudentCohortPage() {
   const { user, status } = useAuthGuard(["admin_tpo"]);
-  const [students, setStudents] = useState<CohortStudent[]>([]);
+  // Everything the college has; `students` (below) is the year the TPO is looking at, and the whole page — numbers, section cards,
+  // readiness mix, roster — reads that, so picking "3rd year" makes it a 3rd-year page.
+  const [allStudents, setAllStudents] = useState<CohortStudent[]>([]);
+  const [year, setYear] = useState<string>(ALL_YEARS);
   const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -162,6 +171,9 @@ export default function StudentCohortPage() {
   const [exporting, setExporting] = useState(false);
   const [showAddStudent, setShowAddStudent] = useState(false);
   const [showBranches, setShowBranches] = useState(false);
+  const [showSetYear, setShowSetYear] = useState(false);
+  const [showSetSection, setShowSetSection] = useState(false);
+  const [editing, setEditing] = useState<CohortStudent | null>(null);
   const catalog = useBranchCatalog();
   // Which department the TPO is looking at (the switcher under the page title). The roster is that department's students, and the
   // coding columns and filters only exist where the department codes at all.
@@ -188,7 +200,7 @@ export default function StudentCohortPage() {
         api.get<{ students: CohortStudent[] }>(deptScope === SCOPE_ALL ? "/tpo/students/cohort" : `/tpo/students/cohort?department=${encodeURIComponent(deptScope)}`),
         api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
       ]);
-      setStudents(studentsRes.students);
+      setAllStudents(studentsRes.students);
       setCoordinators(coordinatorsRes.coordinators);
       setLoadedAt(Date.now());
       // A refresh can drop students (deleted / moved) — never keep a selection that points at someone no longer here.
@@ -221,9 +233,12 @@ export default function StudentCohortPage() {
       if (saved?.filters) setFilters({ ...DEFAULT_FILTERS, ...saved.filters });
       if (saved?.sort?.key && saved?.sort?.dir) setSort(saved.sort);
       if (PAGE_SIZES.includes(saved?.pageSize)) setPageSize(saved.pageSize);
+      if (typeof saved?.year === "string") setYear(saved.year);
     } catch {
       // Storage blocked or a stale shape — start from the defaults.
     }
+    const linked = new URLSearchParams(window.location.search).get("year");
+    if (linked && /^(ALL|[1-4]|none|passed)$/.test(linked)) setYear(linked);
     setViewRestored(true);
   }, [viewKey]);
 
@@ -231,16 +246,22 @@ export default function StudentCohortPage() {
   useEffect(() => {
     if (!viewKey || !viewRestored) return;
     try {
-      window.sessionStorage.setItem(viewKey, JSON.stringify({ filters, sort, pageSize }));
+      window.sessionStorage.setItem(viewKey, JSON.stringify({ filters, sort, pageSize, year }));
     } catch {
       // Private mode — the view simply isn't remembered.
     }
-  }, [viewKey, viewRestored, filters, sort, pageSize]);
+  }, [viewKey, viewRestored, filters, sort, pageSize, year]);
 
   // Sections aren't a fixed enum like tiers — every college names its own
   // (A/B/C, or CSE-1/CSE-2), and the same goes for branches ("CSE (AI & ML)",
   // "AIDS"…) — so both filters' option lists are derived from whatever the
   // cohort actually has on file, never hardcoded.
+  const students = useMemo(() => allStudents.filter((s) => inYear(s, year)), [allStudents, year]);
+  const tabs = useMemo(() => yearTabs(allStudents), [allStudents]);
+  const notSetCount = useMemo(() => allStudents.filter((s) => s.study_year === null || s.study_year === undefined).length, [allStudents]);
+  const yearLabel = tabs.find((t) => t.value === year)?.label ?? "All years";
+  const allSections = useMemo(() => Array.from(new Set(allStudents.map((s) => s.section).filter((s): s is string => !!s))).sort(), [allStudents]);
+  const yearGroups = useMemo(() => departmentBranchBreakdown(students, catalog), [students, catalog]);
   const sections = useMemo(() => Array.from(new Set(students.map((s) => s.section).filter((s): s is string => !!s))).sort(), [students]);
   const branchGroups = useMemo(() => branchFilterGroups(students, catalog), [students, catalog]);
   // Labels the platform does not recognise yet: students who cannot be matched to branch-specific drives.
@@ -250,6 +271,11 @@ export default function StudentCohortPage() {
     return { labels: labels.size, students: Array.from(labels.values()).reduce((a, b) => a + b, 0) };
   }, [students]);
   const languageRollup = useMemo(() => rollupLanguages(students), [students]);
+
+  useEffect(() => {
+    if (loading || loadError || tabs.length === 0) return;
+    if (!tabs.some((t) => t.value === year)) setYear(ALL_YEARS);
+  }, [loading, loadError, tabs, year]);
 
   // A restored filter pointing at something that's gone (a branch nobody is in any more) would silently show an empty roster.
   useEffect(() => {
@@ -273,10 +299,10 @@ export default function StudentCohortPage() {
   // must not silently carry into another (someone could "Notify Selected" people they can no longer see).
   useEffect(() => {
     setPage(1);
-  }, [effectiveFilters, sort, pageSize]);
+  }, [effectiveFilters, sort, pageSize, year]);
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [effectiveFilters]);
+  }, [effectiveFilters, year]);
 
   if (status !== "ready") {
     return (
@@ -345,6 +371,64 @@ export default function StudentCohortPage() {
     setNotifyConfirm(null);
   };
 
+  /** Shows a change on the roster the moment the server has accepted it, before any reload. */
+  const patchStudents = (ids: number[], patch: Partial<CohortStudent>) => {
+    const set = new Set(ids);
+    setAllStudents((prev) => prev.map((s) => (set.has(s.id) ? { ...s, ...patch } : s)));
+  };
+
+  /** Files students under a year: the roster updates at once, then refreshes quietly for what the year changes about each of them. */
+  const applyYear = async (ids: number[], chosen: number) => {
+    const res = await api.post<{ message: string; updated: number; graduation_year: number; study_year: number; year_label: string }>("/tpo/students/year", {
+      student_ids: ids,
+      year: chosen,
+    });
+    patchStudents(ids, { graduation_year: res.graduation_year, study_year: res.study_year, year_label: res.year_label });
+    triggerToast(res.message);
+    void loadStudents(true);
+  };
+
+  const handleSetYear = async (chosen: number) => {
+    await applyYear(Array.from(selectedIds), chosen);
+    setShowSetYear(false);
+    setSelectedIds(new Set());
+  };
+
+  // "Add these students to a year": everyone currently shown (they all have no year) in one go.
+  const handleAssignUnfiled = async (chosen: number) => {
+    const ids = students.map((s) => s.id);
+    const ok = await confirmDialog({
+      title: `Move ${ids.length} ${ids.length === 1 ? "student" : "students"} to ${yearName(chosen)}?`,
+      message: "You can change any of them again afterwards.",
+      confirmLabel: `Move to ${yearName(chosen)}`,
+    });
+    if (!ok) return;
+    try {
+      await applyYear(ids, chosen);
+      // They have a year now, so the "Year not set" tab is gone: follow them to where they went.
+      setYear(String(chosen));
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Couldn't set the year. Please try again.");
+    }
+  };
+
+  const handleSetSection = async (section: string | null) => {
+    const ids = Array.from(selectedIds);
+    const res = await api.post<{ message: string; section: string | null }>("/tpo/students/section", { student_ids: ids, section });
+    patchStudents(ids, { section: res.section });
+    setShowSetSection(false);
+    setSelectedIds(new Set());
+    triggerToast(res.message);
+  };
+
+  /** One student edited in the modal: the server sent back their refreshed row. */
+  const handleStudentSaved = (row: CohortStudent) => {
+    setAllStudents((prev) => prev.map((s) => (s.id === row.id ? { ...s, ...row } : s)));
+    setActiveStudent((prev) => (prev && prev.id === row.id ? { ...prev, ...row } : prev));
+    setEditing(null);
+    triggerToast(`${row.name} updated.`);
+  };
+
   const openNotify = (ids: number[], label: string) => {
     setNotifyConfirm({ ids, label, students: students.filter((s) => ids.includes(s.id)) });
   };
@@ -389,11 +473,28 @@ export default function StudentCohortPage() {
       }}
     >
       <HpStagger className="space-y-6">
+        {/* Year of study — pick a year; the page becomes that year's students, department by department */}
+        <HpItem>
+          <div className="space-y-4">
+            <YearSwitcher tabs={tabs} value={year} onChange={setYear} notSetCount={notSetCount} />
+            {!loading && !loadError && allStudents.length > 0 && (
+              <YearBreakdown
+                groups={yearGroups}
+                yearLabel={yearLabel}
+                total={students.length}
+                activeBranch={filters.branch}
+                onPickBranch={(filter) => setFilter("branch", filter ?? ALL)}
+              />
+            )}
+            {!loading && !loadError && year === YEAR_NOT_SET && students.length > 0 && <UnfiledStudentsPanel count={students.length} onAssign={handleAssignUnfiled} />}
+          </div>
+        </HpItem>
+
         {/* KPI strip */}
         <HpItem>
           <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
             <HpStatCard
-              label="Total cohort"
+              label={year === ALL_YEARS ? "Total cohort" : `${yearLabel} cohort`}
               value={students.length}
               icon={Users}
               tone="sky"
@@ -1003,7 +1104,18 @@ export default function StudentCohortPage() {
                 <HpErrorCard message={loadError} onRetry={() => loadStudents()} />
               </div>
             ) : filtered.length === 0 ? (
-              students.length === 0 ? (
+              students.length === 0 && allStudents.length > 0 ? (
+                <div className="flex flex-col items-center px-6 py-14 text-center">
+                  <HpIconTile icon={CalendarRange} tone="violet" size="lg" />
+                  <p className="mt-4 text-sm font-bold text-primary">Nobody is in {yearLabel} yet</p>
+                  <p className="mt-1 max-w-sm text-2xs leading-relaxed text-text-muted">
+                    Add a student and choose this year, or import a roster for it. To move students you already have, tick them in another year and use Set year.
+                  </p>
+                  <HpButton variant="secondary" size="sm" className="mt-4" onClick={() => setYear(ALL_YEARS)}>
+                    Show all years
+                  </HpButton>
+                </div>
+              ) : students.length === 0 ? (
                 <div className="p-4 sm:p-5">
                   <HpEmptyState
                     icon={GraduationCap}
@@ -1089,6 +1201,7 @@ export default function StudentCohortPage() {
                                 <div className="flex flex-wrap items-center gap-1">
                                   <BranchChip branch={s.branch} className="max-w-[10rem]" />
                                   {showDepartmentChip && <DepartmentTag department={s.department} catalog={catalog} />}
+                                  <YearChip student={s} />
                                   <SectionChip section={s.section} />
                                 </div>
                                 <CgpaCell student={s} />
@@ -1110,10 +1223,11 @@ export default function StudentCohortPage() {
                               <div className="flex flex-col items-start gap-1.5">
                                 <StatusCell student={s} />
                                 <EligibilityCell student={s} />
+                                <VaultAiChip student={s} />
                               </div>
                             </td>
                             <td className="py-3 pl-4 pr-5">
-                              <RowActions student={s} onProfile={() => setActiveStudent(s)} />
+                              <RowActions student={s} onProfile={() => setActiveStudent(s)} onEdit={() => setEditing(s)} />
                             </td>
                           </tr>
                         );
@@ -1152,6 +1266,7 @@ export default function StudentCohortPage() {
                             <div className="mt-3 flex flex-wrap items-center gap-1.5">
                               <BranchChip branch={s.branch} />
                               {showDepartmentChip && <DepartmentTag department={s.department} catalog={catalog} />}
+                              <YearChip student={s} />
                               <SectionChip section={s.section} />
                               <span className="tabular inline-flex items-center gap-1 rounded-md bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
                                 <GraduationCap className="h-3 w-3" aria-hidden />
@@ -1161,6 +1276,7 @@ export default function StudentCohortPage() {
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
                               <StatusCell student={s} />
                               <EligibilityCell student={s} />
+                              <VaultAiChip student={s} />
                             </div>
                             <div className="mt-3 space-y-2 rounded-xl bg-elevated/40 p-2.5">
                               <PracticeCell student={s} inline />
@@ -1168,7 +1284,7 @@ export default function StudentCohortPage() {
                               {showCoding && <LanguageChips coding={s.coding} />}
                             </div>
                             <div className="mt-3">
-                              <RowActions student={s} onProfile={() => setActiveStudent(s)} align="start" />
+                              <RowActions student={s} onProfile={() => setActiveStudent(s)} onEdit={() => setEditing(s)} align="start" />
                             </div>
                           </div>
                         </li>
@@ -1239,6 +1355,12 @@ export default function StudentCohortPage() {
                 <HpButton variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
                   Clear
                 </HpButton>
+                <HpButton variant="secondary" size="sm" onClick={() => setShowSetYear(true)} leftIcon={<CalendarRange className="h-3.5 w-3.5" />}>
+                  Set year
+                </HpButton>
+                <HpButton variant="secondary" size="sm" onClick={() => setShowSetSection(true)} leftIcon={<LayoutGrid className="h-3.5 w-3.5" />}>
+                  Set section
+                </HpButton>
                 <HpButton
                   size="sm"
                   onClick={() => openNotify(Array.from(selectedIds), `${selectedIds.size} selected student(s)`)}
@@ -1256,10 +1378,16 @@ export default function StudentCohortPage() {
         open={showAddStudent}
         onClose={() => setShowAddStudent(false)}
         onAdded={(student) => {
-          setStudents((prev) => [student, ...prev]);
+          setAllStudents((prev) => [student, ...prev]);
           triggerToast(`${student.name} added — login credentials emailed to ${student.email}.`);
         }}
       />
+
+      {showSetSection && <SetSectionModal count={selectedIds.size} sections={allSections} onClose={() => setShowSetSection(false)} onConfirm={handleSetSection} />}
+
+      {editing && <EditStudentModal student={editing} sections={allSections} onClose={() => setEditing(null)} onSaved={handleStudentSaved} />}
+
+      {showSetYear && <SetYearModal count={selectedIds.size} onClose={() => setShowSetYear(false)} onConfirm={handleSetYear} />}
 
       {showBranches && <BranchMappingModal onClose={() => setShowBranches(false)} onChanged={() => void loadStudents(true)} />}
 
@@ -1290,7 +1418,7 @@ export default function StudentCohortPage() {
 /* ── Local presentation pieces ──────────────────────────────────────────── */
 
 /** Thin bar that fills in on mount (instant under reduced motion). `value` is 0–100. */
-function RowActions({ student: s, onProfile, align = "end" }: { student: CohortStudent; onProfile: () => void; align?: "start" | "end" }) {
+function RowActions({ student: s, onProfile, onEdit, align = "end" }: { student: CohortStudent; onProfile: () => void; onEdit: () => void; align?: "start" | "end" }) {
   return (
     <div className={cn("flex items-center gap-2", align === "end" ? "justify-end" : "justify-start")}>
       {/* One click straight into contest/interview/drive history, the
@@ -1309,6 +1437,10 @@ function RowActions({ student: s, onProfile, align = "end" }: { student: CohortS
       <button type="button" onClick={onProfile} aria-label={`Open profile for ${s.name}`} className={hpBtn("soft", "sm", "h-8 px-2.5")}>
         <UserRound className="h-3.5 w-3.5" />
         Profile
+      </button>
+      <button type="button" onClick={onEdit} aria-label={`Edit year and section for ${s.name}`} title="Edit year & section" className={hpBtn("secondary", "sm", "h-8 px-2.5")}>
+        <Pencil className="h-3.5 w-3.5" />
+        Edit
       </button>
     </div>
   );

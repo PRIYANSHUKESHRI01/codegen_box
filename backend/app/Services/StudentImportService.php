@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
  */
 class StudentImportService
 {
-    public function import(College $college, UploadedFile $file, ?User $uploadedBy, ?string $department = null): StudentImport
+    public function import(College $college, UploadedFile $file, ?User $uploadedBy, ?string $department = null, ?int $studyYear = null): StudentImport
     {
         // A college with no active subscription at all (never had one, or
         // it expired/was canceled) must be blocked outright here — without
@@ -67,6 +67,8 @@ class StudentImportService
             'college_id' => $college->id,
             // The department the whole file is for (null only for an import queued by code that predates departments).
             'department_code' => $department,
+            // The year of study the whole file is for (1-4), or null when the file names each student's year itself (a `year` column).
+            'study_year' => $studyYear,
             'uploaded_by' => $uploadedBy?->id,
             'original_filename' => $file->getClientOriginalName(),
             'status' => StudentImport::STATUS_PENDING,

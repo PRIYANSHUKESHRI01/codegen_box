@@ -152,6 +152,10 @@ final class StudentPreferences
 
         return [
             'branch_code' => ['sometimes', 'string', Rule::exists('branches', 'code')->where('is_active', true)],
+            // "My branch isn't listed": what the student wrote instead of picking one, and the department they said it belongs to.
+            // Only used when no branch_code is sent (see StudentPreferencesController::applyBranchAnswers).
+            'branch_label' => ['sometimes', 'nullable', 'string', 'min:2', 'max:80'],
+            'branch_department' => ['sometimes', 'nullable', 'string', Rule::exists('departments', 'code')->where('is_active', true)],
             'track_focus' => ['sometimes', 'nullable', 'string', Rule::in(self::TRACK_FOCUS)],
             'core_interests' => ['sometimes', 'nullable', 'array', 'max:8'],
             'core_interests.*' => ['string', 'distinct', Rule::in(self::allCoreInterests())],
@@ -194,7 +198,7 @@ final class StudentPreferences
         }
 
         // Handled by BranchAssignmentService / the controller, not stored through this array.
-        unset($values['branch_code']);
+        unset($values['branch_code'], $values['branch_label'], $values['branch_department']);
 
         if (array_key_exists('core_interests', $validated)) {
             $values['core_interests'] = array_values(array_unique($validated['core_interests'] ?? []));

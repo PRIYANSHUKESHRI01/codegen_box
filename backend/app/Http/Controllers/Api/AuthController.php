@@ -168,6 +168,8 @@ class AuthController extends Controller
      */
     private function touchLastSeen(User $user, bool $force = false): void
     {
+        $this->stampFirstLogin($user);
+
         if (! $force
             && $user->last_seen_at !== null
             && $user->last_seen_at->gt(now()->subMinutes(self::LAST_SEEN_THROTTLE_MINUTES))) {
@@ -191,6 +193,34 @@ class AuthController extends Controller
 
         $user->setAttribute('last_seen_at', $now);
         $user->syncOriginalAttribute('last_seen_at');
+    }
+
+    /**
+     * Stamps users.first_login_at the first time a student really uses their account - the moment the Vault AI Interview's wait
+     * (45 / 90 days) starts. It is written once and never moved: the `whereNull` makes a second tab or a retry a no-op. Here rather
+     * than in login() because a student's very first session starts at the end of the one-time-password flow, not at login(); every
+     * session, whichever way it began, checks in through here.
+     */
+    private function stampFirstLogin(User $user): void
+    {
+        if ($user->role !== User::ROLE_USER || $user->first_login_at !== null || ! User::hasYearColumn()) {
+            return;
+        }
+
+        $now = now();
+
+        try {
+            DB::table('users')->where('id', $user->id)->whereNull('first_login_at')->update(['first_login_at' => $now]);
+        } catch (QueryException $e) {
+            if (Cache::add('first-login-write-failed', true, 3600)) {
+                Log::warning('Could not stamp users.first_login_at: '.$e->getMessage());
+            }
+
+            return;
+        }
+
+        $user->setAttribute('first_login_at', $now);
+        $user->syncOriginalAttribute('first_login_at');
     }
 
     /**

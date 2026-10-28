@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Services\CollegeDepartmentService;
 use App\Services\IssuedCredentialVault;
+use App\Support\AcademicYear;
 use App\Support\BranchCatalog;
 use App\Models\College;
 use App\Models\StudentImport;
@@ -105,6 +106,18 @@ class ProcessStudentImportJob implements ShouldQueue
         $department = $import->department_code;
         $departmentName = $department !== null ? (BranchCatalog::instance()->department($department)['name'] ?? $department) : null;
 
+        // The year of study. The whole file may be for one year (chosen at upload), each row may name its own (a `year` column), or both:
+        // a row that names a different year from the file's is a mistake worth stopping at the door, not a quiet override.
+        $fileYear = $import->study_year !== null ? (int) $import->study_year : null;
+        $yearColumn = null;
+        foreach (['year', 'study_year', 'year_of_study', 'graduation_year', 'passout_year', 'passing_out_year'] as $candidate) {
+            if (in_array($candidate, $header, true)) {
+                $yearColumn = $candidate;
+                break;
+            }
+        }
+        $yearsSupported = User::hasYearColumn();
+
         while (($row = fgetcsv($handle)) !== false) {
             $rowNumber++;
 
@@ -133,6 +146,24 @@ class ProcessStudentImportJob implements ShouldQueue
 
             $backlogsRaw = trim((string) ($data['backlogs'] ?? ''));
             $backlogs = ($backlogsRaw !== '' && is_numeric($backlogsRaw)) ? (int) $backlogsRaw : null;
+
+            $rowYearRaw = $yearColumn !== null ? trim((string) ($data[$yearColumn] ?? '')) : '';
+            $rowYear = $rowYearRaw !== '' ? AcademicYear::parse($rowYearRaw) : null;
+
+            if ($rowYearRaw !== '' && $rowYear === null) {
+                $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => "Year \"{$rowYearRaw}\" isn't recognised - write it as 1st, 2nd, 3rd or 4th year."];
+
+                continue;
+            }
+
+            if ($rowYear !== null && $fileYear !== null && $rowYear !== $fileYear) {
+                $errors[] = ['row' => $rowNumber, 'email' => $email, 'error' => 'This row says '.AcademicYear::label($rowYear).' but this file is being imported as '.AcademicYear::label($fileYear).'.'];
+
+                continue;
+            }
+
+            $studyYear = $rowYear ?? $fileYear;
+            $graduationYear = $studyYear !== null && $yearsSupported ? AcademicYear::graduationYearFor($studyYear) : null;
 
             $existing = User::where('email', $email)->first();
 
@@ -172,11 +203,17 @@ class ProcessStudentImportJob implements ShouldQueue
                 // Idempotent re-upload: refresh their academic data, but never
                 // touch their password or re-send the welcome email.
                 $existing->departmentHint = $department;
-                $existing->update(array_filter([
+                $existing->fill(array_filter([
                     'name' => $name,
                     'college_id' => $import->college_id,
                     ...array_filter($academicFields, fn ($v) => $v !== null),
                 ], fn ($v) => $v !== null));
+                // Re-importing a student under a year moves them to it (a correction, or a promotion); no year in the file leaves theirs alone.
+                // Not mass-assignable on purpose: only a roster the college's staff upload may say which year someone is in.
+                if ($graduationYear !== null) {
+                    $existing->forceFill(['graduation_year' => $graduationYear]);
+                }
+                $existing->save();
                 $successCount++;
             } else {
                 if ($subscriptionExpired) {
@@ -205,6 +242,9 @@ class ProcessStudentImportJob implements ShouldQueue
                 ]);
                 // Not an attribute: tells the saving hook which department this row is being filed under.
                 $user->departmentHint = $department;
+                if ($graduationYear !== null) {
+                    $user->forceFill(['graduation_year' => $graduationYear]);
+                }
                 $user->save();
 
                 app(IssuedCredentialVault::class)->keep($user, $plainPassword, 'import');

@@ -85,6 +85,11 @@ class SubscriptionController extends Controller
 
         return response()->json([
             'signature' => $signature,
+            // What the college has filed about this student (year, section). A separate marker, not part of the plan signature: a TPO
+            // moving someone up a year is not a plan change and must never read as one.
+            'academic_signature' => $user->role === User::ROLE_USER
+                ? substr(sha1(json_encode([$user->college_id, $user->getRawOriginal('graduation_year'), $user->section])), 0, 16)
+                : null,
             'source' => $coverage['source'],
             'plan' => $plan && $running ? ['code' => $plan->code, 'name' => $plan->name] : null,
             'days_remaining' => $running ? $coverage['days_remaining'] : null,

@@ -12,6 +12,7 @@ use App\Services\Integrity\IntegrityService;
 use App\Services\PlanGate;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -41,7 +42,9 @@ class InterviewController extends Controller
             ->with('company:id,name,logo')
             ->orderByDesc('created_at')
             ->get()
-            ->filter(fn (Interview $interview) => $interview->isVisibleToUser($request->user()))
+            ->filter(fn (Interview $interview) => $interview->isVisibleToUser($request->user())
+                && empty($interview->practice_config['qualification_id'])
+                && ($interview->practice_config['source'] ?? null) !== 'curated_set')
             // "For your branch" first (newest first within each group — the sort is stable): an ECE student sees the ECE
             // interviews before the general ones; a CSE or unknown-branch student sees the list exactly as before.
             ->sortByDesc(fn (Interview $interview) => (int) $interview->isForBranchOf($request->user()))
@@ -267,6 +270,8 @@ class InterviewController extends Controller
             'passed' => $status === 'scored' && $interview->isTrackRound()
                 ? (float) $session->composite_score_percent >= (float) $interview->qualifying_score_percent
                 : null,
+            'is_qualification' => $this->isQualificationInterview($interview),
+            'reattemptable' => $this->canReattempt($interview, $session),
             'responses' => $responses,
         ]);
     }
@@ -304,6 +309,87 @@ class InterviewController extends Controller
     }
 
     /**
+     * Resets a completed practice/mock interview session so the student can re-attempt it.
+     * Essential when scoring below the target threshold (e.g. < 60%) to improve and retry.
+     */
+    public function reattempt(Request $request, Interview $interview)
+    {
+        abort_unless($interview->isVisibleToUser($request->user()), 404);
+
+        $session = InterviewSession::where('interview_id', $interview->id)
+            ->where('user_id', $request->user()->id)
+            ->firstOrFail();
+
+        abort_unless($session->status === InterviewSession::STATUS_COMPLETED, 422, 'Only completed interviews can be re-attempted.');
+        abort_unless($this->canReattempt($interview, $session), 422, $this->isQualificationInterview($interview)
+            ? 'A Vault AI Interview qualification set is scored once per attempt and cannot be re-sat.'
+            : 'This interview cannot be re-attempted.');
+
+        // Assert plan allowance for taking another mock interview round (a Vault AI Interview set needs no plan)
+        if (! $this->isQualificationInterview($interview)) {
+            app(PlanGate::class)->assertMockInterviewAllowed($request->user());
+        }
+
+        $audioPaths = $session->responses()->whereNotNull('audio_path')->pluck('audio_path')->all();
+
+        DB::transaction(function () use ($session) {
+            // Delete previous answers to give a completely clean re-attempt
+            $session->responses()->delete();
+
+            // Clear proctoring session if present
+            if ($session->proctoringSession) {
+                $session->proctoringSession->violations()->delete();
+                $session->proctoringSession->delete();
+            }
+
+            $session->update([
+                'status' => InterviewSession::STATUS_IN_PROGRESS,
+                'started_at' => now(),
+                'completed_at' => null,
+                'current_question_order' => 0,
+                'composite_score_percent' => null,
+                'ai_scored_at' => null,
+                'reviewed_at' => null,
+                'scoring_failed_at' => null,
+            ]);
+        });
+
+        // The recordings of the answers that were just discarded (the rows are gone, so nothing else can reach them).
+        foreach ($audioPaths as $path) {
+            Storage::disk('local')->delete($path);
+        }
+
+        return response()->json([
+            'message' => 'Interview session reset for re-attempt.',
+            'slug' => $interview->slug,
+            'session' => $this->sessionPayload($interview, $session->fresh()),
+        ]);
+    }
+
+    private function isQualificationInterview(Interview $interview): bool
+    {
+        return ! empty($interview->practice_config['qualification_id']);
+    }
+
+    /**
+     * Whether the student may sit this interview again. Only their own practice/mock interviews qualify — a track round
+     * or a company's hiring interview was (or is being) decided on its score, so it can never be reset — and a Vault AI
+     * Interview qualification set only when scoring itself failed, which gave the student no score at all.
+     */
+    private function canReattempt(Interview $interview, InterviewSession $session): bool
+    {
+        if ($interview->isTrackRound() || $interview->interview_type === Interview::INTERVIEW_TYPE_COMPANY_HIRING) {
+            return false;
+        }
+
+        if ($this->isQualificationInterview($interview)) {
+            return $session->scoringFailed() && ! $session->hasScoreAvailable();
+        }
+
+        return $interview->is_mock || $interview->interview_type === Interview::INTERVIEW_TYPE_PRACTICE;
+    }
+
+    /**
      * The plan-tier practice gate for mock interviews (a free plan's one-time
      * try, then the daily limit) — only counts a
      * genuine practice attempt: `is_mock` interviews and tpo_mock-type
@@ -316,7 +402,9 @@ class InterviewController extends Controller
      */
     private function assertWithinDailyMockInterviewLimit(Request $request, Interview $interview): void
     {
+        // A Vault AI Interview set is open to every student who has unlocked it: no plan, no trial, no daily cap.
         $isPracticeType = ! $interview->isTrackRound()
+            && ! $this->isQualificationInterview($interview)
             && ($interview->is_mock || $interview->interview_type === Interview::INTERVIEW_TYPE_TPO_MOCK);
 
         if (! $isPracticeType) {
@@ -336,6 +424,11 @@ class InterviewController extends Controller
     private function assertNotLocked(?InterviewSession $session): void
     {
         if ($session?->proctoringSession?->isLocked()) {
+            // A Vault AI Interview set was not sent by anyone either, and a set is scored once: it cannot be re-sat.
+            if ($session->interview !== null && $this->isQualificationInterview($session->interview)) {
+                abort(403, 'This Vault AI Interview set was closed after repeated proctoring violations, so it cannot be sat again. Please contact AptRun support.');
+            }
+
             // A practice interview has no one who invited the student — they built it — so there is no one to reinstate it either.
             $own = $session->interview?->interview_type === Interview::INTERVIEW_TYPE_PRACTICE;
 
@@ -374,6 +467,15 @@ class InterviewController extends Controller
                 ? (int) $questions->sum(fn (InterviewQuestion $q) => ($q->questionBank->expected_duration_seconds ?? 0) + self::PREP_SECONDS_PER_QUESTION)
                 : null,
             'my_session_status' => $session?->status,
+            // A Vault AI Interview qualification set is sat in the Vault AI Interview's own pages, not the Mock AI Interview's: these
+            // tell the page which one this is and where in the series it sits.
+            'is_qualification' => $this->isQualificationInterview($interview),
+            'qualification' => $this->isQualificationInterview($interview) ? [
+                'stack_key' => $interview->practice_config['stack_key'] ?? null,
+                'role_key' => $interview->practice_config['role_key'] ?? null,
+                'series_number' => isset($interview->practice_config['series_number']) ? (int) $interview->practice_config['series_number'] : null,
+                'set_number' => isset($interview->practice_config['set_number']) ? (int) $interview->practice_config['set_number'] : null,
+            ] : null,
         ];
     }
 

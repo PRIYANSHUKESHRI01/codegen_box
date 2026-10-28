@@ -161,7 +161,7 @@ export function TalkToTeamModal({ open, onClose, defaultAudience = "institution"
           </button>
         </div>
       ) : (
-              <form onSubmit={handleSubmit} className="space-y-5">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Audience toggle — same bespoke two-button pattern as PricingHero's audience switch. Not for a student asking about Mellow Academy. */}
                 {!askingAboutAcademy && !lockAudience && (
                 <div className="inline-flex items-center gap-1 p-1 rounded-btn bg-elevated border border-border-strong w-full">

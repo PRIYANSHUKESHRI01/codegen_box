@@ -1,4 +1,5 @@
 import type { CohortLanguage } from "./languageInsights";
+import type { CohortVaultAi } from "./vaultAi";
 
 /**
  * Where a student stands on coding practice, in one word — decided on the
@@ -43,6 +44,14 @@ export interface CohortStudent {
   branch_source?: "college" | "self" | null;
   /** The department the student belongs to (engineering · management · commerce · arts …); null = not classified yet, read as engineering. */
   department?: string | null;
+  /** The year they pass out, as the college filed it; null until it files one. */
+  graduation_year?: number | null;
+  /** The year of study they are in right now (1-4; above 4 = passed out), derived from `graduation_year` so it moves on by itself every July. Null = not filed. */
+  study_year?: number | null;
+  /** "3rd year" / "Passed out"; null when not filed. */
+  year_label?: string | null;
+  /** Where they stand on unlocking the Vault AI Interview (the same answer the student sees). */
+  vault_ai?: CohortVaultAi | null;
   /** Non-CS students' chosen weighting: core_first / balanced / it_first. */
   track_focus?: "core_first" | "balanced" | "it_first" | null;
   /** Core Prep standing — null unless their branch's Core Prep is live. */

@@ -9,6 +9,8 @@ use App\Models\Submission;
 use App\Models\User;
 use App\Services\Core\CoreAccess;
 use App\Services\Core\CoreMasteryService;
+use App\Services\Vault\VaultAiAccessService;
+use App\Support\AcademicYear;
 use App\Support\DepartmentCapabilities;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -115,6 +117,26 @@ class StudentCohortService
     }
 
     /**
+     * The Vault AI Interview unlock, as a TPO needs it: whether it is open, and if not, what is still missing. The readiness score is
+     * the one this row already carries (already computed for the whole roster), so this adds no query.
+     *
+     * @return array{state: string, reasons: array<int, string>, days_remaining: ?int, required_days: ?int, unlocks_at: ?string, readiness_required: ?int}
+     */
+    private function vaultAi(User $student): array
+    {
+        $access = app(VaultAiAccessService::class)->evaluate(
+            true,
+            $student->study_year,
+            $student->first_login_at,
+            $student->readinessScore(),
+            $student->vault_ai_unlocked_at,
+        );
+
+        return array_intersect_key($access, array_flip(['state', 'reasons', 'days_remaining', 'required_days', 'unlocks_at']))
+            + ['readiness_required' => $access['readiness']['required'] ?? null];
+    }
+
+    /**
      * What a core-branch student's row says about Core Prep: how much they answered lately and where they are weakest.
      * Grouped queries over the whole set, never per student.
      *
@@ -186,6 +208,14 @@ class StudentCohortService
             'branch_source' => $student->branch_source,
             // The department the student belongs to (Engineering, Commerce …): null = not known yet, which the roster reads as engineering.
             'department' => $student->department,
+            // The year of study (1st-4th), derived from the year they pass out - null until the college files the student under one.
+            'graduation_year' => $student->graduation_year,
+            'study_year' => $student->study_year,
+            'year_label' => AcademicYear::label($student->study_year),
+            // Where the student stands on unlocking the Vault AI Interview - the very rule the student's own screens run on.
+            'vault_ai' => $this->vaultAi($student),
+            // The student's best Vault AI Interview series average (0-100), kept on the student; null until they complete a series.
+            'vault_ai_score' => $student->vault_ai_score,
             'track_focus' => $student->track_focus,
             'section' => $student->section,
             'phone' => $student->phone,

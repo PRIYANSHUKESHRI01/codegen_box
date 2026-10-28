@@ -31,6 +31,9 @@ import type { PlanSignal } from "@/types/subscription";
 
 export const PLAN_SYNC_POLL_MS = 30_000;
 
+/** Fired (on window) when the college changed this student's year or section while the page was open. Not a plan change: no plan notice goes with it. */
+export const ACADEMIC_CHANGED_EVENT = "aptrun:academic-changed";
+
 export type PlanChangeKind = "upgraded" | "extended" | "changed" | "ended";
 
 export interface PlanChangeNotice {
@@ -49,6 +52,7 @@ const PLAN_RANK: Record<string, number> = { coder: 0, expert: 1, grandmaster: 2 
 
 let baseline: PlanSignal | null = null;
 let baselineOwner: number | null = null;
+let academicBaseline: string | null = null;
 let inFlight: Promise<void> | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let starts = 0;
@@ -112,6 +116,14 @@ export function checkPlanNow({ silent = false }: { silent?: boolean } = {}): Pro
       const previous = baseline;
       baseline = next;
 
+      // A TPO moved the student up a year / to another section: tell whoever shows it (the Vault AI Interview's countdown, the
+      // sidebar), whether or not anything about the plan moved. The first answer only sets the starting point.
+      const academicBefore = academicBaseline;
+      academicBaseline = next.academic_signature ?? null;
+      if (previous !== null && academicBefore !== null && academicBaseline !== null && academicBefore !== academicBaseline) {
+        window.dispatchEvent(new Event(ACADEMIC_CHANGED_EVENT));
+      }
+
       if (previous === null || previous.signature === next.signature) return;
 
       dispatching = true;
@@ -151,6 +163,7 @@ export function startPlanSync(userId: number): () => void {
   // A different account signing in on the same page load must not inherit the last one's baseline.
   if (baselineOwner !== userId) {
     baseline = null;
+    academicBaseline = null;
     baselineOwner = userId;
   }
 
@@ -203,6 +216,7 @@ export function __resetPlanSyncForTests(): void {
   timer = null;
   starts = 0;
   baseline = null;
+  academicBaseline = null;
   baselineOwner = null;
   inFlight = null;
   dispatching = false;

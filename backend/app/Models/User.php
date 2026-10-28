@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use App\Services\ReadinessScoreService;
+use App\Support\AcademicYear;
 use App\Support\BranchAudience;
 use App\Support\BranchCatalog;
 use App\Support\BranchNormalizer;
@@ -239,7 +240,7 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $appends = ['avatar_url', 'has_resume', 'onboarding_pending', 'branch_pending', 'core_enabled', 'capabilities'];
+    protected $appends = ['avatar_url', 'has_resume', 'onboarding_pending', 'branch_pending', 'core_enabled', 'capabilities', 'study_year'];
 
     /**
      * The attributes that should be cast.
@@ -287,6 +288,18 @@ class User extends Authenticatable
             'onboarding_skipped_at' => 'datetime',
             // Stamped by AuthController (login + throttled /me) — never mass-assigned.
             'last_seen_at' => 'datetime',
+            // The year a college student passes out (their year of study is derived from it - see AcademicYear). Set only by the
+            // college's staff (roster import, add student, "set year"), so deliberately NOT in $fillable: a student cannot move
+            // themselves up a year to reach the Vault AI Interview sooner.
+            'graduation_year' => 'integer',
+            // First real sign-in (starts the Vault AI Interview's wait) and the kept unlock — AuthController / VaultAiAccessService only.
+            'first_login_at' => 'datetime',
+            'vault_ai_unlocked_at' => 'datetime',
+            // The two scores kept on the student for filtering and ranking - written only by ScoreLedger, never mass-assigned.
+            'readiness_score' => 'integer',
+            'readiness_scored_at' => 'datetime',
+            'vault_ai_score' => 'float',
+            'vault_ai_scored_at' => 'datetime',
             // Set by the unsubscribe link in a nudge e-mail (EmailPreferenceController) — never mass-assigned.
             'email_nudges_opt_out_at' => 'datetime',
             // What the person MUTED in Settings → Notifications ({"muted": ["hackathons"]}) — written only by NotificationService.
@@ -442,7 +455,9 @@ class User extends Authenticatable
         }
 
         if ($this->branch_code === null) {
-            return true;
+            // A student who wrote their own branch ("my branch isn't listed") has answered; there is nothing more to ask
+            // until their TPO maps it to a listed one.
+            return ! ($this->branch_source === 'self' && trim((string) $this->branch) !== '');
         }
 
         if ($this->track_focus !== null || ! $this->hasDomainPrepFamily()) {
@@ -530,6 +545,27 @@ class User extends Authenticatable
         return Attribute::make(
             get: fn () => $this->needsOnboarding(),
         );
+    }
+
+    /**
+     * The year of study (1..4) a college student is in right now, derived from their passing-out year; above 4 once they have passed
+     * out. Null when no year is on file (and always for anyone who is not a student of a college).
+     */
+    protected function studyYear(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->role === self::ROLE_USER && $this->college_id !== null
+                ? AcademicYear::studyYearOf(isset($this->attributes['graduation_year']) ? (int) $this->attributes['graduation_year'] : null)
+                : null,
+        );
+    }
+
+    /** Whether the years migration has run (a deploy may ship code before `migrate`); only a positive answer is remembered. */
+    public static function hasYearColumn(): bool
+    {
+        static $present = false;
+
+        return $present || ($present = Schema::hasColumn('users', 'graduation_year'));
     }
 
     public function college(): BelongsTo
@@ -737,9 +773,32 @@ class User extends Authenticatable
         });
     }
 
+    /**
+     * Narrow to the students in one year of study (1..4). `0` means "no year on file"; a year above the programme means "passed out".
+     * Works on the stored passing-out year, so the answer moves on by itself every July.
+     */
+    public function scopeInStudyYear(Builder $query, int $studyYear): Builder
+    {
+        if ($studyYear === 0) {
+            return $query->whereNull('users.graduation_year');
+        }
+
+        if ($studyYear > AcademicYear::programmeYears()) {
+            return $query->where('users.graduation_year', '<', AcademicYear::graduationYearFor(AcademicYear::programmeYears()));
+        }
+
+        return $query->where('users.graduation_year', AcademicYear::graduationYearFor($studyYear));
+    }
+
     public function isCompanyAdmin(): bool
     {
         return $this->role === self::ROLE_ADMIN_COMPANY;
+    }
+
+    /** A student who belongs to a college (as opposed to a direct AptRun user): the people the year-wise rules apply to. */
+    public function isCollegeStudent(): bool
+    {
+        return $this->role === self::ROLE_USER && $this->college_id !== null;
     }
 
     public function isStudent(): bool

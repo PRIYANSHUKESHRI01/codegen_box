@@ -49,8 +49,8 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/drills": { title: "Skill Drills", parent: "/dashboard" },
   "/dashboard/drills/session": { title: "Drill", parent: "/dashboard/drills" },
   "/dashboard/drives": { title: "Upcoming & Drives", parent: "/dashboard#placement-drives", backLabel: "Placement drives" },
-  "/dashboard/interview-tracks": { title: "AI Interviews", parent: "/dashboard/interviews" },
-  "/dashboard/interviews": { title: "AI Interviews", parent: "/dashboard" },
+  "/dashboard/interview-tracks": { title: "Mock AI Interview", parent: "/dashboard/interviews" },
+  "/dashboard/interviews": { title: "Mock AI Interview", parent: "/dashboard" },
   "/dashboard/interviews/practice": { title: "Practice interview", parent: "/dashboard/interviews" },
   "/dashboard/interviews/session": { title: "Interview", parent: "/dashboard/interviews" },
   "/dashboard/interviews/view": { title: "Interview", parent: "/dashboard/interviews" },
@@ -75,6 +75,9 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/soft-skills/view": { title: "Soft Skills", parent: "/dashboard/soft-skills" },
   "/dashboard/talent-pool": { title: "Talent Pool", parent: "/dashboard" },
   "/dashboard/vault": { title: "Vault", parent: "/dashboard" },
+  "/dashboard/vault-interviews": { title: "Vault AI Interview", parent: "/dashboard" },
+  "/dashboard/vault-interviews/view": { title: "Qualification set", parent: "/dashboard/vault-interviews" },
+  "/dashboard/vault-interviews/session": { title: "Qualification set", parent: "/dashboard/vault-interviews" },
 
   // ── Shared by every role: their parent is whichever portal root the signed-in role has (resolved in resolveBack) ──
   "/settings": { title: "Settings", parent: "@portal" },

@@ -20,6 +20,8 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { departmentShort, useBranchCatalog } from "@/lib/branches";
 import { DepartmentPicker, useCollegeDepartments } from "@/components/branches/DepartmentPicker";
+import { YearPicker } from "@/components/dashboard/tpo/YearPicker";
+import { yearName } from "@/lib/studyYear";
 import { HP_TONES, HpButton, HpCard, HpIconTile, HpPill, HpSkeleton, hpEase, type HpTone } from "@/components/portal/kit";
 import { HpFormError } from "@/components/portal/pipeline-kit";
 
@@ -65,6 +67,8 @@ interface ApiStudentImport {
   original_filename: string;
   /** The department the whole file was imported under. */
   department_code?: string | null;
+  /** The year of study the whole file was imported as (1-4); null when each row named its own. */
+  study_year?: number | null;
   status: ImportStatus;
   total_rows: number;
   processed_rows: number;
@@ -108,6 +112,8 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
   const [chosenDepartment, setChosenDepartment] = useState<string>("");
   const department = departments.length === 1 ? departments[0].code : chosenDepartment;
   const needsDepartment = departments.length > 1;
+  // The year of study the whole file is for. Blank = the file names each student's year itself (a `year` column).
+  const [year, setYear] = useState<string>("");
   const [imports, setImports] = useState<ApiStudentImport[]>([]);
   const [loadingImports, setLoadingImports] = useState(true);
   const [file, setFile] = useState<File | null>(null);
@@ -188,6 +194,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
       const formData = new FormData();
       formData.append("file", file);
       if (department) formData.append("department", department);
+      if (year) formData.append("year", year);
       const res = await api.postFormData<{ import: ApiStudentImport }>(`${basePath(collegeId)}/import`, formData);
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -242,6 +249,18 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
           label="Which department is this roster for?"
         />
         {needsDepartment && !department && <p className="text-2xs text-text-muted">The template and the branch list follow the department you choose.</p>}
+
+        <YearPicker
+          value={year}
+          onChange={setYear}
+          label="Which year are these students in?"
+          blankLabel="My file has a year column"
+          hint={
+            year
+              ? `Everyone in this file is filed under ${yearName(Number(year))}. A row that says a different year is skipped, so a mixed-up sheet can't slip through.`
+              : "Import one year at a time, or leave this and put a year (1st, 2nd, 3rd, 4th) in each row of the sheet's Year column."
+          }
+        />
 
         {/* Drop zone — the native file input is stretched invisibly over the
             whole zone, so click-to-browse and drag-and-drop are both the
@@ -345,6 +364,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
                           <p className="mt-0.5 text-3xs text-text-muted">
                             {formatDate(imp.created_at)}
                             {imp.department_code && departments.length > 1 ? ` · ${departmentShort(catalog, imp.department_code)}` : ""}
+                            {imp.study_year ? ` · ${yearName(imp.study_year)}` : ""}
                           </p>
                         </div>
                       </div>
@@ -448,6 +468,8 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
       </div>
 
       <DepartmentPicker options={departments} value={department} onChange={setChosenDepartment} label="Which department is this roster for?" />
+
+      <YearPicker value={year} onChange={setYear} label="Which year are these students in?" blankLabel="My file has a year column" />
 
       <div className="flex flex-col sm:flex-row items-center gap-2 p-3 rounded-control bg-elevated/60 border border-dashed border-border-subtle">
         <input

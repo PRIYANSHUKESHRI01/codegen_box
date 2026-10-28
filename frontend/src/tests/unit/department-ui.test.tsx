@@ -88,12 +88,13 @@ describe("choosing a branch across departments", () => {
 
     const departments = await screen.findByRole("radiogroup", { name: "Department" });
     expect(within(departments).getAllByRole("radio")).toHaveLength(4);
-    expect(screen.queryByRole("radiogroup", { name: "Branch family" })).toBeNull();
+    expect(screen.queryByRole("radiogroup", { name: "Branch" })).toBeNull();
 
     fireEvent.click(within(departments).getByRole("radio", { name: /Commerce/ }));
 
-    const families = await screen.findByRole("radiogroup", { name: "Branch family" });
-    expect(within(families).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Bachelor of Commerce", "Master of Commerce"]);
+    // The department's branches are listed straight away — no family step in between.
+    const branches = await screen.findByRole("radiogroup", { name: "Branch" });
+    expect(within(branches).getAllByRole("radio").map((r) => r.textContent)).toEqual(["B.Com (General)", "B.Com (Honours)", "M.Com (General)"]);
     expect(screen.queryByRole("radio", { name: /MBA/ })).toBeNull();
     expect(screen.queryByRole("radio", { name: /Computer Science/ })).toBeNull();
   });
@@ -103,7 +104,6 @@ describe("choosing a branch across departments", () => {
     render(<Harness user={asUser()} onValue={(v) => seen.push(v)} />);
 
     fireEvent.click(await screen.findByRole("radio", { name: /Commerce/ }));
-    fireEvent.click(await screen.findByRole("radio", { name: "Bachelor of Commerce" }));
     fireEvent.click(await screen.findByRole("radio", { name: /Honours/ }));
 
     expect(seen.at(-1)?.branchCode).toBe("bcom_hons");
@@ -114,7 +114,6 @@ describe("choosing a branch across departments", () => {
     render(<Harness user={asUser()} onValue={(v) => seen.push(v)} />);
 
     fireEvent.click(await screen.findByRole("radio", { name: /Commerce/ }));
-    fireEvent.click(await screen.findByRole("radio", { name: "Bachelor of Commerce" }));
     fireEvent.click(await screen.findByRole("radio", { name: /B\.Com \(General\)/ }));
     expect(seen.at(-1)?.branchCode).toBe("bcom");
 
@@ -127,7 +126,7 @@ describe("choosing a branch across departments", () => {
   it("does not ask a student whose college runs one department to choose it", async () => {
     render(<Harness user={asUser({ college_id: 3, college: { id: 3, name: "Tulas", departments: ["commerce"] } })} />);
 
-    expect(await screen.findByRole("radiogroup", { name: "Branch family" })).toBeTruthy();
+    expect(await screen.findByRole("radiogroup", { name: "Branch" })).toBeTruthy();
     expect(screen.queryByRole("radiogroup", { name: "Department" })).toBeNull();
     expect(screen.queryByRole("radio", { name: /MBA/ })).toBeNull();
   });
@@ -142,12 +141,12 @@ describe("choosing a branch across departments", () => {
   it("does not ask a student whose roster was imported under a department", async () => {
     render(<Harness user={asUser({ college_id: 3, department: "arts", college: { id: 3, name: "Tulas", departments: ["engineering", "arts"] } })} />);
 
-    const families = await screen.findByRole("radiogroup", { name: "Branch family" });
-    expect(within(families).getAllByRole("radio").map((r) => r.textContent)).toEqual(["Languages & Literature"]);
+    const branches = await screen.findByRole("radiogroup", { name: "Branch" });
+    expect(within(branches).getAllByRole("radio").map((r) => r.textContent)).toEqual(["BA English"]);
     expect(screen.queryByRole("radiogroup", { name: "Department" })).toBeNull();
   });
 
-  it("shows the families of an older catalogue that predates departments", async () => {
+  it("shows the branches of an older catalogue that predates departments", async () => {
     get.mockImplementation((path: string) =>
       path.startsWith("/public/branches")
         ? Promise.resolve({ disciplines: [{ code: "cse", name: "Computer Science & IT", short: "CSE / IT" }], branches: [{ code: "cse", discipline: "cse", name: "Computer Science & Engineering", short: "CSE" }] })
@@ -155,7 +154,7 @@ describe("choosing a branch across departments", () => {
     );
     render(<Harness user={asUser()} />);
 
-    expect(await screen.findByRole("radio", { name: /Computer Science & IT/ })).toBeTruthy();
+    expect(await screen.findByRole("radio", { name: /Computer Science & Engineering/ })).toBeTruthy();
   });
 });
 

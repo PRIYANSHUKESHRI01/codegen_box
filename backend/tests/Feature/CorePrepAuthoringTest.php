@@ -16,6 +16,7 @@ use Laravel\Sanctum\Sanctum;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 use ZipArchive;
 
@@ -134,7 +135,7 @@ class CorePrepAuthoringTest extends TestCase
         $this->assertDatabaseHas('core_question_audits', ['action' => 'created']);
     }
 
-    /** @dataProvider invalidPayloads */
+    #[DataProvider('invalidPayloads')]
     public function test_invalid_questions_are_refused_with_a_reason(array $over, string $field): void
     {
         Sanctum::actingAs($this->staff());

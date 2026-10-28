@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthProvider } from "@/lib/AuthContext";
 import type { AuthUser } from "@/lib/auth";
@@ -103,13 +103,15 @@ describe("wizard without a branch question", () => {
 });
 
 describe("wizard with the branch step", () => {
-  it("asks first, and will not continue until a family and a branch are picked", async () => {
+  it("asks first, lists the branches straight away, and will not continue until one is picked", async () => {
     mount(asUser({ branch_pending: true }));
 
     expect(await screen.findByText(/Step 1 of 4/)).toBeTruthy();
     expect(continueButton().disabled).toBe(true);
 
-    fireEvent.click(await screen.findByRole("radio", { name: /Mechanical/ }));
+    // no family step: every branch of the department is there to pick
+    expect(await screen.findByRole("radio", { name: /Computer Science & Engineering/ })).toBeTruthy();
+    expect(radio(/Electronics & Communication Engineering/)).toBeTruthy();
     expect(continueButton().disabled).toBe(true);
 
     fireEvent.click(radio(/Mechanical Engineering/));
@@ -174,6 +176,154 @@ describe("wizard with the branch step", () => {
     expect(body).toMatchObject({ track_focus: "core_first", skill_level: "beginner", career_goal: "core_company" });
     expect(body).not.toHaveProperty("primary_language");
     await waitFor(() => expect(onDone).toHaveBeenCalled());
+  });
+});
+
+describe("a branch that is not on the list", () => {
+  const ownBranch = () => screen.getByRole("button", { name: /My branch isn.t listed/ });
+  const writeBranch = (text: string) => fireEvent.change(screen.getByPlaceholderText(/Biomedical Engineering/), { target: { value: text } });
+
+  it("offers every listed branch AND a way to write your own", async () => {
+    mount(asUser({ branch_pending: true }));
+
+    expect(await screen.findByRole("radio", { name: /Mechanical Engineering/ })).toBeTruthy();
+    expect(ownBranch().getAttribute("aria-pressed")).toBe("false");
+    expect(screen.queryByPlaceholderText(/Biomedical Engineering/)).toBeNull();
+  });
+
+  it("needs something written before it will continue, and then hides the listed branches", async () => {
+    mount(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Mechanical Engineering/ }));
+    expect(continueButton().disabled).toBe(false);
+
+    // switching to "my branch isn't listed" drops the pick — it is one or the other
+    fireEvent.click(ownBranch());
+    expect(ownBranch().getAttribute("aria-pressed")).toBe("true");
+    expect(screen.queryByRole("radio", { name: /Mechanical Engineering/ })).toBeNull();
+    expect(continueButton().disabled).toBe(true);
+
+    writeBranch("B");
+    expect(continueButton().disabled).toBe(true);
+    writeBranch("Biomedical Engineering");
+    expect(continueButton().disabled).toBe(false);
+  });
+
+  it("goes back to the list when they change their mind", async () => {
+    mount(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /My branch isn.t listed/ }));
+    writeBranch("Biomedical Engineering");
+
+    fireEvent.click(ownBranch()); // tap it again to leave "write my own"
+    expect(screen.queryByPlaceholderText(/Biomedical Engineering/)).toBeNull();
+    expect(continueButton().disabled).toBe(true);
+    fireEvent.click(radio(/Electronics & Communication Engineering/));
+    expect(continueButton().disabled).toBe(false);
+  });
+
+  it("starts from the label the college gave us when we could not read it", async () => {
+    mount(asUser({ branch_pending: true, branch: "Mech-A (Day)", branch_code: null, branch_source: "college" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /My branch isn.t listed/ }));
+
+    expect((screen.getByPlaceholderText(/Biomedical Engineering/) as HTMLInputElement).value).toBe("Mech-A (Day)");
+    expect(continueButton().disabled).toBe(false);
+  });
+
+  it("sends what they wrote — not a branch code — when the wizard finishes", async () => {
+    post.mockResolvedValue({ user: asUser({ onboarding_pending: false, branch: "Biomedical Engineering", branch_source: "self" }) });
+    mount(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("button", { name: /My branch isn.t listed/ }));
+    writeBranch("  Biomedical   Engineering ");
+    next();
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Python/ }));
+    next();
+    fireEvent.click(radio(/Just starting/));
+    fireEvent.click(radio(/Campus placement/));
+    next();
+    fireEvent.click(screen.getByRole("button", { name: /finish/i }));
+
+    await waitFor(() => expect(post).toHaveBeenCalled());
+    const [path, body] = post.mock.calls[0];
+    expect(path).toBe("/me/onboarding");
+    expect(body).toMatchObject({ branch_label: "Biomedical Engineering", primary_language: "python" });
+    expect(body).not.toHaveProperty("branch_code");
+  });
+});
+
+describe("what follows the department they choose", () => {
+  const NO_CODING = { coding_practice: false, contests: false, company_prep: false, project_lab: false, hackathons: false, skill_drills: false, domain_prep: true };
+  const DEPT_CATALOG: BranchCatalog = {
+    departments: [
+      { code: "engineering", name: "Engineering & Technology", short: "Engineering", icon: "cpu", accent: "indigo", capabilities: {} },
+      { code: "commerce", name: "Commerce & Accounting", short: "Commerce", icon: "calculator", accent: "emerald", capabilities: NO_CODING },
+    ],
+    disciplines: [
+      { code: "cse", name: "Computer Science & IT", short: "CSE / IT", department: "engineering" },
+      { code: "bcom", name: "Bachelor of Commerce", short: "B.Com", department: "commerce" },
+    ],
+    branches: [
+      { code: "cse", discipline: "cse", name: "Computer Science & Engineering", short: "CSE" },
+      { code: "bcom", discipline: "bcom", name: "B.Com (General)", short: "B.Com" },
+    ],
+    aliases: {},
+  };
+  const mountWithDepartments = (user: AuthUser) => {
+    window.localStorage.setItem("aptrun_user", JSON.stringify(user));
+    get.mockImplementation((path: string) => (path.startsWith("/public/branches") ? Promise.resolve(DEPT_CATALOG) : Promise.resolve({ user })));
+    render(
+      <AuthProvider>
+        <StudentOnboardingModal onDone={vi.fn()} onSkip={vi.fn()} />
+      </AuthProvider>
+    );
+  };
+
+  it("asks the department first, then lists only that department's branches", async () => {
+    mountWithDepartments(asUser({ branch_pending: true }));
+
+    const departments = await screen.findByRole("radiogroup", { name: "Department" });
+    expect(screen.queryByRole("radiogroup", { name: "Branch" })).toBeNull();
+
+    fireEvent.click(within(departments).getByRole("radio", { name: /Engineering/ }));
+    expect(radio(/Computer Science & Engineering/)).toBeTruthy();
+    expect(screen.queryByRole("radio", { name: /B\.Com/ })).toBeNull();
+  });
+
+  it("a commerce student's journey has no programming-language step", async () => {
+    mountWithDepartments(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Commerce/ }));
+    fireEvent.click(radio(/B\.Com \(General\)/));
+    next();
+
+    // the language step is skipped: About you comes straight after the branch, and the wizard is three steps long
+    expect(await screen.findByText(/Step 2 of 3/)).toBeTruthy();
+    expect(screen.queryByText(/Which language do you code in most/)).toBeNull();
+  });
+
+  it("the same holds when a commerce student writes their own branch", async () => {
+    mountWithDepartments(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Commerce/ }));
+    fireEvent.click(screen.getByRole("button", { name: /My branch isn.t listed/ }));
+    fireEvent.change(screen.getByPlaceholderText(/Biomedical Engineering/), { target: { value: "Banking Studies" } });
+    next();
+
+    expect(await screen.findByText(/Step 2 of 3/)).toBeTruthy();
+  });
+
+  it("an engineering student still gets the language step", async () => {
+    mountWithDepartments(asUser({ branch_pending: true }));
+
+    fireEvent.click(await screen.findByRole("radio", { name: /Engineering/ }));
+    fireEvent.click(radio(/Computer Science & Engineering/));
+    next();
+
+    expect(await screen.findByText(/Step 2 of 4/)).toBeTruthy();
+    expect(screen.getByText(/Which language do you code in most/)).toBeTruthy();
   });
 });
 

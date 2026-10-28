@@ -46,12 +46,14 @@ import {
   KeyRound,
   CircuitBoard,
   Layers,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { departmentShort, loadBranchCatalog, useBranchCatalog } from "@/lib/branches";
-import { codesAtAll, useDomainPrepLabel } from "@/lib/departments";
+import { capabilitiesOf, codesAtAll, useDomainPrepLabel } from "@/lib/departments";
 import { buildStudentNav } from "./studentNav";
+import { useVaultAiAccess } from "@/lib/useVaultAiAccess";
 import { getStoredUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { getRatingTier } from "@/lib/rating";
@@ -90,7 +92,7 @@ export type DashboardRole = "superadmin" | "admin_internal" | "admin_tpo" | "adm
  * earns colour, which is also why the tone is declared at the call site
  * rather than a class list: a new item can't invent a seventh badge style.
  */
-type BadgeTone = "count" | "new" | "live" | "ok";
+type BadgeTone = "count" | "new" | "live" | "ok" | "priority";
 
 export interface NavItem {
   label: string;
@@ -105,6 +107,9 @@ export interface NavItem {
    * on that section's upgrade page.
    */
   locked?: boolean;
+  /** A locked item that is not an upgrade (the Vault AI Interview's wait) says so itself: the chip beside the lock ("45d"; a bare lock when absent) and the tooltip. */
+  lockChip?: string;
+  lockTitle?: string;
   /** Highlight this item on its sub-pages too (/dashboard/projects/view, …), not only on its exact path. */
   matchPrefix?: boolean;
 }
@@ -210,6 +215,8 @@ export function DashboardSidebar({
     coverage?.source === "individual" && !!coverage.plan && coverage.plan.code !== "coder" && coverage.days_remaining !== null && coverage.days_remaining <= 0;
   const [projectLabEnabled, setProjectLabEnabled] = useState<boolean | null>(null);
   const [vaultEnabled, setVaultEnabled] = useState<boolean | null>(null);
+  // The Vault AI Interview's lock (a college student who has not earned it yet) and its countdown; null until the server has answered.
+  const { access: vaultAi } = useVaultAiAccess(currentRole === "user" && capabilitiesOf(storedUser).ai_interviews);
   // Core Prep (branch technical practice) is in the rail only when the server says it exists for this student.
   const [coreAvailable, setCoreAvailable] = useState(false);
   // A TPO sees "Core Tests" (or "Domain Tests" for a college with other departments) only once Mellow has switched at least one
@@ -674,6 +681,7 @@ export function DashboardSidebar({
       trackFocus: getStoredUser()?.track_focus ?? null,
       capabilities: getStoredUser()?.capabilities ?? null,
       domainPrepLabel,
+      vaultAi,
     });
   };
 
@@ -844,6 +852,11 @@ export function DashboardSidebar({
     live: {
       idle: "bg-amber-400/10 text-amber-300 ring-1 ring-inset ring-amber-400/25",
       onActive: "bg-amber-400/20 text-amber-200 ring-1 ring-inset ring-amber-300/40",
+    },
+    // Something worth doing first (the Vault AI Interview once it is open to the student): gold, with a star, so it outranks a green "New".
+    priority: {
+      idle: "bg-gradient-to-r from-amber-300/25 to-orange-400/20 text-amber-200 ring-1 ring-inset ring-amber-300/40 shadow-[0_0_12px_rgba(251,191,36,0.18)]",
+      onActive: "bg-gradient-to-r from-amber-300/40 to-orange-400/30 text-amber-100 ring-1 ring-inset ring-amber-200/60",
     },
   };
 
@@ -1066,7 +1079,7 @@ export function DashboardSidebar({
                           ? "bg-sidebar-active text-sidebar-strong"
                           : "text-sidebar-text hover:bg-sidebar-hover hover:text-sidebar-strong"
                       )}
-                      title={isExpanded ? undefined : item.locked ? `${item.label} — requires Expert` : item.label}
+                      title={isExpanded ? undefined : item.locked ? item.lockTitle ?? `${item.label} — requires Expert` : item.label}
                     >
                       {/* Selection rule: one 3px bar flush to the rail's inner
                           edge. The cheapest unambiguous "you are here" there
@@ -1143,6 +1156,7 @@ export function DashboardSidebar({
                                 {item.badgeTone === "live" && (
                                   <span className="h-1.5 w-1.5 rounded-full bg-amber-300 motion-safe:animate-pulse-subtle" />
                                 )}
+                                {item.badgeTone === "priority" && <Star aria-hidden className="h-2.5 w-2.5 fill-amber-300 text-amber-300" />}
                                 {item.badge}
                               </span>
                             )}
@@ -1150,11 +1164,20 @@ export function DashboardSidebar({
                             {item.locked && (
                               <span
                                 className="flex shrink-0 items-center gap-1 rounded-full bg-sidebar-chip px-2 py-[3px] text-3xs font-bold leading-none text-sidebar-chip-text"
-                                title="Part of the Expert plan"
+                                title={item.lockTitle ?? "Part of the Expert plan"}
                               >
                                 <Lock aria-hidden className="h-3 w-3" />
-                                <span>Pro</span>
-                                <span className="sr-only">— requires the Expert plan</span>
+                                {item.lockTitle ? (
+                                  <>
+                                    {item.lockChip && <span className="tabular">{item.lockChip}</span>}
+                                    <span className="sr-only">{item.lockTitle}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span>Pro</span>
+                                    <span className="sr-only">— requires the Expert plan</span>
+                                  </>
+                                )}
                               </span>
                             )}
                           </motion.span>

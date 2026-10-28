@@ -94,6 +94,9 @@ interface VaultCandidateCard {
   readiness_tier: string | null;
   qualified_at: string | null;
   my_inquiry_status: string | null;
+  ai_interview_score?: number | null;
+  ai_interview_stack?: string | null;
+  ai_interview_scores?: Record<string, number> | null;
   user:
     | ({
         id: number;
@@ -551,6 +554,18 @@ function CandidateCard({ candidate: c, index, onView }: { candidate: VaultCandid
             <span className="shrink-0 text-3xs font-bold uppercase tracking-wider text-text-muted">{u.college.short_code}</span>
           )}
         </div>
+
+        {c.ai_interview_score && (
+          <div className="relative mt-2.5 flex items-center justify-between rounded-control bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 text-3xs">
+            <span className="font-extrabold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <ShieldCheck className="h-3 w-3" />
+              <span className="capitalize">Vault Interview: {c.ai_interview_stack ? c.ai_interview_stack.replace(/_/g, " ") : "Technical"}</span>
+            </span>
+            <span className="font-black text-emerald-600 dark:text-emerald-400">
+              {Math.round(c.ai_interview_score)}%
+            </span>
+          </div>
+        )}
 
         {skills.length > 0 && (
           <div className="relative mt-3 flex flex-wrap items-center gap-1.5">

@@ -42,7 +42,7 @@ class StudentPreferencesController extends Controller
         $validated = $request->validate(StudentPreferences::rules(
             required: true,
             trackFocus: $request->input('track_focus', $user->track_focus),
-            codes: DepartmentCapabilities::forUser($user)['coding_practice'],
+            codes: $this->codesAfterThisRequest($user, $request),
         ));
         $validated = $this->applyBranchAnswers($user, $validated);
 
@@ -111,6 +111,8 @@ class StudentPreferencesController extends Controller
         $rules = StudentPreferences::rules(required: false);
         $validated = $request->validate([
             'branch_code' => $rules['branch_code'],
+            'branch_label' => $rules['branch_label'],
+            'branch_department' => $rules['branch_department'],
             'track_focus' => $rules['track_focus'],
             'core_interests' => $rules['core_interests'],
             'core_interests.*' => $rules['core_interests.*'],
@@ -165,12 +167,30 @@ class StudentPreferencesController extends Controller
      */
     private function applyBranchAnswers(User $user, array $validated): array
     {
+        $label = isset($validated['branch_label']) ? trim(preg_replace('/\s+/u', ' ', (string) $validated['branch_label'])) : '';
+        $department = $validated['branch_department'] ?? null;
+
         if (isset($validated['branch_code']) && $this->branches->canDeclare($user)) {
             $this->assertCollegeRunsBranch($user, $validated['branch_code']);
             $this->branches->declareSelf($user, $validated['branch_code']);
+        } elseif (! isset($validated['branch_code']) && mb_strlen($label) >= 2 && $this->branches->canDeclare($user)) {
+            // "My branch isn't listed". What they wrote may still be a branch we know under another spelling — then it is that
+            // branch. Otherwise it is kept as their own words, in the department they chose, for their TPO to see and map.
+            $catalog = BranchCatalog::instance();
+            $code = $catalog->resolve($label, $user->college_id, $department ?? $user->department);
+
+            // A spelling that maps to a branch which is switched off (not offered any more) is not a pick we can make for them:
+            // it stays their own words, and their TPO can map it.
+            if ($code !== null && ($catalog->branch($code)['is_active'] ?? false)) {
+                $this->assertCollegeRunsBranch($user, $code);
+                $this->branches->declareSelf($user, $code);
+            } else {
+                $this->assertCollegeRunsDepartment($user, $department);
+                $this->branches->declareOther($user, $label, $department);
+            }
         }
 
-        unset($validated['branch_code']);
+        unset($validated['branch_code'], $validated['branch_label'], $validated['branch_department']);
 
         // The Core / IT weighting only exists for the core engineering families; every other programme has no track.
         if (array_key_exists('track_focus', $validated)
@@ -187,6 +207,33 @@ class StudentPreferencesController extends Controller
         return $validated;
     }
 
+    /**
+     * Whether the student's programme has coding practice — judged AFTER the branch or department this same request declares.
+     * A new student picks their department and branch in the wizard that is being saved, so the programme they are in is the one
+     * they just chose, not the "nothing yet" they were a moment ago. Without this a Commerce student (who is rightly never asked
+     * which language they code in) was refused for not giving one.
+     */
+    private function codesAfterThisRequest(User $user, Request $request): bool
+    {
+        $catalog = BranchCatalog::instance();
+        $code = $request->input('branch_code');
+        $department = $request->input('branch_department');
+
+        if ($this->branches->canDeclare($user)) {
+            if (is_string($code) && $catalog->branch($code) !== null) {
+                $caps = DepartmentCapabilities::resolve($catalog->departmentOf($code), $catalog->disciplineOf($code), $code);
+
+                return ($caps['coding_practice'] ?? true) || $user->coding_opt_in;
+            }
+
+            if (! is_string($code) && is_string($department) && $catalog->department($department) !== null) {
+                return (DepartmentCapabilities::resolve($department)['coding_practice'] ?? true) || $user->coding_opt_in;
+            }
+        }
+
+        return DepartmentCapabilities::forUser($user)['coding_practice'];
+    }
+
     /** A student of a college can only state a programme their college runs (a Commerce college does not suddenly have Mechanical). */
     private function assertCollegeRunsBranch(User $user, string $branchCode): void
     {
@@ -201,6 +248,16 @@ class StudentPreferencesController extends Controller
         if (! $college->runsDepartment($department)) {
             throw ValidationException::withMessages(['branch_code' => ["{$college->name} does not run that programme's department."]]);
         }
+    }
+
+    /** The department a student names for a branch we don't list must be one their college runs (no college: any department). */
+    private function assertCollegeRunsDepartment(User $user, ?string $department): void
+    {
+        if ($department === null || $user->college === null || $user->college->runsDepartment($department)) {
+            return;
+        }
+
+        throw ValidationException::withMessages(['branch_department' => ["{$user->college->name} does not run that department."]]);
     }
 
     private function isEngineering(User $user): bool

@@ -190,6 +190,9 @@ const config: Config = {
         "glow-cyan": "0 0 25px -5px rgba(6, 182, 212, 0.25)",
       },
       keyframes: {
+        shimmerx: {
+          "100%": { transform: "translateX(100%)" },
+        },
         "pulse-subtle": {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.5" },

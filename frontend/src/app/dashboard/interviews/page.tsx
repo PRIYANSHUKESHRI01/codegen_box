@@ -57,7 +57,7 @@ export default function InterviewsListPage() {
   return (
     <DashboardShell
       role="user"
-      title="AI Interviews"
+      title="Mock AI Interview"
       subtitle="Voice interviews — each question is read aloud, you answer by speaking, and AI scores your result instantly."
     >
       {!loading && entitlements && (

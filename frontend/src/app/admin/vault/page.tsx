@@ -13,6 +13,9 @@ import {
   RotateCcw,
   Search,
   Users2,
+  ShieldCheck,
+  Target,
+  Sparkles,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -22,7 +25,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { userHasPermission } from "@/lib/auth";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { AdminVaultProfile, AdminVaultSummary, AdminVaultSyncEvent, Paginated, VaultStatus } from "@/types/vault";
+import type { AdminVaultAiQualifier, AdminVaultProfile, AdminVaultSummary, AdminVaultSyncEvent, Paginated, VaultStatus } from "@/types/vault";
 import { useToast, type ToastTrigger } from "@/lib/toast";
 
 const STATUS_LABEL: Record<VaultStatus, string> = {
@@ -56,7 +59,7 @@ const EVENT_BADGE: Record<AdminVaultSyncEvent["status"], string> = {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—";
 
-type Tab = "overview" | "students" | "sync";
+type Tab = "overview" | "students" | "ai_qualifiers" | "sync";
 
 /**
  * Mellow staff's oversight of the Vault — see AdminVaultController. Nothing is
@@ -89,6 +92,7 @@ export default function AdminVaultPage() {
               [
                 ["overview", "Overview"],
                 ["students", "Students"],
+                ["ai_qualifiers", "AI Interview Qualifiers"],
                 ["sync", "Mellow Vault sync"],
               ] as const
             ).map(([id, label]) => (
@@ -103,7 +107,15 @@ export default function AdminVaultPage() {
             ))}
           </div>
 
-          {tab === "overview" ? <OverviewTab onToast={showToast} onGo={setTab} /> : tab === "students" ? <StudentsTab onToast={showToast} /> : <SyncTab onToast={showToast} />}
+          {tab === "overview" ? (
+            <OverviewTab onToast={showToast} onGo={setTab} />
+          ) : tab === "students" ? (
+            <StudentsTab onToast={showToast} />
+          ) : tab === "ai_qualifiers" ? (
+            <AiInterviewQualifiersTab onToast={showToast} />
+          ) : (
+            <SyncTab onToast={showToast} />
+          )}
         </>
       )}
     </DashboardShell>
@@ -133,6 +145,7 @@ function OverviewTab({ onToast, onGo }: { onToast: ToastTrigger; onGo: (tab: Tab
     { label: "Awaiting consent", value: counts.pending_consent, hint: "Ready, haven't said yes" },
     { label: "Ready, no Vault plan", value: counts.upgrade_required, hint: "Eligible, but not on Expert or Grandmaster" },
     { label: "Live in the Vault", value: counts.visible, hint: "Visible to hiring partners" },
+    { label: "AI Interview Qualifiers", value: summary.ai_qualifiers ?? 0, hint: "Scored ≥ 60% in 3-round circuit" },
     { label: "Live on Mellow Vault", value: summary.listed_on_mellow_vault, hint: "Mellow Vault acknowledged" },
     { label: "Hired", value: counts.hired, hint: "Through the Vault" },
     { label: "Hidden by Mellow", value: counts.hidden_by_mellow, hint: "Policy override" },
@@ -587,6 +600,210 @@ function SyncTab({ onToast }: { onToast: ToastTrigger }) {
           <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="rounded-control border border-border-subtle px-3 py-1.5 text-xs text-text-secondary disabled:opacity-40">Prev</button>
           <span className="text-xs text-text-muted">Page {result.current_page} of {result.last_page}</span>
           <button disabled={page >= result.last_page} onClick={() => setPage((p) => p + 1)} className="rounded-control border border-border-subtle px-3 py-1.5 text-xs text-text-secondary disabled:opacity-40">Next</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────── AI interview qualifiers ─────────────────────────────
+
+function AiInterviewQualifiersTab({ onToast }: { onToast: ToastTrigger }) {
+  const [qualifiers, setQualifiers] = useState<Paginated<AdminVaultAiQualifier> | null>(null);
+  const [stats, setStats] = useState<{ total_qualified: number; average_score: number; top_stack: string | null } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [selectedStack, setSelectedStack] = useState("");
+  const [page, setPage] = useState(1);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (search.trim()) params.set("search", search.trim());
+    if (selectedStack) params.set("stack", selectedStack);
+    if (page > 1) params.set("page", String(page));
+
+    api
+      .get<{ qualifiers: Paginated<AdminVaultAiQualifier>; stats: { total_qualified: number; average_score: number; top_stack: string | null } }>(
+        `/admin/vault/ai-interview-qualifiers?${params.toString()}`
+      )
+      .then((res) => {
+        setQualifiers(res.qualifiers);
+        setStats(res.stats);
+      })
+      .catch((err) => onToast(err instanceof ApiError ? err.message : "Failed to load qualifiers.", "error"))
+      .finally(() => setLoading(false));
+  }, [search, selectedStack, page, onToast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  return (
+    <div className="mt-6 space-y-6">
+      {/* Metric Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
+            <div className="text-3xs uppercase font-extrabold tracking-wider text-text-muted">Total AI Qualifiers</div>
+            <div className="text-2xl font-black text-emerald-500 mt-1">{stats.total_qualified}</div>
+            <div className="text-3xs text-text-muted mt-0.5">Scored ≥ 60% across 3 Sets</div>
+          </div>
+          <div className="rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
+            <div className="text-3xs uppercase font-extrabold tracking-wider text-text-muted">Average Series Score</div>
+            <div className="text-2xl font-black text-accent-primary mt-1">{stats.average_score}%</div>
+            <div className="text-3xs text-text-muted mt-0.5">Across all qualified attempts</div>
+          </div>
+          <div className="rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
+            <div className="text-3xs uppercase font-extrabold tracking-wider text-text-muted">Top Tech Stack</div>
+            <div className="text-2xl font-black text-primary mt-1 capitalize">{stats.top_stack ? stats.top_stack.replace(/_/g, " ") : "None"}</div>
+            <div className="text-3xs text-text-muted mt-0.5">Most qualified stack</div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter / Search Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search candidate name, email, stack..."
+            className="w-full pl-9 pr-3 py-1.5 rounded-control border border-border-subtle bg-surface text-xs text-primary focus:outline-none focus:border-accent-primary"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={selectedStack}
+            onChange={(e) => {
+              setSelectedStack(e.target.value);
+              setPage(1);
+            }}
+            className="rounded-control border border-border-subtle bg-surface px-3 py-1.5 text-xs text-primary focus:outline-none focus:border-accent-primary"
+          >
+            <option value="">All Tech Stacks</option>
+            <option value="laravel">Laravel (PHP)</option>
+            <option value="nodejs">Node.js</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="golang">Go</option>
+            <option value="react_nextjs">React & Next.js</option>
+            <option value="typescript">TypeScript</option>
+            <option value="mern">MERN Stack</option>
+            <option value="nextjs_fullstack">Fullstack Next.js</option>
+            <option value="llm_rag">LLMs & RAG</option>
+            <option value="deeplearning_pytorch">Deep Learning (PyTorch)</option>
+            <option value="docker_k8s">Docker & Kubernetes</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <Loading />
+      ) : !qualifiers || qualifiers.data.length === 0 ? (
+        <div className="rounded-panel border border-border-subtle bg-surface p-10 text-center text-xs text-text-muted">
+          No candidates have qualified with ≥ 60% in Vault AI Interview yet.
+        </div>
+      ) : (
+        <div className="overflow-x-auto rounded-panel border border-border-subtle bg-surface shadow-subtle">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-border-subtle bg-surface-raised text-3xs font-extrabold uppercase text-text-muted">
+              <tr>
+                <th className="px-4 py-3">Candidate</th>
+                <th className="px-4 py-3">Tech Stack & Role</th>
+                <th className="px-4 py-3">Composite Score</th>
+                <th className="px-4 py-3">Round Breakdown</th>
+                <th className="px-4 py-3">Attempt</th>
+                <th className="px-4 py-3">Vault Status</th>
+                <th className="px-4 py-3">Qualified Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {qualifiers.data.map((q) => {
+                const vaultStatus = q.user?.vault_profile?.visibility_status as VaultStatus | undefined;
+                const statusBadge = vaultStatus ? STATUS_BADGE[vaultStatus] ?? "bg-elevated text-text-muted" : "bg-elevated text-text-muted";
+                const statusLabel = vaultStatus ? STATUS_LABEL[vaultStatus] ?? vaultStatus : "Transferred";
+
+                return (
+                  <tr key={q.id} className="hover:bg-surface-raised/40 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="font-bold text-primary">{q.user?.name ?? "Unknown"}</div>
+                      <div className="text-3xs text-text-muted font-mono">{q.user?.email}</div>
+                      <div className="text-3xs text-text-secondary mt-0.5">
+                        {q.user?.college?.short_code ?? q.user?.college?.name ?? "—"} • {q.user?.branch ?? "—"}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-3xs font-bold uppercase bg-surface-raised border border-border-subtle text-primary">
+                        {q.stack_key.replace(/_/g, " ")}
+                      </span>
+                      <div className="text-3xs text-text-muted capitalize mt-0.5">{q.role_key.replace(/_/g, " ")}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-control bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black text-xs border border-emerald-500/25">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        {Math.round(q.series_average)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 font-mono text-3xs">
+                        <span className="px-1.5 py-0.5 rounded bg-surface-raised border border-border-subtle" title="Set 1 (Foundations)">
+                          S1: {q.series_scores?.["1"] ?? "—"}%
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-surface-raised border border-border-subtle" title="Set 2 (Implementation)">
+                          S2: {q.series_scores?.["2"] ?? "—"}%
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded bg-surface-raised border border-border-subtle" title="Set 3 (Systems)">
+                          S3: {q.series_scores?.["3"] ?? "—"}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary text-xs">
+                      Attempt {q.current_attempt} of {q.max_attempts}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("px-2 py-0.5 rounded text-3xs font-bold capitalize", statusBadge)}>
+                        {statusLabel}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-text-muted text-xs">
+                      {fmt(q.qualified_at)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {qualifiers && qualifiers.last_page > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="rounded-control border border-border-subtle px-3 py-1.5 text-xs text-text-secondary disabled:opacity-40"
+          >
+            Prev
+          </button>
+          <span className="text-xs text-text-muted">
+            Page {qualifiers.current_page} of {qualifiers.last_page}
+          </span>
+          <button
+            disabled={page >= qualifiers.last_page}
+            onClick={() => setPage((p) => p + 1)}
+            className="rounded-control border border-border-subtle px-3 py-1.5 text-xs text-text-secondary disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
       )}
     </div>

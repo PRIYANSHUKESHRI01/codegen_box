@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Info, Lock } from "lucide-react";
+import { Check, Info, Lock, PencilLine } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { accentStyle, branchName, DEFAULT_DEPARTMENT, departmentsFor, disciplineStyle, isCoreDiscipline, useBranchCatalog, type DisciplineCode } from "@/lib/branches";
@@ -16,10 +16,30 @@ export interface BranchAnswers {
   branchCode: string | null;
   trackFocus: TrackFocus | null;
   interests: string[];
+  /**
+   * "My branch isn't listed": non-null while the student is writing their own branch (an empty string is "chosen, not typed yet").
+   * It replaces `branchCode` — picking a listed branch again sets this back to null.
+   */
+  otherLabel?: string | null;
+  /** The department they said that branch belongs to. */
+  otherDepartment?: string | null;
 }
 
+/** The fewest characters that count as a branch name. */
+export const OTHER_BRANCH_MIN = 2;
+
 export function initialBranchAnswers(user: AuthUser | null): BranchAnswers {
-  return { branchCode: null, trackFocus: user?.track_focus ?? null, interests: user?.core_interests ?? [] };
+  return { branchCode: null, trackFocus: user?.track_focus ?? null, interests: user?.core_interests ?? [], otherLabel: null, otherDepartment: null };
+}
+
+/** What to send to the API for the branch question: a picked branch, or — when they wrote their own — the text and its department. */
+export function branchPayload(answers: BranchAnswers): { branch_code?: string; branch_label?: string; branch_department?: string } {
+  if (answers.otherLabel != null) {
+    const label = answers.otherLabel.trim().replace(/\s+/g, " ");
+    return label.length >= OTHER_BRANCH_MIN ? { branch_label: label, ...(answers.otherDepartment ? { branch_department: answers.otherDepartment } : {}) } : {};
+  }
+
+  return answers.branchCode ? { branch_code: answers.branchCode } : {};
 }
 
 /** True when the college has told us the branch and we recognised it — the student confirms it, doesn't choose it. */
@@ -32,6 +52,9 @@ export function branchIsFromCollege(user: AuthUser | null): boolean {
  * live for that family — what they want to lead with.
  */
 export function branchAnswersComplete(user: AuthUser | null, answers: BranchAnswers, trackAsked: boolean): boolean {
+  // Writing their own branch: it counts once there is something written, and no track is asked (we don't know the family).
+  if (answers.otherLabel != null) return answers.otherLabel.trim().length >= OTHER_BRANCH_MIN;
+
   const hasBranch = !!(answers.branchCode ?? user?.branch_code);
   return hasBranch && (!trackAsked || !!answers.trackFocus);
 }
@@ -52,13 +75,12 @@ interface Props {
  * the ones their college runs, or just the one their roster was imported under), and then only sees that department's programmes.
  *
  * A branch the COLLEGE gave us and we recognise is shown read-only (a student cannot change what their
- * TPO imported — "Not right?" tells the TPO instead). Otherwise the student picks their family, then the
- * branch. The weighting (Core first / Core + IT / IT roles first) and interests appear only for non-CS
- * families whose Core Prep is live — before that there is nothing for them to choose between.
+ * TPO imported — "Not right?" tells the TPO instead). Otherwise the student sees their department's branches and picks
+ * one, or writes their own when theirs is not listed. The weighting (Core first / Core + IT / IT roles first) and interests
+ * appear only for non-CS families whose Core Prep is live — before that there is nothing for them to choose between.
  */
 export function BranchFields({ user, value, onChange, onDisputed }: Props) {
   const catalog = useBranchCatalog();
-  const [family, setFamily] = useState<DisciplineCode | null>(null);
   const [pickedDepartment, setPickedDepartment] = useState<string | null>(null);
   const [disputing, setDisputing] = useState(false);
   const [disputeError, setDisputeError] = useState<string | null>(null);
@@ -74,15 +96,26 @@ export function BranchFields({ user, value, onChange, onDisputed }: Props) {
   const departmentChoices = fixedDepartment ? departmentsFor(catalog, [fixedDepartment]) : departmentsFor(catalog, collegeDepartments);
   const currentCode = value.branchCode ?? user?.branch_code ?? null;
   const currentDiscipline = (catalog.branches.find((b) => b.code === currentCode)?.discipline ?? user?.discipline ?? null) as DisciplineCode | null;
-  const shownFamily = family ?? (value.branchCode ? currentDiscipline : null);
   const departmentOfCurrent = catalog.disciplines.find((d) => d.code === currentDiscipline)?.department ?? null;
   // A catalogue from before departments existed (or one that failed to carry them) is engineering only: its families are shown, not hidden behind a choice that cannot be made.
   const onlyEngineering = (catalog.departments?.length ?? 0) === 0;
   const selectedDepartment = pickedDepartment ?? fixedDepartment ?? departmentOfCurrent ?? (departmentChoices.length === 1 ? departmentChoices[0].code : onlyEngineering ? DEFAULT_DEPARTMENT : null);
-  const familiesToShow = catalog.disciplines.filter((d) => selectedDepartment === null ? false : (d.department ?? DEFAULT_DEPARTMENT) === selectedDepartment);
+  const familiesInDepartment = new Set(catalog.disciplines.filter((d) => selectedDepartment !== null && (d.department ?? DEFAULT_DEPARTMENT) === selectedDepartment).map((d) => d.code));
+  const branchesToShow = catalog.branches.filter((b) => familiesInDepartment.has(b.discipline));
   const familyMeta = catalog.disciplines.find((d) => d.code === currentDiscipline);
-  const asksTrack = isCoreDiscipline(currentDiscipline) && (!!familyMeta?.is_live || (!!user?.core_enabled && currentDiscipline === user.discipline));
+  // The student is writing their own branch instead of picking one.
+  const otherOn = value.otherLabel != null;
+  const asksTrack = !otherOn && isCoreDiscipline(currentDiscipline) && (!!familyMeta?.is_live || (!!user?.core_enabled && currentDiscipline === user.discipline));
   const interests = currentDiscipline ? CORE_INTERESTS[currentDiscipline] ?? [] : [];
+  // A college's own label that we couldn't recognise is the best starting text for "my branch isn't listed".
+  const collegeLabel = user?.branch && !user.branch_code ? user.branch : "";
+  const toggleOther = () => {
+    if (otherOn) {
+      onChange({ ...value, otherLabel: null, otherDepartment: null });
+      return;
+    }
+    onChange({ ...value, branchCode: null, otherLabel: collegeLabel, otherDepartment: selectedDepartment });
+  };
 
   const dispute = async () => {
     setDisputing(true);
@@ -143,8 +176,9 @@ export function BranchFields({ user, value, onChange, onDisputed }: Props) {
                     aria-checked={selected}
                     onClick={() => {
                       setPickedDepartment(dept.code);
-                      setFamily(null);
                       if (value.branchCode) onChange({ ...value, branchCode: null });
+                      // What they wrote stays; it just moves to the department they now chose.
+                      if (otherOn) onChange({ ...value, branchCode: null, otherDepartment: dept.code });
                     }}
                     className={cn(
                       "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
@@ -161,40 +195,12 @@ export function BranchFields({ user, value, onChange, onDisputed }: Props) {
               })}
             </div>
           )}
-          {selectedDepartment !== null && <div role="radiogroup" aria-label="Branch family" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {familiesToShow.map((d) => {
-              const selected = shownFamily === d.code;
-              return (
-                <button
-                  key={d.code}
-                  type="button"
-                  role="radio"
-                  aria-checked={selected}
-                  onClick={() => {
-                    setFamily(d.code);
-                    // Moving to another family clears a branch that belonged to the previous one.
-                    if (value.branchCode && catalog.branches.find((b) => b.code === value.branchCode)?.discipline !== d.code) onChange({ ...value, branchCode: null });
-                  }}
-                  className={cn(
-                    "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-bold text-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
-                    selected ? "border-accent-primary bg-accent-primary/10 ring-1 ring-accent-primary/40" : "border-border-subtle bg-surface hover:border-border-strong hover:bg-elevated"
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className={cn("h-2 w-2 shrink-0 rounded-full", disciplineStyle(catalog, d.code).dot)} aria-hidden />
-                    <span className="truncate">{d.name}</span>
-                  </span>
-                  {selected && <Check className="h-3.5 w-3.5 shrink-0 text-accent-primary" aria-hidden />}
-                </button>
-              );
-            })}
-          </div>}
-
-          {shownFamily && (
-            <div role="radiogroup" aria-label="Branch" className="flex flex-wrap gap-2">
-              {catalog.branches
-                .filter((b) => b.discipline === shownFamily)
-                .map((b) => {
+          {/* The department's branches, straight away — no family step in between. Every branch carries its family's colour dot. */}
+          {selectedDepartment !== null && !otherOn && branchesToShow.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-2xs font-semibold text-text-secondary">Choose your branch</p>
+              <div role="radiogroup" aria-label="Branch" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {branchesToShow.map((b) => {
                   const selected = value.branchCode === b.code;
                   return (
                     <button
@@ -202,17 +208,55 @@ export function BranchFields({ user, value, onChange, onDisputed }: Props) {
                       type="button"
                       role="radio"
                       aria-checked={selected}
-                      onClick={() => onChange({ ...value, branchCode: b.code })}
+                      onClick={() => onChange({ ...value, branchCode: b.code, otherLabel: null, otherDepartment: null })}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-2xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
-                        selected ? "border-accent-primary bg-accent-primary/10 text-accent-primary" : "border-border-subtle bg-surface text-text-secondary hover:border-border-strong hover:bg-elevated"
+                        "flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left text-xs font-bold text-primary transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
+                        selected ? "border-accent-primary bg-accent-primary/10 ring-1 ring-accent-primary/40" : "border-border-subtle bg-surface hover:border-border-strong hover:bg-elevated"
                       )}
                     >
-                      {selected && <Check className="h-3 w-3" aria-hidden />}
-                      {b.name}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className={cn("h-2 w-2 shrink-0 rounded-full", disciplineStyle(catalog, b.discipline).dot)} aria-hidden />
+                        <span>{b.name}</span>
+                      </span>
+                      {selected && <Check className="h-3.5 w-3.5 shrink-0 text-accent-primary" aria-hidden />}
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {selectedDepartment !== null && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                aria-pressed={otherOn}
+                onClick={toggleOther}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border border-dashed px-3 py-1.5 text-2xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
+                  otherOn ? "border-accent-primary bg-accent-primary/10 text-accent-primary" : "border-border-strong bg-surface text-text-secondary hover:bg-elevated"
+                )}
+              >
+                {otherOn ? <Check className="h-3 w-3" aria-hidden /> : <PencilLine className="h-3 w-3" aria-hidden />}
+                My branch isn&apos;t listed
+              </button>
+
+              {otherOn && (
+                <label className="block space-y-1">
+                  <span className="text-2xs font-semibold text-text-secondary">Write your branch</span>
+                  <input
+                    type="text"
+                    value={value.otherLabel ?? ""}
+                    maxLength={80}
+                    autoComplete="off"
+                    autoCapitalize="words"
+                    placeholder="e.g. Biomedical Engineering"
+                    onChange={(e) => onChange({ ...value, branchCode: null, otherLabel: e.target.value, otherDepartment: selectedDepartment })}
+                    className="w-full rounded-xl border border-border-subtle bg-surface px-3 py-2 text-base text-primary outline-none transition-all placeholder:text-text-muted focus:border-accent-primary focus:ring-[3px] focus:ring-accent-primary/12 sm:text-sm"
+                  />
+                  <span className="block text-2xs text-text-muted">Your TPO can see this and match it to a listed branch.</span>
+                </label>
+              )}
             </div>
           )}
         </section>
@@ -263,6 +307,7 @@ export function BranchFields({ user, value, onChange, onDisputed }: Props) {
 
 /** Whether the track question applies to this student once `answers` are applied — the wizard and dialog use it to decide what is required. */
 export function branchAsksTrack(user: AuthUser | null, answers: BranchAnswers, disciplines: { code: string; is_live?: boolean }[] | undefined, branches: { code: string; discipline: string }[] | undefined): boolean {
+  if (answers.otherLabel != null) return false; // their own branch has no family, so nothing to weigh
   const code = answers.branchCode ?? user?.branch_code ?? null;
   const discipline = branches?.find((b) => b.code === code)?.discipline ?? user?.discipline ?? null;
   // Live for everyone, or this student's own college is a pilot for their (unchanged) branch family.

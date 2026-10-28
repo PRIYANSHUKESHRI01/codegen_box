@@ -1,5 +1,7 @@
-import { Activity, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FlaskConical, LayoutDashboard, LineChart, Mic, Sparkles, Swords, Zap } from "lucide-react";
+import { Activity, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Zap } from "lucide-react";
 import { DEFAULT_CAPABILITIES, type CapabilityMap } from "@/lib/departments";
+import { sidebarChip, sidebarTitle } from "@/lib/vaultAi";
+import type { VaultAiAccess } from "@/types/vaultAi";
 import type { NavItem, NavSection } from "./DashboardSidebar";
 
 export interface StudentNavOptions {
@@ -21,6 +23,12 @@ export interface StudentNavOptions {
   capabilities?: Partial<CapabilityMap> | null;
   /** What the student's department calls Domain Prep: "Core Prep", "Management Prep", "Commerce Prep", "Subject Prep". */
   domainPrepLabel?: string;
+  /**
+   * Where the student stands on the Vault AI Interview. null = not known yet: the item then shows as open but without its badge, so
+   * an entitled student never sees a lock flash (and a locked one never briefly sees "Priority"). "open" wears a gold "Priority";
+   * "locked" keeps the item in the rail with a lock and the days left; "unavailable" (1st / 2nd year) takes it out of the rail.
+   */
+  vaultAi?: Pick<VaultAiAccess, "state" | "reasons" | "days_remaining" | "readiness"> | null;
 }
 
 /**
@@ -35,6 +43,7 @@ export function buildStudentNav({
   trackFocus = null,
   capabilities = null,
   domainPrepLabel = "Core Prep",
+  vaultAi = null,
 }: StudentNavOptions): NavSection[] {
   const caps: CapabilityMap = { ...DEFAULT_CAPABILITIES, ...(capabilities ?? {}) };
   // A rail built without capabilities (an older cached user, a test) is the engineering rail: the server's word that Core Prep is
@@ -76,7 +85,25 @@ export function buildStudentNav({
     { label: "Upcoming & Drives", href: "/dashboard#placement-drives", icon: Briefcase },
     ...(caps.company_prep ? [{ label: "Company PYQs", href: "/dashboard/company-prep", icon: Building2, matchPrefix: true, badge: "New", badgeTone: "new" as const }] : []),
     ...(caps.contests ? [{ label: "Contests", href: "/dashboard/contests", icon: Swords }] : []),
-    ...(caps.ai_interviews ? [{ label: "AI Interviews", href: "/dashboard/interviews", icon: Mic }] : []),
+    ...(caps.ai_interviews ? [{ label: "Mock AI Interview", href: "/dashboard/interviews", icon: Mic }] : []),
+    // The final qualification interview. A college student who has not earned it yet sees it locked (with the days left); a year that
+    // is not offered it does not see it at all. Everyone else - direct users, unlocked students - sees it open.
+    ...(caps.ai_interviews && vaultAi?.state !== "unavailable"
+      ? [
+          {
+            label: "Vault AI Interview",
+            href: "/dashboard/vault-interviews",
+            icon: ShieldCheck,
+            matchPrefix: true,
+            ...(vaultAi?.state === "locked"
+              ? { locked: true, lockChip: sidebarChip(vaultAi) ?? undefined, lockTitle: sidebarTitle(vaultAi) }
+              : vaultAi?.state === "open"
+                ? // Open to this student: the thing to do first - a gold "Priority", not the green "New" every other item wears.
+                  { badge: "Priority", badgeTone: "priority" as const }
+                : {}),
+          },
+        ]
+      : []),
     ...(caps.soft_skills ? [{ label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain }] : []),
     // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their readiness score and how to
     // raise it are there), so the item wears a lock rather than hiding — see StudentVaultPage.

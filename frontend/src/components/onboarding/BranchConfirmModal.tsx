@@ -8,7 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { useBranchCatalog } from "@/lib/branches";
-import { BranchFields, branchAnswersComplete, branchAsksTrack, initialBranchAnswers, type BranchAnswers } from "./BranchFields";
+import { BranchFields, branchAnswersComplete, branchAsksTrack, branchPayload, initialBranchAnswers, type BranchAnswers } from "./BranchFields";
 
 /**
  * The one question for a student who finished onboarding before branches existed (or whose college's
@@ -31,7 +31,7 @@ export function BranchConfirmModal({ onDone, onLater }: { onDone: () => void; on
     setError(null);
     try {
       const res = await api.put<{ user: AuthUser }>("/me/branch", {
-        ...(answers.branchCode ? { branch_code: answers.branchCode } : {}),
+        ...branchPayload(answers),
         ...(answers.trackFocus ? { track_focus: answers.trackFocus, core_interests: answers.interests } : {}),
       });
       const token = getToken();

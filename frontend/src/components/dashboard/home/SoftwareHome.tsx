@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HackArenaBanner } from "@/components/arena/HackArenaBanner";
+import { MellowVaultInterviewBanner } from "@/components/dashboard/home/MellowVaultInterviewBanner";
 import { useBranchCatalog } from "@/lib/branches";
 import { capabilitiesOf } from "@/lib/departments";
 import { StatTile } from "@/components/dashboard/student/StatTile";
@@ -417,6 +418,11 @@ export function SoftwareHome({ layout = "software", extraTop }: { layout?: "soft
           </div>
         </section>
       )}
+
+      {/* ------------------------------------------------------------ */}
+      {/* Mellow Vault AI Interview doorway — highlighted live card     */}
+      {/* ------------------------------------------------------------ */}
+      {caps.ai_interviews && <MellowVaultInterviewBanner />}
 
       {/* ------------------------------------------------------------ */}
       {/* Hack Arena doorway — the Arena is its own full-screen world, */}

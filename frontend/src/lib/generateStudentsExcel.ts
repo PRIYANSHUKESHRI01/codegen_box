@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { ENGAGEMENT_LABEL, rollupLanguages } from "./cohortInsights";
 import { languageLabel } from "./judgeLanguages";
+import { cohortVaultAiLabel } from "./vaultAi";
 import type { CohortStudent } from "@/types/cohort";
 
 export type ExportableStudent = Pick<
@@ -12,6 +13,8 @@ export type ExportableStudent = Pick<
   | "roll_number"
   | "branch"
   | "section"
+  | "year_label"
+  | "vault_ai"
   | "cgpa"
   | "backlogs"
   | "readiness_score"
@@ -62,6 +65,7 @@ export async function generateStudentsExcel(students: ExportableStudent[], colle
     { header: "Roll Number", key: "roll_number", width: 16 },
     { header: "Branch", key: "branch", width: 14 },
     { header: "Section", key: "section", width: 10 },
+    { header: "Year", key: "year", width: 12 },
     { header: "CGPA", key: "cgpa", width: 8 },
     { header: "Backlogs", key: "backlogs", width: 10 },
     { header: "Readiness Score", key: "readiness_score", width: 16 },
@@ -84,6 +88,7 @@ export async function generateStudentsExcel(students: ExportableStudent[], colle
     { header: "Languages Used (solved)", key: "languages", width: 34 },
     { header: "Struggling In", key: "needs_work", width: 20 },
     { header: "Onboarding Answered", key: "onboarded", width: 18 },
+    { header: "Vault AI Interview", key: "vault_ai", width: 24 },
   ];
 
   styleHeader(sheet);
@@ -97,6 +102,7 @@ export async function generateStudentsExcel(students: ExportableStudent[], colle
       roll_number: s.roll_number ?? "—",
       branch: s.branch ?? "—",
       section: s.section ?? "—",
+      year: s.year_label ?? "Not set",
       cgpa: s.cgpa ?? "—",
       backlogs: s.backlogs ?? "—",
       readiness_score: s.readiness_score,
@@ -119,6 +125,7 @@ export async function generateStudentsExcel(students: ExportableStudent[], colle
       languages: s.coding.languages.length ? s.coding.languages.map((l) => `${languageLabel(l.language)} (${l.solved})`).join(", ") : "—",
       needs_work: s.coding.needs_work.length ? s.coding.needs_work.map(languageLabel).join(", ") : "—",
       onboarded: s.onboarded ? "Yes" : "No",
+      vault_ai: cohortVaultAiLabel(s.vault_ai),
     });
   });
 

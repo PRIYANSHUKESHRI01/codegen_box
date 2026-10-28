@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { ArrowUpCircle, Info, TimerOff } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
+import { ACADEMIC_CHANGED_EVENT, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
 import { toast, type ToastTone } from "@/lib/toast";
 
 const NOTICE_MS = 14_000;
@@ -43,8 +43,28 @@ function wording(notice: PlanChangeNotice, audience: "student" | "college") {
  * toast layer (lib/toast), like every other message popup in the app.
  */
 export function PlanSyncWatcher({ audience }: { audience: "student" | "college" }) {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const userId = user?.id ?? null;
+
+  // A student's college changed their year or section: reload the signed-in user (so their own year/section are right everywhere)
+  // and say so once. What the year unlocks (the Vault AI Interview) refreshes itself on the same event.
+  useEffect(() => {
+    if (audience !== "student" || userId === null) return;
+
+    const onAcademicChange = () => {
+      void refresh();
+      toast("Your year or section was updated, and what unlocks for you has been refreshed.", {
+        id: "academic-sync",
+        tone: "info",
+        title: "Your college updated your details",
+        duration: NOTICE_MS,
+        icon: Info,
+      });
+    };
+
+    window.addEventListener(ACADEMIC_CHANGED_EVENT, onAcademicChange);
+    return () => window.removeEventListener(ACADEMIC_CHANGED_EVENT, onAcademicChange);
+  }, [audience, userId, refresh]);
 
   useEffect(() => {
     if (userId === null) return;

@@ -9,10 +9,13 @@ use App\Models\User;
 use App\Services\CollegeDepartmentService;
 use App\Services\StudentBulkNotificationService;
 use App\Services\StudentCohortService;
+use App\Support\AcademicYear;
 use App\Support\SingleMail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -47,9 +50,13 @@ class TpoStudentController extends Controller
         // ?department=commerce narrows the roster to one department; without it the whole college, as always.
         $department = $request->query('department');
 
+        // ?year=3 narrows it to one year of study (0 = no year set yet, 5 = passed out); without it every year, as always.
+        $year = $request->query('year');
+
         $students = User::where('college_id', $collegeId)
             ->where('role', User::ROLE_USER)
             ->inDepartment(is_string($department) ? $department : null)
+            ->when(is_numeric($year) && (int) $year >= 0 && (int) $year <= AcademicYear::programmeYears() + 1, fn ($q) => $q->inStudyYear((int) $year))
             ->orderBy('name')
             ->get();
 
@@ -81,6 +88,8 @@ class TpoStudentController extends Controller
             'branch' => ['nullable', 'string', 'max:100'],
             'department' => ['nullable', 'string', 'max:30'],
             'section' => ['nullable', 'string', 'max:20'],
+            // The year of study they are in now (1st-4th): the vault AI interview's rules, and the TPO's year-wise view, run on it.
+            'year' => ['nullable', 'integer', Rule::in(AcademicYear::selectableYears())],
             'cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'backlogs' => ['nullable', 'integer', 'min:0'],
             'phone' => ['nullable', 'string', 'max:20'],
@@ -145,6 +154,12 @@ class TpoStudentController extends Controller
             'parent_phone' => $validated['parent_phone'] ?? null,
         ]);
         $student->departmentHint = $department;
+
+        // Not mass-assignable (a student must not be able to set their own year): the college's staff set it, here.
+        if (isset($validated['year']) && User::hasYearColumn()) {
+            $student->forceFill(['graduation_year' => AcademicYear::graduationYearFor((int) $validated['year'])]);
+        }
+
         $student->save();
 
         app(IssuedCredentialVault::class)->keep($student, $plainPassword, 'created');
@@ -157,6 +172,132 @@ class TpoStudentController extends Controller
         return response()->json([
             'student' => $this->cohort->payload($student->refresh(), $this->cohort->activeMappingsFor($collegeId)),
         ], 201);
+    }
+
+    /**
+     * Files students under a year of study - the way to fix a roster that was imported before years existed, or to correct a
+     * wrong one, without re-uploading anything. Scoped to the caller's own college like every other action here: an id from another
+     * college is dropped, not reported, so nothing reveals that it exists.
+     */
+    public function setYear(Request $request)
+    {
+        $collegeId = $request->user()->college_id;
+        abort_unless($collegeId, 422, 'Your account is not linked to a college.');
+
+        $validated = $request->validate([
+            'student_ids' => ['required', 'array', 'min:1', 'max:5000'],
+            'student_ids.*' => ['integer'],
+            'year' => ['required', 'integer', Rule::in(AcademicYear::selectableYears())],
+        ]);
+
+        $graduationYear = AcademicYear::graduationYearFor((int) $validated['year']);
+
+        $updated = 0;
+
+        // Chunked: the id list can be a whole college and every driver has a limit on bound parameters.
+        DB::transaction(function () use ($validated, $collegeId, $graduationYear, &$updated) {
+            foreach (array_chunk($validated['student_ids'], 500) as $ids) {
+                // A query-builder update on purpose: it skips the per-student save hook (branch re-resolution), which a year cannot change.
+                $updated += User::where('college_id', $collegeId)
+                    ->where('role', User::ROLE_USER)
+                    ->whereIn('id', $ids)
+                    ->update(['graduation_year' => $graduationYear]);
+            }
+        });
+
+        $label = AcademicYear::label((int) $validated['year']);
+
+        return response()->json([
+            'message' => $updated === 0
+                ? 'No matching students in your cohort were updated.'
+                : "Filed {$updated} student(s) under {$label}.",
+            'updated' => $updated,
+            'graduation_year' => $graduationYear,
+            'study_year' => (int) $validated['year'],
+            'year_label' => $label,
+        ]);
+    }
+
+    /**
+     * Changes one student's year of study and/or section - the two things a TPO corrects most often. Either may be sent on its own;
+     * `year: null` takes a student back to "not set", `section: null` (or blank) to "no section". Scoped to the caller's own college:
+     * a student of another college is a 404, never a 403 that would say they exist.
+     *
+     * Answers with the student's refreshed cohort row, so the roster can show the change at once, and the student's own screens
+     * (their Vault AI Interview countdown, a section coordinator's roster) follow it on their next check (the plan-signal's `academic_signature`).
+     */
+    public function update(Request $request, User $student)
+    {
+        $collegeId = $request->user()->college_id;
+        abort_unless($collegeId, 422, 'Your account is not linked to a college.');
+        abort_unless($student->role === User::ROLE_USER && (int) $student->college_id === (int) $collegeId, 404);
+
+        $validated = $request->validate([
+            'year' => ['sometimes', 'nullable', 'integer', Rule::in(AcademicYear::selectableYears())],
+            'section' => ['sometimes', 'nullable', 'string', 'max:20'],
+        ]);
+
+        if (! array_key_exists('year', $validated) && ! array_key_exists('section', $validated)) {
+            throw ValidationException::withMessages(['year' => ['Say which year or section to change.']]);
+        }
+
+        if (array_key_exists('year', $validated)) {
+            $student->forceFill(['graduation_year' => $validated['year'] === null ? null : AcademicYear::graduationYearFor((int) $validated['year'])]);
+        }
+
+        if (array_key_exists('section', $validated)) {
+            $student->section = $this->cleanSection($validated['section']);
+        }
+
+        $student->save();
+
+        return response()->json([
+            'student' => $this->cohort->payload($student->refresh(), $this->cohort->activeMappingsFor($collegeId)),
+        ]);
+    }
+
+    /**
+     * Files a selection of students in one section - or takes them out of theirs (`section: null`). Same college scoping as
+     * setYear(): ids from another college are dropped, not reported.
+     */
+    public function setSection(Request $request)
+    {
+        $collegeId = $request->user()->college_id;
+        abort_unless($collegeId, 422, 'Your account is not linked to a college.');
+
+        $validated = $request->validate([
+            'student_ids' => ['required', 'array', 'min:1', 'max:5000'],
+            'student_ids.*' => ['integer'],
+            'section' => ['present', 'nullable', 'string', 'max:20'],
+        ]);
+
+        $section = $this->cleanSection($validated['section']);
+        $updated = 0;
+
+        DB::transaction(function () use ($validated, $collegeId, $section, &$updated) {
+            foreach (array_chunk($validated['student_ids'], 500) as $ids) {
+                $updated += User::where('college_id', $collegeId)
+                    ->where('role', User::ROLE_USER)
+                    ->whereIn('id', $ids)
+                    ->update(['section' => $section]);
+            }
+        });
+
+        return response()->json([
+            'message' => $updated === 0
+                ? 'No matching students in your cohort were updated.'
+                : ($section === null ? "Took {$updated} student(s) out of their section." : "Moved {$updated} student(s) to section {$section}."),
+            'updated' => $updated,
+            'section' => $section,
+        ]);
+    }
+
+    /** A section as stored: trimmed, and null when blank - "no section" has one spelling. */
+    private function cleanSection(?string $section): ?string
+    {
+        $section = trim((string) $section);
+
+        return $section === '' ? null : $section;
     }
 
     /**

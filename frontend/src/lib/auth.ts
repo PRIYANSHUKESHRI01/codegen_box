@@ -50,6 +50,8 @@ export interface AuthUser {
   branch: string | null;
   /** For a student, the section they're in; for a section_coordinator, the one section they manage. Set by the TPO either way, never self-editable. */
   section: string | null;
+  /** The year of study a college student is in (1-4, above 4 once passed out), worked out by the server; null for a direct user or until the college files it. */
+  study_year?: number | null;
   cgpa: string | null;
   backlogs: number | null;
   phone: string | null;

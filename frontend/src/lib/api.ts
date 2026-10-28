@@ -111,6 +111,8 @@ export const api = {
     request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined, ...init }),
   put: <T>(path: string, body?: unknown, init?: RequestInit) =>
     request<T>(path, { method: "PUT", body: body ? JSON.stringify(body) : undefined, ...init }),
+  patch: <T>(path: string, body?: unknown, init?: RequestInit) =>
+    request<T>(path, { method: "PATCH", body: body ? JSON.stringify(body) : undefined, ...init }),
   // `body` is optional so every existing one-argument call is unchanged; the superadmin
   // "permanently delete a university" call sends the confirmation (password + typed name).
   delete: <T>(path: string, body?: unknown) =>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,16 +37,9 @@ export interface ModalProps {
 }
 
 /**
- * The one modal shell for the app. Exists because every hand-rolled modal
- * used `items-center` to vertically center itself *and* relied on the page
- * scrolling for overflow — a combination that clips the top of any dialog
- * taller than the viewport (the browser has no way to scroll to negative
- * flex offset), which is exactly what cut off the header on tall forms like
- * "Schedule Drive". This shell sidesteps that entirely: the outer layer
- * scrolls, an inner `min-h-full` flex wrapper does the centering without
- * clipping, and the card itself caps its own height and scrolls its body
- * internally — so the header and footer stay pinned and visible no matter
- * how long the form gets.
+ * The one modal shell for the app. Uses React Portal onto document.body so it escapes
+ * any ancestor's overflow-hidden, transform, or stacking context (such as isolated landing sections,
+ * cards, or hero motion containers). Centered, scrollable, with pinned header and footer.
  */
 export function Modal({
   onClose,
@@ -61,8 +55,11 @@ export function Modal({
   variant = "default",
   children,
 }: ModalProps) {
+  const [mounted, setMounted] = useState(false);
   const premium = variant === "premium";
+
   useEffect(() => {
+    setMounted(true);
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && showCloseButton) onClose();
     };
@@ -77,25 +74,29 @@ export function Modal({
     };
   }, [onClose, showCloseButton]);
 
-  return (
+  if (!mounted || typeof document === "undefined") {
+    return null;
+  }
+
+  const modalContent = (
     <div
       className={cn(
-        // !mt-0: pages render modals inside a `space-y-*` column, whose
-        // sibling margin otherwise nudges this fixed overlay down by 2rem
-        // and leaves a strip of live page above the backdrop.
-        "fixed inset-0 z-50 overflow-y-auto animate-fade-in !mt-0",
+        // Rendered onto <body> via portal to escape parent overflow/stacking contexts;
+        // z-[100] keeps it safely above sticky navbars (z-40) and banners (z-50) while staying
+        // below DialogHost (z-[120]) and Toaster (z-[130]).
+        "fixed inset-0 z-[100] overflow-y-auto animate-fade-in !mt-0",
         premium ? "bg-slate-950/60 backdrop-blur-md" : "bg-black/70 backdrop-blur-sm"
       )}
       onClick={closeOnBackdrop ? onClose : undefined}
     >
-      <div className="flex min-h-full items-center justify-center p-4 py-8">
+      <div className="flex min-h-full items-center justify-center p-4 py-6 sm:py-8">
         <div
           role="dialog"
           aria-modal="true"
           aria-labelledby="modal-title"
           onClick={(e) => e.stopPropagation()}
           className={cn(
-            "w-full flex flex-col max-h-[calc(100vh-4rem)] bg-surface animate-modal-in",
+            "w-full flex flex-col max-h-[calc(100vh-3rem)] sm:max-h-[calc(100vh-4rem)] bg-surface animate-modal-in",
             premium
               ? "relative overflow-hidden rounded-[24px] border border-border-subtle shadow-[0_32px_80px_-20px_rgba(15,23,42,0.55),0_0_0_1px_rgba(99,102,241,0.08)]"
               : "rounded-panel border border-border-strong shadow-card",
@@ -150,4 +151,6 @@ export function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

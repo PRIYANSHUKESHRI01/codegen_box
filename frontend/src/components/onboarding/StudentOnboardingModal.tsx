@@ -21,7 +21,7 @@ import {
   type WeeklyPace,
 } from "@/lib/studentPreferences";
 import { ChipMulti, OtherLanguagesChoice, PrimaryLanguageChoice, RadioCards } from "./PreferenceFields";
-import { BranchFields, branchAnswersComplete, branchAsksTrack, initialBranchAnswers, type BranchAnswers } from "./BranchFields";
+import { BranchFields, branchAnswersComplete, branchAsksTrack, branchPayload, initialBranchAnswers, type BranchAnswers } from "./BranchFields";
 import { cn } from "@/lib/utils";
 
 const BRANCH_STEP = { id: "branch", title: "Your branch", subtitle: "So your dashboard, drives and practice fit what you study.", icon: GitBranch } as const;
@@ -74,7 +74,8 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
   const asksTrack = branchAsksTrack(user, branch, catalog?.disciplines, catalog?.branches);
   const discipline = catalog?.branches.find((b) => b.code === (branch.branchCode ?? user?.branch_code))?.discipline ?? user?.discipline ?? null;
   // The department the student is in — or has just picked on the branch step — decides whether coding is part of their programme at all.
-  const department = catalog?.disciplines.find((d) => d.code === discipline)?.department ?? user?.department ?? null;
+  // A student who writes their own branch has no family, so the department they chose for it decides.
+  const department = (branch.otherLabel != null ? branch.otherDepartment : null) ?? catalog?.disciplines.find((d) => d.code === discipline)?.department ?? user?.department ?? null;
   const codes = (user?.coding_opt_in ?? false) || (department ? departmentCan(catalog, department, "coding_practice") : capabilitiesOf(user).coding_practice);
   // A programme without coding is never asked which language it codes in.
   const steps = codes ? allSteps : allSteps.filter((s) => s.id !== "language");
@@ -100,7 +101,7 @@ export function StudentOnboardingModal({ onDone, onSkip }: StudentOnboardingModa
     setError(null);
     try {
       const res = await api.post<{ user: AuthUser }>("/me/onboarding", {
-        ...(branch.branchCode ? { branch_code: branch.branchCode } : {}),
+        ...branchPayload(branch),
         ...(branch.trackFocus ? { track_focus: branch.trackFocus, core_interests: branch.interests } : {}),
         ...(primary ? { primary_language: primary, preferred_languages: others } : {}),
         skill_level: level,

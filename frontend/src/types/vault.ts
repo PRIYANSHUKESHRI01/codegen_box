@@ -59,6 +59,13 @@ export interface StudentVaultProfile {
   peak_readiness: number;
   /** Set only on a profile carried over from the old Talent Pool contest. */
   legacy_score_percent: string | null;
+  qualification_source?: string | null;
+  ai_interview_score?: number | null;
+  ai_interview_stack?: string | null;
+  ai_interview_role?: string | null;
+  ai_interview_scores?: Record<string, number> | null;
+  ai_interview_attempt?: number | null;
+  ai_interview_qualified_at?: string | null;
   hired: {
     at: string | null;
     via: "aptrun_partner" | "mellow_vault" | null;
@@ -92,6 +99,15 @@ export interface StudentVaultResponse {
   shared_fields: string[];
   never_shared: string[];
   mellow_vault_connected: boolean;
+  ai_interview_qualifications?: Array<{
+    id: number;
+    stack_key: string;
+    role_key: string;
+    series_average: number;
+    series_scores: Record<string, number> | null;
+    current_attempt: number;
+    qualified_at: string;
+  }> | null;
 }
 
 // ── Hiring partners ──────────────────────────────────────────────────────
@@ -139,6 +155,7 @@ export interface AdminVaultSummary {
   eligible: number;
   consented: number;
   listed_on_mellow_vault: number;
+  ai_qualifiers?: number;
   thresholds: { enter: number; exit: number };
   sync: {
     configured: boolean;
@@ -198,4 +215,39 @@ export interface Paginated<T> {
   last_page: number;
   per_page: number;
   total: number;
+}
+
+export interface AdminVaultAiQualifier {
+  id: number;
+  user_id: number;
+  stack_key: string;
+  role_key: string;
+  current_attempt: number;
+  max_attempts: number;
+  status: string;
+  series_scores: Record<string, number> | null;
+  series_average: number;
+  qualified_at: string;
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    college_id: number | null;
+    branch: string | null;
+    branch_code: string | null;
+    discipline: string | null;
+    department: string | null;
+    cgpa: string | null;
+    is_blocked: boolean;
+    college?: { id: number; name: string; short_code: string } | null;
+    vault_profile?: {
+      id: number;
+      visibility_status: VaultStatus;
+      readiness_score: number;
+      readiness_tier: string | null;
+      qualified_at: string | null;
+      ai_interview_score: number | null;
+      ai_interview_stack: string | null;
+    } | null;
+  };
 }

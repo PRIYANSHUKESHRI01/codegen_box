@@ -117,6 +117,14 @@ class CompanyVaultController extends Controller
             });
         }
 
+        if ($request->boolean('ai_qualified')) {
+            $query->whereNotNull('vault_profiles.ai_interview_score');
+        }
+
+        if ($request->filled('stack')) {
+            $query->where('vault_profiles.ai_interview_stack', $request->string('stack'));
+        }
+
         // Readiness leads; a fuller profile (resume, links, skills) breaks ties, and
         // whoever qualified most recently breaks any that remain. `sort=complete`
         // flips the first two for a company that cares more about a rich profile.

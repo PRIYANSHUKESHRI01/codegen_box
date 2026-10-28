@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import {
+  ArrowRight,
   Award,
   Briefcase,
   CalendarClock,
@@ -138,6 +140,64 @@ export default function StudentVaultPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Verified Vault AI Interview Qualification Banner */}
+          {data.ai_interview_qualifications && data.ai_interview_qualifications.length > 0 && (
+            <div className="rounded-panel border border-emerald-500/35 bg-gradient-to-r from-emerald-500/10 via-surface to-surface p-5 shadow-sm space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border-subtle pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-control bg-emerald-500/15 border border-emerald-500/30 text-emerald-500 flex items-center justify-center shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-3xs uppercase font-extrabold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                        Verified Technical Credential
+                      </span>
+                      <span className="text-3xs text-text-muted">
+                        Transferred to Mellow Vault
+                      </span>
+                    </div>
+                    <h3 className="text-sm sm:text-base font-bold text-primary mt-0.5">
+                      Vault AI Interview Qualification Verified
+                    </h3>
+                  </div>
+                </div>
+                <Link
+                  href="/dashboard/vault-interviews"
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+                >
+                  <span>View circuits</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+                {data.ai_interview_qualifications.map((qual) => (
+                  <div key={qual.id} className="p-3.5 rounded-control bg-surface-raised border border-border-subtle flex flex-col justify-between gap-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="text-xs font-black text-primary capitalize">
+                          {qual.stack_key.replace(/_/g, " ")}
+                        </span>
+                        <div className="text-3xs text-text-muted capitalize">{qual.role_key.replace(/_/g, " ")}</div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-xs font-black bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25">
+                        {Math.round(qual.series_average)}%
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-3xs font-mono text-text-muted pt-2 border-t border-border-subtle">
+                      <span>S1: {qual.series_scores?.["1"] ?? "—"}%</span>
+                      <span>S2: {qual.series_scores?.["2"] ?? "—"}%</span>
+                      <span>S3: {qual.series_scores?.["3"] ?? "—"}%</span>
+                      <span className="text-text-secondary font-sans font-semibold">Att. {qual.current_attempt}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <ReadinessCard data={data} />
 
           {data.history && <ReadinessTrend history={data.history} exitThreshold={readiness.exit_threshold} />}

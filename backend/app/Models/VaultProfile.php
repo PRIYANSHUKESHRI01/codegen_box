@@ -53,6 +53,9 @@ class VaultProfile extends Model
 
     public const SOURCE_LEGACY_CONTEST = 'legacy_contest';
 
+    /** Cleared a Vault AI Interview qualification series (VaultInterviewQualificationService). */
+    public const SOURCE_AI_INTERVIEW = 'ai_interview_series';
+
     public const SYNC_IDLE = 'idle';
 
     public const SYNC_PENDING = 'pending';
@@ -77,6 +80,12 @@ class VaultProfile extends Model
         'eligible_since',
         'left_at',
         'qualification_source',
+        'ai_interview_score',
+        'ai_interview_stack',
+        'ai_interview_role',
+        'ai_interview_scores',
+        'ai_interview_attempt',
+        'ai_interview_qualified_at',
         'consent_given_at',
         'consent_withdrawn_at',
         'hidden_by_staff_at',
@@ -117,6 +126,10 @@ class VaultProfile extends Model
             'eligible_since' => 'datetime',
             'left_at' => 'datetime',
             'legacy_score_percent' => 'decimal:2',
+            'ai_interview_score' => 'decimal:2',
+            'ai_interview_scores' => 'array',
+            'ai_interview_attempt' => 'integer',
+            'ai_interview_qualified_at' => 'datetime',
             'consent_given_at' => 'datetime',
             'consent_withdrawn_at' => 'datetime',
             'hidden_by_staff_at' => 'datetime',
@@ -153,6 +166,11 @@ class VaultProfile extends Model
     public function inquiries(): HasMany
     {
         return $this->hasMany(VaultInquiry::class);
+    }
+
+    public function interviewQualifications(): HasMany
+    {
+        return $this->hasMany(VaultInterviewQualification::class, 'user_id', 'user_id');
     }
 
     /** The only profiles a hiring partner's browse listing ever includes. */

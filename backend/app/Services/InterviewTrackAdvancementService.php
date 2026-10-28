@@ -97,6 +97,18 @@ class InterviewTrackAdvancementService
         // The score just landed — the single biggest part of the student's readiness, so re-score now.
         app(VaultRefreshService::class)->refreshQuietly([$session->user_id]);
 
+        if (! empty($interview->practice_config['qualification_id'])) {
+            try {
+                app(\App\Services\Vault\VaultInterviewQualificationService::class)
+                    ->recordSetScoreAndEvaluate($interview, (int) round($percent));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[InterviewTrackAdvancementService] qualification evaluation failed', [
+                    'session_id' => $session->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return [
             'finalized' => true,
             'composite_score_percent' => $percent,
@@ -151,6 +163,18 @@ class InterviewTrackAdvancementService
         ]);
 
         app(VaultRefreshService::class)->refreshQuietly([$session->user_id]);
+
+        if (! empty($interview->practice_config['qualification_id'])) {
+            try {
+                app(\App\Services\Vault\VaultInterviewQualificationService::class)
+                    ->recordSetScoreAndEvaluate($interview, (int) round($percent));
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[InterviewTrackAdvancementService] qualification evaluation failed', [
+                    'session_id' => $session->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return ['finalized' => true, 'composite_score_percent' => $percent];
     }

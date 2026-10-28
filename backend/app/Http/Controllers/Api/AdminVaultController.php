@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Models\VaultInterviewQualification;
 use App\Models\VaultProfile;
 use App\Models\VaultSyncEvent;
 use App\Services\Vault\VaultService;
@@ -32,6 +33,7 @@ class AdminVaultController extends Controller
             'eligible' => VaultProfile::where('is_eligible', true)->count(),
             'consented' => VaultProfile::whereNotNull('consent_given_at')->count(),
             'listed_on_mellow_vault' => VaultProfile::whereNotNull('vault_listed_at')->count(),
+            'ai_qualifiers' => VaultInterviewQualification::where('status', 'qualified')->count(),
             'thresholds' => ['enter' => (int) config('vault.enter_score'), 'exit' => (int) config('vault.exit_score')],
             'sync' => $sync->health(),
         ]);
@@ -56,6 +58,14 @@ class AdminVaultController extends Controller
             $query->where('readiness_score', '>=', (int) $request->input('min_readiness'));
         }
 
+        if ($request->filled('source')) {
+            $query->where('qualification_source', $request->string('source'));
+        }
+
+        if ($request->filled('stack')) {
+            $query->where('ai_interview_stack', $request->string('stack'));
+        }
+
         if ($request->filled('search')) {
             $search = $request->string('search');
             $query->whereHas('user', fn ($q) => $q->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
@@ -67,6 +77,56 @@ class AdminVaultController extends Controller
                 ->orderByDesc('qualified_at')
                 ->paginate(30)
                 ->through(fn (VaultProfile $p) => $p->makeVisible(['hidden_reason', 'external_id'])),
+        ]);
+    }
+
+    /**
+     * Dedicated roster of all students who qualified through Vault AI Interview (score >= 60%)
+     * and were transferred to Mellow Vault.
+     */
+    public function aiInterviewQualifiers(Request $request)
+    {
+        $query = VaultInterviewQualification::query()
+            ->where('status', VaultInterviewQualification::STATUS_QUALIFIED)
+            ->with([
+                'user:id,name,email,college_id,branch,branch_code,discipline,department,cgpa,is_blocked',
+                'user.college:id,name,short_code',
+                'user.vaultProfile:id,user_id,visibility_status,readiness_score,readiness_tier,qualified_at,consent_given_at,ai_interview_score,ai_interview_stack',
+            ]);
+
+        if ($request->filled('stack')) {
+            $query->where('stack_key', $request->string('stack'));
+        }
+
+        if ($request->filled('role')) {
+            $query->where('role_key', $request->string('role'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('stack_key', 'like', "%{$search}%")
+                    ->orWhereHas('user', fn ($uq) => $uq->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            });
+        }
+
+        $qualifiers = $query
+            ->orderByDesc('series_average')
+            ->orderByDesc('qualified_at')
+            ->paginate(30);
+
+        return response()->json([
+            'qualifiers' => $qualifiers,
+            'stats' => [
+                'total_qualified' => VaultInterviewQualification::where('status', 'qualified')->count(),
+                'average_score' => round((float) VaultInterviewQualification::where('status', 'qualified')->avg('series_average'), 2),
+                'top_stack' => VaultInterviewQualification::where('status', 'qualified')
+                    ->select('stack_key')
+                    ->selectRaw('count(*) as count')
+                    ->groupBy('stack_key')
+                    ->orderByDesc('count')
+                    ->first()?->stack_key,
+            ],
         ]);
     }
 

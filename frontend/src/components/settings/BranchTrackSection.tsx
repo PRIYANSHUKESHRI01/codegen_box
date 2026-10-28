@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Save } from "lucide-react";
-import { BranchFields, branchAnswersComplete, branchAsksTrack, initialBranchAnswers, type BranchAnswers } from "@/components/onboarding/BranchFields";
+import { BranchFields, branchAnswersComplete, branchAsksTrack, branchPayload, initialBranchAnswers, type BranchAnswers } from "@/components/onboarding/BranchFields";
 import { Button } from "@/components/ui/Button";
 import { api, ApiError } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
@@ -26,7 +26,7 @@ export function BranchTrackSection({ user, onToast }: { user: AuthUser; onToast:
 
   const asksTrack = branchAsksTrack(user, answers, catalog?.disciplines, catalog?.branches);
   const dirty = useMemo(
-    () => !!answers.branchCode || (answers.trackFocus ?? null) !== (user.track_focus ?? null) || !sameSet(answers.interests, user.core_interests ?? []),
+    () => !!answers.branchCode || answers.otherLabel != null || (answers.trackFocus ?? null) !== (user.track_focus ?? null) || !sameSet(answers.interests, user.core_interests ?? []),
     [answers, user.track_focus, user.core_interests]
   );
   const ready = branchAnswersComplete(user, answers, asksTrack);
@@ -36,7 +36,7 @@ export function BranchTrackSection({ user, onToast }: { user: AuthUser; onToast:
     setError(null);
     try {
       const res = await api.put<{ user: AuthUser }>("/me/branch", {
-        ...(answers.branchCode ? { branch_code: answers.branchCode } : {}),
+        ...branchPayload(answers),
         ...(answers.trackFocus ? { track_focus: answers.trackFocus, core_interests: answers.interests } : {}),
       });
       const token = getToken();

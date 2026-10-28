@@ -55,6 +55,10 @@ export interface StudentInterviewSummary {
   my_session_status: InterviewSessionStatus | null;
   /** Made for the student's branch (not merely open to it); these are listed first. Absent from an older API. */
   for_your_branch?: boolean;
+  /** A Vault AI Interview qualification set: sat in the Vault AI Interview's own pages, never in the Mock AI Interview's. Absent from an older API. */
+  is_qualification?: boolean;
+  /** Where a qualification set sits in the student's series; null for every other interview. */
+  qualification?: { stack_key: string | null; role_key: string | null; series_number: number | null; set_number: number | null } | null;
 }
 
 export interface InterviewProctoringSummary {
@@ -165,6 +169,10 @@ export interface InterviewResult {
   composite_score_percent: number | null;
   /** Only ever non-null for a track round — a standalone interview has no pass/fail concept. */
   passed: boolean | null;
+  /** A Vault AI Interview qualification set: it counts toward the series average and is scored once. */
+  is_qualification?: boolean;
+  /** Whether the server will let the student sit this interview again (never for a track round or a scored qualification set). */
+  reattemptable?: boolean;
   responses: InterviewResultQuestion[];
 }
 

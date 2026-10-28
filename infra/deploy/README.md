@@ -45,6 +45,22 @@ the file changed in transit (a pen drive can carry malware) — do not deploy it
 5. Check these all return 403/404 from outside: `/.env`, `/composer.json`, `/vendor/autoload.php`,
    `/storage/logs/laravel.log`, `/artisan`. If any returns content, the web root is wrong — fix that first.
 
+### Updating an already-deployed backend (do this EVERY time you upload new code)
+
+The package leaves `bootstrap/cache/` out on purpose, so the server keeps the route and config caches it built last time.
+Laravel serves from those caches: **a route added since then answers 404 until they are rebuilt**, however new the code is.
+(Symptom: the browser console shows `404` on `/api/public/branches` or `/api/notifications`, the branch filter lists only
+"All Branches", and newer screens look empty.) After uploading the new files:
+
+```
+php artisan migrate --force
+php artisan optimize:clear     # drops the old route/config/view/event caches
+php artisan optimize           # rebuilds them from the new code (or: config:cache && route:cache)
+sudo systemctl restart php8.2-fpm   # or your PHP service / `apachectl graceful`: clears opcache so the new code is what runs
+```
+
+Then confirm: `php artisan route:list --path=public/branches` and `--path=notifications` must each print a route.
+
 ## 4. Frontend on the server
 
 Upload the contents of `frontend-out.zip` to the site's web root (`index.html` at the top). The API address is baked

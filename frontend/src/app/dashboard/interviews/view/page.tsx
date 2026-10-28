@@ -2,11 +2,13 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, Headphones, MessageSquare, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle } from "lucide-react";
+import { Mic, Headphones, MessageSquare, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle, RotateCcw, ArrowLeft } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { hasSpeechRecognition, hasSpeechSynthesis } from "@/lib/voice/VoiceEngine";
 import type { InterviewResult, StudentInterviewSummary } from "@/types/interview";
@@ -36,14 +38,32 @@ function InterviewDetailPageContent() {
   const [result, setResult] = useState<InterviewResult | null>(null);
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
+  const [reattempting, setReattempting] = useState(false);
+
+  const handleReattempt = async () => {
+    if (reattempting) return;
+    setReattempting(true);
+    try {
+      await api.post(`/interviews/${encodeURIComponent(slug)}/reattempt`, {});
+      router.push(`/dashboard/interviews/session?slug=${encodeURIComponent(slug)}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Failed to reset interview session for re-attempt.");
+      setReattempting(false);
+    }
+  };
 
   useEffect(() => {
     if (status !== "ready") return;
     api
       .get<StudentInterviewSummary>(`/interviews/${slug}`)
-      .then(setInterview)
+      .then((summary) => {
+        // A Vault AI Interview set is sat in the Vault AI Interview's own pages (an old link or bookmark lands here).
+        if (summary.is_qualification) router.replace(`/dashboard/vault-interviews/view?slug=${encodeURIComponent(slug)}`);
+        setInterview(summary);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "This interview isn't available."))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, slug]);
 
   // Fetched separately (not part of the summary above) — only meaningful
@@ -83,7 +103,7 @@ function InterviewDetailPageContent() {
     }
   };
 
-  if (status !== "ready") return <SessionLoader />;
+  if (status !== "ready" || interview?.is_qualification) return <SessionLoader />;
 
   const ttsSupported = hasSpeechSynthesis();
   const sttSupported = hasSpeechRecognition();
@@ -203,6 +223,64 @@ function InterviewDetailPageContent() {
                     <p className="text-2xs text-text-muted mt-0.5">Scored by AI — a human reviewer can still adjust this.</p>
                   </div>
                 </div>
+                {result.is_qualification && (
+                  <div className="p-4 rounded-control bg-emerald-500/10 border border-emerald-500/25 flex flex-wrap items-center justify-between gap-3 mt-3">
+                    <p className="text-2xs text-text-secondary leading-relaxed max-w-md">
+                      This set counts toward your Mellow Vault qualification series and is scored once. Your series average decides whether you qualify.
+                    </p>
+                    <Link
+                      href="/dashboard/vault-interviews"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-surface border border-border-subtle hover:border-accent-primary text-primary text-xs font-bold transition-all"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5 text-text-muted" />
+                      <span>Qualification Circuit</span>
+                    </Link>
+                  </div>
+                )}
+                {Math.round(result.composite_score_percent ?? 0) < 60 && result.reattemptable !== false && (
+                  <div className="p-4 rounded-control bg-amber-500/10 border border-amber-500/25 space-y-3 mt-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 mt-0.5">
+                        <RotateCcw className="w-4 h-4" />
+                      </div>
+                      <div className="space-y-1">
+                        <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                          Score below 60% — Re-attempt Recommended
+                        </h4>
+                        <p className="text-2xs text-text-secondary leading-relaxed">
+                          You scored <strong className="text-primary font-bold">{Math.round(result.composite_score_percent ?? 0)}%</strong>, which is below the 60% technical readiness benchmark required by top engineering companies and campus placement rounds. Review the AI critiques below to identify your weak spots, then re-attempt this interview to improve your score!
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 pt-1 flex-wrap">
+                      <Link
+                        href="/dashboard/vault-interviews"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-surface border border-border-subtle hover:border-accent-primary text-primary text-xs font-bold transition-all"
+                      >
+                        <ArrowLeft className="w-3.5 h-3.5 text-text-muted" />
+                        <span>Qualification Circuit</span>
+                      </Link>
+                      <button
+                        onClick={handleReattempt}
+                        disabled={reattempting}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                      >
+                        {reattempting ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Resetting session...</span>
+                          </>
+                        ) : (
+                          <>
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Re-attempt Interview</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {result.responses.length > 0 && (
                   <div className="space-y-2.5 pt-2 border-t border-border-subtle">
                     <h3 className="text-2xs font-bold uppercase tracking-wide text-text-muted">Full Transcript</h3>
@@ -243,11 +321,25 @@ function InterviewDetailPageContent() {
                 )}
               </div>
             ) : (
-              <div className="p-4 rounded-panel bg-status-success/10 border border-status-success/25 flex items-center gap-2 text-xs font-semibold text-status-success">
-                <CheckCircle2 className="w-4 h-4" />
-                {result?.status === "needs_human_review"
-                  ? "You've completed this interview. A reviewer has been notified."
-                  : "You've completed this interview — it's being scored."}
+              <div className="space-y-3">
+                <div className="p-4 rounded-panel bg-status-success/10 border border-status-success/25 flex items-center gap-2 text-xs font-semibold text-status-success">
+                  <CheckCircle2 className="w-4 h-4" />
+                  {result?.status === "needs_human_review"
+                    ? result.is_qualification
+                      ? "Scoring didn't complete for this set, so it hasn't counted. You can sit it again."
+                      : "You've completed this interview. A reviewer has been notified."
+                    : "You've completed this interview — it's being scored."}
+                </div>
+                {result?.status === "needs_human_review" && result.reattemptable && (
+                  <button
+                    onClick={handleReattempt}
+                    disabled={reattempting}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold transition-all shadow-sm disabled:opacity-50"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{reattempting ? "Resetting session..." : "Re-attempt Interview"}</span>
+                  </button>
+                )}
               </div>
             )
           ) : (

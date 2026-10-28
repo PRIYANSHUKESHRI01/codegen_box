@@ -72,6 +72,10 @@ class VaultService
 
         $score = (int) $breakdown['score'];
         $line = $this->thresholds();
+
+        // Every scoring pass that reaches the Vault also leaves the score on the student (for filtering and ranking).
+        app(\App\Services\ScoreLedger::class)->readiness($user->id, $score);
+
         $profile = $known ?? VaultProfile::where('user_id', $user->id)->first();
 
         if ($profile === null && $score < $line['enter']) {
@@ -98,7 +102,9 @@ class VaultService
                 $p->qualified_at ??= now();
                 $p->eligible_since = now();
                 $p->qualification_source = VaultProfile::SOURCE_READINESS;
-            } elseif ($p->is_eligible && $score < $line['exit']) {
+            } elseif ($p->is_eligible && $score < $line['exit'] && $p->ai_interview_qualified_at === null) {
+                // (A student who qualified through the Vault AI Interview earned their place there, not on the readiness
+                // score, so the readiness exit line does not remove them.)
                 $p->is_eligible = false;
                 $p->eligible_since = null;
                 $p->left_at = now();
@@ -136,6 +142,35 @@ class VaultService
         }
 
         return $profile;
+    }
+
+    /**
+     * A student cleared a Vault AI Interview qualification series (VaultInterviewQualificationService). That makes
+     * them Vault-eligible whatever their readiness score says, and — like every other change to a profile — goes
+     * through mutate(), so consent, plan and staff-hide decide whether Mellow Vault actually sees them.
+     *
+     * @param  array<string, int>  $scores  set number => percent
+     */
+    public function applyAiInterviewQualification(User $user, string $stackKey, string $roleKey, float $average, array $scores, int $attempt): VaultProfile
+    {
+        return $this->mutate($this->profileFor($user), function (VaultProfile $p) use ($stackKey, $roleKey, $average, $scores, $attempt) {
+            if (! $p->is_eligible) {
+                $p->is_eligible = true;
+                $p->eligible_since = now();
+                $p->left_at = null;
+                $p->qualification_source = VaultProfile::SOURCE_AI_INTERVIEW;
+            }
+
+            $p->qualified_at ??= now();
+            // The student is told about this qualification by its own notification, not the readiness "you're Vault-ready" mail.
+            $p->ready_notified_at ??= now();
+            $p->ai_interview_score = $average;
+            $p->ai_interview_stack = $stackKey;
+            $p->ai_interview_role = $roleKey;
+            $p->ai_interview_scores = $scores;
+            $p->ai_interview_attempt = $attempt;
+            $p->ai_interview_qualified_at = now();
+        });
     }
 
     // ───────────────────────────── the student's choices ─────────────────────────────

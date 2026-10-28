@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { cohortVaultAiLabel } from "@/lib/vaultAi";
 import Link from "next/link";
 import { motion, AnimatePresence, MotionConfig } from "framer-motion";
 import {
@@ -507,6 +508,14 @@ function PremiumDrawer({
                     <div className="grid grid-cols-2 gap-2.5">
                       <FactTile icon={BookOpen} label="Branch" value={student.branch ?? "Not on file"} muted={!student.branch} tone="sky" />
                       <FactTile icon={LayoutGrid} label="Section" value={student.section ? `Section ${student.section}` : "Not on file"} muted={!student.section} tone="indigo" />
+                      <FactTile icon={GraduationCap} label="Year of study" value={student.year_label ?? "Not set — set it from the roster"} muted={!student.year_label} tone="violet" />
+                      <FactTile
+                        icon={ShieldCheck}
+                        label="Vault AI Interview"
+                        value={cohortVaultAiLabel(student.vault_ai)}
+                        muted={student.vault_ai?.state !== "open"}
+                        tone={student.vault_ai?.state === "open" ? "emerald" : "slate"}
+                      />
                       <FactTile
                         icon={AlertTriangle}
                         label="Active Backlogs"

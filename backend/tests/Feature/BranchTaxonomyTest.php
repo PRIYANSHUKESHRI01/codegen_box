@@ -9,6 +9,7 @@ use App\Services\BranchAssignmentService;
 use App\Support\BranchCatalog;
 use App\Support\BranchNormalizer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class BranchTaxonomyTest extends TestCase
@@ -50,9 +51,8 @@ class BranchTaxonomyTest extends TestCase
      * The frontend ports this function (lib/branches.ts normalizeBranchKey) to show an older drive's "MECH" as the
      * Mechanical chip. These are the SAME cases pinned in frontend/src/tests/unit/branches.test.ts — change one side
      * without the other and a picker will silently disagree with the server about what a label means.
-     *
-     * @dataProvider sharedKeyCases
      */
+    #[DataProvider('sharedKeyCases')]
     public function test_normalizer_agrees_with_the_frontend_port(string $raw, ?string $key): void
     {
         $this->assertSame($key, BranchNormalizer::key($raw));
@@ -88,7 +88,7 @@ class BranchTaxonomyTest extends TestCase
         $this->assertSame('eee', $catalog->disciplineOf('eee'));
     }
 
-    /** @dataProvider commonLabels */
+    #[DataProvider('commonLabels')]
     public function test_common_labels_resolve(string $label, string $branch, string $discipline): void
     {
         $catalog = app(BranchCatalog::class);

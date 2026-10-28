@@ -50,6 +50,8 @@ use App\Http\Controllers\Api\InterviewQuestionBankController;
 use App\Http\Controllers\Api\DrillController;
 use App\Http\Controllers\Api\StudySittingController;
 use App\Http\Controllers\Api\PracticeInterviewController;
+use App\Http\Controllers\Api\CuratedInterviewSetController;
+use App\Http\Controllers\Api\VaultInterviewQualificationController;
 use App\Http\Controllers\Api\InterviewQuestionGenerationController;
 use App\Http\Controllers\Api\InterviewTrackController;
 use App\Http\Controllers\Api\InternalCustomerController;
@@ -591,6 +593,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 // hide a profile, and the state of the hand-off to Mellow Vault.
                 Route::get('/vault/summary', [AdminVaultController::class, 'summary']);
                 Route::get('/vault/profiles', [AdminVaultController::class, 'index']);
+                Route::get('/vault/ai-interview-qualifiers', [AdminVaultController::class, 'aiInterviewQualifiers']);
                 Route::post('/vault/profiles/{profile}/visibility', [AdminVaultController::class, 'updateVisibility']);
                 Route::post('/vault/profiles/{profile}/resync', [AdminVaultController::class, 'resync']);
                 Route::get('/vault/sync-events', [AdminVaultController::class, 'syncEvents']);
@@ -827,6 +830,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/students/cohort', [TpoStudentController::class, 'index']);
             Route::post('/students', [TpoStudentController::class, 'store']);
             Route::post('/students/bulk-notify', [TpoStudentController::class, 'bulkNotify']);
+            Route::post('/students/year', [TpoStudentController::class, 'setYear']);
+            Route::post('/students/section', [TpoStudentController::class, 'setSection']);
+            Route::patch('/students/{student}', [TpoStudentController::class, 'update'])->whereNumber('student');
 
             // The Cohort table's "View Report" drill-down: one student's
             // full contest/interview/drive history, activity calendar, and
@@ -1233,6 +1239,12 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // Practice interview studio: build your own AI mock interview for a branch role (see PracticeInterviewService). Creating one
             // can spend an AI call when the question bank is short for the role, hence the same per-user limiter as the other AI generators.
             Route::get('/me/practice-interviews/options', [PracticeInterviewController::class, 'options'])->middleware('capability:ai_interviews');
+            Route::get('/curated-interview-sets', [CuratedInterviewSetController::class, 'index'])->middleware('capability:ai_interviews');
+            Route::get('/curated-interview-sets/{setId}', [CuratedInterviewSetController::class, 'show'])->middleware('capability:ai_interviews');
+            Route::post('/curated-interview-sets/{setId}/start', [CuratedInterviewSetController::class, 'start'])->middleware('capability:ai_interviews');
+            Route::get('/vault-qualification/access', [VaultInterviewQualificationController::class, 'access'])->middleware('capability:ai_interviews');
+            Route::get('/vault-qualification/status', [VaultInterviewQualificationController::class, 'status'])->middleware('capability:ai_interviews');
+            Route::post('/vault-qualification/start-set', [VaultInterviewQualificationController::class, 'startSet'])->middleware('capability:ai_interviews');
             Route::post('/me/practice-interviews', [PracticeInterviewController::class, 'store'])->middleware('capability:ai_interviews')->middleware('throttle:ai-generation');
 
             // Skill Drills: the questions are generated in the browser; the server keeps the answers (streak, mastery). See config/drills.php.
@@ -1267,6 +1279,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/start', [InterviewController::class, 'start'])->middleware('capability:ai_interviews');
             Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer'])->middleware('capability:ai_interviews');
             Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}/responses/{interviewResponse}/audio', [InterviewController::class, 'responseAudio'])->middleware('capability:ai_interviews');
 

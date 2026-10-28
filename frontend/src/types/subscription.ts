@@ -87,6 +87,8 @@ export interface MySubscriptionResponse {
  */
 export interface PlanSignal {
   signature: string;
+  /** What the college has filed about a student (year, section) — moves when a TPO edits it; null for staff. Separate from `signature`: it is never a plan change. */
+  academic_signature?: string | null;
   source: CoverageSource;
   /** The plan the account is on right now; null when none is running. */
   plan: { code: string; name: string } | null;

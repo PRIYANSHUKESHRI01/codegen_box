@@ -8,10 +8,12 @@ use App\Models\Department;
 use App\Models\StudentImport;
 use App\Services\CollegeDepartmentService;
 use App\Services\StudentImportService;
+use App\Support\AcademicYear;
 use App\Support\BranchCatalog;
 use App\Support\StudentImportSheets;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Validation\Rule;
 
 /**
  * Bulk student-roster CSV import — one implementation, two audiences:
@@ -99,10 +101,10 @@ class StudentImportController extends Controller
             ]);
         }
 
-        $csv = "name,email,roll_number,branch,section,cgpa,backlogs,phone,parent_phone\n"
+        $csv = "name,email,roll_number,branch,section,cgpa,backlogs,phone,parent_phone,year\n"
             .($ownSample
-                ? 'Alex Chen,alex.chen@student.example.edu,24'.strtoupper(substr($first['code'], 0, 3)).'1042,"'.$first['name'].'",A,8.4,0,+91-9876543210,+91-9876500000'."\n"
-                : "Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000\n");
+                ? 'Alex Chen,alex.chen@student.example.edu,24'.strtoupper(substr($first['code'], 0, 3)).'1042,"'.$first['name'].'",A,8.4,0,+91-9876543210,+91-9876500000,3rd year'."\n"
+                : "Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000,3rd year\n");
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
@@ -127,12 +129,14 @@ class StudentImportController extends Controller
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:5120'],
             'department' => ['nullable', 'string', 'max:30'],
+            // The year of study the whole roster is for (1st-4th). Optional: a file may carry a `year` column instead.
+            'year' => ['nullable', 'integer', Rule::in(AcademicYear::selectableYears())],
         ]);
 
         // Which department this roster is for. A college running one department needs no answer; one running several must give it.
         $department = $this->departments->requested($college, $request->input('department'));
 
-        $studentImport = $this->service->import($college, $request->file('file'), $request->user(), $department);
+        $studentImport = $this->service->import($college, $request->file('file'), $request->user(), $department, $request->filled('year') ? (int) $request->input('year') : null);
 
         return response()->json(['import' => $studentImport], 201);
     }

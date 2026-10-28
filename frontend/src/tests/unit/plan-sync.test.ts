@@ -9,7 +9,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 import { SUBSCRIPTION_CHANGED_EVENT, notifySubscriptionChanged } from "@/lib/projectLab";
-import { PLAN_SYNC_POLL_MS, __resetPlanSyncForTests, checkPlanNow, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
+import { ACADEMIC_CHANGED_EVENT, PLAN_SYNC_POLL_MS, __resetPlanSyncForTests, checkPlanNow, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
 
 const signal = (signature: string, plan: { code: string; name: string } | null, days = 100): PlanSignal => ({ signature, source: plan ? "individual" : "none", plan, days_remaining: plan ? days : null });
 
@@ -219,5 +219,93 @@ describe("live plan sync", () => {
     get.mockClear();
     await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS * 3);
     expect(get).not.toHaveBeenCalled();
+  });
+
+  describe("when the college changes a student's year or section", () => {
+    const withAcademic = (base: PlanSignal, academic: string | null): PlanSignal => ({ ...base, academic_signature: academic });
+    let academicEvents: number;
+    const onAcademic = () => {
+      academicEvents += 1;
+    };
+
+    beforeEach(() => {
+      academicEvents = 0;
+      window.addEventListener(ACADEMIC_CHANGED_EVENT, onAcademic);
+    });
+    afterEach(() => window.removeEventListener(ACADEMIC_CHANGED_EVENT, onAcademic));
+
+    it("fires its own event on the next beat, and never reads as a plan change", async () => {
+      get.mockResolvedValue(withAcademic(CODER, "year-3"));
+      const stop = startPlanSync(1);
+      await flush();
+      expect(academicEvents).toBe(0);
+
+      get.mockResolvedValue(withAcademic(CODER, "year-4"));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+
+      expect(academicEvents).toBe(1);
+      expect(notices).toHaveLength(0);
+      expect(changedEvents).toBe(0);
+      stop();
+    });
+
+    it("says it once, not on every beat", async () => {
+      get.mockResolvedValue(withAcademic(CODER, "a"));
+      const stop = startPlanSync(1);
+      await flush();
+
+      get.mockResolvedValue(withAcademic(CODER, "b"));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+
+      expect(academicEvents).toBe(1);
+      stop();
+    });
+
+    it("says nothing for the first answer, and nothing for staff (who have no marker)", async () => {
+      get.mockResolvedValue(withAcademic(CODER, "a"));
+      const stop = startPlanSync(1);
+      await flush();
+      expect(academicEvents).toBe(0);
+      stop();
+
+      __resetPlanSyncForTests();
+      get.mockResolvedValue(withAcademic(CODER, null));
+      const stopStaff = startPlanSync(2);
+      await flush();
+      get.mockResolvedValue(withAcademic(CODER, null));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+      expect(academicEvents).toBe(0);
+      stopStaff();
+    });
+
+    it("still announces a plan change that arrives together with it", async () => {
+      get.mockResolvedValue(withAcademic(CODER, "a"));
+      const stop = startPlanSync(1);
+      await flush();
+
+      get.mockResolvedValue(withAcademic(EXPERT, "b"));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+
+      expect(academicEvents).toBe(1);
+      expect(notices).toHaveLength(1);
+      expect(notices[0].kind).toBe("upgraded");
+      stop();
+    });
+
+    it("does not carry one account's marker over to the next account on the same page", async () => {
+      get.mockResolvedValue(withAcademic(CODER, "mine"));
+      const stop = startPlanSync(1);
+      await flush();
+      stop();
+
+      get.mockResolvedValue(withAcademic(CODER, "someone-elses"));
+      const stopOther = startPlanSync(2);
+      await flush();
+
+      expect(academicEvents).toBe(0);
+      stopOther();
+    });
   });
 });

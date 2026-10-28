@@ -99,6 +99,36 @@ class BranchAssignmentService
         return $student;
     }
 
+    /**
+     * The student's branch is not in the catalogue, so they wrote it. Kept as their own words (`branch`), with no branch code or family
+     * — nothing is guessed — in the department they chose (or already had). It counts as answered, so they are not asked again, and
+     * their TPO still sees the text on the roster.
+     *
+     * Written with a plain UPDATE on purpose: saving the model would run the `saving` hook, which reads a changed `branch` as a label a
+     * college typed and re-resolves it as one.
+     */
+    public function declareOther(User $student, string $label, ?string $department = null): User
+    {
+        $values = [
+            'branch' => mb_substr($label, 0, 80),
+            'branch_key' => BranchNormalizer::key($label),
+            'branch_code' => null,
+            'discipline' => null,
+            'branch_source' => 'self',
+            'branch_confirmed_at' => now(),
+            'branch_disputed_at' => null,
+        ];
+
+        if ($department !== null) {
+            $values['department'] = $department;
+        }
+
+        $student->newQuery()->whereKey($student->getKey())->update($values);
+        $student->forceFill($values)->syncOriginalAttributes(array_keys($values));
+
+        return $student;
+    }
+
     /** A college's recognised label is final; everything else the student may state or change. */
     public function canDeclare(User $student): bool
     {

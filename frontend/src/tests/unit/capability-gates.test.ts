@@ -14,6 +14,7 @@ const GATED: Record<string, string[]> = {
   "dashboard/drills": ["skill_drills", "coding_practice"],
   "dashboard/interviews": ["ai_interviews"],
   "dashboard/interview-tracks": ["ai_interviews"],
+  "dashboard/vault-interviews": ["ai_interviews"],
   "dashboard/soft-skills": ["soft_skills"],
   "dashboard/learning-centre": ["learning_centre"],
   "dashboard/articles": ["learning_centre"],

@@ -29,6 +29,15 @@ class PaymentException extends RuntimeException
 
     public const NOTHING_TO_PAY = 'nothing_to_pay';
 
+    /** A student asked to redeem a plan that is not free (any more): the price changed, or it never was. They must pay for it. */
+    public const PAYMENT_REQUIRED = 'payment_required';
+
+    /** The free offer is for a priced plan whose discount is 100%; this one isn't (the free Coder plan, a team-sold or retired plan). */
+    public const OFFER_UNAVAILABLE = 'offer_unavailable';
+
+    /** They already hold the plan and are not yet in its renewal window, so redeeming again would only pile up free time. */
+    public const ALREADY_ON_PLAN = 'already_on_plan';
+
     public const ORDER_NOT_FOUND = 'order_not_found';
 
     public const SIGNATURE_INVALID = 'signature_invalid';

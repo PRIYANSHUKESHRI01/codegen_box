@@ -142,7 +142,11 @@ class Interview extends Model
      */
     public function scopeCountsTowardReadiness(Builder $query): Builder
     {
-        return $query->where('interviews.interview_type', '!=', self::INTERVIEW_TYPE_COMPANY_HIRING);
+        return $query
+            ->where('interviews.interview_type', '!=', self::INTERVIEW_TYPE_COMPANY_HIRING)
+            // Merchant Navy certificate-oral practice is exam preparation for a different profession: it must not move a student's
+            // placement-readiness score, which decides their way into the Vault (an IT recruiter's pool).
+            ->where(fn (Builder $q) => $q->whereNull('interviews.discipline')->orWhere('interviews.discipline', '!=', \App\Support\InterviewDiscipline::MARITIME_KEY));
     }
 
     public function interviewQuestions(): HasMany

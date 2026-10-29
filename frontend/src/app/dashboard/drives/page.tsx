@@ -29,6 +29,10 @@ import { cn } from "@/lib/utils";
 import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import type { DriveStatus, MyDriveApplication, PlacementDriveDetail, PrepQuestionCategory } from "@/types/placement";
 import { BranchChips } from "@/components/branches/BranchChips";
+import { UpcomingDrivesPage } from "@/components/dashboard/drives/UpcomingDrivesPage";
+
+/** The way back from a single drive is the list it was opened from, not the Overview. */
+const BACK_TO_LIST = { href: "/dashboard/drives", label: "Upcoming Drives" } as const;
 
 interface ApiDriveDetailResponse {
   drive: {
@@ -124,17 +128,25 @@ const YEAR_FILTER_ALL = "All";
 const CATEGORY_FILTER_ALL = "All";
 const ROUND_FILTER_ALL = "All";
 
-export default function PlacementDrivePreparePage() {
+/**
+ * /dashboard/drives is two screens on one address (a static export has no [id] segment, so a single drive is `?driveId=`):
+ * without a drive id it is the Upcoming Drives list; with one it is that drive's prep pack. Notifications and old bookmarks
+ * link to either form, so both keep working.
+ */
+export default function DrivesRoute() {
   return (
     <Suspense fallback={<SessionLoader />}>
-      <PlacementDrivePreparePageContent />
+      <DrivesRouter />
     </Suspense>
   );
 }
 
-function PlacementDrivePreparePageContent() {
-  const searchParams = useSearchParams();
-  const driveId = searchParams.get("driveId") ?? "";
+function DrivesRouter() {
+  const driveId = useSearchParams().get("driveId");
+  return driveId ? <PlacementDrivePreparePageContent driveId={driveId} /> : <UpcomingDrivesPage />;
+}
+
+function PlacementDrivePreparePageContent({ driveId }: { driveId: string }) {
   const router = useRouter();
   const { status: authStatus, user: authUser } = useAuthGuard(["user"]);
   // The recommended problems are coding practice: a programme without it is not pointed at a Practice Arena it does not have.
@@ -213,7 +225,7 @@ function PlacementDrivePreparePageContent() {
 
   if (loadState !== "ready" || !detail) {
     return (
-      <DashboardShell role="user" title="Drive Unavailable">
+      <DashboardShell role="user" title="Drive Unavailable" back={BACK_TO_LIST}>
         <div className="p-10 text-center rounded-panel bg-surface border border-border-subtle space-y-3">
           <AlertCircle className="w-8 h-8 text-text-muted mx-auto" />
           <p className="text-sm text-text-secondary max-w-md mx-auto">
@@ -222,11 +234,11 @@ function PlacementDrivePreparePageContent() {
               : "Something went wrong loading this drive. Please try again."}
           </p>
           <Link
-            href="/dashboard"
+            href="/dashboard/drives"
             className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-accent-primary hover:underline"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back to Dashboard</span>
+            <span>Back to Upcoming Drives</span>
           </Link>
         </div>
       </DashboardShell>
@@ -242,6 +254,7 @@ function PlacementDrivePreparePageContent() {
       role="user"
       title={`Prepare — ${company.name}`}
       subtitle={`${drive.roleTitle} · ${drive.ctcRange ?? "CTC not disclosed"}`}
+      back={BACK_TO_LIST}
     >
       {/* Header */}
       <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">

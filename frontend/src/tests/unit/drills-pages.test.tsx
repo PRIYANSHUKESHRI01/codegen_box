@@ -158,7 +158,7 @@ describe("<PracticeShelf>", () => {
     expect(within(items[0]).getByText("You asked for this")).toBeTruthy();
     expect(within(items[0]).getByText(/3 of 45 question sets done/)).toBeTruthy();
     expect(within(items[1]).getByText("Matches your interests")).toBeTruthy();
-    expect(within(items[1]).getByRole("link").getAttribute("href")).toBe("/dashboard/interviews/practice?role=ece_embedded");
+    expect(within(items[1]).getByRole("link").getAttribute("href")).toBe("/dashboard/interviews");
     expect(within(items[2]).getByRole("link").getAttribute("href")).toBe("/dashboard/drills/session?skill=ohms_law");
     expect(within(items[3]).getByRole("link").getAttribute("href")).toBe("/dashboard/learning-centre");
     expect(screen.getByText("5-day drill streak")).toBeTruthy();

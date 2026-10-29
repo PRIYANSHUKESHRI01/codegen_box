@@ -3,9 +3,10 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Swords, CheckCircle2, Trophy, Loader2 } from "lucide-react";
+import { Swords, CheckCircle2, Trophy, Radio, CalendarClock, History } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
+import { HpCard, HpEmptyState, HpIconTile, HpPill, HpSectionHeader, HpSkeletonCards, hpBtn, type HpTone } from "@/components/portal/kit";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -42,19 +43,24 @@ export default function ContestsListPage() {
       subtitle="Real, timed, rated rounds — your rating moves based on how you actually place."
     >
       {loading ? (
-        <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading contests...
-        </div>
+        <HpSkeletonCards count={3} />
       ) : contests.length === 0 ? (
-        <div className="p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          No contests scheduled right now — check back soon.
-        </div>
+        <HpEmptyState
+          icon={Swords}
+          tone="indigo"
+          title="No contests scheduled right now"
+          description="Rated rounds appear here as soon as they are scheduled. Keep your streak going in the Practice Arena while you wait."
+          action={
+            <Link href="/dashboard/practice" className={hpBtn("primary", "md")}>
+              Open Practice Arena
+            </Link>
+          }
+        />
       ) : (
-        <div className="space-y-8">
-          {live.length > 0 && <ContestSection title="Live Now" contests={live} accent="danger" />}
-          {upcoming.length > 0 && <ContestSection title="Upcoming" contests={upcoming} accent="primary" />}
-          {ended.length > 0 && <ContestSection title="Past Contests" contests={ended} accent="muted" />}
+        <div className="space-y-10">
+          {live.length > 0 && <ContestSection title="Live now" subtitle="Happening right now — jump in before it ends" icon={Radio} tone="rose" contests={live} accent="danger" />}
+          {upcoming.length > 0 && <ContestSection title="Upcoming" subtitle="Register early so you are ready at the start" icon={CalendarClock} tone="indigo" contests={upcoming} accent="primary" />}
+          {ended.length > 0 && <ContestSection title="Past contests" subtitle="Results and standings" icon={History} tone="slate" contests={ended} accent="muted" />}
         </div>
       )}
     </DashboardShell>
@@ -63,21 +69,35 @@ export default function ContestsListPage() {
 
 function ContestSection({
   title,
+  subtitle,
+  icon,
+  tone,
   contests,
   accent,
 }: {
   title: string;
+  subtitle: string;
+  icon: typeof Trophy;
+  tone: HpTone;
   contests: ContestSummary[];
   accent: "danger" | "primary" | "muted";
 }) {
   return (
     <section className="space-y-4">
-      <h2 className="text-base font-bold text-primary flex items-center gap-2">
-        {accent === "danger" && <span className="w-2 h-2 rounded-full bg-status-danger animate-pulse" />}
-        <span>{title}</span>
-        <span className="text-xs font-normal text-text-muted">({contests.length})</span>
-      </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <HpSectionHeader
+        icon={icon}
+        tone={tone}
+        title={
+          <span className="flex items-center gap-2">
+            {title}
+            <HpPill tone={tone} size="sm">
+              {contests.length}
+            </HpPill>
+          </span>
+        }
+        subtitle={subtitle}
+      />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {contests.map((contest) => {
           const minutesFromNow = Math.round((new Date(contest.start_at).getTime() - Date.now()) / 60000);
           const minutesToEnd = Math.round((new Date(contest.end_at).getTime() - Date.now()) / 60000);
@@ -86,61 +106,50 @@ function ContestSection({
             <Link
               key={contest.id}
               href={`/dashboard/contests/view?slug=${contest.slug}`}
-              className="p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle hover:border-border-strong hover:-translate-y-1 hover:shadow-card transition-all flex flex-col gap-3"
+              className="group block h-full rounded-[20px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="w-10 h-10 rounded-control bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
-                  <Swords className="w-5 h-5" />
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  {contest.contest_type === "daily" && (
-                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-sky-500/10 text-sky-400 border border-sky-500/25">
-                      Daily
-                    </span>
+              <HpCard interactive className="relative flex h-full flex-col gap-3 overflow-hidden p-5">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "absolute inset-x-0 top-0 h-[3px] origin-left bg-gradient-to-r transition-transform duration-500 ease-out motion-reduce:transition-none",
+                    accent === "danger" ? "scale-x-100 from-rose-500 to-orange-400" : "scale-x-0 from-indigo-500 via-violet-500 to-sky-400 group-hover:scale-x-100"
                   )}
-                  {contest.company && (
-                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-accent-secondary/10 text-accent-secondary border border-accent-secondary/25">
-                      {contest.company.name}
-                    </span>
-                  )}
-                  {contest.contest_type === "tpo_mock" && (
-                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/25">
-                      Mock
-                    </span>
-                  )}
-                  {contest.is_rated && (
-                    <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded bg-amber-500/10 text-amber-500 border border-amber-500/25">
-                      Rated
-                    </span>
-                  )}
-                  {contest.is_registered && (
-                    <span className="text-3xs font-bold text-status-success flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Registered
-                    </span>
-                  )}
-                </div>
-              </div>
+                />
 
-              <h3 className="text-sm font-bold text-primary leading-snug">{contest.title}</h3>
-              {contest.description && (
-                <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{contest.description}</p>
-              )}
+                <div className="flex items-start justify-between gap-2">
+                  <HpIconTile icon={Swords} tone={accent === "danger" ? "rose" : accent === "muted" ? "slate" : "indigo"} size="lg" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+                  <div className="flex flex-col items-end gap-1.5">
+                    {contest.contest_type === "daily" && <HpPill tone="sky" size="sm">Daily</HpPill>}
+                    {contest.company && <HpPill tone="violet" size="sm">{contest.company.name}</HpPill>}
+                    {contest.contest_type === "tpo_mock" && <HpPill tone="teal" size="sm">Mock</HpPill>}
+                    {contest.is_rated && <HpPill tone="amber" size="sm">Rated</HpPill>}
+                    {contest.is_registered && (
+                      <HpPill tone="emerald" size="sm" icon={CheckCircle2}>
+                        Registered
+                      </HpPill>
+                    )}
+                  </div>
+                </div>
 
-              <div className="flex items-center justify-between text-2xs text-text-muted mt-auto pt-2 border-t border-border-subtle">
-                <span>
-                  {contest.problem_count} problems · {contest.total_points} pts
-                </span>
-                {contest.has_ended ? (
-                  <span className={cn("font-semibold", contest.is_finalized ? "text-status-success" : "text-text-muted")}>
-                    {contest.is_finalized ? "Results in" : "Ended"}
+                <h3 className="text-15 font-bold leading-snug tracking-tight text-primary transition-colors group-hover:text-indigo-600 dark:group-hover:text-indigo-300">{contest.title}</h3>
+                {contest.description && <p className="line-clamp-2 text-xs leading-relaxed text-text-secondary">{contest.description}</p>}
+
+                <div className="mt-auto flex items-center justify-between border-t border-border-subtle pt-3 text-2xs text-text-muted">
+                  <span>
+                    {contest.problem_count} problems · {contest.total_points} pts
                   </span>
-                ) : contest.has_started ? (
-                  <CountdownTimer minutesFromNow={minutesToEnd} compact className="text-status-danger font-bold" />
-                ) : (
-                  <CountdownTimer minutesFromNow={minutesFromNow} compact className="text-accent-primary font-bold" />
-                )}
-              </div>
+                  {contest.has_ended ? (
+                    <span className={cn("font-semibold", contest.is_finalized ? "text-emerald-600 dark:text-emerald-300" : "text-text-muted")}>
+                      {contest.is_finalized ? "Results in" : "Ended"}
+                    </span>
+                  ) : contest.has_started ? (
+                    <CountdownTimer minutesFromNow={minutesToEnd} compact className="font-bold text-rose-600 dark:text-rose-300" />
+                  ) : (
+                    <CountdownTimer minutesFromNow={minutesFromNow} compact className="font-bold text-indigo-600 dark:text-indigo-300" />
+                  )}
+                </div>
+              </HpCard>
             </Link>
           );
         })}

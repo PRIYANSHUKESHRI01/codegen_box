@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BadgePercent, ExternalLink, GraduationCap, History, Loader2, RefreshCw, SlidersHorizontal, Users, Wallet } from "lucide-react";
+import { AlertTriangle, BadgePercent, ExternalLink, Gift, GraduationCap, History, Loader2, RefreshCw, SlidersHorizontal, Users, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
@@ -12,7 +12,7 @@ import { notifyPricingChanged } from "@/lib/usePublicPlans";
 import type { AdminPlan, AdminPlansResponse, PlanLimits, PlanPricing } from "@/types/pricing";
 import { type ToastTrigger } from "@/lib/toast";
 
-const DISCOUNT_PRESETS = [0, 10, 20, 30, 40, 50];
+const DISCOUNT_PRESETS = [0, 10, 20, 30, 40, 50, 75, 100];
 
 interface Draft {
   list: string;
@@ -78,6 +78,8 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
   const [loadError, setLoadError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [confirming, setConfirming] = useState<AdminPlan | null>(null);
+  /** The "I understand everyone gets it free" tick-box in the review step; reset every time the review opens. */
+  const [understandsFree, setUnderstandsFree] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [editingLimits, setEditingLimits] = useState<AdminPlan | null>(null);
@@ -129,21 +131,34 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
     const result = evaluate(confirming);
     if (!result.valid || result.list === null || result.discount === null) return;
 
+    // Turning a plan free hands it to every student with one click, so it is only sent once the box is ticked.
+    const makesFree = result.preview?.salePrice === 0 && !confirming.redeemable;
+    if (makesFree && !understandsFree) return;
+
     setSaving(true);
     setSaveError(null);
     try {
       const res = await api.put<{ plan: AdminPlan }>(`/superadmin/plans/${confirming.code}`, {
         list_price: result.list,
         discount_percent: result.discount,
+        ...(makesFree ? { confirm_free_offer: true } : {}),
         version: confirming.version,
       });
       setData((prev) => (prev ? { ...prev, plans: prev.plans.map((p) => (p.code === res.plan.code ? res.plan : p)) } : prev));
       setDrafts((prev) => ({ ...prev, [res.plan.code]: toDraft(res.plan) }));
       notifyPricingChanged();
-      triggerToast(`${res.plan.name} pricing is live: ${formatInr(res.plan.sale_price)} a year.`);
+      triggerToast(
+        res.plan.redeemable
+          ? `${res.plan.name} is now free to redeem — students claim it with one click, no payment.`
+          : `${res.plan.name} pricing is live: ${formatInr(res.plan.sale_price)} a year.`
+      );
       setConfirming(null);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.errors?.version?.[0] ?? err.errors?.list_price?.[0] ?? err.errors?.discount_percent?.[0] ?? err.message : "Couldn't save the price.");
+      setSaveError(
+        err instanceof ApiError
+          ? err.errors?.version?.[0] ?? err.errors?.list_price?.[0] ?? err.errors?.discount_percent?.[0] ?? err.errors?.confirm_free_offer?.[0] ?? err.message
+          : "Couldn't save the price."
+      );
     } finally {
       setSaving(false);
     }
@@ -171,6 +186,9 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
   }
 
   const confirmingResult = confirming ? evaluate(confirming) : null;
+  // The review step is where a plan can become free (a one-click claim for every student) or stop being free.
+  const confirmingMakesFree = !!confirming && confirmingResult?.preview?.salePrice === 0 && !confirming.redeemable;
+  const confirmingEndsOffer = !!confirming && !!confirming.redeemable && (confirmingResult?.preview?.salePrice ?? 0) > 0;
 
   return (
     <div className="space-y-5">
@@ -208,6 +226,8 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
                 discount_percent: result.discount ?? plan.discount_percent,
                 discount_amount: result.preview.discountAmount,
                 sale_price: result.preview.salePrice,
+                // What the student would see with this draft: a priced plan at ₹0 is a free offer, not a ₹0 price.
+                redeemable: (result.list ?? 0) > 0 && result.preview.salePrice === 0,
               }
             : plan;
 
@@ -222,12 +242,22 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
                     <Users className="h-3 w-3" aria-hidden />
                     {plan.active_subscribers} student{plan.active_subscribers === 1 ? "" : "s"} on this plan
                   </p>
+                  {plan.redeemable && (
+                    <p className="mt-0.5 flex items-center gap-1.5 text-2xs text-text-muted">
+                      <Gift className="h-3 w-3" aria-hidden />
+                      {plan.redemptions ?? 0} redeemed through the free offer
+                    </p>
+                  )}
                 </div>
-                {!plan.is_editable && (
+                {!plan.is_editable ? (
                   <span className="rounded-full border border-border-subtle bg-elevated px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-text-muted">
                     {plan.contact_only ? "Sold by our team" : "Always free"}
                   </span>
-                )}
+                ) : plan.redeemable ? (
+                  <span className="rounded-full border border-status-success/30 bg-status-success/15 px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-status-success">
+                    Free offer live
+                  </span>
+                ) : null}
               </div>
 
               <div className="mt-4 rounded-control border border-border-subtle bg-elevated/50 p-4">
@@ -266,7 +296,7 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
                       <BadgePercent className="h-3.5 w-3.5 text-status-success" /> Discount (%)
                     </label>
                     <p className="text-3xs text-text-muted">
-                      Taken off the list price automatically. 0 removes the discount (up to {limits?.max_discount_percent}%).
+                      Taken off the list price automatically. 0 removes the discount; {limits?.max_discount_percent}% makes the plan free — students then redeem it with one click instead of paying.
                     </p>
                     <input
                       id={`${plan.code}-discount`}
@@ -298,7 +328,7 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
                               : "border-border-subtle bg-elevated text-text-secondary hover:text-primary"
                           )}
                         >
-                          {preset === 0 ? "None" : `${preset}%`}
+                          {preset === 0 ? "None" : preset === 100 ? "100% · Free" : `${preset}%`}
                         </button>
                       ))}
                     </div>
@@ -310,6 +340,7 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
                       disabled={!result.dirty}
                       onClick={() => {
                         setSaveError(null);
+                        setUnderstandsFree(false);
                         setConfirming(plan);
                       }}
                       className="flex-1 rounded-btn bg-accent-primary py-2.5 text-xs font-bold text-white shadow-subtle transition-all hover:bg-accent-primary-hover disabled:cursor-not-allowed disabled:opacity-50"
@@ -418,11 +449,14 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
               <button
                 type="button"
                 onClick={() => void save()}
-                disabled={saving}
-                className="inline-flex items-center gap-2 rounded-btn bg-accent-primary px-4 py-2 text-xs font-bold text-white hover:bg-accent-primary-hover disabled:opacity-60"
+                disabled={saving || (confirmingMakesFree && !understandsFree)}
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-btn px-4 py-2 text-xs font-bold text-white disabled:opacity-60",
+                  confirmingMakesFree ? "bg-status-danger hover:bg-status-danger/90" : "bg-accent-primary hover:bg-accent-primary-hover"
+                )}
               >
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Save &amp; go live
+                {confirmingMakesFree ? "Make it free & go live" : "Save & go live"}
               </button>
             </>
           }
@@ -430,8 +464,40 @@ export function PlansPricingPanel({ triggerToast }: { triggerToast: ToastTrigger
           <dl className="space-y-2.5 text-xs">
             <ChangeRow label="List price" from={formatInr(confirming.list_price)} to={formatInr(confirmingResult.list ?? 0)} />
             <ChangeRow label="Discount" from={`${confirming.discount_percent}%`} to={`${confirmingResult.discount}%`} />
-            <ChangeRow label="Students pay" from={formatInr(confirming.sale_price)} to={formatInr(confirmingResult.preview.salePrice)} emphasise />
+            <ChangeRow
+              label="Students pay"
+              from={confirming.redeemable ? "Free" : formatInr(confirming.sale_price)}
+              to={confirmingResult.preview.salePrice === 0 ? "Free" : formatInr(confirmingResult.preview.salePrice)}
+              emphasise
+            />
           </dl>
+          {confirmingMakesFree && (
+            <div role="alert" className="mt-4 rounded-control border border-status-danger/40 bg-status-danger/10 p-3 text-xs leading-relaxed text-status-danger">
+              <p className="flex items-center gap-1.5 font-bold">
+                <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden /> This makes {confirming.name} free for every student
+              </p>
+              <p className="mt-1.5 text-text-secondary">
+                The pricing page will say <strong className="text-primary">Free</strong> and the button becomes <strong className="text-primary">Redeem offer</strong>. One click activates{" "}
+                {confirming.name} for a full {confirming.term_unit ?? "term"} — no payment, no payment page, and nothing is refundable because nothing is paid. Students can
+                redeem again when it is close to ending, for as long as the offer is on. To stop it, set a discount below 100%: people who already redeemed keep their plan until it ends.
+              </p>
+              <label className="mt-2.5 flex cursor-pointer items-start gap-2 font-semibold text-primary">
+                <input
+                  type="checkbox"
+                  checked={understandsFree}
+                  onChange={(e) => setUnderstandsFree(e.target.checked)}
+                  disabled={saving}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--status-danger,#dc2626)]"
+                />
+                <span>I understand — anyone with an account can get {confirming.name} for free.</span>
+              </label>
+            </div>
+          )}
+          {confirmingEndsOffer && (
+            <p className="mt-4 rounded-control border border-status-warning/30 bg-status-warning/10 p-3 text-2xs leading-relaxed text-text-secondary">
+              This ends the free offer. Students who already redeemed {confirming.name} keep it until it runs out; from now on it has to be paid for.
+            </p>
+          )}
           <p className="mt-4 text-2xs leading-relaxed text-text-muted">
             {confirming.active_subscribers > 0
               ? `${confirming.active_subscribers} student${confirming.active_subscribers === 1 ? " is" : "s are"} on ${confirming.name} now; they keep what they paid and see the new price when they renew.`

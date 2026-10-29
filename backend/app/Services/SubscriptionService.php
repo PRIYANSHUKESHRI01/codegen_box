@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Notifications\PlanNotifier;
+use App\Services\Payments\PaymentException;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -130,6 +131,69 @@ class SubscriptionService
         }
 
         return $subscriptions;
+    }
+
+    /**
+     * Hands a student a plan whose discount is 100% — the free offer — with no payment, no gateway and no PaymentOrder
+     * (nothing was charged, so there is nothing for the payments ledger to hold). What it leaves behind instead is the
+     * subscription row, marked `offer_redeemed` with the list price, the discount and a `redemption_ref`, so the
+     * superadmin's Subscriptions list, the audit log and the student's history all say how it was obtained and that no
+     * money came in. `price_paid` is 0, so it is never revenue and never converts a lead.
+     *
+     * The caller (OfferRedemptionService) has already priced the cart at ₹0 and checked college cover and downgrades. What
+     * is decided here, under the buyer's row lock, is the one thing that must not race: a free plan must not pile up. A
+     * student who already holds this plan may redeem it again only in its renewal window (the last N days, the same
+     * window the pricing page's Renew button uses), and the new term then stacks on the days left — exactly what paying
+     * to renew does. Without that, clicking Redeem fifty times would be fifty free years.
+     *
+     * @throws PaymentException when they hold this plan and it is not yet in its renewal window
+     */
+    public function redeemOffer(User $user, Plan $plan): Subscription
+    {
+        $reference = (string) Str::ulid();
+
+        $subscription = DB::transaction(function () use ($user, $plan, $reference) {
+            User::whereKey($user->id)->lockForUpdate()->first();
+
+            $held = $user->activeSubscription();
+
+            if ($held !== null && $held->isActive() && (int) $held->plan_id === (int) $plan->id) {
+                $window = (int) config('billing.redeem_renewal_window_days', 30);
+                $end = $held->current_period_end;
+
+                if ($end === null || $held->daysRemaining() > $window) {
+                    throw new PaymentException(
+                        "You already have {$plan->name}".($end ? ' until '.$end->format('j M Y') : '').'. '
+                            .($end ? "You can renew it free once it's within {$window} days of ending." : 'It never expires, so there is nothing to renew.'),
+                        PaymentException::ALREADY_ON_PLAN,
+                        409,
+                    );
+                }
+            }
+
+            return $this->activate($user, $plan, null, [
+                'source' => Subscription::SOURCE_OFFER_REDEEMED,
+                'redemption_ref' => $reference,
+                'list_price' => $plan->listPrice(),
+                'discount' => $plan->discountAmount(),
+                'discount_percent' => (int) $plan->discount_percent,
+                'price_paid' => 0,
+                'quote_total' => 0,
+            ], stackRenewal: true);
+        });
+
+        ActivityLog::record(
+            $user,
+            'Redeemed a free plan offer',
+            'Plan',
+            $plan->name,
+            ['plan_code' => $plan->code, 'list_price' => $plan->listPrice(), 'discount_percent' => (int) $plan->discount_percent, 'redemption_ref' => $reference]
+        );
+
+        app(LifecycleMailService::class)->planRedeemed($user, $subscription->loadMissing('plan'));
+        $this->notifyPlan(fn (PlanNotifier $n) => $n->redeemed($user, $subscription->loadMissing('plan')));
+
+        return $subscription;
     }
 
     /** Longest term a superadmin may hand out by hand, in days — five years. A guard against a typo, not a business rule. */

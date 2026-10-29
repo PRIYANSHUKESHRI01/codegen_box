@@ -45,6 +45,12 @@ class Subscription extends Model
     /** A superadmin gave it by hand — free of charge, or against a payment taken outside the gateway (bank transfer, cash). */
     public const SOURCE_ADMIN_GRANT = 'admin_grant';
 
+    /**
+     * A student redeemed a plan whose discount is 100% (Plan::isRedeemable) — no payment, no gateway, no payment order.
+     * Carries a `redemption_ref` (never a `purchase_ref`, which would make it read as a purchase) and `price_paid` 0.
+     */
+    public const SOURCE_OFFER_REDEEMED = 'offer_redeemed';
+
     /** Assigned by Mellow staff to a college or company through a sales conversation, or started as a demo. */
     public const SOURCE_ADMIN_ASSIGNED = 'admin_assigned';
 

@@ -46,6 +46,10 @@ class GeminiInterviewScoringService
         try {
             $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
                 ->timeout(30)
+                // One more try for what is usually momentary (a dropped connection, a rate-limit blip, Google's 5xx): a failed scoring
+                // otherwise leaves the student without a score for the set. A bad key or bad request is not retried.
+                ->retry(2, 1500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException
+                    || ($exception instanceof \Illuminate\Http\Client\RequestException && in_array($exception->response->status(), [429, 500, 502, 503, 504], true)))
                 ->post(
                     'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
                     [

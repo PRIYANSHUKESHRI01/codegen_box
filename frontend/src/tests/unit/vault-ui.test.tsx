@@ -33,6 +33,7 @@ import { Toaster } from "@/components/ui/Toaster";
 import { resetToasts } from "@/lib/toast";
 import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBreakdown";
+import { MELLOW_VAULT_URL, vaultDoor } from "@/lib/vaultAccess";
 
 const component = (over: Partial<ReadinessComponent> = {}): ReadinessComponent => ({
   key: "interview_performance",
@@ -154,7 +155,7 @@ describe("StudentVaultPage", () => {
   it("shows a newcomer how far they are and offers a yes ahead of time, with the list of what is shared", async () => {
     await open(page({}, 41));
 
-    expect(screen.getByRole("heading", { name: "Vault" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Mellow Vault", level: 1 })).toBeTruthy();
     expect(screen.getByText(/19 more points to reach 60/)).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "Progress toward the Vault" })).toBeTruthy();
     // The yes is an informed one: what is shared is on the page BEFORE the button is pressed.
@@ -343,5 +344,99 @@ describe("StudentVaultPage", () => {
     await flush();
 
     await screen.findByText("Server unavailable");
+  });
+});
+
+// ───────────────────────────── the Mellow Vault door ─────────────────────────────
+
+describe("vaultDoor", () => {
+  const door = (data: StudentVaultResponse) => vaultDoor(data);
+
+  it("is locked below the line, and says how far there is to go", () => {
+    expect(door(page({}, 41))).toEqual({ state: "locked", reason: "score", pointsNeeded: 19 });
+  });
+
+  it("opens at exactly the line, and above it", () => {
+    expect(door(page({}, 60)).state).toBe("open");
+    expect(door(page({}, 88)).state).toBe("open");
+  });
+
+  it("does not lock out a student who is listed and has dipped between the exit and entry lines", () => {
+    // Listed at 60, now 57: the server keeps them in until below 55, so the page must not lock them.
+    expect(door(page({ profile: profile({ status: "visible" }) }, 57)).state).toBe("open");
+  });
+
+  it("stays locked, for the plan's sake, when the score qualifies but the plan does not include the Vault", () => {
+    expect(door(page({ access: false }, 75))).toEqual({ state: "locked", reason: "plan", pointsNeeded: 0 });
+  });
+
+  it("still celebrates a hire whose plan has since lapsed", () => {
+    expect(door(page({ access: false, profile: profile({ status: "hired" }) }, 75)).state).toBe("open");
+  });
+
+  it("is locked while Mellow staff hold the profile, whatever the score", () => {
+    expect(door(page({ profile: profile({ status: "hidden_by_mellow" }) }, 90))).toMatchObject({ state: "locked", reason: "review" });
+  });
+});
+
+describe("StudentVaultPage - the Mellow Vault button and what surrounds it", () => {
+  const open = async (data: StudentVaultResponse) => {
+    get.mockResolvedValue(data);
+    render(<StudentVaultPage />);
+    await screen.findByText("Your readiness score");
+  };
+
+  it("below 60: shows the button locked (not a link), the benefit, the steps and the tracker", async () => {
+    await open(page({}, 41));
+
+    const button = screen.getByRole("button", { name: /Open Mellow Vault/ });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("title")).toBe("Locked until your readiness reaches 60% — 19 points to go");
+    expect(screen.queryByRole("link", { name: /Open Mellow Vault/ })).toBeNull();
+
+    expect(screen.getByRole("heading", { name: "Cross 60% readiness to unlock Mellow Vault" })).toBeTruthy();
+    expect(screen.getByText(/always looking for ready, talented candidates/)).toBeTruthy();
+    expect(screen.getByText("How it works")).toBeTruthy();
+    expect(screen.getByText("Why Mellow Vault")).toBeTruthy();
+    expect(screen.getByText("Your progress to the Vault line")).toBeTruthy();
+  });
+
+  it("clicking the locked button does nothing and opens nothing", async () => {
+    const opener = vi.spyOn(window, "open").mockImplementation(() => null);
+    await open(page({}, 41));
+    fireEvent.click(screen.getByRole("button", { name: /Open Mellow Vault/ }));
+    expect(opener).not.toHaveBeenCalled();
+    opener.mockRestore();
+  });
+
+  it("at 60 and above: the button is a real link to Mellow Vault that opens in a new tab", async () => {
+    await open(page({ profile: profile() }, 72));
+
+    const link = screen.getByRole("link", { name: /Open Mellow Vault/ });
+    expect(link.getAttribute("href")).toBe("https://mellowvault.com/developer_admin");
+    expect(link.getAttribute("href")).toBe(MELLOW_VAULT_URL);
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toContain("noopener");
+    expect(screen.queryByRole("button", { name: /Open Mellow Vault/ })).toBeNull();
+
+    expect(screen.getByRole("heading", { name: "You’re Mellow Vault ready" })).toBeTruthy();
+    // the "why / how" pitch is for people who have not got there yet
+    expect(screen.queryByText("How it works")).toBeNull();
+    expect(screen.queryByText("Why Mellow Vault")).toBeNull();
+  });
+
+  it("on a plan without the Vault: score qualifies, button stays locked and says it is the plan, with the upgrade prompt", async () => {
+    await open(page({ access: false, profile: profile() }, 72));
+
+    const button = screen.getByRole("button", { name: /Open Mellow Vault/ });
+    expect(button.getAttribute("title")).toBe("Locked — Mellow Vault is part of the Expert plan");
+    expect(screen.queryByRole("link", { name: /Open Mellow Vault/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /See plans/ }).getAttribute("href")).toBe("/dashboard/billing");
+  });
+
+  it("under a staff hold: locked, and says the profile is under review", async () => {
+    await open(page({ profile: profile({ status: "hidden_by_mellow" }) }, 80));
+
+    expect(screen.getByRole("button", { name: /Open Mellow Vault/ }).getAttribute("title")).toBe("Locked — your profile is under review");
   });
 });

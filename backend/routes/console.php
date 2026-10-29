@@ -35,6 +35,10 @@ Schedule::command('vault:sync')->everyMinute()->withoutOverlapping(5);
 // Daily: drop delivered Vault outbox events past their retention.
 Schedule::command('vault:prune')->daily();
 
+// The safety net under live AI scoring: a finished interview is scored right after the request that finished it; this catches the rare
+// one that was left unscored (a restart mid-scoring) so no student is stuck on "scoring...".
+Schedule::command('interview:score-pending')->everyMinute()->withoutOverlapping(5);
+
 // Daily: remove practice interviews a student built but never took (kept once they have a session).
 Schedule::command('interview:prune-practice')->dailyAt('03:50');
 

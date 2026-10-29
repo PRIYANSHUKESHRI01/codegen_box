@@ -1,0 +1,898 @@
+import os
+import sys
+sys.path.append(os.path.dirname(__file__))
+from vault_helper import write_php_file
+
+part3_data = {
+    # ------------------ E-COMMERCE ------------------
+    # Series 1
+    'fullstack-ecommerce-s1-set1': [
+        {
+            'text': "How do you model core e-commerce entities in a relational database? Explain the relationships between Products, Product Variants, SKUs, Categories, and Inventory levels.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Candidate must show that a Product acts as parent container, Variants hold specific combinations (e.g. Size M / Color Blue) with unique SKUs, prices, barcodes, and inventory rows mapped per warehouse."
+        },
+        {
+            'text': "Compare managing shopping cart state in client-side localStorage versus server-side Redis versus relational database sessions. What are the conversion trade-offs?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "localStorage is fast but loses items on device switch; Redis offers high-speed persistent session lookup by cart token; DB sessions persist long-term for cross-device checkout recovery with higher write load."
+        },
+        {
+            'text': "Walk through the architectural stages of a modern checkout flow: cart validation, address input, shipping calculation, tax computation, payment processing, and order confirmation.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Highlight atomic steps, validating cart item prices right before payment, calculating accurate real-time taxes and shipping, creating temporary order reservations, and transitioning order status post-payment."
+        },
+        {
+            'text': "How should discount codes and promotional pricing rules be structured? How do you prevent coupon abuse like applying multiple stacking percentage discounts simultaneously?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Rule engine evaluating coupon eligibility (min order value, usage limits, user email restriction), explicit 'stackable' boolean flag, applying discounts in strict order (item-level, then cart-level)."
+        },
+        {
+            'text': "How do e-commerce platforms calculate sales tax (VAT / GST / US sales tax) across multiple state and international jurisdictions? Why is third-party tax API integration standard?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Tax rules vary by destination address, product category exemption, nexus laws, and marketplace facilitator rules. Services like Avalara / Stripe Tax automate rate calculation and legal compliance."
+        }
+    ],
+    'fullstack-ecommerce-s1-set2': [
+        {
+            'text': "Explain the Payment Intent API workflow (e.g. Stripe or Razorpay). How does client-side tokenization prevent sensitive credit card numbers from ever touching your application servers?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Client SDK renders hosted iframe (Stripe Elements) directly sending card details to payment processor, returning temporary client_secret/token. App server never handles raw PAN, maintaining PCI-DSS SAQ-A compliance."
+        },
+        {
+            'text': "How do you prevent inventory overselling during checkout? Compare optimistic inventory locking with temporary reservation expirations (e.g. holding items for 10 minutes).",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "When user enters checkout, create reservation with TTL (Redis/DB). If user completes payment, finalize deduction; if TTL expires without payment, release inventory back to available pool."
+        },
+        {
+            'text': "Detail the states and transitions of an Order Lifecycle: Pending, Payment Authorized, Paid, Processing, Shipped, Delivered, Cancelled, and Refunded. What triggers each transition?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "State machine pattern: Payment webhook triggers Pending -> Paid; warehouse packing triggers Paid -> Processing; carrier tracking webhook triggers Processing -> Shipped -> Delivered; refunds trigger Refunded."
+        },
+        {
+            'text': "How do you implement search and faceted filtering (by brand, price range, rating, size) for a catalog of 100,000 products using Elasticsearch or Algolia?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Index documents with searchable text and filterable attributes (keywords/integers). Execute bool queries with multi-match for search term and filter clauses for facets, returning aggregations for dynamic facet counts."
+        },
+        {
+            'text': "How should Guest Checkout be supported while allowing seamless order linking if the guest later registers an account with the same email address?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Orders link to customer_email and optional user_id (nullable). On guest purchase, issue signed guest order token; on subsequent account registration, run background job linking past orders matching email."
+        }
+    ],
+    'fullstack-ecommerce-s1-set3': [
+        {
+            'text': "During a flash sale with 10,000 concurrent buyers competing for 50 items, how do you architect inventory decrement to avoid overselling and database deadlocks?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Decouple from DB. Store stock counter in Redis; decrement using atomic Lua script ('redis.call('DECR', ...)') checking stock >= 0. Once successful, emit purchase event to Kafka queue for async DB persistence."
+        },
+        {
+            'text': "Why are Idempotency Keys mandatory when calling payment gateways or processing webhook callbacks? Walk through what happens when a payment webhook fires three times for the same order.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Webhooks guarantee at-least-once delivery. Backend checks event_id in a processed_events table inside a database transaction: if already processed, return 200 OK immediately without double-fulfilling."
+        },
+        {
+            'text': "What are 3D Secure 2 (3DS2) and Strong Customer Authentication (SCA)? How does your checkout flow handle 'action_required' payment authentication challenges?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "European/global banking mandate for biometric or OTP 2-factor authentication. When payment returns 'requires_action', frontend SDK displays bank modal; on completion, payment transitions to succeeded."
+        },
+        {
+            'text': "How do you design a multi-warehouse fulfillment algorithm that splits an order with items located in different regional warehouses to minimize shipping costs and delivery times?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Solve as optimization problem: query stock per warehouse, minimize number of packages (splits), minimize distance to customer shipping address, and evaluate warehouse packing capacity."
+        },
+        {
+            'text': "A customer complains they were charged twice for an order that showed an error screen. How do you investigate application logs, payment gateway logs, and database transactions to remediate?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Search logs by timestamp and customer email; inspect gateway transactions for multiple charge IDs; check if first charge succeeded but backend DB timed out before recording order; issue immediate refund for duplicate."
+        }
+    ],
+
+    # Series 2
+    'fullstack-ecommerce-s2-set1': [
+        {
+            'text': "Compare modeling dynamic product specifications using an Entity-Attribute-Value (EAV) schema versus a PostgreSQL JSONB document column. What are the indexing trade-offs?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "EAV requires multiple joins and complex SQL; JSONB allows flexible schema per category with GIN indexes (jsonb_path_ops) for fast filtering, providing simpler queries and superior performance."
+        },
+        {
+            'text': "How do e-commerce platforms calculate shipping rates dynamically using carrier APIs (FedEx, UPS, DHL)? How do dimensional weight (DIM weight) and packaging algorithms work?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "DIM weight = (L x W x H) / divisor. 3D Bin Packing algorithm determines optimal box size for cart items; backend queries carrier rate APIs with total weight and dimensions, caching rates for 15 minutes."
+        },
+        {
+            'text': "How does Shopping Cart Abandonment tracking work? How do you reliably capture the customer's email early in the funnel without blocking guest checkout?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Capture email on initial checkout step (blur event), associate with cart session, start abandonment countdown timer (e.g. 1 hour). If order remains unplaced, trigger automated recovery email with cart link."
+        },
+        {
+            'text': "What Schema.org structured data markup (JSON-LD) should be implemented on product detail pages for Google Merchant Center and rich search results?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "@context: 'https://schema.org', @type: 'Product', name, image, description, sku, offers (@type: 'Offer', price, priceCurrency, availability: 'InStock', itemCondition), and aggregateRating."
+        },
+        {
+            'text': "How do you design an upsell and cross-sell recommendation engine on cart and checkout pages without slowing down page load times?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Pre-compute item co-purchasing affinities in background offline jobs; store top recommendations in Redis or edge cache; load recommendation widget asynchronously via client-side fetch after cart renders."
+        }
+    ],
+    'fullstack-ecommerce-s2-set2': [
+        {
+            'text': "How do you architect recurring subscriptions and recurring billing (e.g. monthly coffee subscription)? Detail grace periods, dunning management, and invoice generation.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Subscription state machine, scheduled cron/webhook charge attempts, dunning emails on card decline, retrying payments over 7-day grace period with smart retry logic, and generating PDF invoices."
+        },
+        {
+            'text': "What is a Return Merchandise Authorization (RMA) workflow? Walk through customer return initiation, prepaid shipping label generation, warehouse inspection, and automated refund.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Customer requests RMA; system validates return window; carrier API generates return label; warehouse scans barcode on receipt; grading condition triggers full/partial refund and updates inventory."
+        },
+        {
+            'text': "How do you handle multi-currency e-commerce? Compare presenting localized currency estimates versus actual multi-currency settlement and foreign exchange (FX) rate risks.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Presentation currency converts prices based on daily FX rates for display; settlement in customer's local currency via multi-currency merchant accounts locks exact price, avoiding customer credit card conversion fees."
+        },
+        {
+            'text': "How do you implement an event-driven order processing pipeline using Apache Kafka or AWS SQS? Detail decoupling order intake from fraud checks, ERP sync, and email notifications.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Checkout service publishes 'OrderPlaced' event; independent consumer microservices ingest event asynchronously: Inventory service reserves stock, Fraud service evaluates score, ERP syncs invoice, Notification service sends email."
+        },
+        {
+            'text': "How do you handle partial refunds, line-item cancellations, and customer product exchanges in your database and ledger without corrupting financial reporting?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Double-entry accounting ledger: never edit original order row. Create immutable OrderAdjustment rows with credit/debit transaction records, tracking refunded tax, shipping adjustments, and restocking fees."
+        }
+    ],
+    'fullstack-ecommerce-s2-set3': [
+        {
+            'text': "How do you synchronize real-time inventory between physical retail Point-of-Sale (POS) systems and an online e-commerce store with minimal latency?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Change Data Capture (CDC) or webhook events on POS barcode scan pushed to message broker; inventory service updates centralized pool and broadcasts inventory deltas via WebSockets/SSE to active web carts."
+        },
+        {
+            'text': "A third-party payment gateway experiences a total service outage for 2 hours during peak shopping hours. How should your e-commerce checkout failover gracefully?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Circuit breaker detects elevated 5xx/timeouts from primary gateway; dynamically routes traffic to secondary backup payment processor (e.g. Adyen/PayPal), or offers 'Buy Now, Pay Later' / offline invoice fallback."
+        },
+        {
+            'text': "How do you execute zero-downtime database schema migrations on a high-traffic e-commerce order table with 50 million rows?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Expand-Contract (Parallel Run) pattern: add new column as nullable, deploy code writing to both old and new columns, backfill historical data in batches, deploy code reading from new column, drop old column."
+        },
+        {
+            'text': "Explain cache invalidation strategies for e-commerce product pages where prices, promotional badges, and stock availability change constantly.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Edge cache static product shell (images, descriptions) with long TTL; inject dynamic stock and personalized prices via client-side micro-APIs or Edge Workers (ESI - Edge Side Includes); purge edge cache on price updates."
+        },
+        {
+            'text': "How do you protect your e-commerce checkout from automated credential stuffing attacks and bot scalpers buying out limited-release merchandise in seconds?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Cloudflare Bot Management / reCAPTCHA v3 invisible score; rate limiting IP and device fingerprint; queue waiting rooms (Virtual Waiting Room); requiring verified SMS/email authentication on checkout start."
+        }
+    ],
+
+    # Series 3
+    'fullstack-ecommerce-s3-set1': [
+        {
+            'text': "Compare B2B e-commerce requirements with consumer B2C: custom price tiers per account, net payment terms (Net 30/60), punchout catalogs (cXML), and multi-tier approval workflows.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "B2B features account hierarchy (organization -> departments -> buyers), contract pricing matrices, credit limits, requisition order approval trees before checkout, and invoicing rather than instant credit card capture."
+        },
+        {
+            'text': "How do you calculate Customer Lifetime Value (LTV), Customer Acquisition Cost (CAC), and Cohort Retention for an e-commerce platform using SQL?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Group customers by acquisition month cohort; calculate total revenue over time minus COGS; track repeat purchase frequency, average order value (AOV), and churn rate to evaluate LTV:CAC health."
+        },
+        {
+            'text': "What are the security requirements of Payment Card Industry Data Security Standard (PCI-DSS) Level 1 compliance? How does scope reduction benefit architecture?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Full compliance requires extensive annual on-site audits, firewall architecture, encryption of cardholder data. Using hosted fields/iframes reduces merchant scope to SAQ-A, transferring primary liability to payment provider."
+        },
+        {
+            'text': "How do you model complex Product Bundles (e.g. 'Camera Kit' including body, lens, and SD card) where components have independent inventory and return policies?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Bundle product entity references child variant SKUs with quantities and bundle discount. When purchased, inventory decrements from each individual child SKU; returns calculate prorated component prices."
+        },
+        {
+            'text': "How do you design an e-commerce loyalty rewards program (points per dollar spent, VIP tiers, point redemption against orders) that prevents financial arbitrage?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Points accrue only after order fulfillment and return window expiry; establish strict point-to-currency redemption ratio cap (e.g. max 20% order total paid via points); reverse points automatically on returns."
+        }
+    ],
+    'fullstack-ecommerce-s3-set2': [
+        {
+            'text': "Architect a Headless E-Commerce platform using Next.js on Vercel, Shopify Plus / Saleor as headless commerce engine, and Algolia for search. What are the caching trade-offs?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Next.js Incremental Static Regeneration (ISR) pre-renders product pages; on-demand webhook invalidates pages on Shopify product update; checkout redirects to secure hosted checkout or uses GraphQL Storefront API."
+        },
+        {
+            'text': "How do you design a real-time Fraud Detection pipeline scoring transactions before payment authorization? Detail signals like IP velocity, device fingerprinting, and billing-shipping mismatch.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Gather signals: device fingerprint, proxy/VPN detection, card country vs shipping country, order velocity per hour. Rule engine or ML model assigns risk score: <30 approve, 30-70 challenge 3DS2, >70 block."
+        },
+        {
+            'text': "Explain the logistics tracking architecture for ingesting webhook status updates from 20 international shipping carriers (FedEx, UPS, DHL, Royal Mail) with unified customer notifications.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Adapter pattern standardizes disparate carrier webhook payloads into a common internal TrackingEvent schema; saves to timeline; publishes to notification engine sending SMS/email on status change."
+        },
+        {
+            'text': "How do you manage database read/write splitting and replication lag in high-volume e-commerce to ensure a customer immediately sees their placed order after checkout?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Writes and immediate post-checkout reads route to primary database ('read-your-own-writes' consistency); read replicas handle general catalog browsing; use session sticky routing to primary for 30s after write."
+        },
+        {
+            'text': "How do you implement an Automated Chargeback and Dispute Management workflow connecting payment gateway webhooks to internal order fulfillment evidence?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Webhook receives 'charge.dispute.created'; automated worker gathers signed proof of delivery, tracking number, customer IP, and AVS/CVV verification logs, generating dispute evidence package submitted via API."
+        }
+    ],
+    'fullstack-ecommerce-s3-set3': [
+        {
+            'text': "Architect an enterprise e-commerce platform handling $1 Billion in GMV annually and 100,000 orders per minute during Black Friday. Detail infrastructure, databases, queues, and resilience.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Global Anycast edge routing, decoupled microservices on Kubernetes, Redis cluster for carts/locks, Kafka event bus for async order ingestion, distributed CockroachDB/Aurora, circuit breakers, and queue waiting room."
+        },
+        {
+            'text': "How do you achieve multi-region active-active database consistency for global e-commerce inventory while respecting the CAP theorem?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Partition inventory ownership by regional warehouse; each region is authoritative for its physical stock. For shared digital goods, use distributed consensus (Raft/Spanner) or reservations across regions."
+        },
+        {
+            'text': "A rogue automated script exploits a race condition in your checkout pricing engine, buying $500 items for $5. Walk through your emergency incident response and financial containment.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Emergency kill-switch / maintenance mode on checkout; halt order fulfillment warehouse queue; patch pricing validator logic; identify all affected orders via SQL; cancel and refund orders citing pricing error TOS clause."
+        },
+        {
+            'text': "How do you design an enterprise Market Basket Analysis recommendation system using the Apriori or FP-Growth algorithm to drive cross-sell revenue?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Extract historical order transactions; run FP-Growth mining association rules with minimum Support, Confidence, and Lift; store top rule pairings in low-latency key-value cache queried during cart checkout."
+        },
+        {
+            'text': "What are the technical and regulatory considerations for expanding e-commerce into mainland China (Cross-Border E-Commerce, Alipay/WeChat Pay, ICP license, Great Firewall latency)?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Must host assets inside China (requires ICP license) or use near-China CDN (Hong Kong); integrate WeChat Pay / Alipay SDKs; comply with PIPL (Personal Information Protection Law); adapt UX for super-app ecosystems."
+        }
+    ],
+
+    # ------------------ CLOUD COMPUTING ------------------
+    # Series 1
+    'devops-cloud_computing-s1-set1': [
+        {
+            'text': "Explain the core networking architecture of a Virtual Private Cloud (VPC). What is the difference between a Public Subnet and a Private Subnet, and how do Route Tables, Internet Gateways (IGW), and NAT Gateways route outbound traffic safely for internal database instances?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "A public subnet has a route table directing 0.0.0.0/0 to an Internet Gateway (IGW), giving instances with public IPs direct internet access. A private subnet has no direct route to an IGW; outbound traffic (e.g. OS patches) is routed through a NAT Gateway located in a public subnet, preventing inbound internet connections from reaching private database instances."
+        },
+        {
+            'text': "What are Cloud Regions, Availability Zones (AZs), and Edge Locations? Why should a production system be deployed across multiple AZs within a region?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Region: geographic area with multiple AZs; AZ: isolated data centers with redundant power and networking; Edge: CDN points of presence. Multi-AZ ensures high availability if a flood or power failure takes down one AZ."
+        },
+        {
+            'text': "Compare Cloud Virtual Machines (e.g. AWS EC2) with Cloud Object Storage (e.g. AWS S3) and Block Storage (e.g. AWS EBS). When do you use EBS versus S3?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "EC2 is virtual server compute; EBS is low-latency block storage attached as virtual drive to a single instance (for OS and databases); S3 is scalable object storage accessed over HTTP (for media, backups, data lakes)."
+        },
+        {
+            'text': "Explain the Cloud Shared Responsibility Model. What security responsibilities belong to the cloud provider (AWS/Azure/GCP) versus the customer?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Provider secures 'OF the cloud' (physical hardware, data centers, hypervisors, global networking); customer secures 'IN the cloud' (guest OS patching, IAM policies, firewall rules, data encryption, application code)."
+        },
+        {
+            'text': "Compare Docker containers with Virtual Machines. How do Linux kernel namespaces (PID, NET, MNT, IPC) and control groups (cgroups) provide process isolation and resource bounding without the overhead of running a full guest OS hypervisor?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "VMs run a full guest OS kernel on top of a hypervisor (Type 1 or Type 2), incurring high memory and boot time overhead. Containers share the host Linux kernel; namespaces isolate processes, network interfaces, and mount points, while cgroups limit and meter hardware resource consumption (CPU, RAM, block I/O), achieving sub-second startup."
+        }
+    ],
+    'devops-cloud_computing-s1-set2': [
+        {
+            'text': "What is a Virtual Private Cloud (VPC)? Explain the purpose of Public Subnets, Private Subnets, Internet Gateways, and NAT Gateways.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "VPC isolates network. Public subnet has route to Internet Gateway (for load balancers); Private subnet has no direct public IP, using NAT Gateway for outbound-only internet access (protecting databases/backends)."
+        },
+        {
+            'text': "How does Cloud Identity and Access Management (IAM) work? Explain Users, Groups, Roles, Policies (JSON permissions), and the Principle of Least Privilege.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "IAM regulates authentication and authorization. Roles grant temporary credentials (STS) to services without hardcoded API keys; Least Privilege grants only the minimum necessary permissions required for the task."
+        },
+        {
+            'text': "Compare Application Load Balancers (ALB, Layer 7) with Network Load Balancers (NLB, Layer 4). When is an NLB required over an ALB?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ALB routes based on HTTP/HTTPS path, headers, and hostnames (Layer 7); NLB routes raw TCP/UDP with ultra-low latency and static IP addresses handling millions of requests/sec (Layer 4, gaming, VoIP, extreme scale)."
+        },
+        {
+            'text': "Compare managed relational databases (like AWS RDS / Cloud SQL) with managed NoSQL databases (like AWS DynamoDB / Google Cloud Firestore).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "RDS manages automated backups, Multi-AZ failover, and OS patching for SQL engines; DynamoDB provides serverless, single-digit millisecond latency at any scale with automatic horizontal partitioning and key-value/document model."
+        },
+        {
+            'text': "What is Serverless Computing (e.g. AWS Lambda / Cloud Functions)? Explain execution triggers, statelessness, cold starts, and maximum execution timeouts.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Event-driven compute running code without provisioning servers; billed per millisecond of execution; cold start is initialization latency on new container spawn; maximum execution limit is typically 15 minutes."
+        }
+    ],
+    'devops-cloud_computing-s1-set3': [
+        {
+            'text': "Define Recovery Time Objective (RTO) and Recovery Point Objective (RPO). How do they dictate Disaster Recovery (DR) architectures in the cloud?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "RTO is maximum acceptable downtime before service is restored; RPO is maximum acceptable data loss measured in time (e.g. last backup 1 hour ago = 1 hour RPO). Drives choice between backup/restore, pilot light, or active-active."
+        },
+        {
+            'text': "How do you optimize cloud compute costs across AWS EC2 instances using On-Demand, Reserved Instances (RIs), Savings Plans, and Spot Instances?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "On-Demand for unpredictable short-term workloads; Reserved/Savings Plans for steady baseline workloads (1-3 yr commitment for up to 72% discount); Spot instances for fault-tolerant batch processing (up to 90% discount)."
+        },
+        {
+            'text': "How does Auto Scaling work in cloud compute? Explain scaling policies: Target Tracking (e.g. maintain 60% CPU utilization), Step Scaling, and Scheduled Scaling.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Auto Scaling Group monitors metrics via CloudWatch alarms; Target Tracking dynamically adjusts instance count to hit metric goal; Step scaling responds to severity thresholds; Scheduled scales for predictable known peaks."
+        },
+        {
+            'text': "Compare AWS CloudWatch with AWS CloudTrail. What is the operational difference between monitoring system performance and auditing security API calls?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CloudWatch collects metrics, logs, and triggers operational alarms (CPU, memory, disk, custom app logs); CloudTrail audits who did what, recording all API calls, IAM identity, IP, and timestamp for security compliance."
+        },
+        {
+            'text': "How does AWS Key Management Service (KMS) implement Envelope Encryption for data at rest? What is the difference between Customer Master Keys (CMKs) and Data Encryption Keys (DEKs)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Envelope encryption encrypts plaintext data with a unique Data Key (DEK); the DEK is then encrypted under a Master Key (CMK) stored securely in KMS. Eliminates sending massive raw data payloads to KMS over network."
+        }
+    ],
+
+    # Series 2
+    'devops-cloud_computing-s2-set1': [
+        {
+            'text': "Explain AWS S3 Storage Classes: S3 Standard, S3 Intelligent-Tiering, S3 Standard-IA, S3 One Zone-IA, and S3 Glacier. How do S3 Lifecycle policies optimize storage bills?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Standard for active data; Intelligent-Tiering auto-moves data between tiers based on access patterns; Glacier for long-term archives. Lifecycle rules automatically transition objects to cheaper tiers after N days."
+        },
+        {
+            'text': "Compare Security Groups with Network Access Control Lists (NACLs) in AWS VPC. What is the practical difference between stateful and stateless firewall rules?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Security Groups act at instance level (stateful: return traffic automatically allowed regardless of inbound rules, allow-rules only); NACLs act at subnet level (stateless: inbound and outbound rules required explicitly, allows and denies)."
+        },
+        {
+            'text': "How does DNS routing work in Amazon Route 53? Compare Simple, Weighted, Latency-based, Failover, and Geolocation routing policies.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Weighted for canary testing; Latency routes to lowest network latency region; Failover routes to secondary DR site on health check failure; Geolocation routes based on user's geographic location."
+        },
+        {
+            'text': "How does CloudFront Content Delivery Network (CDN) work? Explain Edge Caching, Origin Shield, Cache Behaviors, and Signed URLs for private content.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Caches responses at 400+ points of presence worldwide; Origin Shield adds centralized caching layer reducing origin load; Signed URLs restrict premium video/download access to authorized users."
+        },
+        {
+            'text': "What is an Elastic IP address in AWS? Why does releasing or reassigning Elastic IPs require care, and what is the billing penalty for unattached Elastic IPs?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Static public IPv4 address allocated to AWS account that can be dynamically remapped to instances during failure. AWS charges an hourly fee for allocated but unattached Elastic IPs to discourage IPv4 waste."
+        }
+    ],
+    'devops-cloud_computing-s2-set2': [
+        {
+            'text': "How do you build a resilient, serverless event-driven architecture using Amazon SQS (Simple Queue Service) and Amazon SNS (Simple Notification Service) fan-out pattern?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "SNS topic publishes broadcast event; multiple SQS queues subscribe to topic (fan-out); worker Lambda functions consume from queues independently, isolating message processing across domains."
+        },
+        {
+            'text': "Compare container deployment on AWS: AWS Elastic Container Service (ECS with Fargate) versus AWS Elastic Kubernetes Service (EKS). When should an organization choose ECS over EKS?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "ECS is deeply integrated with AWS primitives, simpler to learn, with zero control-plane management; EKS provides cloud-agnostic Kubernetes standard, rich open-source ecosystem, and multi-cloud portability."
+        },
+        {
+            'text': "How does AWS RDS Multi-AZ deployment differ from RDS Read Replicas in terms of replication mechanism (synchronous vs asynchronous) and failover purpose?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Multi-AZ is synchronous replication to standby instance in another AZ for high availability and automatic failover (no read traffic); Read Replicas are asynchronous replication for read scaling across regions."
+        },
+        {
+            'text': "What is AWS CloudFormation / AWS Cloud Development Kit (CDK)? How does declarative infrastructure modeling prevent configuration drift across dev and prod?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Code-based infrastructure templates committed to Git; CDK allows using TypeScript/Python to synthesize CloudFormation; drift detection identifies manual console changes outside of template state."
+        },
+        {
+            'text': "How does Cross-Account IAM access work using AWS Security Token Service (STS) and AssumeRole? Why is this superior to sharing IAM user access keys?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "User in Account A assumes an IAM Role in Account B with trust policy; STS issues temporary credentials (1h); eliminates hardcoded long-lived credentials and centralizes audit logging."
+        }
+    ],
+    'devops-cloud_computing-s2-set3': [
+        {
+            'text': "Architect a multi-region active-active web application on AWS with sub-second database replication and automated regional traffic failover.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Route 53 latency routing with health checks, Application Load Balancers, containerized apps on ECS/EKS in US-East and EU-West, Amazon Aurora Global Database (sub-second cross-region replication), and DynamoDB Global Tables."
+        },
+        {
+            'text': "You discover that inter-VPC network traffic costs have spiked to $15,000/month. How do you analyze network telemetry and optimize VPC Peering, Transit Gateway, and NAT Gateway data transfer?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Enable VPC Flow Logs, analyze traffic in Athena; replace cross-AZ S3 traffic with free VPC S3 Gateway Endpoints; replace NAT Gateway for internal traffic with VPC Interface Endpoints (PrivateLink); use direct VPC Peering for high-volume pairs."
+        },
+        {
+            'text': "An AWS IAM Access Key belonging to a developer is accidentally committed to a public GitHub repository. Walk through your immediate 15-minute emergency security remediation protocol.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "1) Deactivate and delete compromised key in IAM console immediately; 2) Review CloudTrail logs for unauthorized API calls spawned from key; 3) Terminate unauthorized EC2/crypto-mining resources; 4) Rotate credentials and notify security team."
+        },
+        {
+            'text': "How do you implement the AWS Well-Architected Framework's 6 Pillars (Operational Excellence, Security, Reliability, Performance Efficiency, Cost Optimization, Sustainability) in an architecture review?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Evaluate architecture systematically against 6 pillars: automate operations as code; enforce least privilege/defense-in-depth; test recovery procedures; use serverless/managed services; continuously monitor cost waste."
+        },
+        {
+            'text': "Explain how AWS Step Functions orchestrates complex, distributed microservices workflows with error handling, branching, and human-in-the-loop approval gates.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "State machine defined in Amazon States Language (JSON); coordinates Lambda, ECS tasks, and database queries; handles retries with exponential backoff, catch blocks, parallel execution, and wait states."
+        }
+    ],
+
+    # Series 3
+    'devops-cloud_computing-s3-set1': [
+        {
+            'text': "Compare Ephemeral Storage (e.g. EC2 Instance Store) with Persistent Storage (EBS, EFS). What happens to instance store data when an instance is stopped versus rebooted?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Instance store is physical NVMe SSD directly attached to host server (extreme IOPS), but ephemeral: stopping or terminating instance permanently loses all data; rebooting retains data. EBS persists independently."
+        },
+        {
+            'text': "What is the difference between an S3 Bucket Policy, S3 Access Control List (ACL), and an IAM Policy? In what order does AWS evaluate multiple overlapping permissions?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Order: Explicit Deny always overrides everything > Explicit Allow (from IAM, Bucket Policy, or ACL) > Default Deny. Bucket policies regulate resource-level access; IAM policies regulate user-level access."
+        },
+        {
+            'text': "What are AWS Lambda Cold Starts? What factors influence cold start latency (runtime language, memory allocation, VPC attachment), and how does Provisioned Concurrency solve it?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Cold start is container provisioning time. Compiled runtimes (Go/Rust) have faster cold starts than Java; larger memory allocates proportional CPU speed. Provisioned Concurrency keeps warm initialized instances ready 24/7."
+        },
+        {
+            'text': "How do Cloud Budgets and AWS Cost Anomaly Detection alert finance and engineering teams before runaway compute bills occur?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Cost Anomaly Detection uses machine learning to identify unexpected spend patterns; AWS Budgets triggers SNS alerts and automated action policies (e.g. attaching strict IAM deny policies or stopping dev EC2s) when thresholds are crossed."
+        },
+        {
+            'text': "Compare Site-to-Site VPN with AWS Direct Connect for hybrid enterprise cloud connectivity in terms of bandwidth, latency, setup time, and encryption.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Site-to-Site VPN sets up in minutes over public internet with IPsec encryption (variable latency); Direct Connect establishes dedicated physical fiber connection (1-100 Gbps, consistent low latency, no encryption by default unless paired with MACsec/IPsec)."
+        }
+    ],
+    'devops-cloud_computing-s3-set2': [
+        {
+            'text': "How does AWS WAF (Web Application Firewall) integrate with ALB and CloudFront? How do you write custom rules to mitigate SQL Injection, Cross-Site Scripting, and HTTP flood attacks?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "WAF inspects incoming HTTP requests at edge or ALB. Deploy AWS Managed Rules for OWASP Top 10; rate-based rules block IP addresses exceeding 500 requests/5 min; custom regex matches malicious patterns in headers/body."
+        },
+        {
+            'text': "Explain automated secrets management using AWS Secrets Manager. How does it handle automatic database credential rotation without taking down running applications?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Secrets Manager invokes a Lambda rotation function executing 4-step process: createSecret, setSecret, testSecret, finishSecret. The database updates password, verifies connection, and flips active secret version seamlessly."
+        },
+        {
+            'text': "Compare Cloud Disaster Recovery strategies: Backup & Restore, Pilot Light, Warm Standby, and Multi-Site Active/Active in terms of cost and RTO/RPO trade-offs.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Backup & Restore: cheapest, highest RTO (hours/days); Pilot Light: minimal core running, databases replicating, scales up on disaster (RTO tens of minutes); Warm Standby: smaller scaled-down version running; Active/Active: instant RTO (seconds), most expensive."
+        },
+        {
+            'text': "How do you design an enterprise Multi-Account strategy using AWS Organizations and AWS Control Tower? Explain Service Control Policies (SCPs) and Landing Zones.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Isolate environments (Prod, Staging, Dev, Security, Shared Services) into separate AWS accounts; Control Tower sets up automated landing zones; SCPs enforce guardrails at organizational unit (OU) level (e.g. denying disabling CloudTrail)."
+        },
+        {
+            'text': "Explain the principles of Chaos Engineering in cloud environments. How does AWS Fault Injection Simulator (FIS) inject controlled failures into production infrastructure to prove resilience?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Proactively tests system resilience against unexpected failures. FIS injects real-world stress: terminating EC2 instances, injecting CPU spikes, simulating AZ outages, verifying automated failover and alarming while monitoring stop-condition guardrails."
+        }
+    ],
+    'devops-cloud_computing-s3-set3': [
+        {
+            'text': "Architect an enterprise cloud migration strategy migrating 500 on-premise VMware virtual machines to AWS. Detail the 6 Rs of migration (Rehost, Replatform, Repurchase, Refactor, Retire, Retain).",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Rehost (lift-and-shift via AWS Application Migration Service); Replatform (migrate to RDS/managed DBs); Refactor (redesign for serverless/containers); Repurchase (switch to SaaS); Retire (decommission unused); Retain (keep legacy on-prem)."
+        },
+        {
+            'text': "How do you implement an enterprise FinOps framework in a company spending $50 Million annually across multiple clouds? Detail unit metrics, tagging governance, and anomalous spend detection.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Establish cost allocation tags (Team, Service, Env, CostCenter); measure unit economics (Cloud Cost per Daily Active User); implement automated waste detection (unattached EBS, idle RDS); empower squads with monthly visibility dashboards."
+        },
+        {
+            'text': "Discuss the architectural, operational, and financial trade-offs of a Multi-Cloud strategy (AWS + Azure + GCP) versus committing deeply to a single cloud provider.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Multi-cloud avoids vendor lock-in and leverages best-of-breed services (GCP BigQuery, Azure AD), but incurs massive operational complexity, fragmented security posture, expensive inter-cloud egress fees, and least-common-denominator tooling."
+        },
+        {
+            'text': "Explain Zero Trust Architecture in cloud networking. How do Software-Defined Perimeters (SDP), IAM verification per request, and micro-segmentation eliminate corporate VPN trust models?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "'Never trust, always verify'. Eliminates flat network trust where VPN access gives lateral movement; authenticates and authorizes identity, device health, and context on every single service-to-service request using mTLS."
+        },
+        {
+            'text': "How do you architect an enterprise cloud environment complying with strict data residency regulations (e.g. GDPR, HIPAA, FedRAMP, Saudi PDPL) where customer data cannot leave a physical territory?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Use AWS Local Zones / Outposts; enforce SCP policies restricting resource provisioning exclusively to approved geographical regions; encrypt all data with customer-managed keys (KMS/CloudHSM) stored locally; implement automated geo-fencing audits."
+        }
+    ],
+
+    # ------------------ CLOUD INFRASTRUCTURE & IAC ------------------
+    # Series 1
+    'devops-cloud_infrastructure-s1-set1': [
+        {
+            'text': "Explain Infrastructure as Code (IaC) principles. What is the fundamental difference between Declarative tools (Terraform, CloudFormation) and Imperative tools (Ansible, bash scripts)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Declarative defines 'WHAT' end state should look like (tool determines steps to achieve state); Imperative defines 'HOW' step-by-step commands should execute. Declarative provides predictable convergence and idempotent execution."
+        },
+        {
+            'text': "Walk through the core Terraform workflow: terraform init, terraform plan, terraform apply, and terraform destroy. What specific action does each command perform?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "init downloads required provider plugins and backend modules; plan inspects state and creates execution diff; apply executes infrastructure changes; destroy tears down all resources managed by state file."
+        },
+        {
+            'text': "Explain Linux process management: PID 1 (init/systemd), daemons, process states (Running, Sleeping, Zombie, Stopped), and the signals SIGTERM (15) versus SIGKILL (9).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "systemd manages system startup and services; Zombie is terminated process waiting for parent to read exit status; SIGTERM requests graceful shutdown (trappable by app); SIGKILL immediately kills process via kernel."
+        },
+        {
+            'text': "Walk step-by-step through DNS resolution when an infrastructure engineer runs 'curl https://api.internal.company.com' on a Linux server: /etc/hosts, resolv.conf, recursive resolver, and root/TLD/authoritative servers.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Checks local /etc/hosts; queries nameserver in /etc/resolv.conf; recursive resolver queries root DNS (.), then TLD (.com), then authoritative DNS (company.com); returns A/AAAA record; caches locally according to TTL."
+        },
+        {
+            'text': "What is GitOps? How does managing infrastructure definitions declaratively in Git with automated reconcilers (ArgoCD, Flux) change traditional operations workflows?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Git is single source of truth; declarative state versioned with pull request approvals; automated reconciler continuously compares live cluster state against Git, automatically fixing or alerting on manual drift."
+        }
+    ],
+    'devops-cloud_infrastructure-s1-set2': [
+        {
+            'text': "Explain Terraform State. What is stored in 'terraform.tfstate', why must it never be committed to Git, and how do Remote State Backends (S3 with DynamoDB locking) prevent state corruption?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Maps declared resources to real-world cloud IDs and tracks metadata. Contains sensitive secrets in plaintext (hence never commit to Git); DynamoDB provides distributed locking preventing concurrent apply overwrites."
+        },
+        {
+            'text': "What are Terraform Modules? How do Input Variables, Output Values, and Local Values promote reusable, DRY (Don't Repeat Yourself) infrastructure code?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Modules package related resources (e.g. VPC module); inputs configure parameters; outputs expose resource attributes (e.g. vpc_id) to calling root module; locals encapsulate repeated expressions within module."
+        },
+        {
+            'text': "How do you design a CI/CD pipeline for Terraform using GitHub Actions or GitLab CI? What checks should run on pull requests before approval to apply?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "PR checks: terraform fmt -check (formatting), tflint (best practices), tfsec/checkov (security scanning), terraform plan (posted as PR comment). Apply runs only on merge to main with explicit manual approval gate."
+        },
+        {
+            'text': "What essential Linux networking utilities should an infrastructure engineer know for diagnosing network failures: netstat, ss, curl, dig, traceroute, and iptables?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ss/netstat inspect listening ports and TCP sockets; dig queries DNS records and latency; traceroute maps network hop path and identifies packet loss; iptables configures kernel packet filtering rules."
+        },
+        {
+            'text': "What is Configuration Management? How does Ansible achieve agentless configuration of Linux fleets over SSH using YAML playbooks and idempotency?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Ansible requires no daemon agents installed on target nodes; connects via SSH and executes Python modules; modules are idempotent (only makes changes if current state differs from declared state)."
+        }
+    ],
+    'devops-cloud_infrastructure-s1-set3': [
+        {
+            'text': "What is Terraform State Drift? How do you detect drift, and how does 'terraform refresh' or 'terraform plan' reconcile out-of-band changes made via the AWS Console?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Occurs when someone manually alters cloud resources outside Terraform. 'terraform plan' queries current cloud APIs, compares against state file and code, and proposes changes to overwrite or reconcile drift."
+        },
+        {
+            'text': "Compare Zero-Downtime Deployment strategies: Blue/Green, Canary, and Rolling updates. What are the rollback speeds and infrastructure cost trade-offs of each?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Rolling: updates instances incrementally in-place (cost-effective, slow rollback); Blue/Green: duplicates full environment, switches load balancer traffic instantly (fastest rollback, 2x cost during deploy); Canary: routes 5% traffic to test version."
+        },
+        {
+            'text': "Explain Site Reliability Engineering (SRE) core metrics: Service Level Indicators (SLI), Service Level Objectives (SLO), and Service Level Agreements (SLA). What is an Error Budget?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "SLI is measured metric (e.g. 99.92% successful requests); SLO is internal team target (99.9%); SLA is customer contract with financial penalties (99.5%). Error budget is 100% minus SLO (0.1%); if exhausted, deployments halt to fix stability."
+        },
+        {
+            'text': "How does Prometheus collect and store time-series metrics? Explain pull-based scraping, PromQL, Alertmanager, and Grafana dashboard visualization.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Prometheus scrapes /metrics HTTP endpoints over pull model; stores compressed time-series data; evaluates PromQL alert rules; Alertmanager handles deduplication, silencing, and PagerDuty routing; Grafana graphs metrics."
+        },
+        {
+            'text': "What is a Blameless Post-Mortem? Walk through the structure of an incident report: Executive Summary, Timeline, Root Cause, Contributing Factors, and Action Items.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Focuses on systemic engineering improvements rather than blaming human error; documents detailed timeline (detection, escalation, mitigation), identifies 5 Whys root causes, and assigns prioritized Jira tickets."
+        }
+    ],
+
+    # Series 2
+    'devops-cloud_infrastructure-s2-set1': [
+        {
+            'text': "Explain Linux Memory Management: Virtual Memory, Page Cache, Swap Space, and the Out-Of-Memory (OOM) Killer. How does the kernel decide which process to kill (oom_score)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Virtual memory maps process addresses to physical RAM/swap; page cache buffers disk I/O; when physical RAM is exhausted and swap full, kernel OOM killer calculates oom_score (high RAM usage x badness) and sends SIGKILL."
+        },
+        {
+            'text': "How does SSH key-based authentication work cryptographically? Compare RSA with Ed25519 keys, and explain SSH Agent Forwarding versus ProxyJump through a Bastion host.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Client signs challenge with private key; server verifies with public key in authorized_keys. Ed25519 is faster and more secure than RSA. ProxyJump routes SSH connection through bastion without exposing private keys via agent forwarding."
+        },
+        {
+            'text': "Compare Terraform Workspaces versus Directory-based environment separation (e.g. environments/dev, environments/prod). Why is directory separation preferred for production?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Workspaces share same backend configuration and code, making state isolation brittle and risking accidental prod deploys; Directory separation provides complete backend isolation, separate IAM permissions, and independent module versions."
+        },
+        {
+            'text': "How does Terraform calculate its Resource Dependency Graph? How do implicit dependencies (referencing resource attributes) differ from explicit 'depends_on' directives?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Terraform builds directed acyclic graph (DAG) to determine parallel execution order. Implicit dependencies arise when resource B references resource A's attributes (aws_instance.subnet_id = aws_subnet.id); 'depends_on' forces explicit ordering."
+        },
+        {
+            'text': "What is HashiCorp Vault? Explain how Vault manages dynamic secrets, lease renewals, and PKI certificate generation with automated revocation.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Centralized secrets engine. Generates short-lived dynamic credentials (e.g. DB passwords valid for 1 hour); client must renew lease; when lease expires without renewal, Vault automatically revokes credentials in target system."
+        }
+    ],
+    'devops-cloud_infrastructure-s2-set2': [
+        {
+            'text': "Explain advanced Terraform expressions: dynamic blocks, for_each versus count, and local-exec provisioners. Why are provisioners considered a last resort in IaC?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "for_each uses map/set keys preventing cascading recreation when removing array elements (unlike count); dynamic blocks construct nested configuration blocks; provisioners break declarative model and fail non-idempotently."
+        },
+        {
+            'text': "How do you design a Centralized Logging Architecture for a cloud infrastructure using Fluent Bit, OpenSearch (or Elasticsearch), and Logstash?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Fluent Bit daemonset collects logs from containers/hosts with low resource footprint, filters and parses structured JSON, ships to OpenSearch cluster for indexing, with retention policies (Index State Management)."
+        },
+        {
+            'text': "What is OpenTelemetry (OTel)? How does the OpenTelemetry Collector receive, process (batching/filtering), and export distributed traces, metrics, and logs to observability backends?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Vendor-neutral open standard. OTel Collector has 3-stage pipeline: Receivers (OTLP, Jaeger, Prometheus), Processors (batching, memory limiter, PII redaction), and Exporters (Datadog, Grafana Tempo, Honeycomb)."
+        },
+        {
+            'text': "How do you automate secrets rotation in CI/CD pipelines without storing long-lived cloud credentials in GitHub Secrets? Explain OpenID Connect (OIDC) federation.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "GitHub Actions requests short-lived OIDC JWT from GitHub token mint; passes JWT to AWS STS AssumeRoleWithWebIdentity; AWS validates token signature against GitHub OIDC thumbprint and issues 1-hour temporary credentials."
+        },
+        {
+            'text': "How do you tune the Linux kernel network stack for high-throughput web traffic using sysctl (e.g. net.core.somaxconn, net.ipv4.tcp_max_syn_backlog, ephemeral port ranges)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Increase somaxconn (socket listen backlog) to prevent connection drops; increase tcp_max_syn_backlog for SYN flood resistance; expand ip_local_port_range (1024-65535); enable tcp_tw_reuse for recycling TIME_WAIT sockets."
+        }
+    ],
+    'devops-cloud_infrastructure-s2-set3': [
+        {
+            'text': "A monolithic Terraform state file managing 2,000 resources takes 20 minutes to plan and frequently corrupts. Walk through your strategy to refactor it into micro-states without destroying infrastructure.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Decompose by domain (network, compute, data). Use 'terraform state mv' or 'moved' blocks to transfer resources between state files without deleting/recreating physical cloud resources, using terraform_remote_state for shared outputs."
+        },
+        {
+            'text': "How do you design a Self-Healing Infrastructure pipeline where Prometheus alerts trigger automated remediation playbooks via webhooks or AWS Systems Manager (SSM)?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Prometheus Alertmanager fires webhook to remediation service (e.g. Lambda/SSM); script inspects instance health, drains node, restarts service, or replaces bad instance automatically before paging human on-call."
+        },
+        {
+            'text': "How do you perform Capacity Planning and load forecasting for a 10x traffic surge? How do you calculate required CPU cores, memory headroom, and database IOPS?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Benchmark existing requests-per-core and memory-per-request; model 10x peak throughput; calculate required instance count plus 30% headroom; verify AWS service quotas (vCPU limits, Elastic IPs, IOPS limits) and submit quota increases."
+        },
+        {
+            'text': "How do you audit and harden Linux server infrastructure against the CIS (Center for Internet Security) Benchmarks using automated compliance tooling?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Run OpenSCAP or Lynis; enforce kernel security modules (SELinux/AppArmor); disable unused filesystems and legacy network protocols; configure auditd logging; automate hardening via Ansible CIS roles in golden AMI pipelines."
+        },
+        {
+            'text': "What is Service Mesh (e.g. Istio, Linkerd)? Explain how Envoy sidecar proxies manage traffic routing, mutual TLS (mTLS), and telemetry between microservices.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Injects Envoy proxy container into every application pod; intercepts all inbound/outbound network calls; provides transparent mTLS with automated cert rotation; implements traffic shifting, rate limiting, and distributed tracing."
+        }
+    ],
+
+    # Series 3
+    'devops-cloud_infrastructure-s3-set1': [
+        {
+            'text': "Explain Linux Logical Volume Manager (LVM) and modern filesystems (ext4 vs XFS). How does LVM allow dynamically expanding disk partitions on a running database server?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "LVM pools physical volumes (PV) into volume groups (VG) sliced into logical volumes (LV). To expand: expand underlying EBS volume, run pvresize, lvextend to increase LV size, and resize2fs / xfs_growfs to expand filesystem online."
+        },
+        {
+            'text': "What are Shell Scripting best practices for mission-critical infrastructure automation? Explain why every bash script should start with 'set -euo pipefail'.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "-e exits immediately if any command returns non-zero; -u treats unset variables as an error; -o pipefail prevents errors in pipeline from being masked by trailing successful command. Essential for preventing silent data corruption."
+        },
+        {
+            'text': "What is the difference between Terraform Data Sources and Terraform Resources? What happens when a data source queries a resource that has not yet been created?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Resources declare objects to create/manage; Data Sources perform read-only queries against existing external infrastructure. If data source depends on a newly created resource in same run, it defers evaluation until apply phase."
+        },
+        {
+            'text': "Explain the concept of Immutable Infrastructure. Why is baking complete golden images with Packer and deploying fresh instances superior to patching running servers in-place?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Eliminates configuration drift, untested state, and snowflake servers. Packer bakes OS, security patches, and dependencies into static AMI/container image tested in CI; deployments replace instances entirely."
+        },
+        {
+            'text': "How does Linux cgroups (Control Groups) v2 enforce strict CPU, memory, and I/O resource limits on container processes?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Kernel feature partitioning system resources. cgroups v2 provides unified hierarchy controller; memory.max enforces hard RAM ceiling (triggering OOM kill on breach); cpu.max throttles CPU CFS quota slices."
+        }
+    ],
+    'devops-cloud_infrastructure-s3-set2': [
+        {
+            'text': "How would you build a Custom Terraform Provider from scratch using the official HashiCorp Terraform Plugin Framework in Go?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Implement Provider, Resource, and DataSource interfaces in Go; define schema with typed attributes; implement CRUD methods (Create, Read, Update, Delete) interacting with proprietary REST API, managing state serialization."
+        },
+        {
+            'text': "How do you manage multi-region infrastructure with Terraform using provider aliases and modules? Detail how you provision resources in both us-east-1 and eu-west-1 in a single plan.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Define default provider and aliased provider (provider 'aws' { alias = 'eu', region = 'eu-west-1' }); pass providers = { aws = aws.eu } into child modules, allowing cross-region resource orchestration in one state."
+        },
+        {
+            'text': "How do you architect a Distributed Log Aggregation pipeline handling 10 Terabytes of logs per day with cold storage retention complying with 7-year regulatory mandates?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Kafka ingestion buffer -> Logstash/Vector workers stream hot logs (7 days) into OpenSearch cluster for fast search; worker compresses and batches raw logs to S3 Standard (30 days) -> S3 Glacier Flexible (1 yr) -> S3 Glacier Deep Archive (7 yrs)."
+        },
+        {
+            'text': "Explain how you would design an automated Canary Release rollback pipeline in Kubernetes using Argo Rollouts and Prometheus metrics analysis.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Argo Rollout shifts 10% traffic via service mesh; AnalysisTemplate evaluates Prometheus metrics (error rate <1%, p95 latency <300ms) every 2 min; if analysis fails, rollbacks automatically to stable ReplicaSet instantly."
+        },
+        {
+            'text': "How do you implement Policy as Code using Open Policy Agent (OPA) / Rego or HashiCorp Sentinel to block non-compliant Terraform plans in CI before apply?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Converts 'terraform show -json planfile' to JSON; OPA Rego rules evaluate plan against security policies (e.g. deny any S3 bucket without server-side encryption or any security group opening port 22 to 0.0.0.0/0)."
+        }
+    ],
+    'devops-cloud_infrastructure-s3-set3': [
+        {
+            'text': "Architect an Internal Developer Platform (IDP) serving 2,000 software engineers across 100 microservices. Detail Backstage portal, self-service infrastructure, and automated ephemeral environments.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Backstage service catalog and software templates; Crossplane / Terraform Cloud for self-service IaC provisioning; Kubernetes namespace isolation provisioning on-demand ephemeral preview environments per GitHub PR."
+        },
+        {
+            'text': "A junior engineer accidentally runs 'terraform destroy' on the production VPC state file, or the remote state file is completely corrupted. Walk through your disaster recovery plan.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Enable S3 bucket versioning on state bucket (revert to previous uncorrupted state version immediately); if deleted, use 'terraform import' with IaC code to recreate state mappings without recreating physical cloud resources."
+        },
+        {
+            'text': "How do you design and execute a comprehensive Disaster Recovery simulation testing complete loss of your primary cloud region with zero data corruption?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Schedule GameDay; simulate region blackout by updating Route 53 health check failover; promote cross-region database replica to primary; verify DNS propagation, application health, and transactional integrity; document timeline and gaps."
+        },
+        {
+            'text': "How do you architect an SRE on-call rotation and alerting framework that permanently eliminates Alert Fatigue across 24/7 engineering teams?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Alert ONLY on user-facing symptoms (SLO breaches), never on causes (high CPU); every page must be actionable with a runbook link; automate transient failure retries; review non-actionable pages weekly to delete noisy alerts."
+        },
+        {
+            'text': "Explain how eBPF (Extended Berkeley Packet Filter) technology is revolutionizing Linux observability, networking, and security tooling (Cilium, Falco, Pixie).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Runs sandboxed byte-code programs directly inside Linux kernel without modifying kernel source or loading modules. Provides ultra-low-overhead network packet filtering, tracing syscalls for runtime security, and zero-instrumentation profiling."
+        }
+    ]
+}
+
+if __name__ == '__main__':
+    out_dir = os.path.join(os.path.dirname(__file__), 'vault_questions')
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, 'fullstack_devops_part3.php')
+    write_php_file(out_file, part3_data)
+

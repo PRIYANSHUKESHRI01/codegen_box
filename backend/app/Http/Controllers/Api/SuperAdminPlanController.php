@@ -30,6 +30,11 @@ use Illuminate\Validation\ValidationException;
  * pricing page's numbers and comparison table are generated from them. The
  * hand-written marketing bullets on the plan cards are not (see data/pricing.ts).
  *
+ * A discount of 100% makes the plan a free offer: its card says "Free", the Buy
+ * button becomes "Redeem offer", and the student gets the plan with one click and
+ * no payment (OfferRedemptionService). That is never saved by accident — the editor
+ * must send `confirm_free_offer` — and turning it on or off is flagged in the audit log.
+ *
  * Subscriptions already running are never repriced; a new price applies to
  * whoever buys or renews after it is saved. Every change is written to the
  * audit log with the before and after values.
@@ -64,13 +69,20 @@ class SuperAdminPlanController extends Controller
             ->groupBy('plan_id')
             ->pluck('total', 'plan_id');
 
+        $redeemed = Subscription::query()
+            ->where('meta->source', Subscription::SOURCE_OFFER_REDEEMED)
+            ->whereIn('plan_id', $plans->pluck('id'))
+            ->select('plan_id', DB::raw('count(*) as total'))
+            ->groupBy('plan_id')
+            ->pluck('total', 'plan_id');
+
         return response()->json([
             'currency' => config('billing.currency', 'INR'),
             'limits' => [
                 'max_list_price' => Plan::MAX_LIST_PRICE,
                 'max_discount_percent' => Plan::MAX_DISCOUNT_PERCENT,
             ],
-            'plans' => $plans->map(fn (Plan $plan) => $this->payload($plan, (int) ($subscribers[$plan->id] ?? 0)))->values(),
+            'plans' => $plans->map(fn (Plan $plan) => $this->payload($plan, (int) ($subscribers[$plan->id] ?? 0), (int) ($redeemed[$plan->id] ?? 0)))->values(),
         ]);
     }
 
@@ -83,6 +95,9 @@ class SuperAdminPlanController extends Controller
         $validated = $request->validate([
             'list_price' => ['required', 'integer', 'min:1', 'max:'.Plan::MAX_LIST_PRICE],
             'discount_percent' => ['required', 'integer', 'min:0', 'max:'.Plan::MAX_DISCOUNT_PERCENT],
+            // Making a plan free hands it to every student with one click, so it is never done by a stray keystroke:
+            // the editor sends this only after the superadmin has ticked the warning (see below).
+            'confirm_free_offer' => ['nullable', 'boolean'],
             // The `version` this editor loaded (the price it started from): refuses to overwrite a
             // change another superadmin saved in the meantime, instead of silently discarding it.
             'version' => ['nullable', 'string', 'max:40'],
@@ -90,7 +105,7 @@ class SuperAdminPlanController extends Controller
 
         $actor = $request->user();
 
-        $plan = DB::transaction(function () use ($plan, $validated, $actor) {
+        $plan = DB::transaction(function () use ($plan, $validated, $actor, $request) {
             $locked = Plan::whereKey($plan->id)->lockForUpdate()->firstOrFail();
 
             if (isset($validated['version']) && $validated['version'] !== $this->version($locked)) {
@@ -106,10 +121,24 @@ class SuperAdminPlanController extends Controller
                 return $locked;
             }
 
+            $wasFree = $locked->isRedeemable();
+
             $locked->fill($after + [
                 'pricing_updated_by' => $actor->id,
                 'pricing_updated_at' => now(),
-            ])->save();
+            ]);
+
+            // Judged on the resulting price, not on "100": a ₹1 plan at 99% also rounds to ₹0. Only a change INTO free needs the
+            // confirmation — adjusting the list price of a plan that is already free changes nothing for anyone.
+            $nowFree = $locked->isRedeemable();
+
+            if ($nowFree && ! $wasFree && ! $request->boolean('confirm_free_offer')) {
+                throw ValidationException::withMessages([
+                    'confirm_free_offer' => ["This makes {$locked->name} free: every student will be able to redeem it without paying. Confirm that you mean to do this."],
+                ]);
+            }
+
+            $locked->save();
 
             ActivityLog::record(
                 $actor,
@@ -120,13 +149,13 @@ class SuperAdminPlanController extends Controller
                     'plan_code' => $locked->code,
                     'from' => $before + ['sale_price' => $before['list_price'] - Plan::discountFor($before['list_price'], $before['discount_percent'])],
                     'to' => $after + ['sale_price' => $locked->salePrice()],
-                ]
+                ] + ($nowFree !== $wasFree ? ['free_offer' => $nowFree ? 'turned_on' : 'turned_off'] : [])
             );
 
             return $locked;
         });
 
-        return response()->json(['plan' => $this->payload($plan->load('pricingUpdatedBy:id,name'), $this->activeSubscribers($plan))]);
+        return response()->json(['plan' => $this->payload($plan->load('pricingUpdatedBy:id,name'), $this->activeSubscribers($plan), $this->redemptions($plan))]);
     }
 
     /**
@@ -193,10 +222,11 @@ class SuperAdminPlanController extends Controller
             return $locked;
         });
 
-        return response()->json(['plan' => $this->payload($plan->load('pricingUpdatedBy:id,name'), $this->activeSubscribers($plan))]);
+        return response()->json(['plan' => $this->payload($plan->load('pricingUpdatedBy:id,name'), $this->activeSubscribers($plan), $this->redemptions($plan))]);
     }
+
     /** @return array<string, mixed> */
-    private function payload(Plan $plan, int $activeSubscribers): array
+    private function payload(Plan $plan, int $activeSubscribers, int $redemptions): array
     {
         return $plan->pricing() + [
             'id' => $plan->id,
@@ -207,6 +237,8 @@ class SuperAdminPlanController extends Controller
             'limits' => $this->limits($plan),
             'limits_version' => $this->limitsVersion($plan),
             'active_subscribers' => $activeSubscribers,
+            // Every time a student has taken this plan through the free offer (ever, not just the ones still running).
+            'redemptions' => $redemptions,
             'pricing_updated_by_name' => $plan->pricingUpdatedBy?->name,
             'pricing_updated_at' => $plan->pricing_updated_at?->toIso8601String(),
             'version' => $this->version($plan),
@@ -229,6 +261,11 @@ class SuperAdminPlanController extends Controller
     private function limitsVersion(Plan $plan): string
     {
         return substr(sha1(json_encode($this->limits($plan))), 0, 16);
+    }
+
+    private function redemptions(Plan $plan): int
+    {
+        return Subscription::where('plan_id', $plan->id)->where('meta->source', Subscription::SOURCE_OFFER_REDEEMED)->count();
     }
 
     private function activeSubscribers(Plan $plan): int

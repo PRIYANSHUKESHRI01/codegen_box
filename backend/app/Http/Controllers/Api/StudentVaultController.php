@@ -153,6 +153,8 @@ class StudentVaultController extends Controller
                 // What the components add up to, and what missed days have taken off it (score = base_score - decay.points).
                 'base_score' => $breakdown['base_score'] ?? $breakdown['score'],
                 'decay' => $breakdown['decay'] ?? null,
+                // Set only while a superadmin has set this student's score by hand (the reason is never sent here).
+                'override' => $breakdown['override'] ?? null,
             ],
             'history' => app(ReadinessHistoryService::class)->history($user, $breakdown, 30),
             // Does the plan include listing? The score, the explanation and the breakdown are shown either way;

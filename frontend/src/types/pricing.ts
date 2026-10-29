@@ -35,6 +35,12 @@ export interface PlanPricing {
    * mean nothing: show "contact our team", never ₹0.
    */
   contact_only: boolean;
+  /**
+   * The superadmin has discounted this plan by 100%: students get it by redeeming the offer, never by paying, and the
+   * payment gateway is not involved. Show "Free" and a Redeem button, not ₹0 and Buy. Absent on servers from before
+   * the free offer existed — that means "no".
+   */
+  redeemable?: boolean;
 }
 
 export interface PublicPlan extends PlanPricing {
@@ -53,6 +59,8 @@ export interface AdminPlan extends PublicPlan {
   is_active: boolean;
   /** Students currently on this plan (active and in date). */
   active_subscribers: number;
+  /** How many times students have taken this plan through the free offer, ever. */
+  redemptions?: number;
   pricing_updated_by_name: string | null;
   pricing_updated_at: string | null;
   /** What the editor started from; sent back so a concurrent change is refused instead of overwritten. */

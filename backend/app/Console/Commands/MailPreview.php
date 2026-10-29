@@ -103,7 +103,10 @@ class MailPreview extends Command
             LifecycleEmail::PasswordChanged => ['settings' => ['via' => 'settings', 'at' => now()->toIso8601String()], 'reset' => ['via' => 'reset', 'at' => now()->toIso8601String()]],
             LifecycleEmail::PaymentFailed => ['' => ['order' => 'ord_8F3K2Q', 'plan' => 'Expert', 'amount' => 2999, 'reason' => 'Payment declined by the bank']],
             LifecycleEmail::RefundProcessed => ['full' => ['order' => 'ord_8F3K2Q', 'plan' => 'Expert', 'amount' => 2999, 'full' => true], 'partial' => ['order' => 'ord_8F3K2Q', 'plan' => 'Expert', 'amount' => 500, 'full' => false]],
-            LifecycleEmail::PlanGranted => ['' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days' => 365, 'ends_at' => now()->addDays(365)->toIso8601String(), 'complimentary' => true]],
+            LifecycleEmail::PlanGranted => [
+                '' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days' => 365, 'ends_at' => now()->addDays(365)->toIso8601String(), 'complimentary' => true],
+                'redeemed' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days' => 365, 'ends_at' => now()->addDays(365)->toIso8601String(), 'complimentary' => true, 'redeemed' => true],
+            ],
             LifecycleEmail::PlanExtended => ['' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days' => 30, 'ends_at' => $ends]],
             LifecycleEmail::PlanEnded => ['' => ['plan' => 'Expert', 'plan_code' => 'expert']],
             LifecycleEmail::PlanExpiring => ['7-days' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days_left' => 7, 'ends_at' => $ends], 'tomorrow' => ['plan' => 'Expert', 'plan_code' => 'expert', 'days_left' => 1, 'ends_at' => now()->addDay()->toIso8601String()]],

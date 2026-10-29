@@ -40,7 +40,11 @@ class VaultInterviewQualification extends Model
         'series_scores',
         'series_average',
         'attempt_history',
+        'admin_log',
+        'attempt_offset',
+        'cycle_start',
         'qualified_at',
+        'qualified_by_admin_id',
         'cooldown_until',
     ];
 
@@ -50,6 +54,9 @@ class VaultInterviewQualification extends Model
         'series_scores' => 'array',
         'series_average' => 'float',
         'attempt_history' => 'array',
+        'admin_log' => 'array',
+        'attempt_offset' => 'integer',
+        'cycle_start' => 'integer',
         'qualified_at' => 'datetime',
         'cooldown_until' => 'datetime',
     ];

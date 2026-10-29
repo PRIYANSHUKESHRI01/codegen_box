@@ -398,6 +398,37 @@ class User extends Authenticatable
     }
 
     /**
+     * A person's name always starts every word with a capital, whatever they typed at sign-up ("alex chen" -> "Alex Chen").
+     *
+     * Applied both ways on purpose: when a name is SET it is stored tidied, so new accounts (sign-up, roster import, add-student)
+     * are right at the source; and when it is READ it is tidied again, so accounts written before this rule existed read correctly
+     * everywhere (the dashboard, e-mails, reports, the hand-off to Mellow Vault) without rewriting anyone's stored data.
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value) => self::properName($value),
+            set: fn (?string $value) => self::properName($value),
+        );
+    }
+
+    /**
+     * Capitalises the first letter of each word of a name (and of a hyphenated part: "anne-marie" -> "Anne-Marie"), collapses runs of
+     * spaces and trims. It only ever RAISES a lowercase letter that opens a word: nothing else is touched, so "McDonald", "DSouza",
+     * "O'Brien" and an all-capitals "AKASH" are left exactly as typed rather than "corrected" into something wrong.
+     */
+    public static function properName(?string $name): ?string
+    {
+        if ($name === null) {
+            return null;
+        }
+
+        $name = trim((string) preg_replace('/\s+/u', ' ', $name));
+
+        return (string) preg_replace_callback('/(^|[\s\-])(\p{Ll})/u', fn (array $m) => $m[1].mb_strtoupper($m[2]), $name);
+    }
+
+    /**
      * Only ever set via AuthController::updateAvatar()'s forceFill() — same
      * "cast but deliberately not in $fillable" convention as is_blocked/
      * current_rating above. Null (no photo uploaded yet) resolves to null,

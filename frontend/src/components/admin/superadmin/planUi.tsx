@@ -19,6 +19,7 @@ const SOURCE_LABEL: Record<SubscriptionSource, string> = {
   admin_grant: "Given by admin",
   admin_assigned: "Assigned by Mellow",
   system: "Free plan",
+  offer_redeemed: "Free offer redeemed",
 };
 
 /**
@@ -36,7 +37,8 @@ export function describeSource(row: Pick<AdminSubscriptionRow, "source" | "compl
 }
 
 export function SourceBadge({ row }: { row: Pick<AdminSubscriptionRow, "source" | "complimentary" | "price_paid" | "is_trial"> }) {
-  const tone = row.source === "admin_grant" && row.complimentary ? "border-violet-500/30 bg-violet-500/10 text-violet-500" : "border-border-subtle bg-elevated text-text-secondary";
+  const noRevenue = (row.source === "admin_grant" && row.complimentary) || row.source === "offer_redeemed";
+  const tone = noRevenue ? "border-violet-500/30 bg-violet-500/10 text-violet-500" : "border-border-subtle bg-elevated text-text-secondary";
   return <span className={cn("inline-block rounded-full border px-2 py-0.5 text-3xs font-bold", tone)}>{describeSource(row)}</span>;
 }
 

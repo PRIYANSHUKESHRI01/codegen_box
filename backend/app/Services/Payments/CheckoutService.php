@@ -131,10 +131,22 @@ class CheckoutService
     /** @throws PaymentException */
     private function assertPurchasable(User $user, array $quote): void
     {
+        // A ₹0 cart never reaches a gateway: a free offer is claimed through OfferRedemptionService instead.
         if ($quote['total'] <= 0) {
             throw new PaymentException('That plan is free, so there is nothing to pay for.', PaymentException::NOTHING_TO_PAY, 422);
         }
 
+        $this->assertAllowedToHold($user, $quote);
+    }
+
+    /**
+     * Whether this student may take the cart's plan at all, however it is paid for (money or a free offer): not when a
+     * college already covers them, and not when it would cut a higher plan's paid time short.
+     *
+     * @throws PaymentException
+     */
+    public function assertAllowedToHold(User $user, array $quote): void
+    {
         // A college that pays for its students already covers them: charging one of them
         // personally would be taking money for something they already have.
         $coverage = $user->subscriptionCoverage();

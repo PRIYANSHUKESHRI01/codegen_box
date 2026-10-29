@@ -31,8 +31,12 @@ class Plan extends Model
     /** The Mellow Academy tier: every AptRun feature for three years, arranged with the team (`contact_only`) and never bought at checkout. */
     public const CODE_GRANDMASTER = 'grandmaster';
 
-    /** The superadmin may not discount a plan past this: a typo (400 for 40) must not give a year of access away. */
-    public const MAX_DISCOUNT_PERCENT = 90;
+    /**
+     * The most the superadmin may discount a plan: 100 turns it into a free offer students redeem with one click instead of
+     * paying (see OfferRedemptionService). Because 100 gives a year of access to everyone, SuperAdminPlanController refuses it
+     * unless the request explicitly confirms it — a typo (100 for 10) must not do that quietly.
+     */
+    public const MAX_DISCOUNT_PERCENT = 100;
 
     /** Ceiling for a list price entered by hand (INR). A guard against a stray extra zero, not a business rule. */
     public const MAX_LIST_PRICE = 500000;
@@ -125,7 +129,8 @@ class Plan extends Model
      * real purchase apart from a self-serve downgrade back to free, e.g.
      * for lead-conversion tracking (LeadAssignmentService::convertLead).
      * Judged on the LIST price: a discount never turns a paid plan into "the
-     * free plan" (and the superadmin editor caps it well below 100%).
+     * free plan", not even a 100% one — that is a paid plan on a free offer
+     * (isRedeemable()), still a paid tier for downgrade guards, filters and reports.
      */
     public function isFree(): bool
     {
@@ -176,6 +181,22 @@ class Plan extends Model
         return $this->discountAmount() > 0;
     }
 
+    /**
+     * A priced plan whose discount takes the whole price off: a student gets it by redeeming the offer, never by paying, and
+     * the payment gateway is never involved. Judged on what would be charged (a ₹1 plan at 99% rounds to ₹0 too), so the
+     * pricing page, the checkout and the redeem endpoint can never disagree about "free". A plan nobody can buy self-serve
+     * (inactive, the team-sold Grandmaster, add-ons, college plans) is never redeemable.
+     */
+    public function isRedeemable(): bool
+    {
+        return $this->is_active
+            && $this->audience === self::AUDIENCE_INDIVIDUAL
+            && $this->kind === self::KIND_BASE
+            && ! $this->isContactOnly()
+            && $this->listPrice() > 0
+            && $this->salePrice() === 0;
+    }
+
     /** Billing term as a word for "per ___" — year for a 365-day plan, month for 30, "3 years" for 1,095 days, otherwise the day count. Null for a plan that never expires. */
     public function termUnit(): ?string
     {
@@ -200,7 +221,10 @@ class Plan extends Model
      * `contact_only` is true, so a surface that forgets to check the flag shows
      * nothing alarming, and the one that checks it says "talk to the team".
      *
-     * @return array{code: string, name: string, list_price: int, discount_percent: int, discount_amount: int, sale_price: int, term_days: ?int, term_unit: ?string, is_free: bool, contact_only: bool}
+     * `redeemable` is true when the price has been discounted to ₹0: the surface shows "Free" and a Redeem button instead of
+     * sending the student to pay.
+     *
+     * @return array{code: string, name: string, list_price: int, discount_percent: int, discount_amount: int, sale_price: int, term_days: ?int, term_unit: ?string, is_free: bool, contact_only: bool, redeemable: bool}
      */
     public function pricing(): array
     {
@@ -215,6 +239,7 @@ class Plan extends Model
             'term_unit' => $this->termUnit(),
             'is_free' => $this->isFree(),
             'contact_only' => $this->isContactOnly(),
+            'redeemable' => $this->isRedeemable(),
         ];
     }
 

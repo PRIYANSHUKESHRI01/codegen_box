@@ -8,12 +8,15 @@ use App\Models\InterviewSession;
 use App\Models\User;
 use App\Models\VaultInterviewQualification;
 use App\Models\VaultProfile;
+use App\Models\VaultStackInterest;
 use App\Services\CuratedInterviewSetService;
 use App\Services\NotificationService;
 use App\Services\ScoreLedger;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -35,6 +38,7 @@ class VaultInterviewQualificationService
     public function __construct(
         private readonly CuratedInterviewSetService $curatedService,
         private readonly VaultService $vault,
+        private readonly CuratedCatalog $catalog,
     ) {}
 
     /**
@@ -77,6 +81,8 @@ class VaultInterviewQualificationService
                 'series_scores' => [],
                 'series_average' => null,
                 'cooldown_until' => null,
+                // The failed series of the finished cycle stay on record but no longer count against the student's markers.
+                'cycle_start' => count($qual->attempt_history ?? []),
             ]);
         }
 
@@ -90,6 +96,28 @@ class VaultInterviewQualificationService
      */
     public function getStatus(User $user, string $stackKey): array
     {
+        $found = $this->catalog->stack($stackKey);
+
+        if ($found === null) {
+            throw new NotFoundHttpException("Unknown interview stack [{$stackKey}].");
+        }
+
+        // A stack that is not open yet has no track to show — and must not get a qualification row just for being looked at.
+        $progress = $this->catalog->progress($found['stack']);
+        $existing = VaultInterviewQualification::where('user_id', $user->id)->where('stack_key', $stackKey)->first();
+
+        if (! $progress['live'] && ! $existing?->isQualified()) {
+            return [
+                'stack_live' => false,
+                'status' => 'coming_soon',
+                'stack_key' => $stackKey,
+                'role_key' => $found['role']['key'],
+                'ready_sets' => $progress['ready_sets'],
+                'total_sets' => $progress['total_sets'],
+                'interested' => VaultStackInterest::where('user_id', $user->id)->where('stack_key', $stackKey)->exists(),
+            ];
+        }
+
         $qual = $this->reconcile($this->getOrCreateQualification($user, $stackKey));
 
         $seriesNumber = $qual->current_attempt;
@@ -139,6 +167,7 @@ class VaultInterviewQualificationService
         $cooldownUntil = $qual->cooldown_until;
 
         return [
+            'stack_live' => true,
             'qualification_id' => $qual->id,
             'user_id' => $user->id,
             'stack_key' => $stackKey,
@@ -161,7 +190,7 @@ class VaultInterviewQualificationService
                 'all_sets_completed' => $completedCount >= 3,
                 'series_average' => $qual->series_average,
             ],
-            'past_attempts' => $qual->attempt_history ?? [],
+            'past_attempts' => array_values(array_slice($qual->attempt_history ?? [], (int) $qual->cycle_start)),
         ];
     }
 
@@ -172,6 +201,17 @@ class VaultInterviewQualificationService
      */
     public function startSet(User $user, string $stackKey, int $setNumber): Interview
     {
+        $found = $this->catalog->stack($stackKey);
+
+        if ($found === null) {
+            throw new NotFoundHttpException("Unknown interview stack [{$stackKey}].");
+        }
+
+        // Only an open stack can be sat: all 9 of its sets have questions, so a failed series can always move on to the next.
+        if (! $this->catalog->progress($found['stack'])['live']) {
+            throw new ConflictHttpException("The {$found['stack']['name']} interview is not open yet. Tap \"Notify me\" and we will tell you the moment it is.");
+        }
+
         $this->getOrCreateQualification($user, $stackKey);
 
         return DB::transaction(function () use ($user, $stackKey, $setNumber) {
@@ -267,56 +307,7 @@ class VaultInterviewQualificationService
             $scores[(string) $setNumber] = $scorePercent;
             $qual->series_scores = $scores;
 
-            if (isset($scores['1'], $scores['2'], $scores['3'])) {
-                $avg = round(($scores['1'] + $scores['2'] + $scores['3']) / 3, 2);
-                $qual->series_average = $avg;
-
-                // Kept on the student too (their best series average), whether this series qualifies them or not.
-                app(ScoreLedger::class)->vaultAi((int) $qual->user_id, $avg);
-
-                if ($avg >= VaultInterviewQualification::PASSING_THRESHOLD) {
-                    $qual->status = VaultInterviewQualification::STATUS_QUALIFIED;
-                    $qual->qualified_at = Carbon::now();
-                    $qual->save();
-
-                    // The candidate joins the Vault in the same transaction: if that fails, the score is not recorded
-                    // either, and reconcile() tries again on the next visit.
-                    $user = User::findOrFail($qual->user_id);
-                    $profile = $this->vault->applyAiInterviewQualification(
-                        $user, $qual->stack_key, $qual->role_key, $avg, array_map('intval', $scores), (int) $qual->current_attempt
-                    );
-                    $passed = $profile;
-
-                    return $qual;
-                }
-
-                // FAILED ATTEMPT: Average < 60%
-                $history = $qual->attempt_history ?? [];
-                $history[] = [
-                    'attempt' => $qual->current_attempt,
-                    'series_number' => $qual->current_attempt,
-                    'scores' => $scores,
-                    'average' => $avg,
-                    'evaluated_at' => Carbon::now()->toIso8601String(),
-                    'passed' => false,
-                ];
-                $qual->attempt_history = $history;
-
-                if ($qual->current_attempt < VaultInterviewQualification::MAX_ATTEMPTS) {
-                    // Advance to next distinct series for next attempt
-                    $nextAttempt = $qual->current_attempt + 1;
-                    $qual->current_attempt = $nextAttempt;
-                    $qual->active_series_id = "{$qual->role_key}-{$qual->stack_key}-series-{$nextAttempt}";
-                    $qual->series_scores = [];
-                    $qual->series_average = null;
-                } else {
-                    // Exhausted all 3 attempts -> activate 45-day cooldown
-                    $qual->status = VaultInterviewQualification::STATUS_COOLING_DOWN;
-                    $qual->cooldown_until = Carbon::now()->addDays(VaultInterviewQualification::COOLDOWN_DAYS);
-                }
-            }
-
-            $qual->save();
+            $passed = $this->evaluateSeries($qual);
 
             return $qual;
         });
@@ -326,6 +317,76 @@ class VaultInterviewQualificationService
         }
 
         return $qual;
+    }
+
+    /**
+     * Saves the qualification and, if all three sets of the active series now have a score, closes the series: an average of
+     * 60 or more qualifies the student (and puts them in the Vault); less moves them to the next series, or into the 45-day
+     * cooldown after the third. The ONE place that rule lives - the live flow above and the superadmin's score edits both end here.
+     *
+     * Must run inside the caller's transaction, on a row it has locked.
+     *
+     * @return VaultProfile|null the student's Vault profile when this call qualified them
+     */
+    public function evaluateSeries(VaultInterviewQualification $qual): ?VaultProfile
+    {
+        $scores = $qual->series_scores ?? [];
+
+        if (! isset($scores['1'], $scores['2'], $scores['3'])) {
+            $qual->save();
+
+            return null;
+        }
+
+        $avg = round(($scores['1'] + $scores['2'] + $scores['3']) / 3, 2);
+        $qual->series_average = $avg;
+
+        // Kept on the student too (their best series average), whether this series qualifies them or not.
+        app(ScoreLedger::class)->vaultAi((int) $qual->user_id, $avg);
+
+        if ($avg >= VaultInterviewQualification::PASSING_THRESHOLD) {
+            $qual->status = VaultInterviewQualification::STATUS_QUALIFIED;
+            $qual->qualified_at = Carbon::now();
+            $qual->cooldown_until = null;
+            $qual->save();
+
+            // The candidate joins the Vault in the same transaction: if that fails, the score is not recorded
+            // either, and reconcile() tries again on the next visit.
+            $user = User::findOrFail($qual->user_id);
+
+            return $this->vault->applyAiInterviewQualification(
+                $user, $qual->stack_key, $qual->role_key, $avg, array_map('intval', $scores), (int) $qual->current_attempt
+            );
+        }
+
+        // FAILED ATTEMPT: Average < 60%
+        $history = $qual->attempt_history ?? [];
+        $history[] = [
+            'attempt' => $qual->current_attempt,
+            'series_number' => $qual->current_attempt,
+            'scores' => $scores,
+            'average' => $avg,
+            'evaluated_at' => Carbon::now()->toIso8601String(),
+            'passed' => false,
+        ];
+        $qual->attempt_history = $history;
+
+        if ($qual->current_attempt < VaultInterviewQualification::MAX_ATTEMPTS) {
+            // Advance to next distinct series for next attempt
+            $nextAttempt = $qual->current_attempt + 1;
+            $qual->current_attempt = $nextAttempt;
+            $qual->active_series_id = "{$qual->role_key}-{$qual->stack_key}-series-{$nextAttempt}";
+            $qual->series_scores = [];
+            $qual->series_average = null;
+        } else {
+            // Exhausted all 3 attempts -> activate 45-day cooldown
+            $qual->status = VaultInterviewQualification::STATUS_COOLING_DOWN;
+            $qual->cooldown_until = Carbon::now()->addDays(VaultInterviewQualification::COOLDOWN_DAYS);
+        }
+
+        $qual->save();
+
+        return null;
     }
 
     /**
@@ -375,7 +436,32 @@ class VaultInterviewQualificationService
      */
     private function attemptSeq(VaultInterviewQualification $qual): int
     {
-        return count($qual->attempt_history ?? []) + 1;
+        return count($qual->attempt_history ?? []) + (int) $qual->attempt_offset + 1;
+    }
+
+    /**
+     * "Tell me when this opens" for a stack that is not open yet (or take it back). Idempotent. A stack that is already open
+     * has nothing to wait for, and an unknown one is a 404.
+     */
+    public function setInterest(User $user, string $stackKey, bool $interested): void
+    {
+        $found = $this->catalog->stack($stackKey);
+
+        if ($found === null) {
+            throw new NotFoundHttpException("Unknown interview stack [{$stackKey}].");
+        }
+
+        if ($interested && $this->catalog->progress($found['stack'])['live']) {
+            throw new HttpException(422, "The {$found['stack']['name']} interview is already open — you can start it now.");
+        }
+
+        if ($interested) {
+            VaultStackInterest::firstOrCreate(['user_id' => $user->id, 'stack_key' => $stackKey]);
+
+            return;
+        }
+
+        VaultStackInterest::where('user_id', $user->id)->where('stack_key', $stackKey)->delete();
     }
 
     private function notifyQualified(VaultInterviewQualification $qual, VaultProfile $profile): void
@@ -387,7 +473,7 @@ class VaultInterviewQualificationService
                 return;
             }
 
-            $stackName = ucwords(str_replace('_', ' ', $qual->stack_key));
+            $stackName = $this->catalog->stack($qual->stack_key)['stack']['name'] ?? ucwords(str_replace('_', ' ', $qual->stack_key));
             $average = rtrim(rtrim(number_format((float) $qual->series_average, 2, '.', ''), '0'), '.');
 
             // Say only what is true: being qualified is not the same as being visible to hiring partners.

@@ -1,16 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, GraduationCap, Loader2, Pencil, Trophy } from "lucide-react";
+import { AlertTriangle, GraduationCap, Loader2, Pencil, ShieldCheck, Target, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import type { ManagedUser } from "@/types/adminSubscriptions";
 import { formatDate, formatDateTime, type ApiCollege } from "../types";
+import { ReadinessEditModal } from "../ReadinessEditModal";
 import { Card, Row, SectionTitle, ghostButton, inputClass, primaryButton, timeAgo, type SectionProps } from "./shared";
 
 /** The student-only numbers the drawer adds from /superadmin/users/{id}/detail. */
 export interface StudentDetail {
-  user: { readiness_score: number; readiness_tier: "Placement Ready" | "In Progress" | "Needs Training" };
+  user: { readiness_score: number; readiness_tier: "Placement Ready" | "In Progress" | "Needs Training"; readiness_overridden?: boolean };
   stats: { solved_by_difficulty: { total_solved: number }; solved_score: number; streak: { current: number; max: number } };
 }
 
@@ -58,6 +59,7 @@ export function OverviewSection({ data, reload, triggerToast, detail }: SectionP
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<EditableKey, string>>>({});
+  const [settingScore, setSettingScore] = useState(false);
 
   const isStudent = user.role === "user";
   // Student/coordinator fields: a TPO or staff account has no roll number, branch or CGPA to correct.
@@ -148,6 +150,18 @@ export function OverviewSection({ data, reload, triggerToast, detail }: SectionP
               <span className="font-mono font-bold text-primary">{detail.user.readiness_score}/100</span>
             </div>
             <p className="mt-1 text-text-secondary">Readiness — one score from interviews, practice, the Learning Centre, soft skills, contests, events and consistency (60+ makes a student eligible for the Vault).</p>
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
+              {detail.user.readiness_overridden ? (
+                <span className="inline-flex items-center gap-1 rounded-full border border-accent-primary/30 bg-accent-primary/10 px-2 py-0.5 text-3xs font-bold text-accent-primary">
+                  <ShieldCheck className="h-2.5 w-2.5" aria-hidden /> Set by hand
+                </span>
+              ) : (
+                <span />
+              )}
+              <button type="button" onClick={() => setSettingScore(true)} className={ghostButton}>
+                <Target className="h-3 w-3" /> Set score
+              </button>
+            </div>
           </div>
         </>
       )}
@@ -284,6 +298,18 @@ export function OverviewSection({ data, reload, triggerToast, detail }: SectionP
           <GraduationCap className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden />
           Independent learner — signed up on their own, so they pay for their own plan.
         </p>
+      )}
+
+      {settingScore && (
+        <ReadinessEditModal
+          studentId={user.id}
+          onClose={() => setSettingScore(false)}
+          onChanged={(message) => {
+            setSettingScore(false);
+            triggerToast(message);
+            void reload();
+          }}
+        />
       )}
     </div>
   );

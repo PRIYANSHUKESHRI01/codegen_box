@@ -121,6 +121,19 @@ class LifecycleMailService
         ], 'sub'.$subscription->id);
     }
 
+    /** A student redeemed a free offer: the same "your plan is active" mail, worded as something they did themselves. */
+    public function planRedeemed(User $user, Subscription $subscription): void
+    {
+        $this->send($user->id, LifecycleEmail::PlanGranted, [
+            'plan' => $subscription->plan?->name,
+            'plan_code' => $subscription->plan?->code,
+            'days' => $subscription->plan?->duration_days,
+            'ends_at' => $subscription->current_period_end?->toIso8601String(),
+            'complimentary' => true,
+            'redeemed' => true,
+        ], 'sub'.$subscription->id);
+    }
+
     public function planExtended(Subscription $subscription, int $days): void
     {
         $student = $this->studentOf($subscription);

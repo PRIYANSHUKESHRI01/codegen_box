@@ -55,7 +55,7 @@ class SuperAdminSubscriptionController extends Controller
             'state' => ['nullable', Rule::in(['active', 'expired', 'canceled', 'all'])],
             'audience' => ['nullable', Rule::in([Plan::AUDIENCE_INDIVIDUAL, Plan::AUDIENCE_INSTITUTION, Plan::AUDIENCE_COMPANY])],
             'plan' => ['nullable', 'string', 'max:64'],
-            'source' => ['nullable', Rule::in([Subscription::SOURCE_PURCHASE, Subscription::SOURCE_ADMIN_GRANT])],
+            'source' => ['nullable', Rule::in([Subscription::SOURCE_PURCHASE, Subscription::SOURCE_ADMIN_GRANT, Subscription::SOURCE_OFFER_REDEEMED])],
             'ending_within' => ['nullable', 'integer', 'min:1', 'max:365'],
             'include_free' => ['nullable', 'boolean'],
             'q' => ['nullable', 'string', 'max:100'],
@@ -82,6 +82,7 @@ class SuperAdminSubscriptionController extends Controller
 
         match ($validated['source'] ?? null) {
             Subscription::SOURCE_ADMIN_GRANT => $query->where('meta->source', Subscription::SOURCE_ADMIN_GRANT),
+            Subscription::SOURCE_OFFER_REDEEMED => $query->where('meta->source', Subscription::SOURCE_OFFER_REDEEMED),
             Subscription::SOURCE_PURCHASE => $query->whereNotNull('meta->purchase_ref'),
             default => null,
         };
@@ -263,6 +264,8 @@ class SuperAdminSubscriptionController extends Controller
             'paid_individual' => $paidIndividual()->count(),
             // Given by hand with nothing received — the ones that bring in no revenue.
             'complimentary' => $paidIndividual()->where('meta->source', Subscription::SOURCE_ADMIN_GRANT)->where('meta->price_paid', 0)->count(),
+            // Students on a plan they claimed through a free offer (a 100% discount) — also no revenue.
+            'redeemed' => $paidIndividual()->where('meta->source', Subscription::SOURCE_OFFER_REDEEMED)->count(),
             'colleges' => $running()->where('subscriber_type', College::class)->count(),
             'companies' => $running()->where('subscriber_type', Company::class)->count(),
             'ending_7_days' => $running()

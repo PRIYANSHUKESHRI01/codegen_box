@@ -87,12 +87,21 @@ export function DashboardShell({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultSidebarCollapsed);
-  // Hiring partners and college TPOs get the premium surface system (aurora
+  // Hiring partners, college TPOs and students get the premium surface system (aurora
   // canvas, wider column, richer page heading — see .hp-canvas in
   // globals.css), each with its own identity colour via data-portal. Every
   // other role renders exactly as before.
-  const portal: "hiring" | "tpo" | null =
-    role === "admin_company" ? "hiring" : role === "admin_tpo" && currentTpoView === "tpo" ? "tpo" : null;
+  //
+  // A student gets it on ordinary pages only: the proctored / immersive screens (no chrome, a pinned viewport, an edge-to-edge
+  // workspace) keep their own purpose-built look, and flipping in and out of them mid-attempt only ever changes a class.
+  const portal: "hiring" | "tpo" | "student" | null =
+    role === "admin_company"
+      ? "hiring"
+      : role === "admin_tpo" && currentTpoView === "tpo"
+        ? "tpo"
+        : role === "user" && !hideChrome && !fitViewport && !fullBleed
+          ? "student"
+          : null;
   const isHiring = portal !== null;
 
   return (
@@ -182,6 +191,7 @@ export function DashboardShell({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+              data-hp-heading
               className="space-y-2"
             >
               <span className="inline-flex items-center gap-2 rounded-full border border-indigo-500/20 bg-indigo-500/[0.07] px-2.5 py-1 text-3xs font-bold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
@@ -189,7 +199,7 @@ export function DashboardShell({
                   <span className="hp-ping absolute inline-flex h-full w-full rounded-full bg-[rgb(var(--hp-id))]" />
                   <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[rgb(var(--hp-id))]" />
                 </span>
-                {portal === "tpo" ? "Placement Hub" : "Hiring Hub"}
+                {portal === "tpo" ? "Placement Hub" : portal === "student" ? "Your Arena" : "Hiring Hub"}
               </span>
               <h1 className="text-2xl sm:text-[32px] sm:leading-[38px] font-extrabold text-primary tracking-[-0.025em]">{title}</h1>
               {subtitle && (

@@ -473,6 +473,7 @@ html.light .glass-panel {
 html.light {
   --hp-shadow: 0 1px 2px rgba(39, 47, 92, 0.04), 0 8px 24px -10px rgba(39, 47, 92, 0.14);
   --hp-shadow-hover: 0 2px 4px rgba(39, 47, 92, 0.05), 0 18px 40px -12px rgba(79, 70, 229, 0.22);
+  --hp-shadow-md: 0 2px 4px rgba(39, 47, 92, 0.05), 0 14px 34px -14px rgba(39, 47, 92, 0.24);
   --hp-edge: inset 0 1px 0 rgba(255, 255, 255, 0.9);
   --hp-spot: rgba(99, 102, 241, 0.09);
   --hp-aurora-a: rgba(99, 102, 241, 0.13);
@@ -485,6 +486,7 @@ html.light {
 html.dark {
   --hp-shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 10px 30px -12px rgba(0, 0, 0, 0.6);
   --hp-shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.4), 0 22px 48px -14px rgba(99, 102, 241, 0.35);
+  --hp-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4), 0 16px 38px -14px rgba(0, 0, 0, 0.65);
   --hp-edge: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --hp-spot: rgba(129, 140, 248, 0.12);
   --hp-aurora-a: rgba(99, 102, 241, 0.20);
@@ -509,6 +511,61 @@ html.dark {
   --hp-id: 14 165 233;
   --hp-id2: 99 102 241;
 }
+
+/* ── Student portal ("Your Arena") ──────────────────────────────────────────
+   The student's pages join the same surface system as the TPO and Hiring Partner portals, with their own identity colour
+   (violet→cyan, the Vault AI / Hack Arena palette). Applied by DashboardShell on ordinary student pages only — never on the
+   proctored/immersive screens (hideChrome / fullBleed), which stay exactly as they were.
+
+   Most of the ~75 student pages are written with the shared utility classes (rounded-panel, shadow-subtle, shadow-card,
+   rounded-btn …) rather than HpCard, so instead of rewriting each of them this block re-skins those utilities INSIDE the portal:
+   - the shadow tokens become the portal's layered, theme-aware shadows, so every card gets the top-edge highlight and soft
+     depth — and keeps its own hover:shadow-card, because only the variable's value changed, not which class applies;
+   - rules are wrapped in :where() so they sit at the same specificity as the utilities and lose to any explicit class. */
+.hp-portal[data-portal="student"] {
+  --hp-id: 139 92 246;
+  --hp-id2: 34 211 238;
+  --shadow-subtle: var(--hp-edge), var(--hp-shadow);
+  --shadow-card: var(--hp-edge), var(--hp-shadow-md);
+}
+
+:where(.hp-portal[data-portal="student"]) .rounded-panel {
+  border-radius: 20px;
+}
+
+/* Primary call-to-action buttons written with the legacy classes pick up the portal's gradient, inner highlight and lift. */
+:where(.hp-portal[data-portal="student"]) .rounded-btn.bg-accent-primary {
+  background-image: linear-gradient(to bottom, rgb(99 102 241), rgb(var(--hp-id)));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 20px -8px rgb(var(--accent-primary-rgb) / 0.7);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+:where(.hp-portal[data-portal="student"]) .rounded-btn.bg-accent-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 12px 26px -8px rgb(var(--accent-primary-rgb) / 0.8);
+}
+
+/* Page entrance: each top-level block of a student page rises in on a short stagger. `backwards` (not `both`) on purpose: once
+   it has played the element returns to having NO transform, so a fixed modal rendered inside a section is never trapped in a
+   transformed ancestor. The heading animates itself (see DashboardShell). */
+@keyframes st-rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+:where(.hp-portal[data-portal="student"] main > :not([data-hp-heading]):not([role="dialog"])) {
+  animation: st-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(var(--st-i, 0) * 60ms);
+}
+
+.hp-portal[data-portal="student"] main > :nth-child(2) { --st-i: 1; }
+.hp-portal[data-portal="student"] main > :nth-child(3) { --st-i: 2; }
+.hp-portal[data-portal="student"] main > :nth-child(4) { --st-i: 3; }
+.hp-portal[data-portal="student"] main > :nth-child(5) { --st-i: 4; }
+.hp-portal[data-portal="student"] main > :nth-child(6) { --st-i: 5; }
+.hp-portal[data-portal="student"] main > :nth-child(7) { --st-i: 6; }
+.hp-portal[data-portal="student"] main > :nth-child(n + 8) { --st-i: 7; }
 
 /* Painted as the column's own background-image — NOT a ::before and NOT an
    isolated stacking context. Any stacking context between the page and the

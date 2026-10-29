@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, ApiError } from "./api";
 import { AuthUser, clearSession, getStoredUser, getToken, saveSession } from "./auth";
 import { clearEverything, getImpersonation, restoreOriginalSession } from "./impersonation";
+import { withProperName } from "./personName";
 import { SESSION_ENDED_EVENT, resetSessionEndedFlag, takeSignedOutNotice } from "./sessionEvents";
 
 export type AuthStatus = "loading" | "ready" | "signed_out";
@@ -55,7 +56,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Both server and client always start from this exact same neutral state
   // — that's what keeps hydration consistent. The optimistic correction
   // happens only in the layout effect below, which is client-only.
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [rawUser, setUser] = useState<AuthUser | null>(null);
+  // Whatever the server (or an old cached session) sent, the person is shown by a properly capitalised name. Memoised so the user
+  // object keeps its identity between renders and nothing that depends on it re-runs for no reason.
+  const user = useMemo(() => withProperName(rawUser), [rawUser]);
   const [status, setStatus] = useState<AuthStatus>("loading");
   const hasVerifiedOnce = useRef(false);
 

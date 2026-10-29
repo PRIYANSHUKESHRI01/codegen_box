@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Download,
@@ -34,6 +34,9 @@ import { InactivityNotice } from "@/components/dashboard/student/InactivityNotic
 import { VaultLine } from "@/components/dashboard/student/VaultLine";
 import { SubmissionHistoryList } from "@/components/dashboard/student/SubmissionHistoryList";
 import { LanguageFocusCard } from "@/components/dashboard/student/LanguageFocusCard";
+import { ActivityHeatmap } from "@/components/dashboard/student/ActivityHeatmap";
+import { FocusAreasCard, SolvedBreakdownCard } from "@/components/dashboard/student/ProgressCards";
+import { buildActivityWeeks } from "@/lib/activityGrid";
 import { CodeViewModal, type CodeViewData } from "@/components/dashboard/CodeViewModal";
 import { cn, withMinDelay } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -72,6 +75,7 @@ export default function PerformanceReportPage() {
   const [showAllTopics, setShowAllTopics] = useState(false);
 
   const { stats, loading: statsLoading } = useMyStats(status === "ready");
+  const activityWeeks = useMemo(() => buildActivityWeeks(stats?.activity ?? []), [stats]);
   // A programme without coding practice (Management, Commerce, Arts …) has no solved history, rating or code to report.
   const codes = codesAtAll(user);
 
@@ -303,7 +307,7 @@ export default function PerformanceReportPage() {
           </div>
         </div>
 
-        <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} profile={stats.readiness.profile} decay={stats.readiness.decay} />
+        <ReadinessBreakdown components={stats.readiness.components} nextSteps={stats.readiness.next_steps} profile={stats.readiness.profile} decay={stats.readiness.decay} override={stats.readiness.override} />
 
         <InactivityNotice decay={stats.readiness.decay} score={stats.readiness.score} baseScore={stats.readiness.base_score} className="mt-5" />
 
@@ -340,6 +344,12 @@ export default function PerformanceReportPage() {
           </p>
         )}
       </section>
+
+      {/* Difficulty mix + weakest topics — both moved here from the Overview, next to the rating they explain */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <SolvedBreakdownCard stats={stats} />
+        <FocusAreasCard stats={stats} callout={false} />
+      </div>
 
       {/* Accuracy + languages */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -393,6 +403,24 @@ export default function PerformanceReportPage() {
           )}
         </section>
       </div>
+
+      {/* Activity — a year of submissions, moved here from the Overview (which keeps only the numbers that say what to do next) */}
+      <section className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+          <div>
+            <h2 className="font-bold text-sm sm:text-base text-primary flex items-center gap-2">
+              <Activity className="w-4 h-4 text-status-success" />
+              <span>Submission Activity</span>
+            </h2>
+            <p className="text-xs text-text-muted mt-0.5">Last 12 months</p>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Flame className="w-4 h-4 text-amber-500" />
+            <span className="font-mono font-bold text-primary">{stats.streak.current} day streak</span>
+          </div>
+        </div>
+        <ActivityHeatmap weeks={activityWeeks} />
+      </section>
 
       {/* Language focus — per-language solved / acceptance and where to improve */}
       <LanguageFocusCard enabled={status === "ready"} />

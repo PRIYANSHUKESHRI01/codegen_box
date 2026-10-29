@@ -1,0 +1,1193 @@
+import os
+import sys
+sys.path.append(os.path.dirname(__file__))
+from vault_helper import write_php_file
+
+part8_data = {
+    # ------------------ SOFTWARE TESTING (QA) ------------------
+    # Series 1
+    'qa_testing-software_testing-s1-set1': [
+        {
+            'text': "How do you design robust automated test assertions for a REST API endpoint (such as POST /api/v1/auth/login)? What specific checks must be validated across HTTP status codes, response headers, JSON Schema contracts, token expiry, and error response bodies?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "A complete API test suite asserts: 1) Status codes (200 on success, 400 on malformed body, 401 on bad credentials, 429 on rate limit); 2) Header security (Content-Type application/json, no exposed server versions); 3) JSON schema conformance (types, required fields); 4) Cryptographic token presence and payload validation (non-empty JWT, reasonable expires_in); 5) Sanitized error messaging that never leaks stack traces or SQL details."
+        },
+        {
+            'text': "Explain the differences between Implicit Waits, Explicit Waits, and Fluent Waits in UI automation frameworks (Selenium/Playwright). Why should you never mix implicit and explicit waits, and how do explicit waits prevent test flakiness?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Implicit wait configures global timeout on driver looking for DOM elements; Explicit wait pauses execution until a specific condition (elementToBeClickable, invisibilityOf) evaluates true; Fluent wait adds custom polling frequency and ignored exceptions. Mixing implicit and explicit waits causes indeterminate timeout compounding. Explicit waits synchronize with actual browser animation/DOM states, preventing flaky NoSuchElementException failures."
+        },
+        {
+            'text': "How do you apply Boundary Value Analysis (BVA) and Equivalence Class Partitioning (ECP) on a production form field with complex business logic (e.g. credit card expiration or dynamic discount vouchers)? What specific test inputs catch off-by-one boundary bugs?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ECP divides inputs into valid/invalid partitions (e.g. past months, current month, future months within 20 years, non-numeric). BVA tests 2-value or 3-value boundaries where off-by-one errors cluster: minimum valid value, maximum valid value, just below minimum, and just above maximum (e.g. month 00, 01, 12, 13; past year vs current year vs current year + 20). Checks boundary transitions around leap years and month ends."
+        },
+        {
+            'text': "Explain the Page Object Model (POM) design pattern in test automation. How does POM decouple UI locators and page interaction methods from test assertions, and how does this prevent massive test suite breakage during frontend redesigns?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "POM models each web page or UI component as an independent class containing element selectors (CSS/XPath locators) and action methods (e.g. submitLoginForm(user, pass)). Test files only invoke these high-level actions and perform assertions. When frontend developers change a button class or DOM hierarchy, only the single locator in the Page Object requires updating rather than dozens of test files."
+        },
+        {
+            'text': "When automated end-to-end tests fail intermittently in CI/CD pipelines (flaky tests), what is your systematic debugging methodology to isolate whether the root cause is race conditions, asynchronous network calls, test data collision, or environmental latency?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Systematic triage: 1) Inspect CI test artifacts (video recordings, network traces, console logs, DOM snapshots at failure point); 2) Check for race conditions where assertions run before AJAX requests resolve; 3) Verify test data isolation: are parallel test workers modifying the same database rows or using shared user accounts?; 4) Run test locally in a loop (100 times) with network throttling to reproduce timing dependencies; 5) Replace hardcoded sleep() calls with explicit state promises."
+        }
+    ],
+    'qa_testing-software_testing-s1-set2': [
+        {
+            'text': "Explain black-box test design techniques: Equivalence Class Partitioning (ECP) and Boundary Value Analysis (BVA). How do you design test values for an age field accepting integers between 18 and 65?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ECP divides inputs into valid/invalid partitions (e.g. <18, 18-65, >65); BVA tests extreme edge boundaries where bugs cluster. Boundary test values: 17, 18, 19 (lower boundary) and 64, 65, 66 (upper boundary) plus non-numeric inputs."
+        },
+        {
+            'text': "Compare Regression Testing with Retesting. When a developer fixes a bug and marks it resolved, what is the exact QA verification process?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Retesting explicitly verifies that the original reported defect is fixed in the new build; Regression testing executes existing test suites across surrounding unmodified features to ensure the code fix did not accidentally break adjacent functionality."
+        },
+        {
+            'text': "Explain the architecture of Selenium WebDriver. How does client test code (Java/Python) communicate with browser drivers via the W3C WebDriver standard?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Test scripts use language bindings to send HTTP REST requests (JSON over HTTP) conforming to W3C WebDriver protocol; Browser Driver (chromedriver/geckodriver) translates commands into native browser automation calls, driving browser directly."
+        },
+        {
+            'text': "How do you automate REST API testing using Postman or Newman? Walk through writing assertions for HTTP status codes, JSON schema validation, and chaining response tokens into environment variables.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Write tests in JavaScript under Tests tab: pm.response.to.have.status(200); validate JSON schema using Ajv; extract token from response (pm.environment.set('authToken', jsonData.token)) and inject into Bearer auth of subsequent requests."
+        },
+        {
+            'text': "What is the difference between Functional Testing and Non-Functional Testing? Name three non-functional test types and explain what each evaluates.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Functional tests WHAT software does (features, business rules); Non-functional tests HOW WELL software performs. Performance/Load testing (throughput, latency under stress); Security testing (penetration/auth flaws); Usability/Accessibility testing (WCAG compliance)."
+        }
+    ],
+    'qa_testing-software_testing-s1-set3': [
+        {
+            'text': "What is the Page Object Model (POM) design pattern in test automation? How does POM decouple UI selectors and page interactions from test assertion logic?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Each web page or component is represented by an independent class holding its element locators and action methods; test classes instantiate page objects and assert outcomes. If a button ID changes, update occurs in ONE page class, not across 50 tests."
+        },
+        {
+            'text': "What causes Flaky Tests in UI test automation? Compare Implicit Waits, Explicit Waits, and Fluent Waits. Why is using 'Thread.sleep()' a major anti-pattern?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Flakiness arises from asynchronous rendering and dynamic animations. Implicit wait applies globally; Explicit wait polls conditionally until specific expected condition (e.g. elementToBeClickable); Thread.sleep hardcodes static delays, causing false failures and slow suites."
+        },
+        {
+            'text': "How do you manage test data and database fixtures for automated test suites to guarantee test independence and prevent state contamination across test runs?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Use transactional rollbacks after each test; seed isolated synthetic database fixtures with unique generated IDs (Faker); avoid shared global state; run automated cleanup routines in teardown methods."
+        },
+        {
+            'text': "What is Risk-Based Testing? How do you prioritize limited testing time and resources across 100 features before an emergency production release?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Score features across two axes: Likelihood of Failure (complexity of recent code changes, developer churn) and Business Impact of Failure (core revenue flows, safety, compliance). Focus automated and exploratory testing strictly on high-risk quadrant."
+        },
+        {
+            'text': "What are the Release Go/No-Go criteria? How does a QA Lead lead a defect triage meeting when 3 medium-severity bugs remain open 2 hours before scheduled deployment?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Review open defects with Product and Eng Leads; assess real customer impact and whether viable workarounds exist; verify whether bugs affect core release commitments; decide whether to ship with known issues and hotfix, or abort release."
+        }
+    ],
+
+    # Series 2
+    'qa_testing-software_testing-s2-set1': [
+        {
+            'text': "Compare Smoke Testing with Sanity Testing. At what stage of the CI/CD pipeline does each execute, and what is the scope of coverage?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Smoke testing (build verification test) runs automatically on fresh build, testing broad basic functionality (app launches, login works) to determine if build is testable; Sanity testing is a focused subset executed after bug fix to verify specific module works."
+        },
+        {
+            'text': "Explain Decision Table Testing and State Transition Testing. How do you design a state transition diagram for an ATM cash withdrawal workflow?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Decision tables map combinations of inputs/rules to outcomes (truth table); State transition tests system state shifts based on events. ATM: Idle -> Card Inserted -> PIN Validated -> Amount Entered -> Dispensing Cash -> Card Ejected, testing valid and invalid transitions (e.g. 3 wrong PINs)."
+        },
+        {
+            'text': "What is Exploratory Testing (Session-Based Testing)? How does an experienced QA engineer discover edge-case defects that structured scripted test cases miss?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Simultaneous learning, test design, and test execution guided by charter; probes boundary conditions, interrupts workflows, inputs unexpected data types, and explores complex user paths based on intuition and heuristic checklists."
+        },
+        {
+            'text': "How do you execute Database Testing in backend QA? What SQL validation queries verify transactional integrity, foreign key cascades, and data corruption after UI actions?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Verify that frontend actions reflect accurately in DB: assert record insertion with correct timestamps and foreign keys; verify audit trail logs; test data truncation; verify rollback on failed checkout; check orphaned records."
+        },
+        {
+            'text': "What is Cross-Browser and Cross-Device Testing? How do grid automation tools (Selenium Grid, BrowserStack, Playwright) parallelize test execution across platforms?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Ensures consistent functionality across Chrome, Firefox, Safari, Edge, iOS, and Android; Selenium Grid coordinates hub-and-node architecture distributing parallel test sessions across browser instances and OS containers."
+        }
+    ],
+    'qa_testing-software_testing-s2-set2': [
+        {
+            'text': "Explain the Testing Pyramid (Unit, Integration, End-to-End E2E). Why does an 'Ice Cream Cone' anti-pattern (too many UI E2E tests, zero unit tests) create slow, brittle QA pipelines?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Unit tests are fast, cheap, and pinpoint exact lines of failure (70%); Integration tests verify contracts (20%); E2E tests verify full user journeys (10%). Inverted ice-cream cone results in hours-long execution, constant flakiness, and high maintenance costs."
+        },
+        {
+            'text': "Compare Playwright with Selenium and Cypress for modern web automation. What features (auto-waiting, multi-tab support, network interception, shadow DOM support) differentiate Playwright?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Playwright communicates directly with browser debugging protocols (CDP) via single WebSocket connection, auto-waits for elements to be actionable before clicking, natively supports multiple tabs/origins, mocks network APIs, and punctures Shadow DOM natively."
+        },
+        {
+            'text': "How do you design a Performance and Load Testing strategy using k6 or Apache JMeter? Define Virtual Users (VUs), Ramp-up period, Throughput (RPS), and Latency Percentiles (p95, p99).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Define scenarios simulating concurrent users; ramp up VUs gradually to identify breaking point; measure throughput (Requests Per Second); evaluate response times at p95 and p99 percentiles rather than misleading averages, observing latency under sustained load."
+        },
+        {
+            'text': "What is Contract Testing using Pact in microservices architectures? How does Consumer-Driven Contract testing prevent breaking API changes from deploying to staging?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Consumers define expected request/response contracts; Pact Broker validates contracts against provider implementation in CI. Replaces costly, fragile end-to-end integration environments with fast decoupled contract verification."
+        },
+        {
+            'text': "How does Mobile Test Automation work using Appium? What is the difference between testing native apps, hybrid apps, and mobile web apps on iOS and Android?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Appium uses WebDriver protocol translating commands to native vendor frameworks (XCUITest on iOS, UiAutomator2 on Android); Native uses native UI elements; Hybrid embeds webview requiring switching context (NATIVE_APP vs WEBVIEW)."
+        }
+    ],
+    'qa_testing-software_testing-s2-set3': [
+        {
+            'text': "Architect an automated End-to-End Regression Framework from scratch using Playwright, TypeScript, and GitHub Actions. Detail parallel execution, artifact capture on failure, and HTML reporting.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "POM architecture with TypeScript; parallel worker threads running tests across sharded GitHub Actions matrix; automatic capture of traces, videos, and screenshots on test retry/failure; publishing interactive Playwright HTML report to GitHub Pages."
+        },
+        {
+            'text': "A critical bug escapes into production and breaks checkout for 3 hours. How do you lead a Blameless Root Cause Analysis (RCA) and prevent similar escapes?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Identify 5 Whys (why was it missed in testing, why did automated tests pass, why was monitoring delayed); identify missing test scenario; write automated regression test reproducing bug; add integration test to pre-merge CI quality gate."
+        },
+        {
+            'text': "How do you implement Automated Visual Regression Testing (e.g. Percy / Applitools)? How does pixel-by-pixel comparison differ from DOM assertion testing?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Visual testing captures screenshots of DOM components across viewport sizes and diffs them against approved baseline images; highlights unexpected CSS shifts, color changes, and layout overlapping invisible to standard DOM assertions."
+        },
+        {
+            'text': "What is Mutation Testing in software quality engineering? How does injecting artificial faults ('mutants') into source code evaluate the true effectiveness of a test suite?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Mutation testing modifies source code logic (e.g. changing > to <, or true to false); if existing test suite still passes, the mutant 'survives' (indicating poor test assertions); a high mutation score proves tests actively assert behavior rather than just inflating line coverage."
+        },
+        {
+            'text': "How do you automate Accessibility Testing using axe-core and Pa11y in a CI/CD build pipeline to guarantee WCAG 2.1 AA compliance?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Inject axe-core into Playwright/Cypress test runs; assert zero accessibility violations on rendered pages; automatically flags missing alt text, poor contrast ratios, empty button labels, and invalid ARIA attributes before deployment."
+        }
+    ],
+
+    # Series 3
+    'qa_testing-software_testing-s3-set1': [
+        {
+            'text': "What is Static Testing (Static Code Analysis, Formal Inspections, Peer Reviews) versus Dynamic Testing? What percentage of software defects can be caught before executing code?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Static testing inspects code, architecture, and requirements documents without executing software (linters, SonarQube, security audits); studies prove static testing catches 50-70% of defects early, where remediation cost is 10x cheaper than post-execution bugs."
+        },
+        {
+            'text': "Explain the Requirements Traceability Matrix (RTM). How does RTM map business requirements to test cases and defects to prove 100% test coverage?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Bidirectional grid mapping each functional requirement to its corresponding test case IDs and logged defect IDs; ensures no requirements are omitted from test design and identifies unneeded test cases when requirements change."
+        },
+        {
+            'text': "What is Behavior-Driven Development (BDD)? Explain Gherkin syntax (Feature, Scenario, Given, When, Then, And) and how Cucumber bridges communication between product owners and engineers.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Collaborative approach specifying software behavior in plain human-readable business language. Given (initial context), When (user action), Then (expected observable outcome). Step definitions map Gherkin statements to executable automation code."
+        },
+        {
+            'text': "How does Mocking differ from Stubbing and Virtualization in test automation? When is Service Virtualization required over simple in-memory mocks?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Stub provides canned pre-computed responses; Mock verifies specific method interactions and parameters were called; Service Virtualization simulates complex third-party stateful network endpoints (e.g. mainframe or payment gateway) with latency and error simulation."
+        },
+        {
+            'text': "What are Negative Testing scenarios and Error Guessing? Why is testing invalid inputs, boundary overflow, and unexpected user workflows more revealing than happy-path tests?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Happy-path verifies software works under expected conditions; negative testing proves software handles failures gracefully without crashing, leaking stack traces, or corrupting state when given corrupt, malicious, or malformed inputs."
+        }
+    ],
+    'qa_testing-software_testing-s3-set2': [
+        {
+            'text': "Explain Shift-Left Testing and Shift-Right Testing methodologies. How do Feature Flagging, Canary Analysis, and Testing in Production (TiP) operate on the right side of the lifecycle?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Shift-Left integrates testing into earliest coding phases (TDD, linting, PR gates); Shift-Right tests live running systems in production: synthetic monitoring, chaos engineering, evaluating telemetry on feature flags, and dark launching challenger code."
+        },
+        {
+            'text': "How do you design a Distributed Load Testing infrastructure capable of generating 1,000,000 Requests Per Second across 50 cloud compute worker nodes using k6 and Grafana?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Centralized orchestrator coordinates distributed k6 execution instances across AWS ECS/Kubernetes; tests stream metrics to InfluxDB/Prometheus; Grafana dashboards visualize real-time throughput, error rates, and connection pool saturation."
+        },
+        {
+            'text': "What is Test Impact Analysis (TIA)? How do modern test runners use code coverage delta mapping to execute ONLY the specific test cases affected by a git commit diff?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Maps tests to specific code files and functions. On pull request, TIA analyzes git diff and runs ONLY the 15 tests covering modified code lines rather than the entire 5,000-test suite, reducing PR feedback loop from 40 minutes to 30 seconds."
+        },
+        {
+            'text': "How do you automate Security Testing within QA regression pipelines using OWASP ZAP (Zed Attack Proxy)? How do you run automated baseline scans against staging environments?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Run ZAP Docker container in CI; proxy existing functional E2E tests through ZAP to passive-scan all inspected API calls for security header omissions and insecure cookies; trigger active scan against test endpoints, failing build on High vulnerabilities."
+        },
+        {
+            'text': "How do you test Event-Driven microservices architectures communicating asynchronously over Apache Kafka? How do you verify producer message schemas, partition assignment, and consumer offset commits?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Test container spins up isolated Kafka broker; producer writes message; test consumer asserts Avro schema compliance and payload fields within timeout; simulate network split to verify consumer rebalancing and idempotent replay."
+        }
+    ],
+    'qa_testing-software_testing-s3-set3': [
+        {
+            'text': "Architect an enterprise Quality Engineering transformation strategy for an organization of 50 squads with 500 developers transitioning from manual QA to full Continuous Testing.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Embed Quality Coaches in squads; shift testing ownership to developers; establish standardized automation blueprints (Playwright/dbt); implement strict PR CI quality gates; track DORA metrics (Deployment Frequency, Change Failure Rate, MTTR)."
+        },
+        {
+            'text': "How do you design an AI-powered automated test generation and self-healing test automation framework? How do self-healing locators dynamically adapt to changing DOM attributes?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Self-healing algorithms capture multiple element attributes (semantic role, text, ancestor hierarchy, bounding box). When primary ID changes, algorithm computes similarity score across alternate selectors, locating element without failing test and proposing locator PR."
+        },
+        {
+            'text': "A catastrophic release causes data loss because an automated integration test environment was not representative of production scale and configuration. How do you design Ephemeral Production-like Environments?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Provision on-demand Kubernetes namespaces with Terraform/Helm on pull request; seed with anonymized/sanitized production-equivalent data fixtures; replicate multi-region latency and rate limits; teardown automatically upon PR merge."
+        },
+        {
+            'text': "Discuss the ethical and legal liability of QA Engineers in safety-critical systems (automotive autopilot, medical infusion pumps, Boeing 737 MAX MCAS sensor verification).",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "QA engineers serve as final safety defense. Must resist commercial/management pressure to cut testing; uphold safety standards (DO-178C for aviation, ISO 26262 for automotive); maintain formal written dissenting audit trails when safety concerns are overruled."
+        },
+        {
+            'text': "What are the core metrics for measuring Quality Engineering performance beyond simple 'Defect Count': Defect Escape Rate, Automated Test Coverage, Flaky Test Ratio, and Time-to-Feedback?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Defect Escape Rate (% bugs found in production vs QA); Test Flakiness Index (% unrepeatable failures); Test execution duration in CI; Mean Time to Remediate Defects. Focuses on velocity, reliability, and business impact rather than vanity defect counts."
+        }
+    ],
+
+    # ------------------ EMBEDDED SYSTEMS ------------------
+    # Series 1
+    'embedded_systems-embedded_systems-s1-set1': [
+        {
+            'text': "Compare a Microprocessor (e.g. Intel x86, ARM Cortex-A) with a Microcontroller (e.g. ARM Cortex-M, STM32, PIC). What are their respective memory, cost, and operating system trade-offs?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Microcontrollers integrate CPU, RAM (SRAM), Flash memory, and peripherals on a single silicon chip (low cost, low power, bare-metal or RTOS, deterministic); Microprocessors require external RAM, flash, and power management, running full OS (Linux) with high compute."
+        },
+        {
+            'text': "Explain the exact meaning and purpose of the 'volatile' keyword in Embedded C. Give three specific scenarios where omitting 'volatile' causes compiler optimization bugs.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Tells compiler variable can change unexpectedly outside immediate code flow, forcing fresh read from memory/register on every access. Scenarios: 1) Memory-mapped hardware peripheral registers; 2) Global variables shared with an ISR; 3) Variables shared across concurrent threads/tasks."
+        },
+        {
+            'text': "Demonstrate how to set, clear, and toggle a specific bit (e.g. bit 4) in an 8-bit or 32-bit hardware register in C using bitwise operators without altering other bits.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Set: REG |= (1U << 4); Clear: REG &= ~(1U << 4); Toggle: REG ^= (1U << 4); Test: if (REG & (1U << 4)). Crucial to use '1U' unsigned literal to prevent sign extension bugs."
+        },
+        {
+            'text': "Walk through the memory map of a typical microcontroller: Flash (ROM), SRAM, and Memory-Mapped I/O. What variables are stored in the .text, .rodata, .data, and .bss segments?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': ".text: compiled executable machine instructions in Flash; .rodata: const variables and string literals in Flash; .data: initialized global and static variables copied from Flash to SRAM at boot; .bss: uninitialized global/static variables zeroed in SRAM."
+        },
+        {
+            'text': "How do General Purpose Input/Output (GPIO) pins operate? Compare Push-Pull output, Open-Drain output, Internal Pull-Up, and Internal Pull-Down resistors.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Push-Pull drives active high (VCC) and active low (GND); Open-Drain only pulls low to GND, relying on external pull-up resistor to reach high (mandatory for shared buses like I2C to avoid bus contention); Pull-up/down prevents floating states on inputs."
+        }
+    ],
+    'embedded_systems-embedded_systems-s1-set2': [
+        {
+            'text': "What is an Interrupt Service Routine (ISR)? What are the strict programming rules for writing ISRs (execution duration, non-blocking calls, memory allocation)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Hardware-triggered subroutine. Rules: keep extremely short and fast; NEVER call blocking functions (no delays, no mutex acquisition); NEVER call non-reentrant dynamic memory allocation (malloc); communicate with main code via volatile flags or RTOS queues."
+        },
+        {
+            'text': "Compare serial communication protocols: UART, SPI, and I2C in terms of wire count, communication speed, clock synchronization (synchronous vs asynchronous), and topology.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "UART: asynchronous, 2 wires (TX/RX), point-to-point, up to 1-2 Mbps; SPI: synchronous, 4 wires (MOSI, MISO, SCK, CS), full-duplex, master-multi-slave, fast 20-50+ Mbps; I2C: synchronous, 2 wires (SDA, SCL), half-duplex, multi-master/multi-slave with addresses, 100kbps-3.4Mbps."
+        },
+        {
+            'text': "How do hardware Timers and Counters operate in microcontrollers? Explain Timer Prescalers, Auto-Reload Registers (ARR), and how they generate periodic interrupts and PWM signals.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Timer increments counter register on system clock ticks. Prescaler divides clock frequency to slow counter; when counter matches ARR value, it triggers update interrupt and resets; Output Compare mode toggles pin when counter matches CCR register, creating PWM."
+        },
+        {
+            'text': "What is an Analog-to-Digital Converter (ADC)? Explain ADC Resolution (e.g. 12-bit), Reference Voltage ($V_{ref}$), and how you convert raw ADC integer output into an actual voltage value.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "12-bit ADC divides reference voltage into $2^{12} = 4096$ quantization levels (0 to 4095). Voltage calculation: $V = (ADC\\_Value / 4095) \\times V_{ref}$. Sampling rate (samples/sec) must respect Nyquist frequency ($f_s \\ge 2 f_{max}$)."
+        },
+        {
+            'text': "What is a Real-Time Operating System (RTOS)? How does an RTOS Task Scheduler differ from a general-purpose OS scheduler (like Linux) in terms of deterministic preemption?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "General-purpose OS optimizes overall throughput and fairness; RTOS prioritizes strict determinism. In preemptive priority-based RTOS, the highest-priority READY task is guaranteed to execute immediately within a bounded context switch time, regardless of background tasks."
+        }
+    ],
+    'embedded_systems-embedded_systems-s1-set3': [
+        {
+            'text': "Explain RTOS synchronization primitives: Mutex versus Binary Semaphore. Why can a Binary Semaphore NOT prevent Priority Inversion while a Mutex can?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Mutex has concept of ownership (only task that locked mutex can unlock it) and implements Priority Inheritance to prevent priority inversion; Binary Semaphore is for task signaling/synchronization (can be given by any task or ISR) and has zero ownership or priority inheritance."
+        },
+        {
+            'text': "What is the Priority Inversion problem in real-time embedded systems? Walk through the classic Mars Pathfinder bug and explain how Priority Inheritance solves it.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Low-priority task L locks shared mutex; High-priority task H needs mutex and blocks; Medium-priority task M (not needing mutex) preempts L. H is indirectly starved by M. Priority Inheritance temporarily raises L's priority to H's level until L releases mutex, unblocking H."
+        },
+        {
+            'text': "How does a Watchdog Timer (WDT) work? Explain the difference between an internal hardware watchdog and a windowed watchdog. What happens if software fails to 'kick' the watchdog?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Autonomous hardware countdown timer. Running software must periodically refresh ('kick' / 'feed') timer. If software hangs, deadlocks, or enters infinite loop, counter reaches zero and triggers a hardware system reset. Window watchdog also resets if fed too early."
+        },
+        {
+            'text': "What causes Stack Overflow in embedded systems? How do you detect stack overflow in FreeRTOS, and how do you calculate optimal task stack size?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Deep call stacks, recursion, and allocating large local arrays on stack exhaust bounded RAM, corrupting adjacent memory. FreeRTOS Hook methods (vApplicationStackOverflowHook) check memory patterns (canary words) at stack boundaries; use uxTaskGetStackHighWaterMark() to size."
+        },
+        {
+            'text': "What hardware debugging tools and interfaces are essential for firmware engineers: JTAG, SWD, Digital Oscilloscope, and Logic Analyzer? What is each used to diagnose?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "JTAG/SWD connects debugger to CPU core (breakpoints, stepping, flashing); Logic Analyzer decodes digital protocol packets (SPI, I2C, UART bus timing); Oscilloscope inspects analog signal integrity, rise times, ringing, voltage drop, and electrical noise."
+        }
+    ],
+
+    # Series 2
+    'embedded_systems-embedded_systems-s2-set1': [
+        {
+            'text': "Explain Endianness in embedded systems: Little-Endian versus Big-Endian. How does an ARM Cortex-M store the 32-bit hexadecimal value 0xAABBCCDD in memory?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Little-Endian stores Least Significant Byte (LSB) at lowest memory address: Address 0x00: 0xDD, 0x01: 0xCC, 0x02: 0xBB, 0x03: 0xAA. Big-Endian stores MSB at lowest address. Network protocols standardize on Big-Endian, requiring htons()/ntohl() conversions."
+        },
+        {
+            'text': "Explain Structure Padding and Data Alignment in C. Why does 'struct { char a; int b; char c; }' occupy 12 bytes instead of 6 on a 32-bit architecture, and what is the cost of '#pragma pack(1)'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "32-bit CPUs access memory efficiently on 4-byte aligned boundaries; compiler inserts 3 padding bytes after 'a' and 3 after 'c'. #pragma pack(1) removes padding (6 bytes), but unaligned memory accesses cause hardware exception faults or severe multi-cycle CPU penalties."
+        },
+        {
+            'text': "What is Direct Memory Access (DMA)? How does a DMA controller transfer large data buffers (e.g. ADC samples to SRAM) without consuming CPU cycles?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Dedicated hardware sub-system that moves data directly between peripherals and memory over system bus. CPU sets up source, destination, and length, then resumes execution or sleeps; DMA transfers bytes in background and fires interrupt when complete."
+        },
+        {
+            'text': "Compare microcontroller Low-Power Modes: Sleep, Stop, and Standby. What hardware components remain active in each mode, and what can wake the processor?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Sleep: CPU clock stopped, peripherals and SRAM active (wakes on any interrupt); Stop: all clocks and PLL stopped, SRAM retained, low-power regulator (wakes on external pin/RTC); Standby: core powered down, SRAM lost, minimum power (wakes on reset pin or RTC alarm)."
+        },
+        {
+            'text': "How do you safely share a multi-byte variable (such as a 32-bit counter) between an ISR and main code on an 8-bit or 16-bit microcontroller?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "On architectures smaller than data width, reading/writing 32 bits takes multiple assembly instructions and is NOT atomic; an interrupt can fire halfway through, corrupting data. Must enter critical section (temporarily disable interrupts), copy variable, and re-enable interrupts."
+        }
+    ],
+    'embedded_systems-embedded_systems-s2-set2': [
+        {
+            'text': "Explain I2C bus arbitration, clock stretching, and ACK/NACK signaling. What happens when two I2C masters attempt to transmit simultaneously?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Open-drain with pull-ups. Clock stretching allows slow slave to hold SCL low to pause master; Arbitration: masters monitor SDA while transmitting; if a master transmits '1' but senses '0' (pulled low by competitor), it loses arbitration and backs off gracefully without bus collision."
+        },
+        {
+            'text': "Explain SPI (Serial Peripheral Interface) modes based on Clock Polarity (CPOL) and Clock Phase (CPHA). How do Modes 0, 1, 2, and 3 define when data is sampled versus shifted?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CPOL=0 (clock idle low), CPOL=1 (clock idle high). CPHA=0 (sample on leading clock edge), CPHA=1 (sample on trailing clock edge). Mode 0 (CPOL=0, CPHA=0: idle low, sample rising edge); Mode 3 (CPOL=1, CPHA=1: idle high, sample rising edge)."
+        },
+        {
+            'text': "How do you implement a Lock-Free Circular Ring Buffer in C for high-speed UART packet reception between an ISR and main processing loop?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Array with volatile head and tail pointers. ISR writes to array at head and advances head; main loop reads at tail and advances tail. As long as buffer size is power of 2 (using bitmask wrapping) with single-producer single-consumer, no mutex is required."
+        },
+        {
+            'text': "What is Flash Memory Wear Leveling? Why can NOR/NAND flash only be erased in large blocks while written in small words, and how do flash translation layers (LittleFS) prevent sector burnout?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Flash bits can transition from 1 to 0 during writes, but can only be reset from 0 to 1 by erasing an entire block (sector). Flash has finite write/erase cycles (~10k-100k). Wear leveling algorithms distribute erase cycles evenly across all physical sectors."
+        },
+        {
+            'text': "What are FreeRTOS Event Groups and Message Queues? When should you use an Event Group over a Queue for inter-task communication?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Queue transfers structured data buffers by value between tasks; Event Group synchronizes tasks based on binary bitflags (e.g. waiting for WiFi_Connected AND GPS_Locked before starting upload), allowing a task to block on multiple conditions simultaneously."
+        }
+    ],
+    'embedded_systems-embedded_systems-s2-set3': [
+        {
+            'text': "Architect a Fail-Safe Dual-Bank Flash Bootloader for Over-The-Air (OTA) firmware updates on an IoT microcontroller with automated rollback on boot failure.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Flash partitioned into Bank A, Bank B, and Bootloader. Downloads new firmware to inactive bank; verifies cryptographic SHA-256 signature; sets boot flag and reboots. If new firmware crashes or fails watchdog within 30 seconds, bootloader reverts boot flag back to golden bank."
+        },
+        {
+            'text': "Explain the CAN (Controller Area Network) bus protocol in automotive and industrial embedded systems: Differential signaling, CAN frame structure, and bit stuffing.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Twisted-pair differential voltage (CAN_H, CAN_L). Non-destructive bitwise arbitration gives lowest ID priority; Frame has 11-bit or 29-bit ID, DLC, up to 8/64 bytes data (CAN-FD), and 15-bit CRC. Bit stuffing inserts inverse bit after 5 consecutive identical bits for clock sync."
+        },
+        {
+            'text': "How do you debug an unhandled HardFault or Memory Management Fault on an ARM Cortex-M processor? What registers (CFSR, HFSR, MMFAR, BFAR) and stack frames do you inspect?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "In HardFault handler, read Stack Pointer (MSP/PSP) to inspect saved exception stack frame (R0-R3, R12, LR, PC, xPSR); Program Counter (PC) reveals crashing assembly instruction; inspect Configurable Fault Status Register (CFSR) and BFAR for precise invalid bus access address."
+        },
+        {
+            'text': "Explain Rate Monotonic Scheduling (RMS) for hard real-time systems. What is the Liu-Layland utilization bound ($U \\le n(2^{1/n} - 1)$), and what priority assignment rule does RMS enforce?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Static-priority preemptive scheduling. Assigns highest priority to tasks with shortest repeating period (highest frequency). For N tasks, total CPU utilization $U \\le N(2^{1/N} - 1)$ (approaches $\\ln(2) \\approx 69.3\\%$ as $N \\to \\infty$), guaranteeing 100% schedulability."
+        },
+        {
+            'text': "How do hardware engineers and firmware developers mitigate Electromagnetic Interference (EMI) and switch contact bounce on mechanical push buttons?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Hardware: RC low-pass filter with Schmitt trigger inverter; Software: state-machine debounce timer checking if input pin stays stable for consecutive sample intervals (e.g. 20ms) before asserting valid state change."
+        }
+    ],
+
+    # Series 3
+    'embedded_systems-embedded_systems-s3-set1': [
+        {
+            'text': "Walk step-by-step through the ARM Cortex-M boot sequence from hardware power-on / reset pin deassertion to entering main(): Reset Vector, Vector Table, MSP initialization, and SystemInit.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "At reset: 1) Hardware loads Main Stack Pointer (MSP) from address 0x00000000; 2) Loads Reset Handler PC from address 0x00000004; 3) Executes Reset_Handler in assembly; 4) Calls SystemInit (clocks/FPU); 5) Copies .data to RAM, zeroes .bss; 6) Calls main()."
+        },
+        {
+            'text': "Explain Pointer Arithmetic and Memory-Mapped I/O in C. How do CMSIS header files define register structures using structs and volatile pointers to physical addresses?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Defines struct matching hardware register layout (#define GPIOA ((GPIO_TypeDef *) 0x40020000UL)). Struct members represent 32-bit registers offset by 4 bytes; pointers are declared volatile so compiler never optimizes reads/writes."
+        },
+        {
+            'text': "Compare Floating-Point Units (Hardware FPU) with Fixed-Point Arithmetic in resource-constrained microcontrollers. How does fixed-point representation (e.g. Q15 / Q31) avoid software float emulation overhead?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Microcontrollers without FPU emulate float math via slow multi-cycle software libraries. Fixed-point models fractional numbers as scaled integers (Q15: 1 sign bit, 15 fractional bits), using fast single-cycle integer ALU arithmetic with manual shifting."
+        },
+        {
+            'text': "What is the USB protocol architecture for embedded devices? Explain Endpoints, Descriptors (Device, Configuration, Interface, Endpoint), and standard device classes (HID vs CDC).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Host-controlled protocol. Endpoint 0 for control enumeration; Descriptors are hierarchical data structures describing device capabilities; HID (Human Interface Device: keyboard/mouse, no drivers needed); CDC (Communications Device Class: virtual COM serial port)."
+        },
+        {
+            'text': "How do you design a battery-powered IoT embedded device (e.g. LoRaWAN environmental sensor) operating for 5 years on a single coin-cell battery?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Calculate energy budget: keep MCU in deep sleep (Standby <2uA) 99.9% of time; wake via RTC timer once per hour; read sensors fast via DMA; transmit packet via radio in <100ms; disable all unused peripheral clocks and GPIO pull-ups; return to sleep."
+        }
+    ],
+    'embedded_systems-embedded_systems-s3-set2': [
+        {
+            'text': "Compare FreeRTOS dynamic memory allocation schemes: heap_1, heap_2, heap_3, heap_4, and heap_5. Why is heap_4 standard, and why is heap_1 preferred in mission-critical medical/aerospace systems?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "heap_1 only allocates, never frees (zero risk of memory fragmentation, certified for safety-critical); heap_4 allows alloc and free with first-fit and memory coalescing to prevent fragmentation; heap_5 allows spanning across multiple non-contiguous memory banks."
+        },
+        {
+            'text': "How does Digital Signal Processing (DSP) execute on microcontrollers using CMSIS-DSP? Explain Finite Impulse Response (FIR) versus Infinite Impulse Response (IIR) digital filters.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Leverages ARM SIMD instructions (single-instruction multiple-data, e.g. SMLALD multiply-accumulate). FIR filters rely only on past input samples (inherently stable, linear phase); IIR filters incorporate feedback from past outputs (efficient, requires fewer coefficients, risk of instability)."
+        },
+        {
+            'text': "Explain Secure Boot and Hardware Root of Trust on modern microcontrollers (ARM TrustZone for Cortex-M). How do hardware cryptographic accelerators prevent unauthorized firmware execution?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "ROM bootloader contains immutable public key; verifies digital signature of application firmware image before booting; TrustZone partitions hardware, memory, and peripherals into Secure World (cryptography, keys) and Non-Secure World (application)."
+        },
+        {
+            'text': "What are Zero-Copy Networking stacks (like LwIP) in embedded IoT systems? How do custom packet buffers (pbufs) avoid copying payload bytes between network interface and application?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Standard network stacks copy packets between kernel and user buffers. LwIP uses pbuf linked structures where Ethernet MAC DMA writes packet directly into pbuf payload; application reads from same memory pointer, eliminating CPU memory copy overhead."
+        },
+        {
+            'text': "How do you build a Hardware-Agnostic Board Support Package (BSP) and Hardware Abstraction Layer (HAL) for an enterprise firmware codebase deployed across multiple chip vendors?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Define generic C interface contracts (e.g. bsp_spi_transfer(handle, buf, len)); write concrete low-level implementations for STM32, NXP, and Silicon Labs; application code links against abstract BSP API, allowing chip swaps with zero app code rewrites."
+        }
+    ],
+    'embedded_systems-embedded_systems-s3-set3': [
+        {
+            'text': "Architect a safety-critical medical infusion pump firmware complying with IEC 62304 Class C and MISRA C:2012 guidelines. Detail static analysis, memory safety, and independent supervisor architectures.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "MISRA C compliance (no dynamic allocation, no recursion, single exit points); dual MCU architecture (Primary Controller and Independent Safety Monitor with cross-heartbeat monitoring); motor drive PWM hardware interlocking; fail-safe valve shutdown."
+        },
+        {
+            'text': "You are investigating an intermittent field crash occurring on 1 in 10,000 devices after 3 weeks of continuous operation. Walk through your step-by-step diagnostic and memory dump strategy.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Implement non-volatile crash log partition in Flash; HardFault handler writes register dump, task stack traces, active RTOS tasks, and heap stats to flash before reset; inspect logs for slow memory leak, timer tick 32-bit integer overflow rollover (49.7 days), or rare race condition."
+        },
+        {
+            'text': "Explain the operational differences between Bare-Metal super-loops, Cooperative Schedulers, and Preemptive RTOS. Under what resource constraints is a bare-metal state machine superior to an RTOS?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Bare-metal loop has zero RAM/flash RTOS overhead and lowest power, ideal for simple <16KB MCUs; Cooperative relies on tasks yielding voluntarily; Preemptive RTOS provides strict priority guarantees, but incurs ~5-10KB flash, task stacks RAM overhead, and context-switching cycles."
+        },
+        {
+            'text': "How do you design a high-frequency (10kHz) Field-Oriented Control (FOC) algorithm for Brushless DC (BLDC) motors using Space Vector PWM (SVPWM) and Clark/Park transforms?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Measures 3-phase currents; Clarke transform converts 3-phase $(a,b,c)$ to 2-phase stationary $(\\alpha, \\beta)$; Park transform converts to rotating $(d, q)$ frame aligned with rotor flux; PID controllers regulate direct flux ($I_d = 0$) and quadrature torque ($I_q$); inverse transforms generate SVPWM duty cycles."
+        },
+        {
+            'text': "Discuss the future of Edge AI and TinyML (TensorFlow Lite for Microcontrollers). How do 8-bit quantized neural networks execute on sub-100MHz microcontrollers with under 256KB RAM?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Offline quantization (INT8) maps weights to byte arrays; avoids dynamic memory allocation by using static pre-allocated tensor arenas; leverages CMSIS-NN SIMD instructions; executes keyword spotting, anomaly vibration detection, and gesture recognition at microwatt power budgets."
+        }
+    ],
+
+    # ------------------ C++ ------------------
+    # Series 1
+    'embedded_systems-cpp-s1-set1': [
+        {
+            'text': "Explain the RAII (Resource Acquisition Is Initialization) idiom in modern C++. Compare std::unique_ptr, std::shared_ptr, and std::weak_ptr. How does std::unique_ptr achieve zero runtime overhead over a raw pointer, and how does std::weak_ptr break circular reference memory leaks?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "RAII ties resource lifecycle (heap memory, sockets, file descriptors, mutexes) to object stack scope. std::unique_ptr has exclusive ownership, deleted move-only semantics, zero memory overhead (identical to raw pointer). std::shared_ptr maintains atomic reference counting in a control block. std::weak_ptr observes shared_ptr without incrementing strong refcount, breaking circular dependency cycles that would otherwise prevent deallocation."
+        },
+        {
+            'text': "Explain Move Semantics and Rvalue References (T&&) introduced in C++11. How does std::move cast an expression to an rvalue to enable ownership transfer without copying, and what is the Rule of Five (Destructor, Copy Constructor, Copy Assignment, Move Constructor, Move Assignment)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Rvalue references bind to temporary objects about to expire. std::move performs static_cast<T&&>, signaling that resources (e.g. heap pointers) can be pilfered from the source and transferred to target, setting source pointer to nullptr. Rule of Five dictates that if a class customizes any resource management method (destructor, copy ctor, copy assign), it must explicitly define all five to ensure safe copying and optimal move performance."
+        },
+        {
+            'text': "How does dynamic polymorphism work under the hood in C++? Explain the memory layout of the vtable (virtual method table) and the hidden vptr pointer inside each object instance, and what the runtime performance and memory overhead is compared to static dispatch.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "When a class defines a virtual function, the compiler creates a static vtable containing function pointers for that class type. Each instantiated object has a hidden vptr pointer (typically at offset 0, consuming 8 bytes on 64-bit systems) pointing to the class vtable. Dynamic dispatch dereferences vptr, indexes the vtable, and calls through function pointer, adding an extra memory indirection and inhibiting compiler inlining compared to static CRTP/templates."
+        },
+        {
+            'text': "What is Undefined Behavior (UB) in C++? Detail the dangers of dangling pointers, use-after-free, and buffer overflows. How do compiler tools like AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan) detect these violations at runtime?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Undefined Behavior means the C++ standard imposes no requirements; compilers can assume UB never happens, optimizing away code paths unpredictably. Use-after-free reads deallocated heap, leading to memory corruption or arbitrary code execution. AddressSanitizer (ASan) instruments memory allocations with 'shadow bytes' to detect out-of-bounds access and use-after-free instantly with descriptive stack traces; UBSan detects integer overflows, null pointer dereferences, and misaligned memory."
+        },
+        {
+            'text': "Compare C++ Standard Template Library (STL) sequential containers: std::vector versus std::list versus std::array. Why is std::vector the default choice for cache locality?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "std::array is fixed size stack array; std::list is doubly-linked list (scattered heap nodes, poor cache); std::vector is dynamically resizing contiguous array. Contiguous memory maximizes CPU L1/L2 cache prefetching, outperforming linked lists even on insertions."
+        }
+    ],
+    'embedded_systems-cpp-s1-set2': [
+        {
+            'text': "Explain the RAII (Resource Acquisition Is Initialization) idiom in modern C++. How does tying resource management to object lifetime eliminate memory leaks and dangling handles?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Resources (heap memory, file handles, mutex locks, sockets) are acquired in constructor and guaranteed to be released in destructor. When object leaves scope (even via exception throw), destructor automatically frees resource during stack unwinding."
+        },
+        {
+            'text': "Compare C++ Smart Pointers: std::unique_ptr, std::shared_ptr, and std::weak_ptr. How does std::unique_ptr enforce exclusive ownership with zero runtime overhead?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "unique_ptr: exclusive ownership, copy disabled, movable, zero overhead compared to raw pointer; shared_ptr: reference-counted shared ownership, control block tracks refcount; weak_ptr: non-owning observer of shared_ptr, breaks circular reference memory leaks."
+        },
+        {
+            'text': "What is the Rule of Three, the Rule of Five, and the Rule of Zero in modern C++? What special member functions comprise the Rule of Five?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Rule of 5: if a class defines Destructor, Copy Constructor, Copy Assignment, it should also define Move Constructor and Move Assignment. Rule of 0: design classes using standard types (vector, string, unique_ptr) so compiler auto-generates all 5 correctly."
+        },
+        {
+            'text': "Explain Move Semantics and Rvalue References (T&&) in C++11. How do std::move() and moving resources avoid deep memory copies of large objects?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Lvalues have identifiable memory addresses; Rvalues are temporary objects. Move constructor steals internal pointers/resources from temporary rvalue and sets source pointer to nullptr, transforming expensive $O(N)$ deep copies into instantaneous $O(1)$ pointer swaps."
+        },
+        {
+            'text': "How does Virtual Function Dynamic Dispatch work under the hood? Explain the Virtual Method Table (vtable) and Virtual Table Pointer (vptr), and why base class destructors must be virtual.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Classes with virtual functions contain hidden vptr pointing to static vtable of function pointers. Calling virtual function does indirect table lookup ($O(1)$). Base destructor must be virtual to ensure derived class destructor is called when deleting via base pointer."
+        }
+    ],
+    'embedded_systems-cpp-s1-set3': [
+        {
+            'text': "Explain the C++ Memory Model and Concurrency support: std::thread, std::mutex, and RAII lock guards (std::lock_guard versus std::unique_lock).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "std::thread spawns OS thread; std::mutex ensures mutual exclusion. std::lock_guard acquires mutex on construction and releases on destruction; std::unique_lock provides flexible deferred locking, manual unlocking, and condition variable integration."
+        },
+        {
+            'text': "What are C++ Atomics (std::atomic<T>)? What is a Data Race, and what are memory orders: memory_order_relaxed, memory_order_acquire, and memory_order_release?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Data race occurs when 2 threads access same memory concurrently with at least one writer without synchronization. std::atomic provides lock-free atomic read-modify-write. Relaxed enforces atomicity only; Acquire-Release synchronizes visibility across threads."
+        },
+        {
+            'text': "What is Compile-Time Programming with 'constexpr' and 'consteval' in C++11/14/20? How does executing calculations at compile time boost runtime execution performance?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "constexpr specifies functions/variables can be evaluated at compile time if inputs are constant expressions; consteval enforces compile-time evaluation. Pre-computes lookup tables, mathematical constants, and regexes into static binary constants."
+        },
+        {
+            'text': "What is Undefined Behavior (UB) in C++? Give three examples (signed integer overflow, out-of-bounds array access, use-after-free), and explain how compiler sanitizers (ASan, UBSan) catch them.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "UB means C++ standard imposes no requirements; compiler can generate arbitrary machine code, optimize away checks, or crash. AddressSanitizer (ASan) instruments memory accesses; UndefinedBehaviorSanitizer (UBSan) detects integer overflows and invalid casts."
+        },
+        {
+            'text': "Explain Exception Safety Guarantees in C++: Basic Guarantee, Strong Guarantee (commit-or-rollback), and Nothrow Guarantee (noexcept). Why should move constructors be marked 'noexcept'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Basic: no resource leaks, valid state; Strong: operation succeeds or system rolls back to exact initial state; Nothrow: guaranteed never to throw. std::vector reallocation uses move constructor ONLY if marked noexcept; otherwise falls back to slow copies to guarantee strong exception safety."
+        }
+    ],
+
+    # Series 2
+    'embedded_systems-cpp-s2-set1': [
+        {
+            'text': "Compare C++ Type Casting operators: static_cast, dynamic_cast, const_cast, and reinterpret_cast. Why is C-style casting '(Type)val' dangerous in modern C++?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "static_cast for compile-time verified conversions; dynamic_cast for safe downcasting via RTTI (returns nullptr on failure); const_cast adds/removes const; reinterpret_cast treats raw bits as different type. C-style cast blindly tries all 4, masking dangerous bugs."
+        },
+        {
+            'text': "Compare STL Associative Containers: std::map versus std::unordered_map in terms of underlying data structure, search complexity ($O(\\log N)$ vs $O(1)$), and memory overhead.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "std::map uses balanced Red-Black tree (ordered keys, O(log N) operations, node pointer overhead); std::unordered_map uses hash table with buckets and chaining (average O(1) lookups, unordered, requires good hash function, higher memory for bucket arrays)."
+        },
+        {
+            'text': "Explain C++ Lambda Expressions: Syntax '[captures](params) -> return_type { body }'. Compare capturing by value [=] versus capturing by reference [&], and explain mutable lambdas.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Generates anonymous callable functor object. Capture by value copies outer variables (const by default unless 'mutable' is specified); Capture by reference stores references (risk of dangling references if lambda outlives captured stack variables)."
+        },
+        {
+            'text': "What is std::string_view (introduced in C++17)? How does it provide zero-copy, non-owning views of character sequences, and what are the lifetime pitfalls?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Small struct containing pointer to character buffer and length. Passing string_view avoids heap allocations of std::string for substrings and function parameters. Pitfall: does not own data; if underlying string is destroyed, string_view becomes dangling pointer."
+        },
+        {
+            'text': "How does Operator Overloading work in C++? Explain best practices for overloading operator+ (as non-member friend function) versus operator+= (as member function returning *this).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "operator+= alters state in-place and returns reference to *this; operator+ implemented as non-member taking LHS by value, calling operator+= on it, and returning the new copy, ensuring symmetric implicit type conversions on both sides."
+        }
+    ],
+    'embedded_systems-cpp-s2-set2': [
+        {
+            'text': "Explain Template Metaprogramming in C++. Compare Class Templates, Function Templates, and Full Template Specialization versus Partial Template Specialization.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Generates code at compile time. Function templates instantiate types automatically via deduction; Full specialization customizes implementation for specific type (template<> class Foo<int>); Partial specialization customizes for subset (template<typename T> class Foo<T*>)."
+        },
+        {
+            'text': "What are std::optional, std::variant, and std::any in C++17? How does std::variant provide type-safe sum types (unions) without dynamic memory allocation?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "optional: value that may or may not exist (avoids magic null values); variant: type-safe tagged union holding one of N specified types, queried via std::visit or std::holds_alternative; any: holds single value of arbitrary type (type-erasure, may allocate heap)."
+        },
+        {
+            'text': "What are Universal References (Forwarding References, 'auto&&' or 'T&&' in template deduction)? How does std::forward<T>() achieve Perfect Forwarding?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "When T&& appears in template parameter deduction, Reference Collapsing applies (& + && = &; && + && = &&). std::forward<T>(arg) casts arg to rvalue if and only if it was originally initialized with an rvalue, preserving exact value category when forwarding."
+        },
+        {
+            'text': "Explain C++20 Concepts and Constraints. How do 'requires' clauses improve upon legacy SFINAE (Substitution Failure Is Not An Error) and std::enable_if?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Concepts define named compile-time predicates on template arguments (e.g. concept Integral = std::is_integral_v<T>). Replaces cryptic, verbose SFINAE template metaprogramming with clear readable syntax, yielding clean human-friendly compiler error messages."
+        },
+        {
+            'text': "What are Custom Memory Allocators in modern C++? How does std::pmr (Polymorphic Memory Resources) in C++17 allow swapping monotonic buffer allocators without changing container types?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Standard containers bake allocator into type (vector<int, MyAlloc> != vector<int>). std::pmr uses virtual interface (memory_resource); container types remain identical (pmr::vector<int>), allowing high-speed arena allocation on pre-allocated stack buffers."
+        }
+    ],
+    'embedded_systems-cpp-s2-set3': [
+        {
+            'text': "Explain Data-Oriented Design (DOD) versus Object-Oriented Design in high-performance C++. Compare Array-of-Structures (AoS) with Structure-of-Arrays (SoA) for CPU cache performance.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "AoS (struct Particle { x, y, z, mass, color }) loads unneeded fields into CPU cache line when iterating over positions; SoA (struct Particles { vector<float> x, y, z; ... }) packs position coordinates contiguous in memory, maximizing SIMD vectorization and cache hits."
+        },
+        {
+            'text': "How do you design a Lock-Free Single-Producer Single-Consumer (SPSC) Queue in C++ using std::atomic with memory_order_acquire and memory_order_release?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Ring buffer with atomic head and tail indices. Producer writes data, then updates tail using memory_order_release; Consumer reads tail using memory_order_acquire, reads data, and updates head with release. Eliminates mutex locks entirely."
+        },
+        {
+            'text': "How do you profile and eliminate performance bottlenecks in a high-frequency trading C++ codebase using Linux Perf, Valgrind, and Google Benchmark?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Google Benchmark isolates function micro-benchmarks; Perf records CPU instruction cycles, branch mispredictions, and cache misses (L1-dcache-load-misses); Valgrind/Callgrind graphs call trees; optimize by inlining, branch prediction hints, and eliminating heap allocations."
+        },
+        {
+            'text': "What is Application Binary Interface (ABI) compatibility in C++? What common code changes (adding a non-static data member, changing virtual function order) break ABI?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ABI dictates binary layout: calling conventions, name mangling, struct sizing, vtable offsets. Adding data member changes struct size; reordering virtual functions alters vtable index offsets, causing segmentation faults when dynamic shared libraries link without recompile."
+        },
+        {
+            'text': "Explain the Pimpl (Pointer to Implementation / Compilation Firewall) idiom in C++. How does Pimpl drastically reduce compilation times and preserve binary compatibility?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Class header declares opaque forward-declared struct Impl and std::unique_ptr<Impl>; private members and internal includes move entirely into .cpp file. Altering private members re-compiles ONLY that single .cpp file, sparing all calling consumer files from recompilation."
+        }
+    ],
+
+    # Series 3
+    'embedded_systems-cpp-s3-set1': [
+        {
+            'text': "Explain the One Definition Rule (ODR) in C++. What are the rules for inline functions, inline variables (C++17), and template definitions across multiple translation units?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Translation unit cannot contain multiple definitions of same entity. Non-inline functions/variables must have exactly ONE definition across entire program. Inline functions/variables and templates can appear in multiple translation units if definitions are token-for-token identical."
+        },
+        {
+            'text': "What is Argument-Dependent Lookup (ADL / Koenig Lookup)? How does ADL find non-member functions (such as operator<< or swap) based on the namespaces of function arguments?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "When an unqualified function is called, compiler searches both current scope and the namespaces associated with the types of all function arguments. Enables finding overloaded operators and customization points (e.g. using std::swap; swap(a, b);)."
+        },
+        {
+            'text': "Explain Copy Elision and Return Value Optimization (Named RVO / NRVO) in C++17. Why is RVO mandatory in C++17 even if the copy/move constructor has observable side-effects?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Compiler constructs returned object directly in the memory location allocated for the caller's receiving variable, completely bypassing copy/move constructor invocations. C++17 mandates prvalue copy elision as a language rule, not just an optimization."
+        },
+        {
+            'text': "Explain Variadic Templates and Fold Expressions (introduced in C++17). How do unary and binary fold expressions simplify parameter pack expansion?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Parameter packs (typename... Args) accept arbitrary number of template arguments. Fold expressions apply binary operators across pack: (... + args) expands to ((arg1 + arg2) + arg3); (std::cout << ... << args) prints all arguments cleanly without recursive template boilerplate."
+        },
+        {
+            'text': "What are C++20 Coroutines? Explain the roles of Promises, Awaitables, and the keywords: co_await, co_yield, and co_return.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Stackless functions whose execution can be suspended and resumed. Promise object coordinates coroutine state; Awaitable controls suspension behavior (await_ready, await_suspend, await_resume); co_yield emits value and suspends; co_return finishes; state allocated on heap."
+        }
+    ],
+    'embedded_systems-cpp-s3-set2': [
+        {
+            'text': "Explain the C++20 Ranges library. How do Range Views provide lazy, composable, non-owning evaluation pipelines (e.g. data | views::filter(...) | views::transform(...))?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Ranges abstract pairs of iterators. Views are lightweight, lazily-evaluated transformations composed via pipe operator (|); does not allocate intermediate containers, evaluating elements on-demand as caller iterates, with automatic algorithm safety."
+        },
+        {
+            'text': "Explain C++20 Modules. How do 'import' and 'export' replace the 50-year-old C preprocessor '#include' model and eliminate macro leakages?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "#include copies raw text repeatedly per translation unit, leading to macro pollution and slow compile times. Modules compile once into binary Interface Unit (BMI); 'import' imports compiled AST symbols in linear time without leaking internal macros or private symbols."
+        },
+        {
+            'text': "What is Type Erasure in C++? How does std::function implement type erasure using templates, inheritance, and internal vtables to wrap any callable object?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Encapsulates disparate concrete types behind a uniform non-templated interface. std::function defines internal base class with virtual invoke() method; templated derived class stores actual functor/lambda; uses Small Buffer Optimization (SBO) to avoid heap allocation for small callables."
+        },
+        {
+            'text': "Explain False Sharing in multithreaded C++ architectures. How does the 'alignas(hardware_destructive_interference_size)' attribute prevent cache line ping-ponging?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Occurs when independent variables accessed by different CPU cores reside on the same 64-byte L1 cache line; writing to one variable invalidates the entire cache line on other cores, degrading performance. Aligning variables to 64 bytes separates them into distinct cache lines."
+        },
+        {
+            'text': "How do you implement Lock-Free Multi-Producer Multi-Consumer (MPMC) queues? Explain the ABA Problem in Compare-And-Swap (CAS) and how hazard pointers solve it.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "ABA occurs when thread 1 reads value A, thread 2 changes A to B then back to A; thread 1's CAS succeeds assuming nothing changed, but underlying memory state was altered. Solved via double-word CAS with version counter (tagged pointer) or Hazard Pointers tracking active reader threads."
+        }
+    ],
+    'embedded_systems-cpp-s3-set3': [
+        {
+            'text': "Architect an ultra-low-latency financial matching engine in C++ executing orders with sub-microsecond determinism (p99 < 800 nanoseconds). Detail CPU pinning, zero-allocation, and busy-polling.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Thread pinned to isolated CPU core (taskset / isolcpus); disable OS interrupts and power-saving C-states; busy-poll network ring buffer (Solarflare OpenOnload kernel bypass); pre-allocate all order book memory at startup; zero virtual functions; zero dynamic heap allocations in hot path."
+        },
+        {
+            'text': "How do Compiler Optimization Flags (-O3, -flto, -fno-rtti, -fno-exceptions, -march=native) alter generated assembly? What are the trade-offs of disabling RTTI and Exceptions?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "-flto (Link-Time Optimization) inlines across compilation units; -fno-rtti removes typeinfo and dynamic_cast overhead; -fno-exceptions removes exception table unwinding overhead and reduces binary size, but forbids standard exception handling, requiring error code paradigms (std::expected)."
+        },
+        {
+            'text': "Explain the theoretical and mechanical workings of Garbage Collection vs RAII in systems programming. Why is deterministic destruction required in robotics and aerospace where GC pauses cause failure?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Garbage collection runs non-deterministic sweep cycles, inducing stop-the-world latency spikes; RAII guarantees instantaneous deterministic resource deallocation at the exact moment object leaves scope, essential for real-time safety actuators and flight control."
+        },
+        {
+            'text': "How do you build a custom High-Performance Memory Pool Allocator (Fixed-Size Block Allocator) in C++ that outperforms standard malloc/free by 10x for small objects?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Pre-allocates large contiguous block of memory; divides into linked list of fixed-size chunks (e.g. 64 bytes); allocation pops head of free list in O(1) time without OS syscall; deallocation pushes node to head in O(1) time, eliminating heap fragmentation."
+        },
+        {
+            'text': "Discuss the future of C++ Memory Safety (C++ Profiles, Borrow Checker proposals) in response to US White House and NSA advisories recommending memory-safe languages (Rust).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Industry pushes for static analysis enforcement; Bjarne Stroustrup's C++ Profiles enforce lifetime safety and bounds checking at compile time; adoption of safe wrappers (std::span) and hardening compiler flags (-D_GLIBCXX_ASSERTIONS); gradual interop and migration toward Rust."
+        }
+    ],
+
+    # ------------------ GAME DEVELOPMENT ------------------
+    # Series 1
+    'game_dev-game_development-s1-set1': [
+        {
+            'text': "Explain the core Game Loop architecture (Process Input, Update Game State, Render Frame). Why is decoupling physics simulation updates (FixedUpdate) from rendering updates (Update) necessary?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Game loop iterates continuously. Rendering frame rate fluctuates (30-144+ FPS) depending on scene complexity; Physics requires deterministic fixed time-step integration (e.g. 50Hz / 0.02s) to prevent tunneling, explosive velocity errors, and unstable collision math."
+        },
+        {
+            'text': "What is Delta Time (e.g. Time.deltaTime)? Why must character movement speed be multiplied by Delta Time to ensure frame-rate independent gameplay?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Delta time is time elapsed between previous frame and current frame. Moving 5 units per frame makes character move 300 units/sec at 60 FPS, but 720 units/sec at 144 FPS. Multiplying speed by Delta Time ensures constant speed per second regardless of frame rate."
+        },
+        {
+            'text': "Explain fundamental 3D Vector mathematics in game development: Vector Addition, Dot Product, Cross Product, and Normalization. How is the Dot Product used to test if an enemy is facing the player?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Normalization produces unit vector of length 1; Cross product yields perpendicular vector (computing surface normals). Dot Product ($A \\cdot B = |A||B|\\cos\\theta$): if dot product of enemy forward vector and vector-to-player is $>0$, player is in front; if $<0$, player is behind."
+        },
+        {
+            'text': "Explain Entity-Component Architecture in game engines (Unity / Unreal Actor-Component). How does composition over inheritance prevent deep class hierarchy nightmares?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "GameObjects/Actors are empty entity containers; behavior is attached via modular independent Components (MeshRenderer, Rigidbody, AudioSource). Avoids rigid inheritance traps (e.g. trying to create a flying car when Car and Aircraft are separate base classes)."
+        },
+        {
+            'text': "Compare Colliders with Triggers in 3D physics engines. When does a collision event (OnCollisionEnter) fire versus a trigger event (OnTriggerEnter)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Colliders apply physical forces preventing objects from penetrating each other (firing OnCollisionEnter with collision contact points and impulse); Triggers disable physical resolution, allowing objects to pass through while firing OnTriggerEnter (for coin pickups, zone triggers)."
+        }
+    ],
+    'game_dev-game_development-s1-set2': [
+        {
+            'text': "Explain coordinate spaces in game rendering: Local (Model) Space, World Space, View (Camera) Space, Clip Space, and Screen Space. What transformation matrices convert between them?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Model Matrix transforms Model to World space; View Matrix transforms World to Camera space; Projection Matrix transforms Camera to Clip space (perspective divide); Viewport transform maps normalized coordinates to screen pixel coordinates."
+        },
+        {
+            'text': "How does Raycasting work in game development? Give three common gameplay use cases (e.g. hitscan shooting, ground detection, line-of-sight checks).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Casts an invisible mathematical line ray from origin point along direction vector into physics scene, returning hit distance, point, normal, and collider. Used for: bullet hitscan detection, checking if character is grounded, and testing AI field of view."
+        },
+        {
+            'text': "Compare Character Controllers with Physics-Driven Rigidbodies for player movement. Why do competitive platformers and first-person shooters avoid pure physics forces for player control?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Physics rigidbodies use forces and friction, causing floaty, sluggish response, sliding on slopes, and unpredictable bounces; Character controllers use kinematic displacement math providing instant, responsive, tightly tuned movement expected by players."
+        },
+        {
+            'text': "Explain Animation State Machines, Transitions, and Blend Trees in game animation. How does a blend tree achieve smooth transition between idle, walking, and sprinting based on a speed float parameter?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "State machine coordinates transitions between distinct animations (Jump, Attack) via transition conditions; Blend Tree interpolates and blends multiple animation clips (walk, run, sprint) linearly based on continuous float parameters (speed, direction)."
+        },
+        {
+            'text': "How does 3D Spatial Audio work in games? Explain Audio Listeners, Audio Sources, distance attenuation roll-off curves, and Doppler effect.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "AudioListener (attached to camera/player) hears sounds from AudioSources in 3D space; engine calculates panning based on angle and volume attenuation based on inverse distance curves; Doppler pitch-shifts frequencies when sound source moves relative to listener."
+        }
+    ],
+    'game_dev-game_development-s1-set3': [
+        {
+            'text': "What is the Object Pooling design pattern in game development? Why is calling Instantiate() and Destroy() repeatedly during gameplay (e.g. firing 500 bullets/min) catastrophic for frame rates?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Instantiating and destroying objects causes continuous heap allocations and deallocations, triggering Garbage Collection sweeps that freeze game frames. Object pool pre-allocates objects at startup, deactivating on death and reactivating on spawn, with zero runtime GC."
+        },
+        {
+            'text': "Explain the Graphics Rendering Pipeline: Vertex Shader, Rasterization, and Fragment (Pixel) Shader. What is the difference between a Draw Call and a Vertex?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Vertex shader transforms 3D vertex positions to clip space; Rasterizer converts geometric triangles into pixel fragments; Fragment shader calculates final pixel colors (lighting, textures). A Draw Call is a CPU command instructing the GPU to render a specific mesh with a material."
+        },
+        {
+            'text': "What are Draw Calls, and how do Batching techniques (Static Batching, Dynamic Batching, GPU Instancing) reduce CPU-GPU communication overhead?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "High draw call count bottlenecks CPU. Static batching combines static meshes into single large mesh; Dynamic batching groups small moving vertices; GPU Instancing renders thousands of identical meshes (trees, grass) with distinct transforms in a single draw call."
+        },
+        {
+            'text': "Compare Game AI architectures: Finite State Machines (FSM) versus Behavior Trees. Why are Behavior Trees preferred for complex enemy combat AI in AAA games?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "FSMs suffer from combinatorial transition explosion as states grow; Behavior Trees organize behaviors hierarchically via Composites (Selectors, Sequences), Decorators, and Tasks, enabling modular, reusable, and maintainable decision-making."
+        },
+        {
+            'text': "What are Level of Detail (LOD) systems in 3D games? How do LOD groups optimize GPU vertex counts and rendering load as camera distance increases?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Maintains multiple versions of 3D model with decreasing polygon counts (LOD0: 50,000 tris up close; LOD1: 15,000 tris; LOD2: 2,000 tris in distance; LOD3: 2D billboard impostor). Automatically swaps meshes based on screen percentage, saving millions of vertex calculations."
+        }
+    ],
+
+    # Series 2
+    'game_dev-game_development-s2-set1': [
+        {
+            'text': "How do Unit Quaternions represent 3D rotations in game engines? Why are Quaternions used internally rather than Euler angles, and how does SLERP achieve smooth rotation interpolation?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Euler angles suffer from Gimbal Lock (loss of 1 rotational axis when two align); Quaternions (x, y, z, w) avoid gimbal lock, compose rotations via quaternion multiplication, and enable Spherical Linear Interpolation (SLERP) for constant-speed rotational smoothing."
+        },
+        {
+            'text': "Explain the Scene Graph hierarchy. How do parent-child transform relationships propagate position, rotation, and scale down the hierarchy using matrix multiplication?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Hierarchical tree of transforms. A child object's world matrix is calculated by multiplying parent world matrix by child's local transform matrix ($M_{world} = M_{parent} \\times M_{local}$). Moving the parent automatically moves all attached children."
+        },
+        {
+            'text': "What are Prefabs in Unity and Blueprints in Unreal Engine? How do Prefab Variants and nested prefabs support modular level design and asset reuse?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Reusable pre-configured asset templates combining meshes, components, and scripts. Modifying base prefab propagates changes across thousands of instances across all levels; Prefab variants allow inheriting base logic while overriding specific attributes (e.g. enemy color/health)."
+        },
+        {
+            'text': "Compare Polling input (checking Input.GetKey every frame) with Event-Driven Input Action Maps (Unity New Input System / Unreal Enhanced Input).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Polling creates tight coupling to specific hardware keys in update loop; Input Action maps bind abstract actions ('Jump', 'Fire') to rebindable keys/gamepads, supporting runtime controller remapping, multi-player splitscreen, and composite vector inputs."
+        },
+        {
+            'text': "Explain UI Canvas rendering in game engines: Screen Space - Overlay, Screen Space - Camera, and World Space. When is a World Space canvas required?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Overlay renders flat 2D HUD directly on top of screen; Camera renders UI at fixed distance in front of camera lens; World Space places canvas as physical 3D plane in game world (essential for in-game floating health bars, computer terminals, and VR interfaces)."
+        }
+    ],
+    'game_dev-game_development-s2-set2': [
+        {
+            'text': "Explain Physically Based Rendering (PBR) shader materials. What do the Albedo, Metallic, Roughness / Smoothness, Normal Map, and Ambient Occlusion (AO) texture maps represent?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "PBR simulates real light physics. Albedo: base diffuse color without lighting; Metallic: dielectric vs metal; Roughness: microfacet surface scattering (sharp reflections vs diffuse blur); Normal map: RGB encodes tangent surface angles for fake depth; AO: baked contact shadow crevices."
+        },
+        {
+            'text': "Compare Frustum Culling with Occlusion Culling. How does the camera skip rendering objects outside its view or hidden behind large walls?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Frustum culling checks bounding boxes against camera view frustum planes, discarding objects outside FOV; Occlusion culling calculates which objects are hidden behind occluders (walls, mountains) within the view, eliminating wasted draw calls for invisible geometry."
+        },
+        {
+            'text': "Compare multiplayer game networking architectures: Client-Server with Authoritative Server versus Peer-to-Peer (P2P). Why is authoritative server mandatory for competitive esports?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "P2P shares game state among players (prone to desync, NAT punchthrough issues, and trivial client cheating/tampering); Authoritative server receives raw player inputs, computes game physics and hits, and replicates verified state to clients, stopping speed hacks and aimbots."
+        },
+        {
+            'text': "What is ScriptableObject architecture in Unity? How does storing shared game data (weapon stats, enemy profiles) in ScriptableObjects eliminate memory duplication?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Data containers saved as project assets. Instead of 1,000 enemy MonoBehaviours duplicating identical weapon variables in RAM, all 1,000 enemies hold a reference pointer to a single shared ScriptableObject asset, saving memory and decoupling data from scenes."
+        },
+        {
+            'text': "What is NavMesh (Navigation Mesh) and A* pathfinding in game engines? How do Off-Mesh Links allow AI agents to navigate jumping gaps and climbing ladders?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "NavMesh bakes walkable geometry into convex polygon surface; A* computes optimal path across polygon edges; Off-Mesh Links connect disconnected NavMesh surfaces, triggering special animations (jumping, climbing, dropping) to bridge spatial gaps."
+        }
+    ],
+    'game_dev-game_development-s2-set3': [
+        {
+            'text': "How does Multiplayer Netcode implement Client-Side Prediction, Server Reconciliation, and Entity Interpolation to hide 100ms network latency?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Client predicts movement locally immediately without waiting for server response; sends input with sequence number to server; server validates input and returns authoritative position; client reconciles differences by replaying unacknowledged inputs; remote entities are smoothly interpolated between past snapshots."
+        },
+        {
+            'text': "Explain Lag Compensation in multiplayer hitscan shooting. How does the server 'rewind time' to evaluate where the target was on the shooter's screen when they fired?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Shooter fires at moving enemy on their screen (delayed by latency). When server receives fire command, it inspects shooter's timestamp, temporarily rewinds all target bounding boxes back to that historical millisecond, checks raycast hit, and restores current state."
+        },
+        {
+            'text': "How do you profile a game running at 25 FPS using the Unity Profiler or Unreal Insights? How do you distinguish between being CPU-Bound versus GPU-Bound?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Check frame time. If main thread wait time is low and rendering frame time is high, or reducing resolution increases FPS, it is GPU-bound (fill rate, shaders); if main thread execution is high (physics, scripts, garbage collection) and changing resolution has zero effect, it is CPU-bound."
+        },
+        {
+            'text': "How does Asynchronous Asset Loading work using Addressables (Unity) or Async Asset Loading (Unreal)? Why should synchronous Resources.Load() be avoided in production?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Resources.Load freezes the main thread causing frame hitches while loading from disk; Addressables decouples asset references by address, loads asynchronously in background threads via handles, and supports downloadable DLC asset bundles."
+        },
+        {
+            'text': "Explain Procedural Level Generation algorithms: Cellular Automata (cave generation) versus Binary Space Partitioning (BSP - dungeon room generation).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Cellular Automata initializes grid with random noise, repeatedly applying birth/death neighbor rules to carve organic cave caves; BSP recursively subdivides 2D space into binary tree partitions, placing rooms in leaf nodes and connecting with corridors."
+        }
+    ],
+
+    # Series 3
+    'game_dev-game_development-s3-set1': [
+        {
+            'text': "What are Frame Time Budgets? How many milliseconds does a game developer have to execute ALL game logic, physics, and rendering to maintain a stable 60 FPS versus 120 FPS target?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Frame budget = $1000 / FPS$. At 60 FPS, entire budget is 16.67 milliseconds; at 120 FPS, budget drops to 8.33 milliseconds; at 90 FPS (VR standard), budget is 11.11ms. Any single frame exceeding budget causes stutter (jank) and dropped frames."
+        },
+        {
+            'text': "Explain GPU Vertex Fill Rate versus Pixel Fill Rate. What is Overdraw, and why does rendering overlapping transparent particle textures tank mobile GPU performance?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Overdraw occurs when the same pixel on screen is shaded and overwritten multiple times in a single frame. Opaque geometry uses Z-buffer depth testing to discard hidden pixels; semi-transparent alpha blended particles cannot write depth, forcing GPU to re-shade pixels repeatedly."
+        },
+        {
+            'text': "What is Inverse Kinematics (IK) in character animation? How does Two-Bone IK adapt a walking character's foot placement to uneven terrain in real-time?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Forward kinematics positions joints down from hip; IK calculates hip and knee joint angles to place foot end-effector at specific target position. Raycast detects terrain slope under foot; IK adjusts ankle rotation and knee bend so foot rests flat on ground."
+        },
+        {
+            'text': "Explain the Vertex Shader versus Compute Shader. How do modern game engines use Compute Shaders running on GPU to simulate millions of water ripples or grass blade physics?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Vertex shaders are bound to the graphics pipeline; Compute Shaders execute general-purpose parallel computing (GPGPU) directly on GPU thousands of cores outside rendering pipeline, calculating mass physics/simulation data written directly to GPU buffers."
+        },
+        {
+            'text': "What are Shaders: Universal Render Pipeline (URP) versus High Definition Render Pipeline (HDRP) in Unity? When is Forward Rendering preferred over Deferred Shading?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Forward rendering evaluates lights per object (fast, supports MSAA, ideal for mobile/VR with few lights); Deferred shading renders geometric properties (normals, depth, albedo) into G-Buffers and calculates lighting in screen space (handles hundreds of dynamic lights, higher memory bandwidth)."
+        }
+    ],
+    'game_dev-game_development-s3-set2': [
+        {
+            'text': "Explain pure Entity Component System (ECS) architecture (e.g. Unity DOTS - Data-Oriented Technology Stack / Unreal Mass Entity). How does memory layout differ from traditional OOP?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Entities are pure integer IDs; Components are pure plain-old-data structs (no methods); Systems contain logic iterating over entities with matching components. Entities with identical components are packed tightly in memory chunks (Archetypes), maximizing CPU L1 cache hits."
+        },
+        {
+            'text': "Compare Deterministic Lockstep networking (used in RTS games like StarCraft) with Client-Server Snapshot Replication. Why does Lockstep require strict cross-platform floating point determinism?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Lockstep transmits ONLY player inputs, running identical simulation on all clients. If one client calculates floating-point rounding slightly differently (x86 vs ARM), simulations desync; requires fixed-point integer math to guarantee cross-platform synchronization."
+        },
+        {
+            'text': "What is Post-Processing in rendering pipelines? Explain Bloom, Screen-Space Ambient Occlusion (SSAO), Depth of Field, and Color Grading Tone-Mapping (ACES).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Full-screen pixel shaders applied after scene is rendered. Bloom extracts pixels above luminance threshold and blurs; SSAO approximates contact shadows in screen-space depth; ACES tone-mapping maps High Dynamic Range (HDR) values into standard display range."
+        },
+        {
+            'text': "How do game physics engines resolve Tunneling (Continuous Collision Detection - CCD)? Why does a fast-moving bullet pass through a thin wall when using discrete collision detection?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Discrete detection checks overlaps at fixed time intervals; if bullet velocity exceeds wall thickness in a single frame ($v \\times \\Delta t > thickness$), it is in front of wall in frame 1 and behind wall in frame 2 without ever touching. CCD sweeps collision volume along velocity ray."
+        },
+        {
+            'text': "How do you design an in-game Save System supporting binary serialization, save game versioning, and anti-tamper checksums against cheat engines?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Serialize state to binary/JSON; record schema version number with migration adapters for backwards compatibility; compute HMAC-SHA256 signature using secret embedded key; encrypt save file with AES-GCM to prevent memory hex editor tampering."
+        }
+    ],
+    'game_dev-game_development-s3-set3': [
+        {
+            'text': "Architect a massively multiplayer game server backend (MMO) supporting 10,000 concurrent players per realm using spatial interest management and server clustering.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Divide world into spatial grid cells (Interest Management); players receive entity updates only from adjacent cells; worker nodes manage specific regions; actor model (Akka/Orleans) manages player state; Redis cluster handles cross-node messaging."
+        },
+        {
+            'text': "Explain the architecture of modern Anti-Cheat systems (Easy Anti-Cheat, BattlEye, Riot Vanguard). How do kernel-level drivers (Ring 0) detect memory injection and hook detection?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Operates at kernel level (Ring 0) loading before user-space OS; monitors process handles to prevent OpenProcess memory reading; verifies code section integrity; blocks unauthorized driver loading; analyzes mouse movement telemetry to flag algorithmic aimbots."
+        },
+        {
+            'text': "How do game developers optimize game build pipelines and texture memory budgets for cross-platform releases across Nintendo Switch, PlayStation 5, and PC?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Use platform-specific texture compression formats: ASTC for mobile/Switch, BC7/DXT for PC/consoles; profile VRAM allocations; script automated build pipelines generating platform asset bundles with downscaled texture mips and stripped shaders."
+        },
+        {
+            'text': "A VR game causes severe motion sickness (simulator sickness) during playtesting. Walk through your technical audit of frame rate stability, artificial locomotion, camera acceleration, and latency.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Ensure rock-solid 90+ FPS with zero dropped frames (eliminate GC hitches); eliminate artificial camera acceleration (linear speed or teleportation locomotion); match physical head tracking with zero latency; introduce dynamic field-of-view tunneling (vignetting) during turns."
+        },
+        {
+            'text': "Discuss the technical mechanics of Unreal Engine 5's core innovations: Nanite (virtualized micropolygon geometry) and Lumen (real-time dynamic global illumination).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Nanite streams and rasterizes micropolygon meshes with continuous geometric LOD down to pixel size, eliminating manual LODs; Lumen combines screen-space tracing with signed distance fields (SDF) and hardware ray tracing to calculate infinite-bounce diffuse interreflection."
+        }
+    ]
+}
+
+if __name__ == '__main__':
+    out_dir = os.path.join(os.path.dirname(__file__), 'vault_questions')
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, 'systems_qa_game_part8.php')
+    write_php_file(out_file, part8_data)
+

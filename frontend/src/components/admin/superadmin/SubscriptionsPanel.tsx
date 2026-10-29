@@ -190,9 +190,10 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: ToastTrigge
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-7">
         <Stat label="Paid students" value={summary.paid_individual} hint="on a paid plan now" />
         <Stat label="Given free" value={summary.complimentary} hint="no revenue" tone="violet" />
+        <Stat label="Redeemed offers" value={summary.redeemed ?? 0} hint="free offer, no payment" tone="violet" />
         <Stat label="Colleges" value={summary.colleges} hint="with a running plan" />
         <Stat label="Companies" value={summary.companies} hint="with a running plan" />
         <Stat
@@ -239,6 +240,7 @@ export function SubscriptionsPanel({ triggerToast }: { triggerToast: ToastTrigge
           <option value="">Any source</option>
           <option value="purchase">Bought online</option>
           <option value="admin_grant">Given by an admin</option>
+          <option value="offer_redeemed">Free offer redeemed</option>
         </select>
 
         <label className="flex cursor-pointer items-center gap-1.5 text-2xs font-semibold text-text-secondary">

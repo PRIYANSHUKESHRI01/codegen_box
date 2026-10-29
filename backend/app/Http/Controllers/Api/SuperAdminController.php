@@ -319,6 +319,8 @@ class SuperAdminController extends Controller
                 'created_at' => $user->created_at,
                 'readiness_score' => $user->readinessScore(),
                 'readiness_tier' => $user->readinessTier(),
+                // Set by hand from the Manage drawer (see ReadinessOverrideService): the score above is then that number.
+                'readiness_overridden' => isset($user->readinessBreakdown()['override']),
                 'subscription' => $coverage['plan'] ? [
                     'plan_name' => $coverage['plan']->name,
                     'source' => $coverage['source'],

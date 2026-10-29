@@ -19,8 +19,8 @@ const reload = vi.fn();
 const realLocation = window.location;
 
 /** jsdom's location cannot be spied on; swap in a stand-in with just what the code under test touches. */
-function setLocation(pathname: string) {
-  Object.defineProperty(window, "location", { configurable: true, value: { pathname, assign, reload } });
+function setLocation(pathname: string, search = "") {
+  Object.defineProperty(window, "location", { configurable: true, value: { pathname, search, assign, reload } });
 }
 
 beforeEach(() => {
@@ -80,6 +80,47 @@ describe("useResilientNavigation — Back / Solve can never leave the old screen
     });
 
     expect(push).toHaveBeenCalledTimes(1);
+  });
+
+  it("a navigation that lands on the same page with a new query releases the button at once and never reloads", async () => {
+    setLocation("/dashboard/interviews", "?domain=backend&stack=laravel");
+    const { result } = renderHook(() => useResilientNavigation());
+
+    act(() => result.current.go("/dashboard/interviews?domain=backend"));
+    expect(result.current.pending).toBe(true);
+
+    setLocation("/dashboard/interviews", "?domain=backend"); // the router has changed the address in place - nothing unmounted
+    await vi.advanceTimersByTimeAsync(200);
+    expect(result.current.pending).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(NAVIGATION_STUCK_AFTER_MS * 2);
+    expect(assign).not.toHaveBeenCalled();
+
+    // ...and the same button works again straight away (it used to ignore every press after the first)
+    act(() => result.current.go("/dashboard/interviews"));
+    expect(push).toHaveBeenLastCalledWith("/dashboard/interviews");
+    expect(push).toHaveBeenCalledTimes(2);
+  });
+
+  it("still falls back to a proper load when the address never changes, even if only the query was asked for", async () => {
+    setLocation("/dashboard/interviews", "?domain=backend");
+    const { result } = renderHook(() => useResilientNavigation());
+
+    act(() => result.current.go("/dashboard/interviews"));
+    await vi.advanceTimersByTimeAsync(NAVIGATION_STUCK_AFTER_MS + 200);
+
+    expect(assign).toHaveBeenCalledWith("/dashboard/interviews");
+  });
+
+  it("counts a trailing slash as the same page", async () => {
+    setLocation("/dashboard/practice/", "");
+    const { result } = renderHook(() => useResilientNavigation());
+
+    act(() => result.current.go("/dashboard/practice"));
+    await vi.advanceTimersByTimeAsync(200);
+
+    expect(result.current.pending).toBe(false);
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("starts fresh when the browser restores the page from its back/forward cache", async () => {

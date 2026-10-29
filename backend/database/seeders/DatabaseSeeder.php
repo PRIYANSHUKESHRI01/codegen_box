@@ -265,5 +265,8 @@ class DatabaseSeeder extends Seeder
         if ($rohan !== null && Plan::where('code', 'expert')->exists() && $rohan->lead_status !== User::LEAD_STATUS_CONVERTED) {
             $service->purchase($rohan, app(PurchaseQuoteService::class)->quote($rohan, 'expert'));
         }
+
+        $this->call(CuratedSetQuestionsSeeder::class);
+        $this->call(MockInterviewQuestionsSeeder::class);
     }
 }

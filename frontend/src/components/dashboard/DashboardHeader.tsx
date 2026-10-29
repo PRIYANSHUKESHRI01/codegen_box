@@ -212,12 +212,12 @@ export function DashboardHeader({
     },
     {
       id: "drives",
-      title: "Upcoming & Campus Drives",
-      subtext: "Scheduled corporate placement assessments",
+      title: "Upcoming Drives",
+      subtext: "Companies your placement cell has opened for your college",
       icon: Briefcase,
       category: "Navigation",
       roles: ["user"],
-      action: () => router.push("/dashboard#placement-drives"),
+      action: () => router.push("/dashboard/drives"),
     },
     {
       id: "superadmin",

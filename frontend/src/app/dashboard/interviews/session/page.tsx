@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { InterviewSessionView } from "@/components/dashboard/interviews/InterviewSessionView";
-import { SessionLoader } from "@/components/ui/SessionLoader";
+import { InterviewBoot } from "@/components/dashboard/interviews/room/InterviewBoot";
 import { api } from "@/lib/api";
 import type { StudentInterviewSummary } from "@/types/interview";
 
@@ -34,12 +34,12 @@ function MockSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
-  return checked ? <InterviewSessionView variant="mock" /> : <SessionLoader />;
+  return checked ? <InterviewSessionView variant="mock" /> : <InterviewBoot />;
 }
 
 export default function InterviewSessionPage() {
   return (
-    <Suspense fallback={<SessionLoader />}>
+    <Suspense fallback={<InterviewBoot />}>
       <MockSession />
     </Suspense>
   );

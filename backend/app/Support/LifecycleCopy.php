@@ -307,25 +307,28 @@ final class LifecycleCopy
     {
         $plan = $d['plan'] ?? 'a paid plan';
         $comp = (bool) ($d['complimentary'] ?? true);
+        $redeemed = (bool) ($d['redeemed'] ?? false);
         $days = (int) ($d['days'] ?? 0);
 
         return [
             'subject' => "Your {$plan} plan is active",
-            'preheader' => "Our team has switched on {$plan} for your account.",
+            'preheader' => $redeemed ? "You redeemed the free {$plan} offer." : "Our team has switched on {$plan} for your account.",
             'badge' => 'Plan activated',
             'tone' => 'green',
             'title' => "{$plan} is now active on your account",
             'paragraphs' => array_values(array_filter([
-                $comp
-                    ? "Hi {$first}, our team has activated **{$plan}** on your account at no charge."
-                    : "Hi {$first}, our team has activated **{$plan}** on your account, against the payment you made to us directly.",
+                match (true) {
+                    $redeemed => "Hi {$first}, you redeemed the free **{$plan}** offer, so it is now active on your account — nothing was charged.",
+                    $comp => "Hi {$first}, our team has activated **{$plan}** on your account at no charge.",
+                    default => "Hi {$first}, our team has activated **{$plan}** on your account, against the payment you made to us directly.",
+                },
                 $days > 0 ? "It runs for **{$days} days**, until **".self::day($d['ends_at'] ?? null).'**. Everything below is unlocked right now — there is nothing to set up.' : null,
             ])),
             'facts' => array_filter(['Plan' => $plan, 'Active until' => isset($d['ends_at']) ? self::day($d['ends_at']) : null]),
             'list_title' => 'What you can do now',
             'list' => self::perks(self::plan($d['plan_code'] ?? null)),
             'cta' => ['label' => 'Go to my dashboard', 'url' => self::app('/dashboard')],
-            'note' => 'You are receiving this because a plan was added to your AptRun account.',
+            'note' => $redeemed ? 'You are receiving this because you redeemed a plan on AptRun.' : 'You are receiving this because a plan was added to your AptRun account.',
         ];
     }
 
@@ -389,7 +392,9 @@ final class LifecycleCopy
             'paragraphs' => array_values(array_filter([
                 "Hi {$first}, your **{$plan}** plan ends on **".self::day($d['ends_at'] ?? null).'**. After that your account moves to the free Coder plan.',
                 'Renewing early costs you nothing extra in time: the new term is added **on top of** the days you have left.',
-                $price !== null ? "Renewal price: **{$price}**".($model->termUnit() ? " per {$model->termUnit()}" : '').'.' : null,
+                $model !== null && $model->isRedeemable()
+                    ? 'Renewing is free right now: redeem the offer again from Plans & Billing and the new term is added on top of the days you have left.'
+                    : ($price !== null ? "Renewal price: **{$price}**".($model->termUnit() ? " per {$model->termUnit()}" : '').'.' : null),
             ])),
             'list_title' => "What you'll lose when it ends",
             'list' => self::perks($model),
@@ -628,7 +633,8 @@ final class LifecycleCopy
         }
 
         $unit = $plan->termUnit() ? " a {$plan->termUnit()}" : '';
-        $facts = [$plan->name.' plan' => self::money($plan->salePrice()).$unit];
+        // A plan on a free offer is claimed, not bought: never quote it as "₹0 a year".
+        $facts = [$plan->name.' plan' => $plan->isRedeemable() ? 'Free to redeem'.($plan->termUnit() ? " for a {$plan->termUnit()}" : '') : self::money($plan->salePrice()).$unit];
 
         if ($plan->hasDiscount()) {
             $facts['Discount'] = $plan->discount_percent.'% off the '.self::money($plan->listPrice()).' list price';

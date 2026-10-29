@@ -11,13 +11,16 @@ import { ActivitySection } from "./manage/ActivitySection";
 import { OverviewSection, type StudentDetail } from "./manage/OverviewSection";
 import { PlanSection } from "./manage/PlanSection";
 import { SecuritySection } from "./manage/SecuritySection";
+import { VaultAiSection } from "./manage/VaultAiSection";
 import { type ToastTrigger } from "@/lib/toast";
 
-type Tab = "overview" | "plan" | "security" | "activity";
+type Tab = "overview" | "plan" | "vault_ai" | "security" | "activity";
 
-const TABS: { id: Tab; label: string }[] = [
+const TABS: { id: Tab; label: string; studentsOnly?: boolean }[] = [
   { id: "overview", label: "Overview" },
   { id: "plan", label: "Plan & billing" },
+  // The Vault AI Interview belongs to students only.
+  { id: "vault_ai", label: "Vault AI", studentsOnly: true },
   { id: "security", label: "Sign-in & access" },
   { id: "activity", label: "Activity" },
 ];
@@ -157,7 +160,7 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
           </div>
 
           <div role="tablist" aria-label="Account sections" className="-mb-4 mt-4 flex gap-1 overflow-x-auto">
-            {TABS.map((t) => (
+            {TABS.filter((t) => !t.studentsOnly || user?.role === "user").map((t) => (
               <button
                 key={t.id}
                 type="button"
@@ -193,6 +196,7 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
             <>
               {tab === "overview" && <OverviewSection data={data} reload={reload} triggerToast={triggerToast} detail={detail} />}
               {tab === "plan" && <PlanSection data={data} reload={reload} triggerToast={triggerToast} />}
+              {tab === "vault_ai" && data.user.role === "user" && <VaultAiSection userId={userId} reload={reload} triggerToast={triggerToast} />}
               {tab === "security" && (
                 <SecuritySection
                   data={data}

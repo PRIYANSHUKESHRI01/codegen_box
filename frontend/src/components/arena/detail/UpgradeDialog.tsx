@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Lock } from "lucide-react";
 import { ArenaDialog } from "@/components/arena/ArenaDialog";
-import { formatInr, hasDiscount, termSuffix } from "@/lib/pricing";
+import { formatInr, hasDiscount, isRedeemable, termSuffix } from "@/lib/pricing";
 import { usePublicPlan } from "@/lib/usePublicPlans";
 
 interface UpgradeDialogProps {
@@ -68,8 +68,17 @@ export function UpgradeDialog({ open, onClose }: UpgradeDialogProps) {
                 </span>
               </>
             )}
-            <span className="font-mono text-2xl font-black text-white">{formatInr(plan.sale_price)}</span>
-            <span className="text-sm text-[color:var(--ar-text-2)]">{termSuffix(plan)}</span>
+            {isRedeemable(plan) ? (
+              <>
+                <span className="text-2xl font-black text-white">Free</span>
+                <span className="text-sm text-[color:var(--ar-text-2)]">{plan.term_unit ? `for a ${plan.term_unit}` : ""}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-mono text-2xl font-black text-white">{formatInr(plan.sale_price)}</span>
+                <span className="text-sm text-[color:var(--ar-text-2)]">{termSuffix(plan)}</span>
+              </>
+            )}
           </>
         ) : (
           <span className="h-8 w-40 animate-pulse rounded bg-white/10" aria-busy="true" />

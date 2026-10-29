@@ -1,3 +1,4 @@
+import { withProperName } from "./personName";
 import type { DisciplineCode } from "./branches";
 import type { CapabilityMap } from "./departments";
 import type { CareerGoal, FocusArea, SkillLevel, TrackFocus, WeeklyPace } from "./studentPreferences";
@@ -141,7 +142,7 @@ export function getStoredUser(): AuthUser | null {
   const raw = window.localStorage.getItem(USER_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as AuthUser;
+    return withProperName(JSON.parse(raw) as AuthUser);
   } catch {
     return null;
   }

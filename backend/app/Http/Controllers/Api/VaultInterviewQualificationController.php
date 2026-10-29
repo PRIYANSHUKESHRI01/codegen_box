@@ -97,6 +97,32 @@ class VaultInterviewQualificationController extends Controller
         ]);
     }
 
+    /**
+     * "Notify me when this opens", for a stack with no questions yet.
+     *
+     * POST /api/vault-qualification/interest   { "stack": "data_analytics" }
+     */
+    public function interest(Request $request): JsonResponse
+    {
+        $user = $this->student($request);
+        $validated = $request->validate(['stack' => ['required', 'string', 'max:50']]);
+
+        $this->qualificationService->setInterest($user, $validated['stack'], true);
+
+        return response()->json(['stack' => $validated['stack'], 'interested' => true], 201);
+    }
+
+    /** DELETE /api/vault-qualification/interest   { "stack": "data_analytics" } */
+    public function withdrawInterest(Request $request): JsonResponse
+    {
+        $user = $this->student($request);
+        $validated = $request->validate(['stack' => ['required', 'string', 'max:50']]);
+
+        $this->qualificationService->setInterest($user, $validated['stack'], false);
+
+        return response()->json(['stack' => $validated['stack'], 'interested' => false]);
+    }
+
     private function student(Request $request): User
     {
         $user = $request->user();

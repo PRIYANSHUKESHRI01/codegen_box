@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Gift, Loader2, Search, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { formatInr } from "@/lib/pricing";
+import { formatInr, isRedeemable } from "@/lib/pricing";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 import { Modal } from "@/components/ui/Modal";
 import type { AdminPlan, AdminPlansResponse } from "@/types/pricing";
@@ -291,7 +291,9 @@ export function GrantPlanModal({ student: preselected = null, onClose, onGranted
                     <span className="mt-0.5 block text-2xs text-text-secondary">
                       {p.contact_only
                         ? `Mellow Academy — arranged by our team, ${p.term_unit ?? "its full"} term`
-                        : `${formatInr(p.sale_price)} ${p.term_unit ? `a ${p.term_unit}` : ""} when bought`}
+                        : isRedeemable(p)
+                          ? `Free offer — students redeem it themselves${p.term_unit ? ` for a ${p.term_unit}` : ""}`
+                          : `${formatInr(p.sale_price)} ${p.term_unit ? `a ${p.term_unit}` : ""} when bought`}
                     </span>
                   </button>
                 );

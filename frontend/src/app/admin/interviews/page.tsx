@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { Mic, Plus, Loader2, CheckCircle2, AlertTriangle, ShieldCheck, FileText, BookOpen, Trash2, Sparkles, Layers } from "lucide-react";
+import { Mic, Plus, Loader2, CheckCircle2, AlertTriangle, ShieldCheck, FileText, BookOpen, Trash2, Sparkles, Layers, ListChecks } from "lucide-react";
 import Link from "next/link";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
@@ -140,6 +140,13 @@ export default function AdminInterviewsPage() {
         >
           <BookOpen className="w-3.5 h-3.5" />
           <span>Manage Question Bank</span>
+        </Link>
+        <Link
+          href="/admin/interviews/mock-questions"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-bold text-text-secondary hover:text-primary transition-colors"
+        >
+          <ListChecks className="w-3.5 h-3.5" />
+          <span>Mock Interview Questions (by stack)</span>
         </Link>
       </div>
 

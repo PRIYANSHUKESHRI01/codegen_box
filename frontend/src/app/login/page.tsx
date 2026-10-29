@@ -9,16 +9,16 @@ import {
   Mail,
   Eye,
   EyeOff,
-  Sparkles,
   Building2,
   Briefcase,
   GraduationCap,
   CheckCircle2,
-  Zap,
   ShieldCheck,
   Fingerprint,
+  KeyRound,
 } from "lucide-react";
 import { AuthChrome } from "@/components/auth/AuthChrome";
+import { LoginShowcase } from "@/components/auth/LoginShowcase";
 import { FormField, authInputClass } from "@/components/auth/FormField";
 import { AuthSubmitButton } from "@/components/auth/AuthSubmitButton";
 import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
@@ -56,6 +56,11 @@ const ROLE_TABS: {
   cta: string;
   /** The account roles this tab signs in (besides platform staff, who are admitted everywhere). */
   admits: Role[];
+  /**
+   * Switched off for now: the tab is not offered on the page. Nothing else about it is removed - its copy, accent and the
+   * server-side portal all stay - so turning Hiring Partner sign-in back on is deleting one `hidden: true` line.
+   */
+  hidden?: boolean;
   accent: {
     idleIcon: string;
     activeIcon: string;
@@ -107,6 +112,7 @@ const ROLE_TABS: {
     subtitle: "Sign in to manage your candidate pipeline, interviews, and hiring drives.",
     cta: "Enter Hiring Console",
     admits: ["admin_company"],
+    hidden: true,
     accent: {
       idleIcon: "text-amber-500/60 dark:text-amber-400/50",
       activeIcon: "text-amber-700 dark:text-amber-400",
@@ -118,6 +124,12 @@ const ROLE_TABS: {
     },
   },
 ];
+
+/** The tabs actually shown. Hidden ones (Hiring Partner, for now) stay defined above but are never offered. */
+const VISIBLE_TABS = ROLE_TABS.filter((tab) => !tab.hidden);
+
+/** Literal class names (Tailwind cannot see a computed `grid-cols-${n}`), one per possible number of tabs. */
+const TAB_GRID: Record<number, string> = { 1: "grid-cols-1", 2: "grid-cols-2", 3: "grid-cols-3" };
 
 // Local-dev convenience only. `IS_DEV` is `process.env.NODE_ENV !== "production"`,
 // which Next.js/webpack inlines at build time — in a real `next build` this
@@ -136,6 +148,15 @@ const DEMO_LOGINS: Record<LoginRole, { email: string; password: string }> | null
       admin_company: { email: "hiring@nimbuslabs.example.com", password: "nimbus_hiring_demo_26" },
     }
   : null;
+
+/**
+ * The server answers a sign-in through the wrong tab with "Choose the <Label> tab to sign in." If that names a tab this page is
+ * not offering (Hiring Partner, for now), say so plainly instead of sending the visitor looking for a tab that is not there.
+ */
+function offerableMessage(message: string): string {
+  const hiddenTab = ROLE_TABS.find((tab) => tab.hidden && message.includes(`Choose the ${tab.label} tab`));
+  return hiddenTab ? `${hiddenTab.label} sign-in isn't available on this page right now.` : message;
+}
 
 const fieldVariants = {
   hidden: { opacity: 0, y: 10 },
@@ -206,11 +227,11 @@ export default function LoginPage() {
       // never lets someone in through a tab that isn't theirs even if it is talking to an older server.
       const role = res.user.role;
       if (!PLATFORM_STAFF_ROLES.includes(role) && !activeTab.admits.includes(role)) {
-        const own = ROLE_TABS.find((tab) => tab.admits.includes(role));
+        const own = VISIBLE_TABS.find((tab) => tab.admits.includes(role));
         setError(
           own
             ? `This is a ${own.label} account. Choose the ${own.label} tab to sign in.`
-            : "This account can't sign in here."
+            : "Sign-in for this account type isn't available on this page right now."
         );
         setLoading(false);
         return;
@@ -219,77 +240,31 @@ export default function LoginPage() {
       login(res.token, res.user);
       router.push(homeRouteForRole(res.user.role));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Unable to sign in. Please try again.");
+      setError(err instanceof ApiError ? offerableMessage(err.message) : "Unable to sign in. Please try again.");
       setLoading(false);
     }
   };
 
-  const activeTab = ROLE_TABS.find((tab) => tab.id === selectedRole) ?? ROLE_TABS[0];
+  const activeTab = VISIBLE_TABS.find((tab) => tab.id === selectedRole) ?? VISIBLE_TABS[0];
   const ActiveIcon = activeTab.icon;
   const isStudent = selectedRole === "user";
 
   return (
     <AuthChrome altLabel="Create Account" altLabelShort="Sign up" altHref="/signup">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Left Column: Brand Hero & Platform Credibility (5 cols) */}
+      {/* items-start on large screens: the sign-in card is anchored to the top and never moves when the left copy changes height with the tab. */}
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center lg:items-start">
+        {/* Left Column: what this tab is for (5 cols). It swaps in place, with animation, as the tab changes. */}
         <motion.div
           initial={{ opacity: 0, x: -16 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, ease: "easeOut" }}
-          className="hidden lg:flex lg:col-span-5 flex-col justify-between space-y-6 pr-4"
+          className="hidden lg:block lg:col-span-5 pr-4"
         >
-          <div className="space-y-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-accent-primary/10 text-accent-primary border border-accent-primary/25">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse-subtle" />
-              <span>Enterprise & Campus Edition</span>
-            </span>
-
-            <h1 className="text-3xl xl:text-4xl font-extrabold tracking-tight text-primary leading-tight">
-              One Login. Every{" "}
-              <span className="bg-gradient-to-r from-accent-primary to-accent-secondary bg-clip-text text-transparent">
-                Command Center
-              </span>{" "}
-              You Need.
-            </h1>
-
-            <p className="text-base font-medium text-text-secondary leading-relaxed text-pretty">
-              Sign in to prepare for your next placement drive, run your campus's recruitment pipeline,
-              or manage your hiring pipeline — whichever dashboard is yours.
-            </p>
-          </div>
-
-          {/* Platform Highlight */}
-          <div className="p-4 rounded-panel bg-surface/70 backdrop-blur-md border border-border-subtle space-y-3 shadow-subtle hover:shadow-card hover:border-border-strong transition-all duration-300">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-control bg-accent-secondary/10 border border-accent-secondary/25 text-accent-secondary flex items-center justify-center">
-                <Zap className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <div className="font-bold text-sm text-primary">Bulk Roster Onboarding</div>
-                <div className="text-xs font-medium text-text-muted">Built for placement cells</div>
-              </div>
-            </div>
-            <p className="text-sm font-medium text-text-secondary leading-relaxed">
-              Onboard an entire batch from a single CSV, and map a new recruiter in minutes instead of a
-              week of back-and-forth emails — account creation and welcome emails run automatically.
-            </p>
-          </div>
-
-          {/* Real Platform Depth */}
-          <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border-subtle text-xs">
-            <div>
-              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.problems_total : "—"}</strong>
-              <span className="text-xs font-medium text-text-muted">Practice Problems</span>
-            </div>
-            <div>
-              <strong className="block text-primary font-mono text-xl">{publicStats ? publicStats.languages_total : "—"}</strong>
-              <span className="text-xs font-medium text-text-muted">Judge Languages</span>
-            </div>
-          </div>
+          <LoginShowcase role={selectedRole} stats={publicStats} />
         </motion.div>
 
         {/* Right Column: Production Login Card (7 cols) */}
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 lg:pt-10">
           <motion.div
             initial={{ opacity: 0, y: 20, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -357,8 +332,8 @@ export default function LoginPage() {
 
               {/* 1. Account Role Selector Tabs — sliding pill indicator,
                   tinted to whichever role is active */}
-              <div className="relative p-1 rounded-control bg-elevated border border-border-subtle grid grid-cols-3 gap-1">
-                {ROLE_TABS.map((tab) => {
+              <div className={cn("relative p-1 rounded-control bg-elevated border border-border-subtle grid gap-1", TAB_GRID[VISIBLE_TABS.length] ?? "grid-cols-3")}>
+                {VISIBLE_TABS.map((tab) => {
                   const isActive = selectedRole === tab.id;
                   const Icon = tab.icon;
                   return (
@@ -415,6 +390,19 @@ export default function LoginPage() {
                 onSubmit={handleLoginSubmit}
                 className="space-y-4 text-sm"
               >
+                {/* Most visitors arrive from Mellow Vault, the main product. One calm line, ahead of the fields, so nobody
+                    goes looking for a second sign-up: the same email and password work here. */}
+                <motion.div variants={fieldVariants}>
+                  <div className="flex items-start gap-3 rounded-control border border-accent-primary/20 bg-accent-primary/[0.06] p-3">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-accent-primary/10 text-accent-primary">
+                      <KeyRound className="h-3.5 w-3.5" aria-hidden />
+                    </span>
+                    <p className="text-xs font-medium leading-relaxed text-text-secondary">
+                      <strong className="font-bold text-primary">Already on Mellow Vault?</strong> Sign in to AptRun with the same email and password you use there.
+                    </p>
+                  </div>
+                </motion.div>
+
                 <motion.div variants={fieldVariants}>
                   {/* "Email", not "Email or Handle": the server signs in by email address only, so a handle
                       typed here could never work. A text input (not type=email) keeps the browser from

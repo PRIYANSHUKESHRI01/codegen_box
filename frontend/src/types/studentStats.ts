@@ -56,6 +56,20 @@ export interface ReadinessDecay {
   max_points: number;
 }
 
+/**
+ * Present only while the AptRun team has set this student's score by hand: `score` is then that number and `calculated_score`
+ * is what their activity alone adds up to. The reason is never sent to the student.
+ */
+export interface ReadinessOverride {
+  active: true;
+  score: number;
+  calculated_score: number;
+  calculated_tier: string;
+  set_at: string | null;
+  /** When it stops applying and the calculated score takes over again; null = until the team removes it. */
+  expires_at: string | null;
+}
+
 /** One day on the readiness chart. `score` = `base_score` - `penalty`. */
 export interface ReadinessHistoryPoint {
   date: string;
@@ -97,6 +111,8 @@ export interface ReadinessStats {
   /** What the components add up to, before missed days are taken off. Absent from an older API. */
   base_score?: number;
   decay?: ReadinessDecay | null;
+  /** Set only while a superadmin has set the score by hand. */
+  override?: ReadinessOverride | null;
 }
 
 export interface RatingStats {

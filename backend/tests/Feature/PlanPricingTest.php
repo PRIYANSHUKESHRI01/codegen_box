@@ -109,6 +109,7 @@ class PlanPricingTest extends TestCase
             'term_unit' => 'year',
             'is_free' => false,
             'contact_only' => false,
+            'redeemable' => false,
         ], $this->plan('expert')->pricing());
     }
 
@@ -125,6 +126,7 @@ class PlanPricingTest extends TestCase
             'term_unit' => '3 years',
             'is_free' => false,
             'contact_only' => true,
+            'redeemable' => false,
         ], $this->plan('grandmaster')->pricing());
     }
 
@@ -401,7 +403,7 @@ class PlanPricingTest extends TestCase
 
         $response = $this->getJson('/api/superadmin/plans')->assertOk();
 
-        $response->assertJsonPath('limits.max_discount_percent', 90)
+        $response->assertJsonPath('limits.max_discount_percent', 100)
             ->assertJsonCount(3, 'plans')
             ->assertJsonPath('plans.0.code', 'coder')
             ->assertJsonPath('plans.0.is_editable', false)
@@ -508,7 +510,8 @@ class PlanPricingTest extends TestCase
             'a price in words' => [['list_price' => 'cheap', 'discount_percent' => 40], 'list_price'],
             'no price' => [['discount_percent' => 40], 'list_price'],
             'a discount of 400 for 40' => [['list_price' => 1999, 'discount_percent' => 400], 'discount_percent'],
-            'a discount that gives the plan away' => [['list_price' => 1999, 'discount_percent' => 91], 'discount_percent'],
+            'a discount past 100%' => [['list_price' => 1999, 'discount_percent' => 101], 'discount_percent'],
+            'a 100% discount nobody confirmed' => [['list_price' => 1999, 'discount_percent' => 100], 'confirm_free_offer'],
             'a negative discount' => [['list_price' => 1999, 'discount_percent' => -1], 'discount_percent'],
             'a fractional discount' => [['list_price' => 1999, 'discount_percent' => 12.5], 'discount_percent'],
             'no discount field' => [['list_price' => 1999], 'discount_percent'],

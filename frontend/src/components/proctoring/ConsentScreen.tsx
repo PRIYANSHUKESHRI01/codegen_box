@@ -224,7 +224,7 @@ function SectionTitle({ id, n, title, hint }: { id: string; n: number; title: st
 }
 
 /** Three pips — two warnings, then the third ends the attempt — so the rule reads at a glance before the sentence does. */
-function StrikeMeter() {
+export function StrikeMeter() {
   return (
     <div className="mb-1.5 flex items-center gap-1.5" aria-hidden>
       {[0, 1, 2].map((i) => (

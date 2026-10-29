@@ -8,7 +8,7 @@ import type { PaymentReceipt } from "./payments";
 export type SubscriptionState = "active" | "expired" | "canceled";
 
 /** How a subscription came to exist. `system` is the free plan every student starts on. */
-export type SubscriptionSource = "purchase" | "admin_grant" | "admin_assigned" | "system";
+export type SubscriptionSource = "purchase" | "admin_grant" | "admin_assigned" | "system" | "offer_redeemed";
 
 export type SubscriberType = "user" | "college" | "company" | "deleted";
 
@@ -42,6 +42,8 @@ export interface AdminSubscriptionRow {
 export interface SubscriptionsSummary {
   paid_individual: number;
   complimentary: number;
+  /** Students on a plan they claimed through a free offer (a 100% discount) — no revenue either. */
+  redeemed?: number;
   colleges: number;
   companies: number;
   ending_7_days: number;

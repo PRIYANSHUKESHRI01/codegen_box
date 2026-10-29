@@ -1,4 +1,15 @@
-import { hasMediaRecorder, hasSpeechRecognition, hasSpeechSynthesis, type VoiceEngine, type VoiceListenCallbacks, type VoiceListenError } from "./VoiceEngine";
+import {
+  hasMediaRecorder,
+  hasSpeechRecognition,
+  hasSpeechSynthesis,
+  type VoiceEngine,
+  type VoiceListenCallbacks,
+  type VoiceListenError,
+  type VoiceSpeakCallbacks,
+  type VoiceSpeakOptions,
+} from "./VoiceEngine";
+import { computeRmsLevel, VOICED_LEVEL } from "./level";
+import { playSpeechAudio, type SpeechPlayback } from "./speechAudio";
 
 /** Minimal shape of the non-standard (webkit-prefixed on most browsers) SpeechRecognition API — not in lib.dom.d.ts. */
 interface SpeechRecognitionResultLike {
@@ -32,21 +43,40 @@ function mapRecognitionError(code: string): VoiceListenError {
   return "unknown";
 }
 
-/** Normalized level above which a frame counts as someone speaking. Deliberately low (room hiss is ~0.02-0.04): a quiet speaker must still register, because the server rejects silence anyway. */
-const VOICED_LEVEL = 0.05;
-
 /** How long stopListening() waits for the browser to deliver its last, still-pending speech result before giving up on it. */
 const RECOGNITION_DRAIN_MS = 1500;
 
-/** RMS of a time-domain byte buffer (128 = silence), normalized to roughly 0-1 for typical speech levels. */
-function computeRmsLevel(data: Uint8Array): number {
-  let sumSquares = 0;
-  for (let i = 0; i < data.length; i++) {
-    const centered = (data[i] - 128) / 128;
-    sumSquares += centered * centered;
+/** How long speak() waits for the browser to list its voices before using whatever is default. */
+const VOICES_WAIT_MS = 400;
+
+/**
+ * The most natural-sounding English voice this browser has, or null to leave the browser's default. Neural voices ("Natural" in Edge) are by
+ * far the best; after those a voice that runs on this machine is preferred over a network one — it reports word timing, works offline and
+ * doesn't cut out mid-question — and Indian English wins ties because that is who is listening.
+ */
+export function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  let best: SpeechSynthesisVoice | null = null;
+  let bestScore = 0;
+
+  for (const voice of voices) {
+    const lang = voice.lang.replace("_", "-").toLowerCase();
+    if (!lang.startsWith("en")) continue;
+
+    let score = 1;
+    if (lang === "en-in") score += 30;
+    else if (lang === "en-us" || lang === "en-gb") score += 20;
+    else score += 10;
+    if (/natural|neural/i.test(voice.name)) score += 40;
+    if (voice.localService) score += 6;
+    if (voice.default) score += 3;
+
+    if (score > bestScore) {
+      best = voice;
+      bestScore = score;
+    }
   }
-  const rms = Math.sqrt(sumSquares / data.length);
-  return Math.min(1, rms * 4); // typical speech RMS is small; scale up so the meter isn't perpetually near-empty
+
+  return best;
 }
 
 function getSpeechRecognitionCtor(): (new () => SpeechRecognitionLike) | null {
@@ -73,6 +103,10 @@ export class BrowserVoiceEngine implements VoiceEngine {
   /** Words the recognizer has heard but not yet finalized — folded into the transcript if the browser never finalizes them. */
   private interimChunk = "";
   private currentUtterance: SpeechSynthesisUtterance | null = null;
+  /** The clip of the interviewer's real voice that is playing, if any. */
+  private currentSpeechAudio: SpeechPlayback | null = null;
+  /** Set by cancel(): a clip that was stopped before it began must not fall back to speaking in the browser voice. */
+  private speechCancelled = false;
 
   // Chrome ends a continuous recognition session on its own after a stretch of
   // silence (and sometimes just at a time limit). Unless stopListening() asked
@@ -106,18 +140,77 @@ export class BrowserVoiceEngine implements VoiceEngine {
     return hasSpeechRecognition() && hasMediaRecorder();
   }
 
-  speak(text: string): Promise<void> {
-    if (!this.isTtsSupported()) return Promise.resolve();
+  async speak(text: string, callbacks?: VoiceSpeakCallbacks, options?: VoiceSpeakOptions): Promise<void> {
+    // The real voice first: a recording of this question made by a neural model. Anything short of it playing falls straight through to the
+    // browser's own voice below, so the question is always read.
+    this.speechCancelled = false;
+    if (options?.audioUrl) {
+      this.currentSpeechAudio?.cancel();
+      const playback = playSpeechAudio(options.audioUrl, text, callbacks);
+      this.currentSpeechAudio = playback;
+      const outcome = await playback.finished;
+      if (this.currentSpeechAudio === playback) this.currentSpeechAudio = null;
+      // "ended", or the candidate left the page while it was starting: either way nothing more is to be said.
+      if (outcome === "ended" || this.speechCancelled) return;
+    }
+
+    if (!this.isTtsSupported()) return;
+
+    const voices = await this.loadVoices();
 
     return new Promise((resolve) => {
-      window.speechSynthesis.cancel();
+      const synth = window.speechSynthesis;
+      synth.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
+      const voice = pickVoice(voices);
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      }
       utterance.rate = 0.98;
-      utterance.onend = () => resolve();
-      utterance.onerror = () => resolve();
+
+      let settled = false;
+      // Some voices (Chrome's network ones in particular) occasionally go quiet without ever firing onend, which would leave the
+      // interview waiting on a question nobody is reading. Generous: ~140 ms a character is about half the normal speaking pace.
+      const watchdog = window.setTimeout(() => {
+        synth.cancel();
+        settle();
+      }, text.length * 140 + 5000);
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(watchdog);
+        resolve();
+      };
+
+      utterance.onstart = () => callbacks?.onStart?.();
+      utterance.onboundary = (event) => {
+        if (event.name && event.name !== "word") return;
+        callbacks?.onBoundary?.(event.charIndex);
+      };
+      utterance.onend = settle;
+      utterance.onerror = settle;
+      // Chrome drops an utterance's events if nothing references it, so keep it on the instance until the next one replaces it.
       this.currentUtterance = utterance;
-      window.speechSynthesis.speak(utterance);
+      synth.speak(utterance);
+    });
+  }
+
+  /** Chrome fills the voice list in after page load, so the first call can find it empty; wait briefly for it rather than speaking in whatever voice is default. */
+  private loadVoices(): Promise<SpeechSynthesisVoice[]> {
+    const synth = window.speechSynthesis;
+    const now = synth.getVoices();
+    if (now.length > 0) return Promise.resolve(now);
+
+    return new Promise((resolve) => {
+      const done = () => {
+        window.clearTimeout(timer);
+        synth.removeEventListener?.("voiceschanged", done);
+        resolve(synth.getVoices());
+      };
+      const timer = window.setTimeout(done, VOICES_WAIT_MS);
+      synth.addEventListener?.("voiceschanged", done);
     });
   }
 
@@ -177,7 +270,7 @@ export class BrowserVoiceEngine implements VoiceEngine {
         }
       }
       this.interimChunk = interimChunk.trim();
-      callbacks?.onInterimTranscript?.((this.finalTranscript + " " + interimChunk).trim());
+      callbacks?.onInterimTranscript?.((this.finalTranscript + " " + interimChunk).trim(), { final: this.finalTranscript, interim: this.interimChunk });
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
@@ -305,6 +398,9 @@ export class BrowserVoiceEngine implements VoiceEngine {
   }
 
   cancel(): void {
+    this.speechCancelled = true;
+    this.currentSpeechAudio?.cancel();
+    this.currentSpeechAudio = null;
     if (this.isTtsSupported()) window.speechSynthesis.cancel();
     this.currentUtterance = null;
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,6 +11,7 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Gauge,
   Loader2,
   Lock,
   MapPin,
@@ -24,6 +26,9 @@ import { ReadinessBreakdown } from "@/components/dashboard/student/ReadinessBrea
 import { ReadinessTrend } from "@/components/dashboard/student/ReadinessTrend";
 import { InactivityNotice } from "@/components/dashboard/student/InactivityNotice";
 import { UpgradePanel } from "@/components/billing/UpgradePanel";
+import { VaultBenefits, VaultHero, VaultSteps } from "@/components/dashboard/vault/VaultSections";
+import { HpCard, HpPill, HpSectionHeader, HpSkeleton } from "@/components/portal/kit";
+import { vaultDoor } from "@/lib/vaultAccess";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -126,20 +131,41 @@ export default function StudentVaultPage() {
   // A hire, or a hold placed by staff, is worth telling a student about whatever their plan is; everything else
   // that would ask for their yes needs a plan that includes the Vault.
   const gated = !!data && !data.access && profile?.status !== "hired" && profile?.status !== "hidden_by_mellow";
+  // Whether the Mellow Vault door is open, and if not why (see lib/vaultAccess.ts). The hero, the button and the page's order follow it.
+  const door = data ? vaultDoor(data) : null;
 
   return (
     <DashboardShell
       role="user"
-      title="Vault"
-      subtitle="Reach a readiness score of 60 and get hired directly by employers on Mellow Vault — only if you say yes."
+      title="Mellow Vault"
+      subtitle="Get discovered and hired directly by employers — unlocked once your readiness score reaches 60."
     >
-      {loading || !data || !readiness ? (
-        <div className="flex items-center justify-center gap-2 rounded-panel border border-border-subtle bg-surface p-10 text-xs text-text-muted">
-          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-          Loading your Vault…
+      {loading || !data || !readiness || !door ? (
+        <div className="space-y-6" role="status" aria-label="Loading Mellow Vault">
+          <HpSkeleton className="h-56 rounded-[24px]" />
+          <HpSkeleton className="h-44 rounded-[20px]" />
+          <HpSkeleton className="h-64 rounded-[20px]" />
         </div>
       ) : (
         <div className="space-y-6">
+          {/* What the Vault is for this student right now, and the one button that matters (locked below the line, open above it). */}
+          <VaultHero data={data} door={door} />
+
+          {/* Below the line the page explains the benefit; above it the student's own choices come first. */}
+          {door.state === "locked" && door.reason === "score" && <VaultSteps door={door} score={readiness.score} line={readiness.threshold} />}
+
+          {door.state === "open" && (
+            <StatusCard
+              data={data}
+              profile={profile}
+              busy={busy}
+              confirmingHide={confirmingHide}
+              onConfirmHide={setConfirmingHide}
+              onConsent={handleConsent}
+              onWithdraw={handleWithdraw}
+            />
+          )}
+
           {/* Verified Vault AI Interview Qualification Banner */}
           {data.ai_interview_qualifications && data.ai_interview_qualifications.length > 0 && (
             <div className="rounded-panel border border-emerald-500/35 bg-gradient-to-r from-emerald-500/10 via-surface to-surface p-5 shadow-sm space-y-3">
@@ -202,11 +228,13 @@ export default function StudentVaultPage() {
 
           {data.history && <ReadinessTrend history={data.history} exitThreshold={readiness.exit_threshold} />}
 
+          {door.state === "locked" && door.reason === "score" && <VaultBenefits />}
+
           {/* The Vault is an Expert feature: everyone sees their score and how to raise it, but only a plan that
               includes it gets the yes — everyone else gets what they would be buying, with the live price. */}
           {gated && <UpgradePanel feature="vault" />}
 
-          {!gated && (
+          {!gated && door.state !== "open" && (
             <StatusCard
               data={data}
               profile={profile}
@@ -219,7 +247,7 @@ export default function StudentVaultPage() {
           )}
 
           {profile?.status !== "hired" && (
-            <section className="rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
+            <section id="score-breakdown" className="scroll-mt-24 rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
               <h2 className="flex items-center gap-2 text-sm font-bold text-primary">
                 <Sparkles className="h-4 w-4 text-accent-primary" aria-hidden />
                 What your score is made of
@@ -227,7 +255,7 @@ export default function StudentVaultPage() {
               <p className="mb-5 mt-1 text-xs text-text-muted">
                 One score for everything you do on AptRun — interviews, practice, the Learning Centre, soft skills, contests and the events your placement cell or Mellow schedules. Anything a hiring partner posted never counts.
               </p>
-              <ReadinessBreakdown components={readiness.components} nextSteps={readiness.next_steps} decay={readiness.decay} />
+              <ReadinessBreakdown components={readiness.components} nextSteps={readiness.next_steps} decay={readiness.decay} override={readiness.override} />
             </section>
           )}
 
@@ -260,45 +288,61 @@ export default function StudentVaultPage() {
 function ReadinessCard({ data }: { data: StudentVaultResponse }) {
   const { readiness } = data;
   const ready = readiness.points_needed === 0;
-  const progress = Math.max(0, Math.min(100, (readiness.score / readiness.threshold) * 100));
+  const score = Math.max(0, Math.min(100, readiness.score));
+  const line = Math.max(0, Math.min(100, readiness.threshold));
 
   return (
-    <section className="rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle sm:p-6">
-      <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+    <HpCard className="p-5 sm:p-6" aria-labelledby="vault-progress">
+      <HpSectionHeader
+        icon={Gauge}
+        tone={ready ? "emerald" : "indigo"}
+        title={<span id="vault-progress">Your progress to the Vault line</span>}
+        subtitle="The same readiness score you see everywhere on AptRun"
+        action={
+          <HpPill tone={ready ? "emerald" : "amber"} dot>
+            {ready ? "Line crossed" : `${readiness.points_needed} to go`}
+          </HpPill>
+        }
+      />
+
+      <div className="mt-5 flex flex-col gap-6 sm:flex-row sm:items-center">
         <ReadinessRing value={readiness.score} label={readiness.tier} size={124} stroke={10} showLabel={false} />
 
         <div className="min-w-0 flex-1">
           <div className="text-xs font-bold uppercase tracking-wider text-text-muted">Your readiness score</div>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="font-mono text-4xl font-black leading-none text-primary">{readiness.score}</span>
+            <span className="tabular text-4xl font-black leading-none text-primary">{readiness.score}</span>
             <span className="text-xs font-semibold text-text-muted">/ 100 · {readiness.tier}</span>
           </div>
 
           <p className="mt-2 text-xs leading-relaxed text-text-secondary">
             {ready
-              ? `You've reached ${readiness.threshold} — you're eligible for the Vault. It stays that way until your score drops below ${readiness.exit_threshold}.`
-              : `${readiness.points_needed} more ${readiness.points_needed === 1 ? "point" : "points"} to reach ${readiness.threshold}, the score that makes you eligible.`}
+              ? `You’ve reached ${readiness.threshold}. Mellow Vault stays open to you until your score drops below ${readiness.exit_threshold}.`
+              : `${readiness.points_needed} more ${readiness.points_needed === 1 ? "point" : "points"} to reach ${readiness.threshold}, the score that unlocks Mellow Vault.`}
           </p>
 
-          <div
-            className="relative mt-3 h-2.5 overflow-hidden rounded-full bg-elevated"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={readiness.threshold}
-            aria-valuenow={Math.min(readiness.score, readiness.threshold)}
-            aria-label="Progress toward the Vault"
-          >
-            <div className={cn("h-full rounded-full transition-all duration-700", ready ? "bg-status-success" : "bg-accent-primary")} style={{ width: `${progress}%` }} />
-          </div>
-          <div className="mt-1 flex justify-between text-3xs font-semibold text-text-muted">
-            <span>0</span>
-            <span>Vault line · {readiness.threshold}</span>
+          {/* A 0-100 track with the Vault line drawn on it, so how far there is to go is visible at a glance. */}
+          <div className="relative mt-5 pb-5">
+            <div className="h-3 overflow-hidden rounded-full bg-elevated" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(score)} aria-label="Progress toward the Vault">
+              <motion.div
+                className={cn("h-full rounded-full", ready ? "bg-gradient-to-r from-emerald-400 to-green-500" : "bg-gradient-to-r from-indigo-500 to-violet-500")}
+                initial={{ width: 0 }}
+                animate={{ width: `${score}%` }}
+                transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+              />
+            </div>
+            <span aria-hidden className="absolute -top-1 h-5 w-0.5 rounded-full bg-text-primary/70" style={{ left: `${line}%` }} />
+            <span className="absolute top-5 -translate-x-1/2 whitespace-nowrap text-3xs font-bold text-text-muted" style={{ left: `${line}%` }}>
+              Vault line · {readiness.threshold}
+            </span>
+            <span className="absolute left-0 top-5 text-3xs font-semibold text-text-muted">0</span>
+            <span className="absolute right-0 top-5 text-3xs font-semibold text-text-muted">100</span>
           </div>
         </div>
       </div>
 
       <InactivityNotice decay={readiness.decay} score={readiness.score} baseScore={readiness.base_score} className="mt-5" />
-    </section>
+    </HpCard>
   );
 }
 

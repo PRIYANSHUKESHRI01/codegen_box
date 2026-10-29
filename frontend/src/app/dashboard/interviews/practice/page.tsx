@@ -39,6 +39,8 @@ export default function PracticeInterviewStudioPage() {
 
   const [options, setOptions] = useState<PracticeOptions | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // The studio is switched off on the server (config practice_interviews.student_builder_enabled): say so kindly instead of showing an error.
+  const [paused, setPaused] = useState(false);
   const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
 
   const [role, setRole] = useState<string | null>(null);
@@ -64,7 +66,11 @@ export default function PracticeInterviewStudioPage() {
         setCount(res.defaults.count);
         setDifficulty(res.defaults.difficulty);
       })
-      .catch((err) => live && setLoadError(err instanceof ApiError ? err.message : "Couldn't open the practice studio."));
+      .catch((err) => {
+        if (!live) return;
+        if (err instanceof ApiError && err.code === "practice_builder_paused") setPaused(true);
+        else setLoadError(err instanceof ApiError ? err.message : "Couldn't open the practice studio.");
+      });
     api
       .get<MySubscriptionResponse>("/me/subscription")
       .then((res) => live && setEntitlements(res.entitlements))
@@ -74,7 +80,7 @@ export default function PracticeInterviewStudioPage() {
     };
   }, [status]);
 
-  if (status !== "ready" || (!options && !loadError)) return <SessionLoader />;
+  if (status !== "ready" || (!options && !loadError && !paused)) return <SessionLoader />;
 
   const build = async () => {
     if (!role || building) return;
@@ -89,6 +95,25 @@ export default function PracticeInterviewStudioPage() {
       setBuilding(false);
     }
   };
+
+  if (paused) {
+    return (
+      <DashboardShell role="user" title="Practice interview" subtitle="Build-your-own practice interviews are paused for now.">
+        <div className="mx-auto max-w-xl rounded-2xl border border-border-subtle bg-surface p-8 text-center shadow-subtle">
+          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-primary/10 text-accent-primary">
+            <Mic className="h-6 w-6" aria-hidden />
+          </span>
+          <h2 className="mt-4 text-base font-extrabold text-primary">Practise by domain and tech stack instead</h2>
+          <p className="mt-2 text-sm leading-relaxed text-text-secondary">
+            Building your own interview is paused while we bring in a proper question bank for every domain. Pick your domain and tech stack in the Mock AI Interview and practise a round — AI asks, you answer aloud, AI scores.
+          </p>
+          <Link href="/dashboard/interviews" className="mt-5 inline-flex items-center gap-2 rounded-control bg-accent-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-accent-primary-hover">
+            Go to Mock AI Interview <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </div>
+      </DashboardShell>
+    );
+  }
 
   if (loadError || !options) {
     return (

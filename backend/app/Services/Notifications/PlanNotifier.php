@@ -40,6 +40,20 @@ class PlanNotifier
         ]);
     }
 
+    /** A student claimed a plan that is free right now (a 100% discount) — see SubscriptionService::redeemOffer(). */
+    public function redeemed(User $student, Subscription $subscription): void
+    {
+        $plan = $subscription->plan?->name ?? 'a plan';
+        $until = $subscription->current_period_end?->format('j M Y');
+
+        $this->notifications->notify($student, NotificationType::PlanChanged, "You're on the {$plan} plan", "You redeemed the free {$plan} offer".($until ? ", valid until {$until}" : '').'. Everything it includes is unlocked now.', [
+            'url' => '/dashboard/billing',
+            'severity' => 'success',
+            'data' => ['plan_code' => $subscription->plan?->code, 'change' => 'redeemed'],
+            'group_key' => "plan.redeemed:{$subscription->id}",
+        ]);
+    }
+
     /** A running plan got more days — a student's, a college's or a company's. */
     public function extended(Subscription $subscription, int $days): void
     {

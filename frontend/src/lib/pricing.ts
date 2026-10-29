@@ -27,8 +27,18 @@ export function termSuffix(plan: Pick<PlanPricing, "term_unit">): string {
  * spread: a free plan, a plan with no term, or one billed monthly already.
  */
 export function monthlyEquivalent(plan: Pick<PlanPricing, "sale_price" | "term_days" | "is_free">): number | null {
-  if (plan.is_free || !plan.term_days || plan.term_days <= 31) return null;
+  if (plan.is_free || plan.sale_price <= 0 || !plan.term_days || plan.term_days <= 31) return null;
   return Math.round(plan.sale_price / (plan.term_days / 30.4375));
+}
+
+/**
+ * Whether the plan is a free offer: a priced plan discounted to ₹0, claimed with "Redeem offer" instead of paid for.
+ * The server decides (Plan::isRedeemable); this also accepts a bare ₹0 sale price on a priced plan, so a page
+ * that is a poll behind the server still never offers to take a gateway payment for ₹0.
+ */
+export function isRedeemable(plan: Pick<PlanPricing, "redeemable" | "sale_price" | "list_price" | "is_free" | "contact_only">): boolean {
+  if (plan.contact_only || plan.is_free) return false;
+  return plan.redeemable === true || (plan.list_price > 0 && plan.sale_price <= 0);
 }
 
 /** Whether a price is on sale — a discount that actually takes something off. */

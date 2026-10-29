@@ -173,6 +173,57 @@ class VaultService
         });
     }
 
+    /**
+     * A superadmin took a Vault AI Interview qualification back. If the student is qualified in another stack, that one becomes the
+     * profile's qualification; otherwise the AI-interview fields are cleared and a student who got in only through the interview is
+     * out again - unless their readiness score earns the place on its own. Goes through mutate() like everything else, so
+     * Mellow Vault is told to withdraw the profile when it stops being listable.
+     *
+     * @param  array{stack_key: string, role_key: string, average: float, scores: array<string, int>, attempt: int}|null  $remaining  another qualification the student still holds
+     */
+    public function revokeAiInterviewQualification(User $user, ?array $remaining = null): ?VaultProfile
+    {
+        $profile = VaultProfile::where('user_id', $user->id)->first();
+
+        if ($profile === null) {
+            return null;
+        }
+
+        return $this->mutate($profile, function (VaultProfile $p) use ($remaining) {
+            if ($remaining !== null) {
+                $p->ai_interview_score = $remaining['average'];
+                $p->ai_interview_stack = $remaining['stack_key'];
+                $p->ai_interview_role = $remaining['role_key'];
+                $p->ai_interview_scores = $remaining['scores'];
+                $p->ai_interview_attempt = $remaining['attempt'];
+
+                return;
+            }
+
+            $p->ai_interview_score = null;
+            $p->ai_interview_stack = null;
+            $p->ai_interview_role = null;
+            $p->ai_interview_scores = null;
+            $p->ai_interview_attempt = null;
+            $p->ai_interview_qualified_at = null;
+
+            if ($p->qualification_source !== VaultProfile::SOURCE_AI_INTERVIEW) {
+                return;
+            }
+
+            if ((int) $p->readiness_score >= $this->thresholds()['enter']) {
+                // Their readiness score would have admitted them on its own.
+                $p->qualification_source = VaultProfile::SOURCE_READINESS;
+
+                return;
+            }
+
+            $p->is_eligible = false;
+            $p->eligible_since = null;
+            $p->left_at = now();
+        });
+    }
+
     // ───────────────────────────── the student's choices ─────────────────────────────
 
     /**

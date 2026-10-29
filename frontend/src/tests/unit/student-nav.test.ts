@@ -3,20 +3,32 @@ import { buildStudentNav } from "@/components/dashboard/studentNav";
 
 const flat = (opts: Parameters<typeof buildStudentNav>[0]) => buildStudentNav(opts).map((s) => ({ title: s.title, items: s.items.map((i) => `${i.label}|${i.href}${i.locked ? "|locked" : ""}${i.badge ? `|${i.badge}` : ""}`) }));
 
-/** The rail exactly as it was before Core Prep existed — a CSE student must still get precisely this. */
+/**
+ * The rail a CSE student gets: three groups by purpose — Your Arena (build skill, then the report that measures it),
+ * Placements (get hired) and Competition (measure yourself). Every Overview section that has a page of its own is reached from
+ * here, once; there are no #anchors back into the Overview any more.
+ */
 const ORIGINAL = [
   {
     title: "Your Arena",
-    items: ["Overview|/dashboard", "Practice Arena|/dashboard/practice", "Performance Report|/dashboard/reports", "Learning Centre|/dashboard/learning-centre|AI", "Project Lab|/dashboard/projects|New"],
+    items: ["Overview|/dashboard", "Practice Arena|/dashboard/practice", "Learning Centre|/dashboard/learning-centre|AI", "Soft Skills|/dashboard/soft-skills", "Project Lab|/dashboard/projects|New", "Performance Report|/dashboard/reports"],
+  },
+  {
+    title: "Placements",
+    items: ["Upcoming Drives|/dashboard/drives", "Company PYQs|/dashboard/company-prep|New", "Mock AI Interview|/dashboard/interviews", "Vault AI Interview|/dashboard/vault-interviews", "Mellow Vault|/dashboard/vault|Get Hired"],
   },
   {
     title: "Competition",
-    items: ["Upcoming & Drives|/dashboard#placement-drives", "Company PYQs|/dashboard/company-prep|New", "Contests|/dashboard/contests", "Mock AI Interview|/dashboard/interviews", "Vault AI Interview|/dashboard/vault-interviews", "Soft Skills|/dashboard/soft-skills", "Vault|/dashboard/vault|New", "Submissions|/dashboard#submissions", "Global Leaderboard|/dashboard/leaderboard"],
+    items: ["Contests|/dashboard/contests", "Global Leaderboard|/dashboard/leaderboard"],
   },
 ];
 
 describe("student navigation", () => {
-  it("is unchanged for a CSE student, an unknown branch, or a branch whose Core Prep is not live", () => {
+  it("never points back into the Overview with an anchor (Upcoming Drives and Submissions used to bounce to /dashboard#…)", () => {
+    for (const s of buildStudentNav({ projectLabEnabled: true, vaultEnabled: true })) for (const i of s.items) expect(i.href, i.label).not.toContain("#");
+  });
+
+  it("is stable for a CSE student, an unknown branch, or a branch whose Core Prep is not live", () => {
     const base = { projectLabEnabled: true, vaultEnabled: true };
     expect(flat(base)).toEqual(ORIGINAL);
     expect(flat({ ...base, coreAvailable: false })).toEqual(ORIGINAL);
@@ -101,7 +113,7 @@ describe("student navigation", () => {
   it("keeps the plan locks exactly as before", () => {
     const locked = flat({ projectLabEnabled: false, vaultEnabled: false });
     expect(locked[0].items).toContain("Project Lab|/dashboard/projects|locked");
-    expect(locked[1].items).toContain("Vault|/dashboard/vault|locked");
+    expect(locked[1].items).toContain("Mellow Vault|/dashboard/vault|locked");
     const unknown = flat({ projectLabEnabled: null, vaultEnabled: null });
     expect(unknown[0].items).toContain("Project Lab|/dashboard/projects|New");
   });
@@ -109,8 +121,9 @@ describe("student navigation", () => {
   it("adds exactly two items — Core Prep and Skill Drills — after Practice Arena for a student who leads with IT or balances", () => {
     for (const trackFocus of [null, "balanced", "it_first"]) {
       const nav = flat({ projectLabEnabled: true, vaultEnabled: true, coreAvailable: true, trackFocus });
-      expect(nav[0].items.map((i) => i.split("|")[0])).toEqual(["Overview", "Practice Arena", "Core Prep", "Skill Drills", "Performance Report", "Learning Centre", "Project Lab"]);
+      expect(nav[0].items.map((i) => i.split("|")[0])).toEqual(["Overview", "Practice Arena", "Core Prep", "Skill Drills", "Learning Centre", "Soft Skills", "Project Lab", "Performance Report"]);
       expect(nav[1]).toEqual(ORIGINAL[1]);
+      expect(nav[2]).toEqual(ORIGINAL[2]);
     }
   });
 
@@ -133,9 +146,13 @@ describe("student navigation", () => {
       for (const gone of ["Practice Arena", "Project Lab", "Company PYQs", "Contests", "Submissions", "Global Leaderboard", "Skill Drills"]) {
         expect(labels, gone).not.toContain(gone);
       }
-      for (const kept of ["Overview", "Performance Report", "Learning Centre", "Mock AI Interview", "Vault AI Interview", "Soft Skills", "Vault", "Upcoming & Drives"]) {
+      for (const kept of ["Overview", "Performance Report", "Learning Centre", "Mock AI Interview", "Vault AI Interview", "Soft Skills", "Mellow Vault", "Upcoming Drives"]) {
         expect(labels, kept).toContain(kept);
       }
+    });
+
+    it("has no empty Competition heading when there is nothing to compete in", () => {
+      expect(rail().map((s) => s.title)).toEqual(["Your Arena", "Placements"]);
     });
 
     it("puts the department's own prep right under Overview, under its own name", () => {
@@ -145,12 +162,12 @@ describe("student navigation", () => {
 
     it("shows no prep item until the server says it exists for this student", () => {
       const labels = rail({ coreAvailable: false })[0].items.map((i) => i.split("|")[0]);
-      expect(labels).toEqual(["Overview", "Performance Report", "Learning Centre"]);
+      expect(labels).toEqual(["Overview", "Learning Centre", "Soft Skills", "Performance Report"]);
     });
 
     it("gives a branch back what its department lacks (B.Com Computer Applications codes)", () => {
       const labels = rail({ capabilities: { ...NO_CODING, coding_practice: true, contests: true, company_prep: true } }).flatMap((s) => s.items.map((i) => i.split("|")[0]));
-      expect(labels).toEqual(expect.arrayContaining(["Practice Arena", "Contests", "Company PYQs", "Submissions", "Global Leaderboard"]));
+      expect(labels).toEqual(expect.arrayContaining(["Practice Arena", "Contests", "Company PYQs", "Global Leaderboard"]));
     });
   });
 });

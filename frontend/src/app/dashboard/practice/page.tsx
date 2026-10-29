@@ -18,6 +18,7 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { TopicMasteryList } from "@/components/dashboard/student/TopicMasteryList";
 import { StatTile } from "@/components/dashboard/student/StatTile";
+import { RecentSubmissionsCard, SolvedBreakdownCard } from "@/components/dashboard/student/ProgressCards";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { CompanyBadgeList } from "@/components/problems/CompanyBadge";
 import { SolveButton, solveHref } from "@/components/practice/SolveButton";
@@ -530,6 +531,8 @@ function PracticeArenaPageContent() {
             )}
           </div>
 
+          <SolvedBreakdownCard stats={stats} />
+
           <div className="p-5 rounded-panel bg-surface border border-accent-primary/25 shadow-subtle space-y-3">
             <h3 className="font-bold text-sm text-primary flex items-center gap-2">
               <Swords className="w-4 h-4 text-accent-primary" />
@@ -549,6 +552,9 @@ function PracticeArenaPageContent() {
           </div>
         </section>
       </div>
+
+      {/* Latest attempts, moved here from the Overview: this is where problems are solved, so it is where a student wants to see them. */}
+      <RecentSubmissionsCard submissions={stats?.recent_submissions ?? []} loading={!stats} seeAll={{ href: "/dashboard/reports", label: "Full history" }} />
     </DashboardShell>
   );
 }

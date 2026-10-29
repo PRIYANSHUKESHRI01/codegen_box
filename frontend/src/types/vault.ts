@@ -3,7 +3,7 @@
 //   company:  GET /api/company/vault[/{id}]           (CompanyVaultController)
 //   staff:    GET /api/admin/vault/*                  (AdminVaultController)
 
-import type { ReadinessComponent, ReadinessDecay, ReadinessHistory } from "./studentStats";
+import type { ReadinessComponent, ReadinessDecay, ReadinessHistory, ReadinessOverride } from "./studentStats";
 
 /** The one derived status every screen reads — see VaultProfile::resolveStatus() on the backend. */
 export type VaultStatus =
@@ -88,6 +88,8 @@ export interface StudentVaultResponse {
     points_needed: number;
     base_score?: number;
     decay?: ReadinessDecay | null;
+    /** Set only while a superadmin has set the score by hand. */
+    override?: ReadinessOverride | null;
   };
   /** The last 30 days of the score. Absent from an older API. */
   history?: ReadinessHistory;

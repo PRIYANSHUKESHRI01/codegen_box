@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowRight, Award, CheckCircle2, FlaskConical, Lock, Rocket, type LucideIcon } from "lucide-react";
 import { PriceTag } from "@/components/pricing/PriceTag";
 import { cn } from "@/lib/utils";
+import { isRedeemable } from "@/lib/pricing";
 import { usePublicPlan } from "@/lib/usePublicPlans";
 import type { PlanPricing } from "@/types/pricing";
 
@@ -123,10 +124,12 @@ export function UpgradePanel({ feature, initialPlan = null, className }: Upgrade
             href="/dashboard/billing"
             className="mt-5 flex items-center justify-center gap-2 rounded-btn bg-accent-primary py-3 text-sm font-bold text-white shadow-subtle transition-all hover:bg-accent-primary-hover hover:shadow-glow"
           >
-            Upgrade to Expert
+            {plan && isRedeemable(plan) ? "Get Expert free" : "Upgrade to Expert"}
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>
-          <p className="mt-2.5 text-center text-2xs font-medium text-text-secondary">You&apos;ll confirm the price before anything is charged.</p>
+          <p className="mt-2.5 text-center text-2xs font-medium text-text-secondary">
+            {plan && isRedeemable(plan) ? "Free right now — redeem it in one click, no payment." : "You'll confirm the price before anything is charged."}
+          </p>
         </div>
       </div>
     </section>

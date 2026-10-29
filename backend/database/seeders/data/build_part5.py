@@ -1,0 +1,898 @@
+import os
+import sys
+sys.path.append(os.path.dirname(__file__))
+from vault_helper import write_php_file
+
+part5_data = {
+    # ------------------ DATA ANALYTICS ------------------
+    # Series 1
+    'data_analyst-data_analytics-s1-set1': [
+        {
+            'text': "Explain the mathematical differences between MCAR (Missing Completely at Random), MAR (Missing at Random), and MNAR (Missing Not at Random) in data analytics. What imputation strategies (mean/median, KNN, multiple imputation) are appropriate, and when does listwise deletion introduce severe selection bias?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "MCAR means missingness is entirely independent of observed and unobserved data (safe for deletion or simple imputation); MAR means missingness relates to observed variables (e.g. older users omitting income; solvable with conditional imputation); MNAR means missingness directly depends on the missing value itself (e.g. highest earners refusing to report; requires domain modeling). Listwise deletion in MAR/MNAR skews distributions and ruins statistical validity."
+        },
+        {
+            'text': "What are the essential steps in a Data Cleaning pipeline? How do you identify, handle, and document missing values, duplicate records, and inconsistent date formatting?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Profiling data summary statistics; handling duplicates (exact vs fuzzy deduplication); treating missing data (imputation vs deletion vs flagging); standardizing dates to ISO 8601 (YYYY-MM-DD); logging transformations in data cleaning audit trail."
+        },
+        {
+            'text': "In Microsoft Excel, compare VLOOKUP, INDEX-MATCH, and XLOOKUP. Why is XLOOKUP superior in terms of column insertion resilience and left-lookup capability?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "VLOOKUP breaks when columns are inserted, defaults to approximate match, and cannot look to the left. XLOOKUP handles left lookups naturally, defaults to exact match, allows search from bottom, and is resilient to column index shifts."
+        },
+        {
+            'text': "Explain measures of central tendency (Mean, Median, Mode) and dispersion (Variance, Standard Deviation, Interquartile Range). When is the Median a better summary metric than the Mean?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Mean is sensitive to extreme outliers; Median is robust and represents 50th percentile. In skewed distributions (e.g. household income or house prices), median accurately reflects typical experience without distortion from billionaires."
+        },
+        {
+            'text': "How do you detect and handle extreme outliers in financial and behavioural datasets? Compare the Interquartile Range (IQR) method with Z-score thresholds (|z| > 3). When is winsorization (capping at percentiles) preferred over complete outlier removal?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "IQR defines outliers beyond Q1 - 1.5*IQR or Q3 + 1.5*IQR (robust to non-normal distributions); Z-score requires normal distribution assumptions. Complete deletion shrinks sample size and drops genuine high-value transactions; Winsorization caps outliers at fixed percentiles (e.g. 1st and 99th), preserving sample size and directional variance while limiting distortion on parametric statistics."
+        }
+    ],
+    'data_analyst-data_analytics-s1-set2': [
+        {
+            'text': "What is Exploratory Data Analysis (EDA)? Walk through how you analyze summary distributions, detect outliers using Box Plots and Z-Scores, and evaluate correlations.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Univariate analysis (histograms/boxplots, checking skewness); Bivariate analysis (scatter plots, Pearson correlation matrix); Outlier detection using IQR ($Q1 - 1.5 \\times IQR, Q3 + 1.5 \\times IQR$) or Z-scores ($|Z| > 3$)."
+        },
+        {
+            'text': "Explain the difference between Correlation and Causation. Describe a scenario where two metrics have a 0.95 correlation but zero causal relationship (Spurious Correlation).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Correlation measures statistical association; Causation proves change in A causes change in B. Spurious correlation arises from confounding variables (e.g. ice cream sales and shark attacks both correlated with summer temperature)."
+        },
+        {
+            'text': "What is RFM (Recency, Frequency, Monetary) Customer Segmentation? How does RFM scoring help marketing teams target high-value customers versus churning accounts?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Recency (days since last purchase), Frequency (total count of purchases), Monetary (total revenue generated). Segments customers into Champions (high R, high F, high M), At Risk (low R, high F, high M), and Lost, driving targeted campaigns."
+        },
+        {
+            'text': "How do you design and analyze a Marketing Conversion Funnel? How do you identify drop-off bottlenecks and calculate drop-off rate versus step conversion rate?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Track user progression: Impressions -> Page Visits -> Add to Cart -> Initiate Checkout -> Purchase. Step conversion = $Step_{N} / Step_{N-1}$; Drop-off = $1 - (Step_{N} / Step_{N-1})$; identify largest absolute drop-off to prioritize UX redesign."
+        },
+        {
+            'text': "Explain the Empirical Rule (68-95-99.7 rule) for a Normal Distribution. What percentage of data falls within 1, 2, and 3 standard deviations of the mean?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "68.27% of values lie within $\\pm 1\\sigma$ of mean; 95.45% within $\\pm 2\\sigma$; 99.73% within $\\pm 3\\sigma$. Used for quality control limits, standardizing Z-scores, and statistical process monitoring."
+        }
+    ],
+    'data_analyst-data_analytics-s1-set3': [
+        {
+            'text': "What is a North Star Metric? How do you distinguish between Leading Indicators and Lagging Indicators for a subscription SaaS business?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "North Star is single key metric capturing core value delivered to customer (e.g. Daily Active Messages for Slack). Lagging indicator reflects past results (Monthly Recurring Revenue); Leading indicator predicts future performance (User onboarding completion rate)."
+        },
+        {
+            'text': "Explain the design and statistical analysis of an A/B Test. What are Null Hypothesis ($H_0$), Alternative Hypothesis ($H_1$), p-value, and Statistical Power (1 - $\\beta$)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "H0: no difference between A and B; H1: variant B causes lift; p-value is probability of observing results assuming H0 is true; threshold $\\alpha = 0.05$; statistical power is probability of detecting real effect (standard 80%); requires sample size calculation."
+        },
+        {
+            'text': "You discover an unexplained 25% drop in Daily Active Users (DAU) on Monday morning. Walk through your step-by-step diagnostic triage framework.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "1) Verify data pipeline health (did tracking events fail or logging break?); 2) Segment by dimensions (platform iOS/Android, geography, new vs returning users); 3) Check internal changes (new app release/outage); 4) Check external factors (holidays, competitor actions)."
+        },
+        {
+            'text': "What is Simpson's Paradox? Provide a real-world example where a trend appears in multiple sub-groups but completely reverses when the groups are aggregated.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Statistical paradox where aggregate trend contradicts group trends due to confounding weighted variables (e.g. UC Berkeley admissions bias where men had higher aggregate admission rate, but women had equal/higher admission rates in each specific department because women applied to more competitive departments)."
+        },
+        {
+            'text': "How do you present data-driven recommendations to executive leadership (C-Suite)? How do you structure a 10-minute presentation to drive decisions rather than displaying data charts?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Lead with the bottom line (executive summary & recommended decision); follow with business impact ($ ROI / revenue lift); provide 3 key supporting data charts; anticipate objections with backup slides; avoid technical jargon."
+        }
+    ],
+
+    # Series 2
+    'data_analyst-data_analytics-s2-set1': [
+        {
+            'text': "What is Cohort Analysis? Walk through how you build a monthly user retention cohort chart (triangle matrix) to evaluate long-term product stickiness.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Group users by signup month (rows); track percentage returning in Month 0, 1, 2, ..., N (columns). Allows tracking whether newer cohorts retain better than older cohorts, proving product market fit improvements."
+        },
+        {
+            'text': "Compare Confidence Intervals with P-values. Why does reporting a 95% Confidence Interval for revenue lift provide more practical business value than just stating 'p < 0.05'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "P-value only states whether an effect is statistically significant; Confidence Interval provides range of plausible effect sizes (e.g. lift is between +$12k and +$45k/month), allowing business leaders to evaluate commercial viability and risk."
+        },
+        {
+            'text': "In Linear Regression analysis, explain the Coefficient of Determination ($R^2$), Adjusted $R^2$, and the p-values of individual feature coefficients.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "$R^2$ represents proportion of target variance explained by predictors; Adjusted $R^2$ penalizes adding non-informative variables; coefficient p-values test whether each predictor has a statistically significant relationship with target ($H_0: \\beta_i = 0$)."
+        },
+        {
+            'text': "What is the difference between Percentage Change and Percentage Point difference? Why does confusing these two lead to severe misinterpretation in business reporting?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "If conversion rate moves from 2% to 3%: it increased by 1 percentage point (arithmetic difference $3 - 2 = 1$), but grew by 50% in percentage change ($(3 - 2) / 2 = +50\\%$). Confusing them causes 50x reporting errors."
+        },
+        {
+            'text': "How do you calculate and interpret Customer Acquisition Cost (CAC) and Customer Lifetime Value (LTV)? What does an LTV:CAC ratio below 1:1 or above 5:1 indicate?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CAC = Total sales and marketing spend / new customers acquired; LTV = Average margin per customer x average customer lifespan. <1:1 means losing money acquiring customers (unsustainable); >5:1 indicates under-investing in growth."
+        }
+    ],
+    'data_analyst-data_analytics-s2-set2': [
+        {
+            'text': "What is Marketing Attribution Modeling? Compare First-Touch, Last-Touch, Linear, Time-Decay, and Data-Driven Attribution models in a multi-channel purchase journey.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "First-touch credits initial discovery channel (top of funnel); Last-touch credits final converting channel (bottom of funnel); Linear splits credit equally across touchpoints; Time-decay weights touches closer to purchase; Data-driven uses algorithmic Shapley values."
+        },
+        {
+            'text': "How do you detect and handle Survivorship Bias in business data analysis? Give a classic historical or modern tech example of survivorship bias distorting decision-making.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Focusing only on surviving data while ignoring failures. Abraham Wald's WW2 aircraft armor analysis (reinforce areas WITHOUT bullet holes because planes shot there didn't return); analyzing only successful unicorn startups while ignoring 95% failed ventures."
+        },
+        {
+            'text': "Explain the difference between Type I Error (False Positive, $\\alpha$) and Type II Error (False Negative, $\\beta$) in statistical testing. How do you balance them in fraud detection versus medical screening?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Type I: rejecting true null (false alarm); Type II: failing to reject false null (missed detection). In medical cancer screening, minimize Type II error (never miss a sick patient); in spam filters, minimize Type I (never block important emails)."
+        },
+        {
+            'text': "How do you analyze Churn Rate? Compare Logo Churn (customer count churn) with Net Revenue Retention (NRR) and Gross Revenue Retention (GRR).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Logo churn = Lost customers / Start customers; NRR = (Starting ARR + Expansion - Contraction - Churn) / Starting ARR. NRR > 100% means business grows even without acquiring new customers due to expansion upsells."
+        },
+        {
+            'text': "What is Time-Series Seasonality Decomposition? How do you separate an observed metric into Trend, Seasonal, Cyclical, and Irregular (Noise) components?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Additive ($Y = T + S + C + I$) or Multiplicative ($Y = T \\times S \\times C \\times I$). Trend is long-term progression; Seasonal is fixed periodic fluctuations (e.g. holiday peaks); Cyclical is economic wave; Noise is random residual variation."
+        }
+    ],
+    'data_analyst-data_analytics-s2-set3': [
+        {
+            'text': "How do you design a robust Executive KPI Dashboard in Tableau or Power BI? How do you structure visual hierarchy, drill-down paths, and automated data refresh schedules?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Top banner displays core summary KPIs (revenue, active users, margins) with sparklines; middle displays categorical breakdowns; bottom allows granular drill-through; scheduled incremental refresh during off-peak hours."
+        },
+        {
+            'text': "You are tasked with analyzing customer churn. You discover that 15% of records have missing churn dates. How do you investigate whether the data is MCAR, MAR, or MNAR?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Test if missingness correlates with other variables (e.g. account type or tenure); run Little's MCAR test; check with engineering if event logging was skipped for specific client versions (MAR); adjust survival analysis or flag missingness."
+        },
+        {
+            'text': "Explain Net Promoter Score (NPS). How is it calculated from survey responses (Promoters, Passives, Detractors), and what are its methodological limitations as a customer satisfaction metric?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "NPS = % Promoters (score 9-10) minus % Detractors (0-6). Passives (7-8) are omitted. Limitations: culturally biased response scales, high volatility on small sample sizes, and does not correlate perfectly with actual churn behavior."
+        },
+        {
+            'text': "How do you design and evaluate Price Elasticity of Demand for an e-commerce catalog? What does an elasticity coefficient of -0.5 versus -2.5 mean for revenue optimization?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Elasticity = % Change in Quantity Demanded / % Change in Price. -0.5 is Inelastic (|E| < 1): raising price increases revenue; -2.5 is Elastic (|E| > 1): raising price decreases revenue due to severe volume drop."
+        },
+        {
+            'text': "What is Data Governance for business analysts? How do you maintain a centralized Data Dictionary and ensure compliance with GDPR/CCPA when querying customer records?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Data dictionary defines canonical metric calculations (e.g. exact definition of 'active user'); data catalog maps lineage; compliance requires masking PII (pseudonymization), role-based access control, and honoring customer right-to-be-forgotten requests."
+        }
+    ],
+
+    # Series 3
+    'data_analyst-data_analytics-s3-set1': [
+        {
+            'text': "Explain advanced statistical hypothesis testing: One-Sample T-Test, Two-Sample Independent T-Test, Paired T-Test, and ANOVA (Analysis of Variance). When is ANOVA required over multiple T-tests?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "T-test compares means of 1 or 2 groups. ANOVA compares means across 3+ groups simultaneously. Running multiple pairwise T-tests inflates Type I family-wise error rate ($1 - (1 - \\alpha)^k$), while ANOVA controls global alpha."
+        },
+        {
+            'text': "What is the Chi-Square Test of Independence ($\\chi^2$)? Walk through calculating Expected frequencies versus Observed frequencies in a contingency table.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Tests whether two categorical variables are independent. Contingency table calculates $Expected = (Row\\ Total \\times Column\\ Total) / Grand\\ Total$; $\\chi^2 = \\sum \\frac{(Observed - Expected)^2}{Expected}$; compare against critical value with $(r-1)(c-1)$ degrees of freedom."
+        },
+        {
+            'text': "Explain the differences between Pearson Correlation, Spearman Rank Correlation, and Kendall Tau. When should Spearman be used instead of Pearson?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Pearson measures linear relationship between continuous normal variables; Spearman measures monotonic relationship by ranking values (non-parametric, robust to non-linear relationships and outliers); Kendall Tau evaluates concordant vs discordant pairs."
+        },
+        {
+            'text': "What are Data Normalization techniques: Box-Cox Transformation and Log Transformation? How do they stabilize variance and convert skewed data into a normal distribution for parametric analysis?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Right-skewed data (e.g. monetary values) violates normality assumptions; Log transform ($log(x)$ or $log(1+x)$) compresses extreme positive values; Box-Cox parameterizes power transformation $\\lambda$ finding optimal normalization transformation."
+        },
+        {
+            'text': "How does Non-Parametric statistical testing work? Compare the Mann-Whitney U Test with the Wilcoxon Signed-Rank Test.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Used when data violates normality and cannot be transformed. Mann-Whitney U tests independent two-sample median differences using ranks; Wilcoxon Signed-Rank tests paired dependent samples."
+        }
+    ],
+    'data_analyst-data_analytics-s3-set2': [
+        {
+            'text': "How do you build a customer Churn Risk Scorecard using Logistic Regression and Odds Ratios? How do you interpret an odds ratio of 1.45 for a binary predictor variable?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Logistic regression models log-odds $logit(p) = \\ln(p / (1-p))$. The odds ratio $e^{\\beta} = 1.45$ means that holding other variables constant, customers with that attribute have 45% higher odds of churning compared to customers without it."
+        },
+        {
+            'text': "Explain Survival Analysis (Kaplan-Meier survival curves and Hazard Ratios) in customer analytics. Why is standard linear regression unsuited for customer lifetime and churn duration?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Customer data contains Censoring: active customers have not churned yet (their true lifespan is unknown and in progress). Kaplan-Meier estimates survival probability over time accounting for censored observations without bias."
+        },
+        {
+            'text': "How do you detect and control for Confounding Variables in observational data using Stratification and Multivariable Regression?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "A confounder influences both independent variable and outcome (spurious relationship). Multivariable regression includes confounders as covariates, holding them constant; stratification evaluates relationships within homogenous subgroups."
+        },
+        {
+            'text': "What is Customer Sentiment Analysis on text reviews? How do you combine quantitative CSAT / NPS scores with qualitative NLP sentiment polarity to discover root-cause product friction?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Correlate quantitative low rating scores (1-2 stars) with text sentiment lexicon (VADER) and topic extraction; cluster negative verbatim comments into categories (e.g. shipping delay, broken button) to pinpoint actionable fixes."
+        },
+        {
+            'text': "How do you design a Self-Serve Analytics environment for 500 business users using dbt (data build tool), Looker/Metabase, and semantic layers?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "dbt models standardize raw data into curated dimensional marts; semantic layer defines metrics once; BI tool exposes approved dimensions/measures to non-technical staff with drag-and-drop exploration, eliminating custom SQL drift."
+        }
+    ],
+    'data_analyst-data_analytics-s3-set3': [
+        {
+            'text': "Architect an enterprise Analytics Strategy for a high-growth company scaling from 10 to 100 analysts. Detail data mesh principles, metric standardization, and self-serve governance.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Decentralized domain-oriented data products owned by cross-functional squads; centralized platform team providing infrastructure; unified semantic layer; automated dbt testing and documentation; data literacy training programs."
+        },
+        {
+            'text': "You discover that two senior Vice Presidents are using different numbers for 'Monthly Active Users' and reporting conflicting numbers to the Board of Directors. How do you resolve this dispute permanently?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Audit both SQL definitions to identify discrepancies (e.g. one includes background push notifications, one counts only explicit logins); organize alignment working group; define canonical metric definition approved by leadership; codify in version-controlled semantic layer."
+        },
+        {
+            'text': "How do you measure the true incremental lift of a $20M advertising campaign when third-party cookie attribution fails? Detail Geo-Experimentation (Matched Markets testing).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Select pairs of statistically matched geographic metro areas with similar baseline revenue trends; run ads in test markets while withholding ads from control markets; use synthetic controls / DiD to measure pure incremental revenue lift."
+        },
+        {
+            'text': "How do you balance the trade-off between Speed-to-Insight (delivering directional answers in 24 hours) versus Data Perfection (delivering 100% audited data in 3 weeks) for executive decision-makers?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Frame decisions using Amazon's Type 1 (two-way reversible, act fast with 70% data) vs Type 2 (irreversible, high-risk, require rigorous precision). Clearly communicate confidence intervals and known data caveats."
+        },
+        {
+            'text': "Discuss the ethical responsibilities of a Lead Data Analyst: avoiding p-hacking (data dredging), preventing cherry-picked visualizations, and challenging deceptive leadership narratives with objective truth.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "P-hacking occurs when testing hundreds of hypotheses until one serendipitously hits p<0.05. Ethical analyst pre-registers hypotheses, applies Bonferroni corrections, sets consistent baseline y-axes (avoiding truncated graphs), and upholds intellectual integrity."
+        }
+    ],
+
+    # ------------------ SQL ------------------
+    # Series 1
+    'data_analyst-sql-s1-set1': [
+        {
+            'text': "Explain the logical query execution order in an SQL engine: FROM, ON, JOIN, WHERE, GROUP BY, HAVING, SELECT, DISTINCT, ORDER BY, and LIMIT. Why can you NOT filter by a column alias created in the SELECT clause inside a WHERE clause, and at what stage does grouping occur?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "The database processes the FROM and JOIN clauses first to assemble the working dataset, then evaluates WHERE filters before GROUP BY aggregates. The SELECT clause executes afterwards; therefore, column aliases created in SELECT do not exist yet when WHERE evaluates. ORDER BY and LIMIT execute last, which is why aliases ARE permitted in ORDER BY."
+        },
+        {
+            'text': "Compare Primary Keys, Foreign Keys, and Unique Constraints. Can a table have multiple Unique keys? Can a Primary Key contain NULL values?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Primary Key uniquely identifies row, must be NOT NULL, exactly one per table; Foreign Key enforces referential integrity to another table; Unique key ensures column values are distinct, multiple allowed per table, allows NULL (engine dependent)."
+        },
+        {
+            'text': "Explain the performance difference between Sargable and Non-Sargable WHERE conditions. Why does writing 'WHERE YEAR(created_at) = 2026' or 'WHERE LOWER(email) = ...' force a full table or index scan, and how do you rewrite queries to allow B-Tree index seeks?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Sargable (Search Argument Able) queries allow the query planner to utilize B-Tree index seeks. Wrapping indexed columns in scalar functions (e.g. YEAR(created_at) = 2026) forces the engine to evaluate the function for every single row via full index/table scan. Rewrite using range comparisons: 'WHERE created_at >= '2026-01-01' AND created_at < '2027-01-01'' to leverage index seeks."
+        },
+        {
+            'text': "What is the operational difference between the WHERE clause and the HAVING clause in SQL? Why can you NOT use aggregate functions inside a WHERE clause?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "WHERE filters individual rows BEFORE aggregation; HAVING filters aggregated groups AFTER GROUP BY. Aggregate functions (e.g. SUM, COUNT) cannot run in WHERE because grouping has not yet occurred during row scan phase."
+        },
+        {
+            'text': "Explain Three-Valued Logic in SQL (TRUE, FALSE, UNKNOWN) and how NULL values behave. Why does 'WHERE column = NULL' always return zero rows, and why must 'IS NULL' be used?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "NULL represents absence of value (unknown). Any comparison to NULL (e.g. 'val = NULL' or 'NULL = NULL') evaluates to UNKNOWN, which WHERE clauses treat as false. 'IS NULL' is the dedicated operator testing for missing state."
+        }
+    ],
+    'data_analyst-sql-s1-set2': [
+        {
+            'text': "Compare Subqueries with Common Table Expressions (CTEs). When is a CTE preferred over a nested subquery for query readability and reusability?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CTEs ('WITH cte_name AS (...)') define modular named temporary result sets evaluated within the query scope. Enhances readability, avoids deeply nested subquery pyramids, and can be referenced multiple times in the outer query."
+        },
+        {
+            'text': "Explain SQL Window Functions. What is the difference between ROW_NUMBER(), RANK(), and DENSE_RANK() when ordering values that contain ties?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "For values (100, 100, 80): ROW_NUMBER gives (1, 2, 3) assigning unique sequential integers; RANK gives (1, 1, 3) with ties sharing rank and skipping subsequent numbers; DENSE_RANK gives (1, 1, 2) sharing rank without skipping."
+        },
+        {
+            'text': "What are Database Normalization forms: 1NF, 2NF, 3NF, and BCNF? What is Denormalization, and why is denormalization common in analytical data warehouses?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "1NF: atomic values, no repeating groups; 2NF: 1NF + no partial key dependencies; 3NF: 2NF + no transitive dependencies. Denormalization re-introduces redundancy in warehouses (Star Schema) to minimize costly multi-table joins for analytical queries."
+        },
+        {
+            'text': "Explain the ACID properties of database transactions: Atomicity, Consistency, Isolation, and Durability with a bank fund transfer example.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Atomicity: all debit and credit operations succeed or all rollback; Consistency: preserves schema integrity constraints; Isolation: concurrent transactions do not interfere with each other; Durability: committed writes survive power failure (WAL)."
+        },
+        {
+            'text': "What is the difference between UNION and UNION ALL in SQL? Which operator is faster and why?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "UNION combines result sets and performs an expensive deduplication sort operation to return only distinct rows; UNION ALL concatenates result sets directly without deduplication, making it significantly faster."
+        }
+    ],
+    'data_analyst-sql-s1-set3': [
+        {
+            'text': "What is an Index in a database? How does a B-Tree index work under the hood to transform $O(N)$ full table scans into $O(\\log N)$ index lookups?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Balanced tree data structure maintaining sorted keys with pointers to physical row locations. Searches traverse from root node through branch nodes to leaf nodes in O(log N) depth, avoiding scanning millions of disk blocks."
+        },
+        {
+            'text': "How do you read a SQL Execution Plan using EXPLAIN or EXPLAIN ANALYZE? Contrast an Index Scan, Index Only Scan, and Sequential Scan (Table Scan).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Table Scan reads entire heap table blocks; Index Scan reads B-tree then fetches row data from table heap; Index Only Scan satisfies query entirely from index leaves without touching table heap (highest performance)."
+        },
+        {
+            'text': "How do you solve the classic SQL 'Gaps and Islands' problem (identifying contiguous sequences of consecutive active days versus gaps in user activity)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Calculate difference between continuous ROW_NUMBER() and date sequence ($date - ROW\\_NUMBER()$). Dates in same continuous streak produce identical difference values, grouping consecutive days into 'islands' via GROUP BY."
+        },
+        {
+            'text': "Explain Database Transaction Isolation Levels: Read Uncommitted, Read Committed, Repeatable Read, and Serializable. What concurrency anomalies (Dirty Read, Non-repeatable Read, Phantom Read) can occur in each?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Read Uncommitted allows Dirty Reads (uncommitted data); Read Committed prevents dirty reads; Repeatable Read prevents Non-repeatable reads (row values won't change mid-transaction); Serializable prevents Phantom Reads (no new matching rows inserted), enforcing strict serial execution."
+        },
+        {
+            'text': "You notice that a daily analytics reporting query has slowed from 5 seconds to 4 minutes as table size grew to 20 million rows. Walk through your step-by-step query optimization process.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Run EXPLAIN ANALYZE; identify high-cost Sequential Scans; add composite B-tree indexes matching WHERE and JOIN predicates; eliminate wildcards like '%term'; rewrite correlated subqueries to CTEs/joins; check table statistics (ANALYZE)."
+        }
+    ],
+
+    # Series 2
+    'data_analyst-sql-s2-set1': [
+        {
+            'text': "Explain the difference between String pattern matching in SQL: LIKE (with % and _ wildcards) versus Regular Expressions (REGEXP / ~ in PostgreSQL). Why does 'LIKE '%term'' prevent index usage?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Leading wildcard '%term' forces full table scan because B-tree index is sorted from left to right. Prefix matching ('term%') can use index range scan. Regex allows complex token matching but requires specialized trigram (GIN) indexes."
+        },
+        {
+            'text': "How do SQL Date and Time functions work across databases (e.g. DATE_TRUNC, EXTRACT, DATEADD, DATEDIFF)? How do you aggregate transactions by week or month across UTC timezones?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "DATE_TRUNC('month', created_at AT TIME ZONE 'UTC') truncates timestamp to first day of month; EXTRACT pulls specific components (DOW, hour); always store timestamps in UTC and convert to user local timezone before truncation."
+        },
+        {
+            'text': "How does the CASE WHEN statement work in SQL? Explain how Conditional Aggregation (e.g. SUM(CASE WHEN status = 'active' THEN amount ELSE 0 END)) pivots rows into columns.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Evaluates conditions sequentially, returning THEN expression on first match. Conditional aggregation aggregates only matching rows, enabling pivoting categorical values into distinct metric columns in a single table scan."
+        },
+        {
+            'text': "What is a Correlated Subquery? Why do correlated subqueries often execute with terrible $O(M \\times N)$ performance, and how do you rewrite them into efficient JOINs or Window Functions?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Correlated subquery references columns from outer query, re-executing once for EVERY row evaluated by outer query. Rewrite into LEFT JOIN with pre-aggregated subquery or Window Function (e.g. MAX() OVER(PARTITION BY...)) to execute in single pass."
+        },
+        {
+            'text': "Explain the difference between DELETE, TRUNCATE, and DROP statements in SQL. Which operations are DDL vs DML, which can be rolled back, and which resets auto-increment counters?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "DELETE (DML, row-by-row, logs all deletions, can rollback, does not reset identity); TRUNCATE (DDL, deallocates data pages instantly, fast, resets identity counters); DROP (DDL, deletes entire table structure and data permanently from schema)."
+        }
+    ],
+    'data_analyst-sql-s2-set2': [
+        {
+            'text': "Explain Window Framing specification: ROWS BETWEEN versus RANGE BETWEEN. What is the difference between 'ROWS BETWEEN 2 PRECEDING AND CURRENT ROW' and 'RANGE BETWEEN'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ROWS operates on physical row offsets regardless of duplicate values; RANGE operates on logical value offsets in ORDER BY column (treating ties identically). Crucial for calculating rolling moving averages."
+        },
+        {
+            'text': "What are Window Offset functions: LEAD() and LAG()? How do you calculate Month-over-Month (MoM) revenue growth percentage in a single SQL query?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "LAG(val, 1) accesses value from previous row in window partition; LEAD accesses subsequent row. MoM growth = $(revenue - LAG(revenue, 1) OVER (ORDER BY month)) / LAG(revenue, 1) OVER (ORDER BY month) \\times 100$."
+        },
+        {
+            'text': "Compare Clustered Indexes with Non-Clustered Indexes. Why can a table have only ONE clustered index, and how does the clustered key determine physical row storage on disk?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Clustered index physically sorts and stores data rows on disk in index order (leaf nodes ARE the data pages), hence only one can exist; Non-clustered index leaf nodes store index keys and pointers (row IDs) back to clustered table."
+        },
+        {
+            'text': "What is an UPSERT operation in SQL? Compare PostgreSQL 'ON CONFLICT DO UPDATE' with MySQL 'ON DUPLICATE KEY UPDATE' and ANSI SQL 'MERGE'.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Atomic insert or update: attempts INSERT; if unique constraint / primary key collision occurs, updates specified columns instead, preventing race conditions in concurrent data pipelines."
+        },
+        {
+            'text': "What is Database Deadlock? What sequence of concurrent transactional operations causes a deadlock, and how does the database engine detect and resolve it?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Tx1 holds lock on Row A and requests lock on Row B; Tx2 holds lock on Row B and requests lock on Row A. Neither can proceed. Database deadlock detector identifies cycle in wait-for graph and aborts/rolls back transaction with lowest cost."
+        }
+    ],
+    'data_analyst-sql-s2-set3': [
+        {
+            'text': "How do Composite Indexes work in SQL? Explain the 'Leftmost Prefix Rule' and why a composite index on (A, B, C) cannot be used for a query filtering only on B and C.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Composite index sorts by column A first, then ties sorted by B, then ties sorted by C. Query filtering only on B skips root sorting hierarchy, rendering B-tree traversal impossible and forcing full index scan."
+        },
+        {
+            'text': "What is Table Partitioning in relational databases? Compare Range Partitioning, List Partitioning, and Hash Partitioning. How does Partition Pruning speed up queries?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Divides large table into smaller physical sub-tables while maintaining single logical table view. Range partitions by date; List by region; Hash for even distribution. Partition pruning allows query optimizer to completely skip scanning unneeded partitions."
+        },
+        {
+            'text': "Compare Views, Materialized Views, and Temporary Tables in SQL. When should an analyst use a Materialized View with scheduled refresh over a standard View?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "View is saved virtual query executed dynamically on call; Materialized View physically stores pre-computed result table on disk (fast O(1) reads for complex multi-table aggregations, refreshed on schedule); Temp table exists only for current session."
+        },
+        {
+            'text': "How do you bulk insert 5 million records into a database in seconds? Why is inserting 5 million individual single-row INSERT statements a massive anti-pattern?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Single-row inserts incur 5 million transaction commits, network round-trips, and WAL flushes. Bulk insert uses COPY command (PostgreSQL) or LOAD DATA INFILE (MySQL), disabling indexes/foreign keys temporarily and batching writes."
+        },
+        {
+            'text': "What are Recursive Common Table Expressions (Recursive CTEs)? Walk through writing a recursive CTE to traverse an organizational employee-manager hierarchy.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Structure: Anchor member (selects root nodes, e.g. CEO where manager_id IS NULL) UNION ALL Recursive member (joins employees with CTE on manager_id = cte.employee_id) with termination condition when no children remain."
+        }
+    ],
+
+    # Series 3
+    'data_analyst-sql-s3-set1': [
+        {
+            'text': "Explain Self-Joins in SQL. How do you use a self-join to compare adjacent rows or find all employees who earn more than their direct manager in the same table?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Join table to itself using two distinct aliases (FROM employees e JOIN employees m ON e.manager_id = m.id). Filter WHERE e.salary > m.salary to compare child attribute against parent attribute in same table."
+        },
+        {
+            'text': "What is a CROSS JOIN? When is generating a Cartesian Product useful in analytics (e.g. generating a calendar grid of all dates and all product categories)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Produces Cartesian product matching every row in Table A with every row in Table B ($M \\times N$ rows). Useful for scaffolding complete continuous time-series grids to show zero-sales days rather than omitting dates."
+        },
+        {
+            'text': "Compare Data Types and their storage efficiency: CHAR vs VARCHAR vs TEXT, and INT vs BIGINT vs NUMERIC/DECIMAL. Why should currency always be stored as DECIMAL rather than FLOAT?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "FLOAT uses IEEE 754 floating-point binary representation subject to rounding approximations ($0.1 + 0.2 = 0.30000000000000004$); DECIMAL/NUMERIC stores exact fixed-point base-10 digits, mandatory for financial precision."
+        },
+        {
+            'text': "What is the NTILE() window function in SQL? How do you use NTILE(4) to segment users into customer spending quartiles?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Divides an ordered partition into N approximately equal ranked buckets numbered 1 to N. NTILE(4) OVER (ORDER BY total_spend DESC) assigns quartile 1 to top 25% spenders down to quartile 4 for bottom 25%."
+        },
+        {
+            'text': "How does NULLIF() and COALESCE() work in SQL? How do you prevent 'division by zero' errors in analytical aggregation queries using NULLIF?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "COALESCE returns first non-null argument; NULLIF(a, b) returns NULL if a = b, else returns a. Wrapping denominator in NULLIF(denominator, 0) converts zero to NULL; dividing by NULL yields NULL instead of crashing with division by zero error."
+        }
+    ],
+    'data_analyst-sql-s3-set2': [
+        {
+            'text': "What are Database Triggers? Explain the difference between BEFORE and AFTER triggers, and ROW-level versus STATEMENT-level triggers. Why are triggers discouraged in high-throughput tables?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Stored procedure executing automatically on INSERT/UPDATE/DELETE. BEFORE can validate/modify row before write; AFTER logs audit trails; Row-level fires per mutated row. Discouraged on high volume because hidden side-effects cause locks and latency."
+        },
+        {
+            'text': "Explain Database Lock Types: Shared Locks (S-Locks), Exclusive Locks (X-Locks), and Intent Locks. What is the difference between Table-Level locking and Row-Level locking?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Shared lock allows concurrent readers; Exclusive lock grants single transaction write access, blocking all other readers and writers. Row-level locks only touched rows (high concurrency); Table locks freeze entire table."
+        },
+        {
+            'text': "How does Multi-Version Concurrency Control (MVCC) work in modern engines like PostgreSQL? What are xmin, xmax, and why is VACUUM required to clean up dead row tuples?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Updates/deletes do not overwrite in-place; they write new row versions marked with transaction IDs (xmin, xmax), allowing concurrent readers to read old versions without blocking writers. VACUUM reclaims dead tuples after transactions complete."
+        },
+        {
+            'text': "How do you implement Full-Text Search in SQL (e.g. to_tsvector, to_tsquery, and GIN indexes in PostgreSQL)? How does full-text search differ from simple 'LIKE' queries?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Parses text into lexemes (stemming, stop-word stripping, positions); GIN index maps lexemes to rows; executes fast boolean search and relevance ranking (ts_rank), unlike slow unindexed LIKE scans."
+        },
+        {
+            'text': "What is Write-Ahead Logging (WAL)? How does WAL guarantee Durability and support Point-In-Time Recovery (PITR) in enterprise database systems?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "All changes are written sequentially to append-only disk log (WAL) BEFORE updating actual data table blocks. On crash, database replays WAL to recover uncommitted memory buffer state; PITR replays WAL archive to exact historical second."
+        }
+    ],
+    'data_analyst-sql-s3-set3': [
+        {
+            'text': "Architect a multi-tenant relational database schema for a SaaS platform hosting 1,000 corporate clients. Compare Database-per-tenant, Schema-per-tenant, and Shared-table with Row-Level Security (RLS).",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Shared table with tenant_id is most cost-effective and scalable; PostgreSQL Row-Level Security (RLS) automatically enforces WHERE tenant_id = current_setting('app.tenant_id') at kernel level, preventing cross-tenant data leaks."
+        },
+        {
+            'text': "How do you diagnose and eliminate Replication Lag in a Primary-Replica database topology where analytics read replicas are falling 30 minutes behind the primary write master?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Inspect network throughput, replica disk I/O bottlenecks, and long-running analytical queries locking replica tables; enable parallel replication workers; offload heavy ETL from replicas to dedicated warehouse; partition large tables."
+        },
+        {
+            'text': "How do you create an Index on a 100-million row production table without acquiring an exclusive table lock or taking down live application traffic?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Use 'CREATE INDEX CONCURRENTLY' (PostgreSQL) or 'ALGORITHM=INPLACE, LOCK=NONE' (MySQL). Scans table in two passes without acquiring exclusive write lock, allowing live application reads and writes to proceed unhindered."
+        },
+        {
+            'text': "How do you design a database schema for an Audit Log tracking every historical change, user ID, timestamp, and field-level delta across 20 core business tables?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Dedicated audit_logs table storing table_name, record_id, action (INSERT/UPDATE/DELETE), user_id, timestamp, and JSONB columns 'old_values' and 'new_values'; populated via generic database trigger or application event bus."
+        },
+        {
+            'text': "Explain the difference between Row-Oriented databases (PostgreSQL/MySQL) and Columnar databases (Snowflake, ClickHouse, BigQuery). Why are columnar engines 100x faster for analytical aggregations?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Row-oriented stores entire row contiguous on disk (great for single-record OLTP); Columnar stores values of a single column contiguous on disk. An analytical query 'SELECT AVG(age) FROM users' scans ONLY the age column data blocks, skipping 99% of unneeded I/O."
+        }
+    ],
+
+    # ------------------ POWER BI ------------------
+    # Series 1
+    'data_analyst-power_bi-s1-set1': [
+        {
+            'text': "What is the fundamental difference between a DAX Calculated Column and a DAX Measure in Power BI? Detail how row context versus filter context operates, when calculations execute, and the impact on model file size in RAM.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Calculated Columns evaluate during data refresh row-by-row (Row Context), are stored in the VertiPaq compressed in-memory database, and consume RAM. Measures evaluate dynamically at query time based on user interactions, slicers, and visual matrix coordinates (Filter Context), consuming CPU on demand without bloating model storage."
+        },
+        {
+            'text': "What is Power Query (M Language)? Explain how Power Query extracts, transforms, and cleans messy data before loading it into the data model.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Functional case-sensitive ETL language (M). Steps execute sequentially: connecting to sources, promoting headers, changing data types, unpivoting columns, filtering rows, and removing duplicates before loading clean tables to VertiPaq engine."
+        },
+        {
+            'text': "Explain the Star Schema dimensional modeling in Power BI. Why should Fact tables and Dimension tables be separated rather than flattened into a single massive table?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Fact tables hold numerical measurements/keys (high row count, low width); Dimension tables hold descriptive attributes (low row count). Star schema maximizes VertiPaq columnar compression, eliminates circular relationship paths, and accelerates DAX performance."
+        },
+        {
+            'text': "What are Relationship Cardinality (1:1, 1:Many, Many:Many) and Cross-Filter Direction (Single vs Both) in Power BI? Why is bidirectional cross-filtering dangerous?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "1:Many is standard dimensional relationship. Single filters flow from 1-side to Many-side; Both allows Many-side to filter 1-side. Bidirectional filtering causes ambiguous relationship paths, unexpected filter propagation, and degraded DAX performance."
+        },
+        {
+            'text': "Explain how the CALCULATE() function modifies filter context in DAX. How do modifier functions like ALL(), ALLEXCEPT(), and KEEPFILTERS() interact with user slicers and page filters to calculate metrics like '% of Total Sales'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CALCULATE evaluates an expression in a modified filter context, transitioning existing row context into filter context. ALL() ignores all existing filters on a column or table (denominator for total ratios); ALLEXCEPT() strips all filters except specified columns; KEEPFILTERS() preserves existing slicer selections rather than overriding them."
+        }
+    ],
+    'data_analyst-power_bi-s1-set2': [
+        {
+            'text': "What is the fundamental difference between a DAX Calculated Column and a DAX Measure in Power BI? When is memory consumed for each?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Calculated Column computes row-by-row during data refresh and stores values physically in RAM/disk (consumes model memory); Measure computes dynamically on-the-fly at query time based on user filter context (consumes zero storage memory)."
+        },
+        {
+            'text': "Explain Evaluation Context in DAX: Row Context versus Filter Context. What is Context Transition, and how does the CALCULATE() function trigger it?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Row context evaluates current row (iterators like SUMX); Filter context is active filters from visual rows, columns, slicers, and report filters. Context Transition occurs when CALCULATE() converts current row context into equivalent filter context."
+        },
+        {
+            'text': "How does the DAX CALCULATE() function operate? Explain how its filter parameters modify, override, or clear the existing report filter context.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "CALCULATE(Expression, Filter1, Filter2) is the most powerful DAX function. It evaluates expression in a modified filter context; filter arguments override existing visual filters or add new cross-filtering constraints."
+        },
+        {
+            'text': "What are DAX Time Intelligence functions (TOTALYTD, SAMEPERIODLASTYEAR, DATEADD, DATESYTD)? Why do they strictly require a dedicated, continuous Date Table?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Calculates period comparisons over time. Requires dedicated Date table marked as Date Table with zero missing days, continuous date ranges spanning full years, and single day grain; otherwise time intelligence calculations yield blank or corrupt results."
+        },
+        {
+            'text': "How do you configure Drillthrough pages and Custom Tooltip pages in Power BI Desktop to provide interactive detail on user hover and click?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Drillthrough: add field to Drillthrough filter pane on target page; right-clicking visual in main report reveals navigation. Custom Tooltip: create small canvas page set to 'Tooltip', mapping dimension to display dynamic charts on hover."
+        }
+    ],
+    'data_analyst-power_bi-s1-set3': [
+        {
+            'text': "Compare Power BI Storage Modes: Import Mode, DirectQuery, and Composite Mode (Dual). What are the data latency, model size, and DAX limitations of DirectQuery?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Import: loads data into VertiPaq RAM (fastest, full DAX, 1GB model limit on Pro); DirectQuery: sends SQL queries to underlying database on every click (real-time data, no memory limit, but slower latency and restricted DAX); Composite combines both."
+        },
+        {
+            'text': "How do you implement Row-Level Security (RLS) in Power BI? Compare Static RLS with Dynamic RLS using USERPRINCIPALNAME() and organizational hierarchy security tables.",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Static RLS assigns fixed DAX filters to roles; Dynamic RLS filters dimension table using USERPRINCIPALNAME() matching logged-in user email against security entitlement table, filtering data model automatically per user."
+        },
+        {
+            'text': "How do you diagnose and optimize a slow Power BI report using Performance Analyzer and DAX Studio? How do you distinguish visual display latency from DAX query execution?",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Performance Analyzer records millisecond breakdown: DAX Query, Visual Display, and Other. Copy query into DAX Studio; inspect Server Timings (Storage Engine SE vs Formula Engine FE); optimize DAX to push computation to multi-threaded Storage Engine."
+        },
+        {
+            'text': "How does an On-Premises Data Gateway work in Power BI? What is the difference between a Standard Gateway and a Personal Gateway for automated scheduled refresh?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Acts as secure bridge connecting Power BI Service cloud to on-premises SQL/file sources behind corporate firewalls. Standard gateway supports multiple users, scheduled refresh, and DirectQuery; Personal gateway supports single user scheduled refresh only."
+        },
+        {
+            'text': "Explain the deployment and collaboration structure in Power BI Service: Workspaces, Apps, Deployment Pipelines (Dev, Test, Prod), and sharing permissions.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Workspaces are collaborative development areas; Apps package finalized reports for business consumers in clean read-only portal; Deployment Pipelines automate promotion across Development, Test, and Production environments with parameter swapping."
+        }
+    ],
+
+    # Series 2
+    'data_analyst-power_bi-s2-set1': [
+        {
+            'text': "In Power Query, compare Merging queries with Appending queries. What is the SQL equivalent of each, and how do join types (Left Outer, Anti Join, Full Outer) work in Power Query?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Merge is horizontal table join based on matching keys (SQL JOIN); Append is vertical stacking of rows from matching schemas (SQL UNION ALL). Anti-join returns rows existing in only one table, useful for reconciliation auditing."
+        },
+        {
+            'text': "What is Query Folding in Power Query? Why is query folding essential for refresh performance, and what transformation steps break it?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Translates Power Query M transformations into native SQL sent to source database, offloading compute to DB. Broken by complex custom M functions, changing types on non-folding sources, or running index column steps."
+        },
+        {
+            'text': "Explain DAX filter modifier functions: ALL(), ALLEXCEPT(), and ALLSELECTED(). How do you calculate a measure showing each product's '% Contribution to Total Sales'?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "ALL() clears all filters on table/column; ALLEXCEPT() clears all except specified columns; ALLSELECTED() clears visual filters while respecting slicers. % Contribution = DIVIDE([Total Sales], CALCULATE([Total Sales], ALL(Products)))."
+        },
+        {
+            'text': "Compare RELATED() with RELATEDTABLE() in DAX. What relationship cardinality dictates the use of each function?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "RELATED() navigates from the Many-side to the One-side, returning a single value from related table; RELATEDTABLE() navigates from One-side to Many-side, returning a complete table of related rows evaluated in iterators (SUMX)."
+        },
+        {
+            'text': "How do Bookmarks, Selection Pane, and Buttons work together in Power BI Desktop to create interactive toggle panels (e.g. switching between Chart View and Table View)?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Selection pane toggles visual visibility (eye icon); Bookmark captures canvas state (visual visibility and filters); Action button links to bookmark, allowing users to toggle between views without leaving page."
+        }
+    ],
+    'data_analyst-power_bi-s2-set2': [
+        {
+            'text': "How do you optimize Power BI data model size using the VertiPaq compression engine? How does reducing column cardinality and splitting Date/Time columns shrink model RAM by 80%?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "VertiPaq uses dictionary encoding, run-length encoding (RLE), and bit-packing. High cardinality (unique values) destroys compression. Splitting combined DateTime into separate Date and Time columns reduces dictionary cardinality from 86,400 to 24+365 entries."
+        },
+        {
+            'text': "How do you configure Incremental Refresh in Power BI using RangeStart and RangeEnd parameters? Why is incremental refresh required for datasets with 50+ million rows?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Define RangeStart/RangeEnd DateTime parameters in Power Query; configure policy in Desktop (e.g. store 5 years, refresh last 10 days). Service partitions table, refreshing only recent partition, slashing refresh times from hours to minutes."
+        },
+        {
+            'text': "How do you resolve Many-to-Many relationships in Power BI? Compare native Many-to-Many relationships with using a Bridge Table (Intermediate Dimension).",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Bridge table contains distinct values from both tables with two 1:Many relationships, preserving clear filter flow and predictable performance; native Many-to-Many introduces non-deterministic cross-filtering and performance penalties."
+        },
+        {
+            'text': "What are Calculation Groups in DAX (managed via Tabular Editor)? How do they eliminate creating hundreds of redundant time intelligence measures (YTD, MTD, YoY)?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Calculation groups define Calculation Items applying dynamic formula wrappers using SELECTEDMEASURE(). Allows creating a single YTD calculation item that works across Sales, Profit, Units, and Cost measures seamlessly."
+        },
+        {
+            'text': "Explain the difference between DAX SUM() and DAX SUMX(). What is an Iterator function, and why should iterating over large tables be used cautiously in DAX?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "SUM() aggregates single column directly in multi-threaded storage engine; SUMX(Table, Expression) iterates row-by-row through Table, creating row context and evaluating expression. Heavy iteration over millions of rows slows query execution."
+        }
+    ],
+    'data_analyst-power_bi-s2-set3': [
+        {
+            'text': "How do you manage version control and CI/CD for Power BI using the Power BI Project (.pbip) format, Git integration in Microsoft Fabric, and Azure DevOps?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "PBIP stores report metadata and dataset definition in text JSON/TMDL formats; commits directly to Git; Fabric workspace syncs with Git repo; Azure DevOps pipelines automate testing and deployment across environments."
+        },
+        {
+            'text': "What are Aggregation Tables in Composite Models? How does Power BI automatically route queries to pre-aggregated in-memory tables while falling back to DirectQuery for detail rows?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Agg table stores summarized data (e.g. sales by month/region) in Import mode; mapped in Manage Aggregations. Queries matching summary grain hit fast memory; granular transactional drill downs automatically hit DirectQuery."
+        },
+        {
+            'text': "How do you audit Power BI tenant activity using the Power BI Activity Log API and Microsoft Purview? How do you track report usage, orphan datasets, and external shares?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Admin API extracts daily JSON logs: ViewReport, ExportArtifact, ShareReport events. Feed into monitoring dataset; identifies unviewed orphan reports, over-licensed Pro users, and sensitive data shared externally."
+        },
+        {
+            'text': "What are Field Parameters in Power BI? How do they allow report consumers to dynamically switch both dimensions (e.g. view by Region vs Category) and measures on a single visual?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Creates specialized table linking measure/dimension names with NAMEOF() DAX expressions; adding parameter to slicer lets user toggle visual axis or values dynamically without bookmarks."
+        },
+        {
+            'text': "How do you integrate Power BI Embedded into a customer-facing portal using Service Principal authentication and generateToken API?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "App-Owns-Data architecture: backend authenticates via Azure AD Service Principal; calls Power BI REST API generating embed token with RLS identities; frontend embeds report via Power BI JavaScript SDK in iframe."
+        }
+    ],
+
+    # Series 3
+    'data_analyst-power_bi-s3-set1': [
+        {
+            'text': "Explain the DAX KEEPFILTERS() function. How does wrapping a filter argument in KEEPFILTERS() differ from standard CALCULATE() filter overriding?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Standard CALCULATE filters replace/override any existing filter on that column in the report; KEEPFILTERS() adds the new filter intersecting with existing filters, preserving outer visual constraints."
+        },
+        {
+            'text': "What is the difference between EARLIER() and Variables (VAR / RETURN) in DAX? Why are DAX variables evaluated with static scope and how do they optimize performance?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "EARLIER navigates outer row contexts in legacy nested iterators (confusing, slow). VAR stores computed result once with static scope; avoids recalculating same expression multiple times, boosting speed and readability."
+        },
+        {
+            'text': "Explain Tabular Model Definition Language (TMDL). How does TMDL improve upon Model.bim for human readability and git merge conflict resolution?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "TMDL breaks monolithic Model.bim JSON into structured, human-readable text files with YAML-like indentation; separates tables, measures, and relationships into individual files, eliminating Git merge conflicts."
+        },
+        {
+            'text': "How does Auto Date/Time work in Power BI Desktop, why is it considered a major performance anti-pattern, and how do you disable it globally?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Auto Date/Time silently creates a hidden local date table in the background for EVERY date column in every table, bloating model size by hundreds of megabytes. Disable in Options -> Data Load -> Time Intelligence."
+        },
+        {
+            'text': "What are Semi-Additive Measures in DAX (e.g. bank account balance or warehouse inventory)? How do you calculate Closing Balance using LASTDATE() or CLOSINGBALANCEMONTH()?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Balances cannot be summed across time (adding daily balances is meaningless), but can be summed across categories. CALCULATE([Balance], LASTDATE('Date'[Date])) grabs value on final date of period."
+        }
+    ],
+    'data_analyst-power_bi-s3-set2': [
+        {
+            'text': "Explain the difference between the VertiPaq Formula Engine (FE) and Storage Engine (SE). Why does pushing DAX computation to the Storage Engine maximize multi-threading?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Storage Engine is multi-threaded, executes directly on compressed RAM, ultra-fast; Formula Engine is single-threaded, evaluates complex non-standard logic and passes callbacks. Pushing logic to SE maximizes parallel CPU cores."
+        },
+        {
+            'text': "How do you implement Best Practice Analyzer (BPA) rules in Tabular Editor to automatically audit Power BI data models for memory waste, missing relationships, and syntax errors?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Run Tabular Editor BPA rules script; scans metadata against 60+ rules: unhidden foreign keys, unused columns, improper data types, implicit measures, and missing date table configurations."
+        },
+        {
+            'text': "What is Microsoft Fabric and how does OneLake eliminate data silos in Power BI? Explain the Direct Lake storage mode.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Direct Lake reads Delta Parquet tables stored in OneLake directly into VertiPaq memory without data copying or scheduled refresh, providing Import-mode speed with DirectQuery real-time freshness."
+        },
+        {
+            'text': "How do you manage Power BI Premium Capacity resource throttling? What happens when a capacity hits CPU / memory limits, and how do you monitor with the Premium Metrics App?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "CPU overutilization triggers background job delaying and interactive query throttling; Premium Metrics app tracks Interactive vs Background CPU seconds, pinpointing datasets causing capacity saturation."
+        },
+        {
+            'text': "How do you implement automated testing for DAX measures using DAX queries (EVALUATE, ROW) and PowerShell or python automation in a deployment pipeline?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Execute DAX query (EVALUATE ROW('Test', [Total Sales])) against Power BI XMLA endpoint; compare returned number against expected baseline; assert equality in CI pipeline before deploying to Production."
+        }
+    ],
+    'data_analyst-power_bi-s3-set3': [
+        {
+            'text': "Architect an enterprise Power BI environment for 10,000 users across 5 business units. Detail shared golden datasets, certified endorsements, workspace governance, and thin report decoupling.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Separate Data Modeling from Report Design ('Thin Reports' connect via Live Connection to single shared certified Golden Dataset); Workspace RBAC governance; Deployment pipelines; Tenant-level sharing controls."
+        },
+        {
+            'text': "A mission-critical executive dashboard with DirectQuery against Snowflake experiences 15-second visual rendering times. Walk through your step-by-step performance optimization strategy.",
+            'category': 'scenario',
+            'duration_seconds': 180,
+            'note': "Inspect queries generated via DAX Studio; enable query caching; reduce number of visuals on canvas (each fires separate SQL); configure Snowflake clustering keys; implement Composite Models with in-memory aggregations."
+        },
+        {
+            'text': "How do you design a disaster recovery and backup strategy for Power BI enterprise assets using XMLA endpoints and Azure Blob Storage?",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Enable XMLA Read/Write on Premium capacity; automate daily backup script using Tabular Object Model (TOM) / PowerShell taking .abf backup files to encrypted Azure Blob Storage with point-in-time restore capability."
+        },
+        {
+            'text': "Explain the architectural trade-offs of Paginated Reports (Power BI Report Builder / SSRS) versus interactive Power BI Dashboards for operational pixel-perfect reporting.",
+            'category': 'architecture',
+            'duration_seconds': 180,
+            'note': "Interactive reports are exploratory, canvas-bound for screen viewing; Paginated reports are designed for pixel-perfect printing/PDF export, handling multi-page tables, headers/footers, and automated bursted email delivery."
+        },
+        {
+            'text': "How do you establish a Data Culture and Power BI Center of Excellence (CoE) in a Fortune 500 company to empower business users while preventing dashboard proliferation chaos?",
+            'category': 'technical',
+            'duration_seconds': 180,
+            'note': "Hub-and-Spoke model: central CoE provides governance, certified reusable datasets, and training; business spokes build domain reports; establish visual style guides and decommissioning policies for unused dashboards."
+        }
+    ]
+}
+
+if __name__ == '__main__':
+    out_dir = os.path.join(os.path.dirname(__file__), 'vault_questions')
+    os.makedirs(out_dir, exist_ok=True)
+    out_file = os.path.join(out_dir, 'data_analyst_part5.php')
+    write_php_file(out_file, part5_data)
+

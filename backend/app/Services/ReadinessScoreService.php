@@ -69,6 +69,8 @@ class ReadinessScoreService
 
     private bool $reportedMissingSnapshots = false;
 
+    private bool $reportedMissingOverrides = false;
+
     /**
      * @return array{score: int, tier: string, components: array, next_steps: array<int, string>, vault: array{threshold: int, qualifies: bool, points_needed: int}}
      */
@@ -150,12 +152,14 @@ class ReadinessScoreService
                 'core_mastered' => $mastery->masteredTopicCounts($profiledIds),
             ];
             $practiceScores = $this->practiceScoresFor($ids);
+            $overrides = $this->overridesFor($ids);
 
             foreach ($chunk as $student) {
                 $discipline = $this->disciplineOf($student);
+                $breakdown = $this->assemble($student, $weights, $catalog, $inputs, $profiles[$student->id], $discipline !== null ? ($live[$discipline] ?? null) : null);
 
                 $results[$student->id] = [
-                    'breakdown' => $this->assemble($student, $weights, $catalog, $inputs, $profiles[$student->id], $discipline !== null ? ($live[$discipline] ?? null) : null),
+                    'breakdown' => isset($overrides[$student->id]) ? $this->applyOverride($breakdown, $overrides[$student->id]) : $breakdown,
                     'practice_score' => $practiceScores[$student->id] ?? 0,
                 ];
             }
@@ -831,6 +835,68 @@ class ReadinessScoreService
 
             return [];
         }
+    }
+
+    /**
+     * The scores a superadmin has set by hand that are still in force, one query for the whole chunk. Fails soft: code deployed a
+     * moment before `migrate` must not take every score down with it.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, object{score: int, updated_at: ?string, expires_at: ?string}> student id => row
+     */
+    private function overridesFor(array $ids): array
+    {
+        try {
+            return DB::table('readiness_overrides')
+                ->whereIn('user_id', $ids)
+                ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+                ->get(['user_id', 'score', 'updated_at', 'expires_at'])
+                ->keyBy('user_id')
+                ->all();
+        } catch (\Throwable $e) {
+            if (! $this->reportedMissingOverrides) {
+                $this->reportedMissingOverrides = true;
+                report($e);
+            }
+
+            return [];
+        }
+    }
+
+    /**
+     * A score set by hand replaces the calculated one everywhere: it becomes the score, the earned score and the tier, costs no
+     * missed-day penalty (the number is somebody's decision, not arithmetic) and decides the Vault line. The components stay what
+     * they are - they still describe what the student has done - and the calculated numbers travel with the result so a screen can say
+     * "set by the AptRun team" and a superadmin can see what the student would have had. The reason is NOT included: this array is
+     * shown to the student.
+     *
+     * @param  array<string, mixed>  $breakdown
+     * @return array<string, mixed>
+     */
+    private function applyOverride(array $breakdown, object $override): array
+    {
+        $score = max(0, min(100, (int) $override->score));
+        $threshold = (int) ($breakdown['vault']['threshold'] ?? config('vault.enter_score', 60));
+
+        $breakdown['override'] = [
+            'active' => true,
+            'score' => $score,
+            'calculated_score' => (int) $breakdown['score'],
+            'calculated_tier' => $breakdown['tier'],
+            'set_at' => $override->updated_at !== null ? Carbon::parse($override->updated_at)->toIso8601String() : null,
+            'expires_at' => $override->expires_at !== null ? Carbon::parse($override->expires_at)->toIso8601String() : null,
+        ];
+        $breakdown['score'] = $score;
+        $breakdown['base_score'] = $score;
+        $breakdown['tier'] = $this->tierFor($score);
+        $breakdown['decay']['points'] = 0;
+        $breakdown['vault'] = [
+            'threshold' => $threshold,
+            'qualifies' => $score >= $threshold,
+            'points_needed' => max(0, $threshold - $score),
+        ];
+
+        return $breakdown;
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentOrder;
 use App\Models\User;
+use App\Services\OfferRedemptionService;
 use App\Services\Payments\CheckoutService;
 use App\Services\Payments\GatewayRequestException;
 use App\Services\Payments\PaymentException;
@@ -20,6 +21,8 @@ use Illuminate\Http\Request;
  *                              needs to pay: PayU's signed form (`checkout.gateway = "payu"`, the browser
  *                              posts it to PayU's page) or Razorpay's Checkout options
  *   (card/UPI/netbanking details are typed on the gateway's own page or window — never on our server)
+ *   POST /me/checkout/redeem   a plan the superadmin has discounted to ₹0: claimed with one click, no gateway involved
+ *                              (and /me/checkout refuses a ₹0 cart, so a price is paid for XOR redeemed — never both)
  *   POST /me/checkout/verify   Razorpay only: its signed success callback — signature + gateway check,
  *                              then the plan activates and the new subscription state comes back.
  *                              (PayU's browser comes back through POST /payu/return instead, see
@@ -35,6 +38,7 @@ class CheckoutController extends Controller
 {
     public function __construct(
         private readonly CheckoutService $checkout,
+        private readonly OfferRedemptionService $redemptions,
         private readonly SubscriptionPresenter $presenter,
     ) {}
 
@@ -64,6 +68,36 @@ class CheckoutController extends Controller
         return response()->json([
             'checkout' => $this->checkout->checkoutOptions($order, $user),
             'quote' => $order->quote,
+        ], 201);
+    }
+
+    /**
+     * Claim a plan whose price the superadmin has discounted to ₹0 — no gateway, no payment page. The server prices the
+     * plan again itself and refuses anything that costs money (409 payment_required) or whose price moved since the
+     * student looked (409 price_changed); see OfferRedemptionService.
+     */
+    public function redeem(Request $request): JsonResponse
+    {
+        $user = $this->student($request);
+
+        $validated = $request->validate([
+            'plan_code' => ['required', 'string', 'max:64'],
+            'expected_total' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $subscription = $this->redemptions->redeem(
+            $user,
+            $validated['plan_code'],
+            isset($validated['expected_total']) ? (int) $validated['expected_total'] : null,
+        );
+
+        return response()->json($this->presenter->individual($user->fresh()) + [
+            'redemption' => [
+                'plan_code' => $subscription->plan->code,
+                'plan_name' => $subscription->plan->name,
+                'current_period_end' => $subscription->current_period_end,
+                'days_remaining' => $subscription->daysRemaining(),
+            ],
         ], 201);
     }
 

@@ -6,7 +6,7 @@ import { Container } from "@/components/layout/Container";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { ApiError } from "@/lib/api";
-import { limitBullets } from "@/lib/pricing";
+import { isRedeemable, limitBullets } from "@/lib/pricing";
 import { notifySubscriptionChanged } from "@/lib/projectLab";
 import { PayuRedirectError, readPayuAttempt } from "@/lib/payu";
 import { RazorpayLoadError } from "@/lib/razorpay";
@@ -33,6 +33,7 @@ import {
   Lock,
   X,
   RefreshCw,
+  Gift,
 } from "lucide-react";
 
 interface PricingPlansProps {
@@ -59,6 +60,7 @@ const PHASE_LABEL: Record<string, string> = {
   awaiting_payment: "Waiting for payment…",
   redirecting: "Taking you to the payment page…",
   confirming: "Confirming…",
+  redeeming: "Redeeming your offer…",
 };
 
 /** The hints the server puts in the return address (…&result=…) that the page understands. */
@@ -113,10 +115,18 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
   const daysLeft = coverage?.source === "individual" ? (coverage.days_remaining ?? null) : null;
   const heldPlanIsLive = coverage?.source === "individual" && (daysLeft === null || daysLeft > 0);
 
+  // Whether any plan on the page is a free offer right now, and whether any still has to be paid for: they decide which
+  // payment messages (gateway not set up yet, "secure payment by …") are true of this page.
+  const offerOpen = (live.plans ?? []).some((p) => isRedeemable(p));
+  const hasPaidPlan = live.plans === null || live.plans.some((p) => !p.is_free && !p.contact_only && !isRedeemable(p));
+
   // What happened when a purchase ended: say so, and refresh whatever depends on the plan.
   const applyOutcome = (outcome: CheckoutOutcome | null, planName: string) => {
     if (outcome === null) return;
-    if (outcome.kind === "paid") {
+    if (outcome.kind === "redeemed") {
+      notifySubscriptionChanged();
+      if (outcome.state.coverage) onSubscribed?.(outcome.state.coverage, planName || outcome.state.redemption.plan_name);
+    } else if (outcome.kind === "paid") {
       notifySubscriptionChanged();
       // Coming back from the gateway's page the plan's name is only known from the receipt.
       if (outcome.state.coverage) onSubscribed?.(outcome.state.coverage, planName || outcome.state.payment?.description || "your new");
@@ -159,6 +169,33 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
     } finally {
       // While the window is on its way to the gateway's page the button keeps saying so (and stays locked).
       if (!leaving) setSubscribingCode(null);
+    }
+  };
+
+  /**
+   * "Redeem offer" on a plan that is free right now. No gateway, no redirect, no phone number: one request, and the plan is
+   * active when it answers. The server prices it again and refuses anything that is not ₹0 any more, so a card that is a
+   * poll behind can never get a plan for free that has become paid.
+   */
+  const handleRedeem = async (plan: PricingPlan) => {
+    setActionError(null);
+    setNotice(null);
+    setSubscribingCode(plan.id);
+    try {
+      applyOutcome(await flow.redeem(plan.id), plan.name);
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === "price_changed" || err.code === "payment_required")) {
+        await refreshPlans();
+        setActionError("This offer just changed, so nothing was activated. Please check the price on the card and try again.");
+      } else if (err instanceof ApiError && err.code === "already_on_plan") {
+        // Usually a second click or a retry after a dropped connection: the plan is already theirs. Make the page say so.
+        notifySubscriptionChanged();
+        setNotice(err.message);
+      } else {
+        setActionError(err instanceof ApiError ? err.message : "We couldn't redeem the offer just now. Nothing was changed — please try again.");
+      }
+    } finally {
+      setSubscribingCode(null);
     }
   };
 
@@ -234,7 +271,7 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
             </div>
           )}
 
-          {isSignedInStudent && !coveredByInstitution && checkout?.available === false && (
+          {isSignedInStudent && !coveredByInstitution && checkout?.available === false && !offerOpen && (
             <div className="mb-6 p-4 rounded-panel bg-status-warning/10 border border-status-warning/30 flex items-center gap-3 text-sm">
               <Lock className="w-5 h-5 text-status-warning shrink-0" />
               <span className="text-text-secondary">
@@ -287,11 +324,15 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
             const useSelfServeAction =
               isSignedInStudent && coverageKnown && !coveredByInstitution && !isCurrentIndividualPlan && !isLowerThanCurrent && planIndexOf(plan.id) > 0;
             const isSubscribingThis = subscribingCode === plan.id;
-            const paymentsOff = checkout?.available === false;
-            const buyLabel = lapsedThisPlan ? `Renew ${plan.name}` : plan.ctaLabel;
 
             // The live plan behind an individual card: its price and its real limits.
             const livePlan = live.plans?.find((p) => p.code === plan.id);
+
+            // A plan discounted to ₹0 is redeemed, not bought: it never needs the payment gateway, so a gateway that
+            // is not set up yet does not lock its button.
+            const redeemable = livePlan !== undefined && isRedeemable(livePlan);
+            const paymentsOff = checkout?.available === false && !redeemable;
+            const buyLabel = redeemable ? (lapsedThisPlan ? `Renew ${plan.name} free` : "Redeem offer") : lapsedThisPlan ? `Renew ${plan.name}` : plan.ctaLabel;
             const lines = featureLines(plan, livePlan);
             // A signed-in student can't buy until the price they'd be agreeing to is on screen.
             const priceKnown = livePlan !== undefined;
@@ -433,12 +474,12 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
                       {canRenew && (
                         <button
                           type="button"
-                          onClick={() => livePlan && handleSelfServeSubscribe(plan, livePlan)}
+                          onClick={() => (redeemable ? void handleRedeem(plan) : livePlan && handleSelfServeSubscribe(plan, livePlan))}
                           disabled={flow.busy || paymentsOff || !priceKnown}
                           className="flex items-center justify-center gap-2 w-full py-2.5 rounded-btn text-xs font-bold text-accent-primary border border-accent-primary/40 hover:bg-accent-primary/10 transition-all disabled:opacity-60"
                         >
                           {isSubscribingThis ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                          <span>Renew for another year</span>
+                          <span>{redeemable ? "Renew free for another year" : "Renew for another year"}</span>
                         </button>
                       )}
                     </div>
@@ -454,7 +495,7 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
                   ) : useSelfServeAction ? (
                     <button
                       type="button"
-                      onClick={() => livePlan && handleSelfServeSubscribe(plan, livePlan)}
+                      onClick={() => (redeemable ? void handleRedeem(plan) : livePlan && handleSelfServeSubscribe(plan, livePlan))}
                       disabled={flow.busy || paymentsOff || !priceKnown}
                       title={paymentsOff ? "Online payments are being switched on. This will be available shortly." : undefined}
                       className={cn(
@@ -473,8 +514,9 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
                         <span>Payments launching soon</span>
                       ) : (
                         <>
+                          {redeemable && <Gift className="w-4 h-4" aria-hidden />}
                           <span>{buyLabel}</span>
-                          <ArrowRight className="w-4 h-4" />
+                          {!redeemable && <ArrowRight className="w-4 h-4" />}
                         </>
                       )}
                     </button>
@@ -514,14 +556,21 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
           {/* What a student paying here can rely on — shown only to the people who can pay. */}
           {isSignedInStudent && !coveredByInstitution && (
             <div className="mt-8 flex flex-col items-center gap-2 text-center text-xs text-text-muted">
-              <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
-                <span className="inline-flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5" aria-hidden /> Secure payment by {checkout?.gateway_name ?? "our payment partner"}
-                </span>
-                <span>UPI, cards, netbanking &amp; more</span>
-                <span>Receipt emailed instantly</span>
-              </p>
-              {checkout?.test_mode && checkout.available && (
+              {hasPaidPlan && (
+                <p className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Lock className="h-3.5 w-3.5" aria-hidden /> Secure payment by {checkout?.gateway_name ?? "our payment partner"}
+                  </span>
+                  <span>UPI, cards, netbanking &amp; more</span>
+                  <span>Receipt emailed instantly</span>
+                </p>
+              )}
+              {offerOpen && (
+                <p className="inline-flex items-center gap-1.5">
+                  <Gift className="h-3.5 w-3.5" aria-hidden /> Free offers are activated instantly — no payment details needed
+                </p>
+              )}
+              {hasPaidPlan && checkout?.test_mode && checkout.available && (
                 <p className="rounded-full border border-status-warning/30 bg-status-warning/10 px-3 py-1 font-semibold text-status-warning">
                   Test mode: payments are simulated and no real money is charged.
                 </p>

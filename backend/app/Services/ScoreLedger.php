@@ -42,6 +42,19 @@ class ScoreLedger
             ->update(['vault_ai_score' => $average, 'vault_ai_scored_at' => now()]));
     }
 
+    /**
+     * Sets the student's kept Vault AI Interview score to exactly this (null = none), for when a person corrects or takes back a
+     * result - the "best so far" rule above would otherwise keep a number that no longer stands.
+     */
+    public function vaultAiExact(int $userId, ?float $average): void
+    {
+        $average = $average === null ? null : round(max(0, min(100, $average)), 2);
+
+        $this->write(fn () => DB::table('users')
+            ->where('id', $userId)
+            ->update(['vault_ai_score' => $average, 'vault_ai_scored_at' => $average === null ? null : now()]));
+    }
+
     private function write(callable $update): void
     {
         try {

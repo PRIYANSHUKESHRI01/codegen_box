@@ -24,7 +24,7 @@ class CuratedInterviewSetController extends Controller
     {
         abort_unless($request->user()->isStudent(), 403, 'Curated interview question sets are available to students.');
 
-        return response()->json($this->service->catalog());
+        return response()->json($this->service->catalog($request->user()));
     }
 
     /**

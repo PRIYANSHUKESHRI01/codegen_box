@@ -16,6 +16,8 @@ use App\Http\Controllers\Api\AdminProblemController;
 use App\Http\Controllers\Api\AdminSoftSkillController;
 use App\Http\Controllers\Api\AdminSoftSkillQuestionBankController;
 use App\Http\Controllers\Api\AdminVaultController;
+use App\Http\Controllers\Api\AdminMockInterviewQuestionController;
+use App\Http\Controllers\Api\AdminVaultQuestionController;
 use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CheckoutController;
@@ -45,12 +47,14 @@ use App\Http\Controllers\Api\CoordinatorStudentController;
 use App\Http\Controllers\Api\CoordinatorStudentReportController;
 use App\Http\Controllers\Api\HackathonArenaController;
 use App\Http\Controllers\Api\InterviewController;
+use App\Http\Controllers\Api\InterviewSpeechController;
 use App\Http\Controllers\Api\InterviewProctoringController;
 use App\Http\Controllers\Api\InterviewQuestionBankController;
 use App\Http\Controllers\Api\DrillController;
 use App\Http\Controllers\Api\StudySittingController;
 use App\Http\Controllers\Api\PracticeInterviewController;
 use App\Http\Controllers\Api\CuratedInterviewSetController;
+use App\Http\Controllers\Api\MockInterviewController;
 use App\Http\Controllers\Api\VaultInterviewQualificationController;
 use App\Http\Controllers\Api\InterviewQuestionGenerationController;
 use App\Http\Controllers\Api\InterviewTrackController;
@@ -104,6 +108,8 @@ use App\Http\Controllers\Api\SuperAdminAccountController;
 use App\Http\Controllers\Api\SuperAdminController;
 use App\Http\Controllers\Api\SuperAdminCredentialController;
 use App\Http\Controllers\Api\SuperAdminPaymentController;
+use App\Http\Controllers\Api\SuperAdminReadinessController;
+use App\Http\Controllers\Api\SuperAdminVaultAiController;
 use App\Http\Controllers\Api\SuperAdminPlanController;
 use App\Http\Controllers\Api\SuperAdminSubscriptionController;
 use App\Http\Controllers\Api\TpoContestController;
@@ -123,6 +129,7 @@ use App\Http\Controllers\Api\TpoStudentReportController;
 use App\Http\Controllers\Api\VaultIntegrationController;
 use App\Http\Controllers\Api\VocabularyController;
 use App\Http\Controllers\Api\VocabularyProgressController;
+use App\Http\Controllers\Api\SSOController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -276,6 +283,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
     // (/payu/return) or Razorpay's signed /me/checkout/verify callback reports the result, and the webhooks +
     // reconcile job are the safety nets behind them. Student-only (CheckoutController refuses everyone else).
     Route::post('/me/checkout', [CheckoutController::class, 'create'])->middleware('throttle:checkout-create');
+    // A plan the superadmin has discounted by 100% is claimed here instead — no gateway, no payment (OfferRedemptionService).
+    Route::post('/me/checkout/redeem', [CheckoutController::class, 'redeem'])->middleware('throttle:checkout-redeem');
     Route::post('/me/checkout/verify', [CheckoutController::class, 'verify'])->middleware('throttle:checkout-verify');
     Route::get('/me/payments', [CheckoutController::class, 'index']);
     Route::get('/me/payments/{publicId}', [CheckoutController::class, 'show'])->middleware('throttle:checkout-status');
@@ -422,6 +431,15 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::post('/interviews/{interview}/questions', [AdminInterviewController::class, 'storeQuestion']);
                 Route::delete('/interviews/{interview}/questions/{interviewQuestion}', [AdminInterviewController::class, 'destroyQuestion']);
                 Route::post('/interviews/{interview}/colleges', [AdminInterviewController::class, 'updateColleges']);
+
+                // The Mock AI Interview question bank (domain -> stack -> 3 rounds): which stacks have questions, and the tools to fill them.
+                Route::get('/mock-interview-bank/coverage', [AdminMockInterviewQuestionController::class, 'coverage']);
+                Route::get('/mock-interview-bank/stacks/{stack}', [AdminMockInterviewQuestionController::class, 'show']);
+                Route::post('/mock-interview-bank/rounds/{roundId}/questions', [AdminMockInterviewQuestionController::class, 'store']);
+                Route::put('/mock-interview-bank/questions/{question}', [AdminMockInterviewQuestionController::class, 'update']);
+                Route::delete('/mock-interview-bank/questions/{question}', [AdminMockInterviewQuestionController::class, 'destroy']);
+                Route::get('/mock-interview-bank/template', [AdminMockInterviewQuestionController::class, 'template']);
+                Route::post('/mock-interview-bank/import', [AdminMockInterviewQuestionController::class, 'import'])->middleware('throttle:20,1');
 
                 Route::get('/interview-question-bank', [AdminInterviewQuestionBankController::class, 'index']);
                 Route::post('/interview-question-bank', [AdminInterviewQuestionBankController::class, 'store']);
@@ -598,6 +616,16 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::post('/vault/profiles/{profile}/resync', [AdminVaultController::class, 'resync']);
                 Route::get('/vault/sync-events', [AdminVaultController::class, 'syncEvents']);
                 Route::post('/vault/sync-events/retry', [AdminVaultController::class, 'retrySync']);
+
+                // The Vault AI Interview question bank: which stacks are open to students and which are empty, and the tools
+                // to fill them (one question at a time, or a spreadsheet). See CuratedQuestionAdmin.
+                Route::get('/vault-ai/coverage', [AdminVaultQuestionController::class, 'coverage']);
+                Route::get('/vault-ai/stacks/{stack}', [AdminVaultQuestionController::class, 'show']);
+                Route::post('/vault-ai/sets/{setId}/questions', [AdminVaultQuestionController::class, 'store']);
+                Route::put('/vault-ai/questions/{question}', [AdminVaultQuestionController::class, 'update']);
+                Route::delete('/vault-ai/questions/{question}', [AdminVaultQuestionController::class, 'destroy']);
+                Route::get('/vault-ai/template', [AdminVaultQuestionController::class, 'template']);
+                Route::post('/vault-ai/import', [AdminVaultQuestionController::class, 'import'])->middleware('throttle:20,1');
             });
 
             Route::middleware('permission:'.User::PERM_ARTICLES)->group(function () {
@@ -735,6 +763,25 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/payments', [SuperAdminPaymentController::class, 'index']);
             Route::post('/payments/{payment:public_id}/reconcile', [SuperAdminPaymentController::class, 'reconcile'])
                 ->middleware('throttle:superadmin-sensitive');
+
+            // Vault AI Interview: every student's qualification, and the hand tools to give a blocked student their attempts back,
+            // correct marks, qualify someone outright or take a qualification back. Changes are live on the student's next request.
+            Route::get('/vault-ai/students/{user}', [SuperAdminVaultAiController::class, 'show']);
+            Route::post('/vault-ai/students/{user}/stacks/{stackKey}/reset', [SuperAdminVaultAiController::class, 'reset'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::put('/vault-ai/students/{user}/stacks/{stackKey}/scores', [SuperAdminVaultAiController::class, 'scores'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/vault-ai/students/{user}/stacks/{stackKey}/qualify', [SuperAdminVaultAiController::class, 'qualify'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/vault-ai/students/{user}/unlock-access', [SuperAdminVaultAiController::class, 'unlockAccess'])
+                ->middleware('throttle:superadmin-subscriptions');
+
+            // Readiness: every student's score, and the hand tool to set it. A hand-set score replaces the calculated one everywhere.
+            Route::get('/readiness/{user}', [SuperAdminReadinessController::class, 'show']);
+            Route::put('/readiness/{user}', [SuperAdminReadinessController::class, 'update'])
+                ->middleware('throttle:superadmin-subscriptions');
+            Route::delete('/readiness/{user}', [SuperAdminReadinessController::class, 'destroy'])
+                ->middleware('throttle:superadmin-subscriptions');
         });
 
     // Mellow Marketing team's own surface — "Mellow Direct" leads only (see
@@ -1245,6 +1292,12 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/vault-qualification/access', [VaultInterviewQualificationController::class, 'access'])->middleware('capability:ai_interviews');
             Route::get('/vault-qualification/status', [VaultInterviewQualificationController::class, 'status'])->middleware('capability:ai_interviews');
             Route::post('/vault-qualification/start-set', [VaultInterviewQualificationController::class, 'startSet'])->middleware('capability:ai_interviews');
+            // "Tell me when this stack opens" for a stack that has no questions yet (and taking it back).
+            Route::post('/vault-qualification/interest', [VaultInterviewQualificationController::class, 'interest'])->middleware(['capability:ai_interviews', 'throttle:30,1']);
+            Route::delete('/vault-qualification/interest', [VaultInterviewQualificationController::class, 'withdrawInterest'])->middleware(['capability:ai_interviews', 'throttle:30,1']);
+            // Mock AI Interview: practise by domain -> tech stack -> round (questions come from the Mock bank; see MockInterviewService).
+            Route::get('/mock-interviews/catalog', [MockInterviewController::class, 'catalog'])->middleware('capability:ai_interviews');
+            Route::post('/mock-interviews/rounds/{roundId}/start', [MockInterviewController::class, 'start'])->middleware(['capability:ai_interviews', 'throttle:30,1']);
             Route::post('/me/practice-interviews', [PracticeInterviewController::class, 'store'])->middleware('capability:ai_interviews')->middleware('throttle:ai-generation');
 
             // Skill Drills: the questions are generated in the browser; the server keeps the answers (streak, mastery). See config/drills.php.
@@ -1281,6 +1334,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
             Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
+            // The interviewer's voice (neural text-to-speech, cached). 503 speech_unavailable = use the browser's own voice.
+            Route::get('/interviews/{interview}/questions/{interviewQuestion}/speech', [InterviewSpeechController::class, 'question'])->middleware(['capability:ai_interviews', 'throttle:120,1']);
+            Route::get('/interviews-speech/lines/{line}', [InterviewSpeechController::class, 'line'])->middleware(['capability:ai_interviews', 'throttle:120,1']);
             Route::get('/interviews/{interview}/responses/{interviewResponse}/audio', [InterviewController::class, 'responseAudio'])->middleware('capability:ai_interviews');
 
             // Camera/mic proctoring for the interview attempt — mirrors the

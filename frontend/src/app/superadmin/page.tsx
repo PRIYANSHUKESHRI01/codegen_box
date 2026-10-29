@@ -33,8 +33,7 @@ import { AuditLogPanel } from "@/components/admin/superadmin/AuditLogPanel";
 import { PlansPricingPanel } from "@/components/admin/superadmin/PlansPricingPanel";
 import { PaymentsPanel } from "@/components/admin/superadmin/PaymentsPanel";
 import { SubscriptionsPanel } from "@/components/admin/superadmin/SubscriptionsPanel";
-import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";
-import { useToast } from "@/lib/toast";
+import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";import { useToast } from "@/lib/toast";
 
 type Tab = "overview" | "students" | "leads" | "marketing" | "colleges" | "departments" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
@@ -47,8 +46,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "departments", label: "Departments", icon: Layers },
   { id: "plans", label: "Plans & Pricing", icon: Wallet },
   { id: "subscriptions", label: "Subscriptions", icon: BadgeCheck },
-  { id: "payments", label: "Payments", icon: CreditCard },
-  { id: "staff", label: "Mellow Staff", icon: Users2 },
+  { id: "payments", label: "Payments", icon: CreditCard },  { id: "staff", label: "Mellow Staff", icon: Users2 },
   { id: "accounts", label: "Accounts & Logins", icon: KeyRound },
   { id: "infrastructure", label: "Infrastructure & Flags", icon: Cpu },
   { id: "audit", label: "Audit Log", icon: ShieldAlert },
@@ -141,8 +139,7 @@ function SuperAdminPageContent() {
       {activeTab === "departments" && <DepartmentsPanel triggerToast={triggerToast} />}
       {activeTab === "plans" && <PlansPricingPanel triggerToast={triggerToast} />}
       {activeTab === "subscriptions" && <SubscriptionsPanel triggerToast={triggerToast} />}
-      {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}
-      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}
+      {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}
       {activeTab === "accounts" && <AccountsPanel triggerToast={triggerToast} />}
       {activeTab === "infrastructure" && <InfrastructurePanel triggerToast={triggerToast} />}
       {activeTab === "audit" && <AuditLogPanel />}

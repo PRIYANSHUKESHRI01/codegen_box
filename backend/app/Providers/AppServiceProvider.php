@@ -60,6 +60,11 @@ class AppServiceProvider extends ServiceProvider
         // consulted per student per drive in cohort paths) — see App\Support\BranchCatalog.
         $this->app->scoped(BranchCatalog::class);
 
+        // One catalog per request, so the explorer, the qualification service and the admin screen all see the same tree.
+        $this->app->singleton(\App\Services\Vault\CuratedCatalog::class);
+        // Same reason: one Mock AI Interview catalog per request, so a write that flushes it flushes the one every reader holds.
+        $this->app->singleton(\App\Services\Mock\MockInterviewCatalog::class);
+
         $this->app->singleton(WorkspaceRuntime::class, function ($app) {
             return config('workspaces.runtime') === 'fake'
                 ? new FakeWorkspaceRuntime
@@ -301,6 +306,7 @@ class AppServiceProvider extends ServiceProvider
             // creates a real gateway order, so it is the tightest; the verify callback and the status poll
             // are what a student's browser legitimately repeats while waiting on a bank.
             'checkout-create' => 10,
+            'checkout-redeem' => 10,
             'checkout-verify' => 20,
             'checkout-status' => 40,
         ] as $name => $perMinute) {

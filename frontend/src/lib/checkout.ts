@@ -29,15 +29,18 @@ import type {
   PayuCheckoutOptions,
   RazorpayCheckoutOptions,
   RazorpaySuccessResponse,
+  RedeemOfferResponse,
   VerifyPaymentResponse,
 } from "@/types/payments";
 import type { MySubscriptionResponse } from "@/types/subscription";
 
-export type CheckoutPhase = "idle" | "creating" | "awaiting_payment" | "redirecting" | "confirming";
+export type CheckoutPhase = "idle" | "creating" | "awaiting_payment" | "redirecting" | "confirming" | "redeeming";
 
 export type CheckoutOutcome =
   /** Paid and activated: the new subscription state. */
   | { kind: "paid"; state: VerifyPaymentResponse }
+  /** A free offer was claimed and the plan is active: the new subscription state. Nothing was paid, so there is no payment. */
+  | { kind: "redeemed"; state: RedeemOfferResponse }
   /** The student closed the payment window (or cancelled on the gateway's page) without paying. Not an error. */
   | { kind: "dismissed" }
   /** Definitely not paid (declined, or the confirmation was refused). Safe to try again. */
@@ -91,6 +94,24 @@ export async function runCheckout(request: CheckoutRequest, hooks: CheckoutHooks
   }
 
   return payWithRazorpay(created.checkout, hooks, poll);
+}
+
+/**
+ * A plan the superadmin has discounted by 100% is not paid for, so none of the above applies: no gateway, no page to
+ * leave for, nothing to poll. One request, and the plan is active when it answers. The total the student saw (0) goes
+ * with it, so if the price moved in the meantime the server refuses (409 price_changed / payment_required) instead of
+ * handing over a plan that is no longer free.
+ *
+ * Throws ApiError — price_changed, payment_required, already_on_plan, covered_by_institution, downgrade_blocked — which the
+ * caller words. Unlike a payment there is nothing that "may have happened" on failure: no money moves, so a failure is
+ * always a plain "not activated".
+ */
+export async function redeemOffer(planCode: string, hooks: CheckoutHooks = {}): Promise<CheckoutOutcome> {
+  hooks.onPhase?.("redeeming");
+
+  const state = await api.post<RedeemOfferResponse>("/me/checkout/redeem", { plan_code: planCode, expected_total: 0 });
+
+  return { kind: "redeemed", state };
 }
 
 // ───────────────────────────── PayU: leave for its page, come back later ─────────────────────────────

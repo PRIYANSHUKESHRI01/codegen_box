@@ -179,7 +179,7 @@ describe("the Vault AI Interview page", () => {
 
       expect(screen.getByText(/Sit it when you.re ready/)).toBeTruthy();
       expect(screen.getByText(/3 attempts/)).toBeTruthy();
-      expect(screen.getByRole("link", { name: /Practice first/ }).getAttribute("href")).toBe("/dashboard/interviews/practice");
+      expect(screen.getByRole("link", { name: /Practice first/ }).getAttribute("href")).toBe("/dashboard/interviews");
     });
 
     it("shows the pass mark before the student has a score", () => {

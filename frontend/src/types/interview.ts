@@ -59,6 +59,8 @@ export interface StudentInterviewSummary {
   is_qualification?: boolean;
   /** Where a qualification set sits in the student's series; null for every other interview. */
   qualification?: { stack_key: string | null; role_key: string | null; series_number: number | null; set_number: number | null } | null;
+  /** The interviewer's real voice can be heard before starting (the line it opens with); null/absent when only the browser voice is available. */
+  voice_preview?: { text: string } | null;
 }
 
 export interface InterviewProctoringSummary {
@@ -136,12 +138,19 @@ export interface TakeQuestionPayload {
   expected_duration_seconds: number;
 }
 
+/** Whether the interviewer has a real (neural) voice on the server, and the fixed lines it says besides questions — the text a candidate also reads. */
+export interface InterviewSpeechInfo {
+  enabled: boolean;
+  lines: Record<string, string>;
+}
+
 export interface StartInterviewResponse {
   session: { id: number; status: InterviewSessionStatus; current_question_order: number };
   total_questions: number;
   answered_count: number;
   complete: boolean;
   question: TakeQuestionPayload | null;
+  speech?: InterviewSpeechInfo;
 }
 
 export interface AnswerInterviewResponse {

@@ -58,7 +58,7 @@ const plan = (code: string, name: string, list: number, pct: number, over: Parti
 
 const RESPONSE = (): AdminPlansResponse => ({
   currency: "INR",
-  limits: { max_list_price: 500000, max_discount_percent: 90 },
+  limits: { max_list_price: 500000, max_discount_percent: 100 },
   plans: [plan("coder", "Coder", 0, 0, { active_subscribers: 120 }), plan("expert", "Expert", 1999, 40, { active_subscribers: 7 }), plan("grandmaster", "Grandmaster", 0, 0, { active_subscribers: 2, contact_only: true, is_free: false, is_editable: false, term_days: 1095, term_unit: "3 years" })],
 });
 
@@ -160,7 +160,7 @@ describe("Superadmin → Plans & Pricing", () => {
 
     type(/list price/i, "1999", card("Expert"));
     type(/discount \(%\)/i, "400", card("Expert")); // meant 40
-    expect(within(card("Expert")).getByText(/at most 90%/i)).toBeTruthy();
+    expect(within(card("Expert")).getByText(/at most 100%/i)).toBeTruthy();
     expect(review().disabled).toBe(true);
 
     type(/discount \(%\)/i, "40", card("Expert"));
@@ -240,6 +240,149 @@ describe("Superadmin → Plans & Pricing", () => {
     fireEvent.click(within(card("Expert")).getByRole("button", { name: "Reset" }));
 
     expect((within(card("Expert")).getByLabelText(/list price/i) as HTMLInputElement).value).toBe("1999");
+  });
+
+  describe("a 100% discount makes the plan a free offer", () => {
+    const freeExpert = () => plan("expert", "Expert", 1999, 100, { active_subscribers: 7, redeemable: true, redemptions: 12 });
+    const openReview = () => {
+      fireEvent.click(within(card("Expert")).getByRole("button", { name: /review & save/i }));
+      return screen.findByRole("dialog");
+    };
+
+    it("offers 100% as a quick value and accepts it as a valid discount", async () => {
+      await mount();
+
+      fireEvent.click(within(card("Expert")).getByRole("button", { name: /100% · free/i }));
+
+      expect((within(card("Expert")).getByLabelText(/discount \(%\)/i) as HTMLInputElement).value).toBe("100");
+      expect(within(card("Expert")).queryByText(/at most/i)).toBeNull();
+      expect((within(card("Expert")).getByRole("button", { name: /review & save/i }) as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("previews what students will see: Free, with the real price struck through — not ₹0", async () => {
+      await mount();
+
+      type(/discount \(%\)/i, "100", card("Expert"));
+
+      const preview = card("Expert");
+      expect(within(preview).getByText("Free")).toBeTruthy();
+      expect(within(preview).getByText("₹1,999").tagName).toBe("DEL");
+      expect(within(preview).getByText(/100% off/i)).toBeTruthy();
+      expect(within(preview).queryByText("₹0")).toBeNull();
+    });
+
+    it("cannot be saved until the superadmin has ticked that everyone will get it free", async () => {
+      await mount();
+      put.mockResolvedValue({ plan: freeExpert() });
+
+      type(/discount \(%\)/i, "100", card("Expert"));
+      const dialog = await openReview();
+
+      expect(within(dialog).getByRole("alert").textContent).toMatch(/makes Expert free for every student/i);
+      expect(within(dialog).getByRole("alert").textContent).toMatch(/Redeem offer/);
+      const payRow = within(dialog).getByText("Students pay").closest("div") as HTMLElement;
+      expect(within(payRow).getByText("Free")).toBeTruthy();
+
+      const save = within(dialog).getByRole("button", { name: /make it free & go live/i }) as HTMLButtonElement;
+      expect(save.disabled).toBe(true);
+      fireEvent.click(save);
+      await flush();
+      expect(put).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole("checkbox", { name: /i understand/i }));
+      expect(save.disabled).toBe(false);
+
+      fireEvent.click(save);
+      await flush();
+      await flush();
+
+      expect(put).toHaveBeenCalledWith("/superadmin/plans/expert", { list_price: 1999, discount_percent: 100, confirm_free_offer: true, version: "1999-40" });
+      expect(toast).toHaveBeenCalledWith(expect.stringMatching(/Expert is now free to redeem/));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("asks again every time the review opens — a tick from an earlier edit is not remembered", async () => {
+      await mount();
+
+      type(/discount \(%\)/i, "100", card("Expert"));
+      let dialog = await openReview();
+      fireEvent.click(within(dialog).getByRole("checkbox", { name: /i understand/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /cancel/i }));
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+      dialog = await openReview();
+      expect((within(dialog).getByRole("checkbox", { name: /i understand/i }) as HTMLInputElement).checked).toBe(false);
+      expect((within(dialog).getByRole("button", { name: /make it free & go live/i }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("a big discount that still leaves a price needs no tick and is not sent as a free offer", async () => {
+      await mount();
+      put.mockResolvedValue({ plan: plan("expert", "Expert", 1999, 99) });
+
+      type(/discount \(%\)/i, "99", card("Expert"));
+      const dialog = await openReview();
+
+      expect(within(dialog).queryByRole("checkbox")).toBeNull();
+      fireEvent.click(within(dialog).getByRole("button", { name: /save & go live/i }));
+      await flush();
+      await flush();
+
+      expect(put).toHaveBeenCalledWith("/superadmin/plans/expert", { list_price: 1999, discount_percent: 99, version: "1999-40" });
+    });
+
+    it("shows a plan that is already free as such, with how many students redeemed it", async () => {
+      get.mockImplementation((path: string) =>
+        path === "/superadmin/plans"
+          ? Promise.resolve({ ...RESPONSE(), plans: [RESPONSE().plans[0], freeExpert(), RESPONSE().plans[2]] })
+          : Promise.resolve({ currency: "INR", plans: [] })
+      );
+      render(<PlansPricingPanel triggerToast={toast} />);
+      await screen.findByRole("heading", { name: "Expert" });
+
+      expect(within(card("Expert")).getByText("Free offer live")).toBeTruthy();
+      expect(within(card("Expert")).getByText("12 redeemed through the free offer")).toBeTruthy();
+      expect(within(card("Expert")).getByText("Free")).toBeTruthy();
+    });
+
+    it("turning the offer off needs no tick, and says what happens to people who already redeemed", async () => {
+      get.mockImplementation((path: string) =>
+        path === "/superadmin/plans"
+          ? Promise.resolve({ ...RESPONSE(), plans: [RESPONSE().plans[0], freeExpert(), RESPONSE().plans[2]] })
+          : Promise.resolve({ currency: "INR", plans: [] })
+      );
+      put.mockResolvedValue({ plan: plan("expert", "Expert", 1999, 40) });
+      render(<PlansPricingPanel triggerToast={toast} />);
+      await screen.findByRole("heading", { name: "Expert" });
+
+      type(/discount \(%\)/i, "40", card("Expert"));
+      const dialog = await openReview();
+
+      expect(within(dialog).getByText(/this ends the free offer/i)).toBeTruthy();
+      expect(within(dialog).queryByRole("checkbox")).toBeNull();
+      const payRow = within(dialog).getByText("Students pay").closest("div") as HTMLElement;
+      expect(within(payRow).getByText("Free")).toBeTruthy();
+      expect(within(payRow).getByText("₹1,199")).toBeTruthy();
+
+      fireEvent.click(within(dialog).getByRole("button", { name: /save & go live/i }));
+      await flush();
+      await flush();
+
+      expect(put).toHaveBeenCalledWith("/superadmin/plans/expert", { list_price: 1999, discount_percent: 40, version: "1999-100" });
+    });
+
+    it("shows the server's refusal if it still asks for a confirmation", async () => {
+      await mount();
+      put.mockRejectedValue(new ApiError("The given data was invalid.", 422, { confirm_free_offer: ["This makes Expert free: every student will be able to redeem it without paying. Confirm that you mean to do this."] }));
+
+      type(/discount \(%\)/i, "100", card("Expert"));
+      const dialog = await openReview();
+      fireEvent.click(within(dialog).getByRole("checkbox", { name: /i understand/i }));
+      fireEvent.click(within(dialog).getByRole("button", { name: /make it free & go live/i }));
+      await flush();
+      await flush();
+
+      expect(within(screen.getByRole("dialog")).getAllByRole("alert").map((a) => a.textContent).join(" ")).toMatch(/every student will be able to redeem it without paying/i);
+    });
   });
 
   it("shows a retry when the plans can't be loaded", async () => {

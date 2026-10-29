@@ -10,6 +10,7 @@ use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
 use App\Services\Integrity\IntegrityService;
 use App\Services\PlanGate;
+use App\Services\Speech\InterviewSpeech;
 use App\Services\StudentReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +87,12 @@ class InterviewController extends Controller
             ->where('user_id', $request->user()->id)
             ->first();
 
-        return response()->json($this->interviewSummary($interview, $session));
+        $speech = app(InterviewSpeech::class);
+
+        return response()->json($this->interviewSummary($interview, $session) + [
+            // The interviewer's voice, so the briefing page can let a candidate hear it before they start (null: no real voice configured).
+            'voice_preview' => $speech->available() && isset($speech->lines()['greeting']) ? ['text' => $speech->lines()['greeting']] : null,
+        ]);
     }
 
     /**
@@ -134,6 +140,9 @@ class InterviewController extends Controller
         if ($session->status === InterviewSession::STATUS_INVITED) {
             $session->update(['status' => InterviewSession::STATUS_IN_PROGRESS, 'started_at' => now()]);
         }
+
+        // The candidate's own request makes the current question's voice; get the one after it ready while they answer.
+        $this->warmSpeech($interview, $session->current_question_order + 1);
 
         return response()->json($this->sessionPayload($interview, $session));
     }
@@ -198,15 +207,19 @@ class InterviewController extends Controller
             $session->completed_at = now();
             $session->save();
 
-            // Queued, not inline — keeps this response fast. The candidate
-            // sees a brief "scoring..." state on the completion screen
-            // while this runs in the background (GET .../result polls it).
-            ScoreInterviewSessionJob::dispatch($session->id);
+            // After the response, not inline (keeps the answer fast) and NOT on the queue: the queue here is a database queue that only the
+            // once-a-minute scheduler drains, which measured 23-83 s from "submit" to "score" (and never, on a machine with no scheduler). Run
+            // right after the response it takes what Gemini takes, ~3 s. The candidate sees a brief "scoring..." state on the completion
+            // screen while it runs (GET .../result polls it); interview:score-pending catches the rare session whose scoring was lost.
+            ScoreInterviewSessionJob::dispatch($session->id)->afterResponse();
 
             return response()->json(['complete' => true]);
         }
 
         $session->save();
+
+        // The next question is about to be asked: have the voice for the one after it ready while this one is answered.
+        $this->warmSpeech($interview, $session->current_question_order + 1);
 
         return response()->json([
             'complete' => false,
@@ -495,7 +508,30 @@ class InterviewController extends Controller
             'answered_count' => min($session->current_question_order, $totalQuestions),
             'complete' => $currentQuestion === null,
             'question' => $currentQuestion ? $this->questionPayload($currentQuestion, $session->current_question_order, $totalQuestions) : null,
+            // Whether the interviewer has a real voice (the page then asks for the audio of each question), and what it says besides questions.
+            'speech' => $this->speechInfo(),
         ];
+    }
+
+    private function speechInfo(): array
+    {
+        $speech = app(InterviewSpeech::class);
+
+        return $speech->available() ? ['enabled' => true, 'lines' => $speech->lines()] : ['enabled' => false, 'lines' => (object) []];
+    }
+
+    /** Synthesises the question at `$index` after the response has been sent, so the candidate never waits for it. */
+    private function warmSpeech(Interview $interview, int $index): void
+    {
+        $speech = app(InterviewSpeech::class);
+
+        if (! $speech->available()) {
+            return;
+        }
+
+        app()->terminating(function () use ($interview, $index, $speech) {
+            $speech->warm($interview->interviewQuestions()->orderBy('display_order')->get()->get($index));
+        });
     }
 
     private function questionPayload(InterviewQuestion $interviewQuestion, int $order, int $total): array

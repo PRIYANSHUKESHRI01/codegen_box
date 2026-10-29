@@ -167,3 +167,17 @@ describe("BrowserVoiceEngine speech recognition", () => {
     await engine.stopListening();
   });
 });
+
+describe("BrowserVoiceEngine live captions", () => {
+  it("tells the caller which part of the running transcript is committed and which may still change", async () => {
+    const engine = new BrowserVoiceEngine();
+    const seen: Array<{ text: string; parts?: { final: string; interim: string } }> = [];
+    await engine.startListening({ onInterimTranscript: (text, parts) => seen.push({ text, parts }) });
+
+    FakeRecognition.instances[0].emit("tell me about", true);
+    FakeRecognition.instances[0].emit("your projects", false, 1);
+
+    expect(seen[seen.length - 1]).toEqual({ text: "tell me about your projects", parts: { final: "tell me about", interim: "your projects" } });
+    await engine.stopListening();
+  });
+});

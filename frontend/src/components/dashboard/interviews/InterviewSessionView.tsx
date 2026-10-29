@@ -1,29 +1,18 @@
 "use client";
-import { SessionLoader } from "@/components/ui/SessionLoader";
+import { InterviewBoot } from "./room/InterviewBoot";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Mic,
-  Volume2,
   Square,
   Loader2,
-  CheckCircle2,
-  Edit3,
   Send,
-  PartyPopper,
   RotateCcw,
   Zap,
-  Clock3,
   AlertTriangle,
-  RefreshCw,
-  UserCheck,
-  Mail,
-  Sparkles,
-  ThumbsUp,
-  ThumbsDown,
-  ShieldCheck,
+  ArrowRight,
+  MicOff,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -32,16 +21,32 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { BrowserVoiceEngine } from "@/lib/voice/browserVoiceEngine";
 import { hasMediaRecorder, hasSpeechRecognition, hasSpeechSynthesis, type VoiceEngine, type VoiceListenError } from "@/lib/voice/VoiceEngine";
+import { useSpokenReveal } from "@/lib/voice/spokenReveal";
+import { SpeechAudioCache } from "@/lib/voice/speechAudio";
 import { useInterviewProctoring } from "@/lib/proctoring/useInterviewProctoring";
 import { InterviewProctoringConsentGate } from "@/components/proctoring/InterviewProctoringConsentGate";
-import { InterviewSessionHud } from "@/components/proctoring/InterviewSessionHud";
+import { InterviewSessionHud, StrikePill } from "@/components/proctoring/InterviewSessionHud";
 import { InterviewProctoringLockedScreen } from "@/components/proctoring/InterviewProctoringLockedScreen";
+import { splitWords } from "./room/AnimatedWords";
+import { AnswerEditor } from "./room/AnswerEditor";
+import type { OrbMode } from "./room/AptRunOrb";
+import { InterviewComplete, InterviewError } from "./room/InterviewComplete";
+import { InterviewRoom, type RoomStatus, type RoomStep } from "./room/InterviewRoom";
+import type { Speaker, TranscriptTurn } from "./room/LiveTranscript";
+import { CountdownDigit } from "./room/CountdownDigit";
+import { ReadyBrief } from "./room/ReadyBrief";
+import { useRoomSignal } from "./room/roomSignal";
+import { timing } from "./room/timing";
+import { useOnline, useSilenceWatch } from "./room/useRoomHealth";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
   DIFFICULTY_COLORS,
   type AnswerInterviewResponse,
   type InterviewResult,
+  type InterviewSpeechInfo,
+  type QuestionCategory,
+  type QuestionDifficulty,
   type StartInterviewResponse,
   type StudentInterviewSummary,
   type TakeQuestionPayload,
@@ -49,6 +54,9 @@ import {
 
 type Phase =
   | "loading"
+  | "ready" // the interview is set up and waiting for the candidate to say they are ready
+  | "countdown" // 3-2-1
+  | "greeting" // the interviewer says hello
   | "speaking"
   | "prep"
   | "listening"
@@ -61,17 +69,13 @@ type Phase =
 const PREP_SECONDS = 10;
 const DEFAULT_ANSWER_SECONDS = 180;
 
-function formatClock(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${m}:${String(s).padStart(2, "0")}`;
-}
-
-/** Green while there's plenty of time, amber in the last third, red (pulsing in the UI) in the last 15%. */
-function urgencyColor(ratio: number): string {
-  if (ratio > 0.33) return "#10b981"; // emerald-500
-  if (ratio > 0.15) return "#f59e0b"; // amber-500
-  return "#ef4444"; // red-500
+/** A question the candidate has already answered: it stays in the transcript, dimmed, above the one in progress. */
+interface AnsweredQuestion {
+  id: number;
+  text: string;
+  category: QuestionCategory;
+  difficulty: QuestionDifficulty;
+  answer: string;
 }
 
 /** Runs a one-per-second countdown while `active`, firing `onExpire` exactly once when it reaches 0. Resets to `totalSeconds` every time `active` flips back to true — a fresh attempt (re-record) always gets a full new window. */
@@ -100,65 +104,34 @@ function useCountdown(totalSeconds: number, active: boolean, onExpire: () => voi
   return secondsLeft;
 }
 
-/** A draining ring wrapped around the mic/stop button — the recording countdown's focal point. */
-function CountdownRing({ ratio, size = 96 }: { ratio: number; size?: number }) {
-  const strokeWidth = 4;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const color = urgencyColor(ratio);
+/** Whole seconds since `startedAt.current`, ticking once a second while `running` — the clock in the room's header. */
+function useElapsedSeconds(startedAt: React.MutableRefObject<number>, running: boolean): number {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const tick = () => setSeconds(startedAt.current > 0 ? Math.max(0, Math.round((Date.now() - startedAt.current) / 1000)) : 0);
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [running, startedAt]);
+  return seconds;
+}
 
+function QuestionChips({ category, difficulty }: { category: QuestionCategory; difficulty: QuestionDifficulty }) {
   return (
-    <svg width={size} height={size} className="absolute inset-0 -rotate-90 pointer-events-none">
-      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={strokeWidth} className="text-elevated" />
-      <circle
-        cx={size / 2}
-        cy={size / 2}
-        r={radius}
-        fill="none"
-        stroke={color}
-        strokeWidth={strokeWidth}
-        strokeLinecap="round"
-        strokeDasharray={circumference}
-        strokeDashoffset={circumference * (1 - ratio)}
-        style={{ transition: "stroke-dashoffset 1s linear, stroke 0.3s ease" }}
-      />
-    </svg>
+    <>
+      <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", CATEGORY_COLORS[category])}>{CATEGORY_LABELS[category]}</span>
+      <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", DIFFICULTY_COLORS[difficulty])}>{difficulty}</span>
+    </>
   );
 }
 
-const LEVEL_BAR_COUNT = 7;
-
-/**
- * A small live waveform — each bar reflects one recent audio-level sample
- * (most recent on the right), so it reads as motion over the last ~1s
- * rather than a single jumpy needle. Renders a calm, non-zero baseline even
- * with no data yet (mic still initializing / AudioContext unavailable) so
- * it always looks "ready," never broken.
- */
-function AudioLevelBars({ levels }: { levels: number[] }) {
-  return (
-    <div className="flex items-center justify-center gap-[3px] h-6">
-      {levels.map((level, i) => (
-        <motion.div
-          key={i}
-          className="w-[3px] rounded-full bg-accent-primary"
-          animate={{ height: `${Math.max(15, level * 100)}%`, opacity: 0.45 + level * 0.55 }}
-          transition={{ duration: 0.1, ease: "easeOut" }}
-          style={{ height: "15%" }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="text-center">
-      <div className="text-xl font-black text-primary tabular-nums">{value}</div>
-      <div className="text-3xs font-semibold text-text-muted uppercase tracking-wide mt-0.5">{label}</div>
-    </div>
-  );
-}
+const PRIMARY_BUTTON =
+  "inline-flex items-center gap-2 rounded-full bg-accent-primary px-6 py-3 text-sm font-bold text-white shadow-lg shadow-accent-primary/30 transition-colors hover:bg-accent-primary-hover disabled:pointer-events-none disabled:opacity-50";
+const SECONDARY_BUTTON =
+  "inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface/90 px-5 py-3 text-sm font-bold text-primary shadow-sm transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-50";
+const STOP_BUTTON =
+  "inline-flex items-center gap-2 rounded-full bg-status-danger px-6 py-3 text-sm font-bold text-white shadow-lg shadow-status-danger/30 transition-colors hover:brightness-110 disabled:pointer-events-none disabled:opacity-50";
 
 /**
  * The voice-taking flow — state machine driven through the VoiceEngine
@@ -166,12 +139,16 @@ function Stat({ value, label }: { value: string; label: string }) {
  * SpeechRecognition/MediaRecorder directly. Every question is time-boxed
  * (a short "get ready" prep countdown, then a hard response-time budget
  * from InterviewQuestionBank.expected_duration_seconds — purely a frontend
- * pacing feature, nothing server-side enforces it, matching this feature's
- * "no auto-scoring, a human reviews the final recording" philosophy) and
+ * pacing feature, nothing server-side enforces it) and
  * gated behind camera/mic proctoring exactly like a live contest problem —
  * see useInterviewProctoring. Unlike contest proctoring, the candidate's
- * own camera stays visible the entire time (InterviewSessionHud) — a real
- * interview is a video-call experience, not silent surveillance.
+ * own camera stays visible the entire time — a real interview is a
+ * video-call experience, not silent surveillance.
+ *
+ * This component owns the interview itself (the phases, the timers, the
+ * network calls). What the candidate actually sees while it runs is
+ * ./room/InterviewRoom, fed from here: the AptRun orb, the camera and mic,
+ * and a live transcript of both the questions and the answers.
  */
 /**
  * Which section the interview is sat in. The Mock AI Interview and the Vault AI Interview use the very same live engine (voice, proctoring,
@@ -181,7 +158,7 @@ export type InterviewSessionVariant = "mock" | "vault";
 
 export function InterviewSessionView({ variant = "mock" }: { variant?: InterviewSessionVariant }) {
   return (
-    <Suspense fallback={<SessionLoader />}>
+    <Suspense fallback={<InterviewBoot />}>
       <InterviewSessionViewContent variant={variant} />
     </Suspense>
   );
@@ -197,6 +174,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [question, setQuestion] = useState<TakeQuestionPayload | null>(null);
+  const [answered, setAnswered] = useState<AnsweredQuestion[]>([]);
   const [totalQuestions, setTotalQuestions] = useState(0);
   const [answeredCount, setAnsweredCount] = useState(0);
   // Captured exactly once, the instant the interview actually finishes —
@@ -214,9 +192,16 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [starting, setStarting] = useState(false);
   const [micErrorMessage, setMicErrorMessage] = useState<string | null>(null);
   const [listenHint, setListenHint] = useState<string | null>(null);
-  const [interimCaption, setInterimCaption] = useState("");
-  const [levelHistory, setLevelHistory] = useState<number[]>(() => Array(LEVEL_BAR_COUNT).fill(0));
+  /** The running transcript of the answer being spoken, and how much of it the recognizer has committed (the rest it may still revise). */
+  const [interim, setInterim] = useState({ text: "", committed: "" });
   const [reattempting, setReattempting] = useState(false);
+  /** What the interviewer said to open with (shown in the transcript like any other turn), and the 3-2-1 before it. */
+  const [intro, setIntro] = useState<{ text: string } | null>(null);
+  const [beginCount, setBeginCount] = useState(0);
+  /** The audio of the question is being fetched: the interviewer is about to speak, the words aren't coming yet. */
+  const [voiceLoading, setVoiceLoading] = useState(false);
+  const [speechInfo, setSpeechInfo] = useState<InterviewSpeechInfo | null>(null);
+  const [estimatedSeconds, setEstimatedSeconds] = useState<number | null>(null);
 
   const handleReattempt = async () => {
     if (reattempting) return;
@@ -232,9 +217,12 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const startResponseRef = useRef<StartInterviewResponse | null>(null);
   const revealedRef = useRef(false);
+  /** Set when the page goes away mid-countdown, so a pending "begin" does not start an interview nobody is looking at. */
+  const leftRef = useRef(false);
+  /** The real voice's clips: fetched ahead of time, one per question. Absent/failed clips quietly become the browser voice. */
+  const voiceCache = useMemo(() => new SpeechAudioCache(), []);
   const stopGuardRef = useRef(false);
   const interviewStartedAtRef = useRef<number>(0);
-  const levelFrameRef = useRef(0);
   const listenHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const engineRef = useRef<VoiceEngine>(new BrowserVoiceEngine());
@@ -242,14 +230,22 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const ttsSupported = hasSpeechSynthesis();
   const sttSupported = hasSpeechRecognition() && hasMediaRecorder();
 
-  // Vault only: which set of which series this is, for the header above the questions.
+  // What the orb and the mic meter follow, and how much of the question has been spoken (for the transcript).
+  const signal = useRoomSignal();
+  const reveal = useSpokenReveal();
+
+  // Vault only: which set of which series this is, for the header above the questions. Everyone: how long it is expected to take.
   const [setInfo, setSetInfo] = useState<StudentInterviewSummary["qualification"]>(null);
   useEffect(() => {
-    if (!vault || status !== "ready") return;
+    if (status !== "ready") return;
     let alive = true;
     api
       .get<StudentInterviewSummary>(`/interviews/${encodeURIComponent(slug)}`)
-      .then((summary) => alive && setSetInfo(summary.qualification ?? null))
+      .then((summary) => {
+        if (!alive) return;
+        if (vault) setSetInfo(summary.qualification ?? null);
+        setEstimatedSeconds(summary.estimated_total_seconds ?? null);
+      })
       .catch(() => undefined);
     return () => {
       alive = false;
@@ -263,12 +259,12 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   // ScoreInterviewSessionJob usually finishes within a few seconds, but
   // this self-scheduling chain (not setInterval, so requests never overlap)
   // keeps checking until it resolves to "scored"/"needs_human_review" or
-  // gives up after ~60s and just leaves the safe fallback copy showing.
+  // gives up after ~2 min and just leaves the safe fallback copy showing.
   useEffect(() => {
     if (phase !== "complete") return;
     let cancelled = false;
     let attempts = 0;
-    const MAX_ATTEMPTS = 30;
+    const MAX_ATTEMPTS = 60; // 2 minutes: scoring normally takes a few seconds, but a slow Gemini reply should not leave the screen stuck
 
     const poll = async () => {
       try {
@@ -294,8 +290,12 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const proctoring = useInterviewProctoring({ basePath, enabled: status === "ready" });
 
   useEffect(() => {
+    // (Reset on every mount: React's dev double-mount runs the cleanup once before the page is really used.)
+    leftRef.current = false;
     return () => {
+      leftRef.current = true;
       engineRef.current.cancel();
+      voiceCache.dispose();
       if (audioUrl) URL.revokeObjectURL(audioUrl);
       if (listenHintTimeoutRef.current) clearTimeout(listenHintTimeoutRef.current);
     };
@@ -310,22 +310,114 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       setTimedOut(false);
       setMicErrorMessage(null);
       setListenHint(null);
-      setInterimCaption("");
-      setLevelHistory(Array(LEVEL_BAR_COUNT).fill(0));
+      setInterim({ text: "", committed: "" });
+      signal.level = 0;
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
       }
 
-      if (ttsSupported) {
+      // The interviewer's real voice, if there is one: a clip made ahead of time on the server. The words wait for it, so they never run
+      // ahead of the sound. No clip in time (or no real voice at all) means the browser's own voice reads it, exactly as before.
+      let clip: string | null = null;
+      reveal.hold();
+      if (speechInfo?.enabled) {
         setPhase("speaking");
-        await engineRef.current.speak(q.question_text);
+        setVoiceLoading(true);
+        clip = await voiceCache.get(`q:${q.interview_question_id}`, `${basePath}/questions/${q.interview_question_id}/speech`);
+        setVoiceLoading(false);
+        if (leftRef.current) return;
       }
+
+      // Without any voice the question is simply written out on screen, quickly; with one, the words appear as they are spoken.
+      const spoken = clip !== null || ttsSupported;
+      reveal.begin(q.question_text, { silent: !spoken });
+      if (spoken) {
+        setPhase("speaking");
+        await engineRef.current.speak(
+          q.question_text,
+          {
+            onStart: reveal.markStarted,
+            onBoundary: (charIndex) => {
+              reveal.boundary(charIndex);
+              signal.pulse = 1;
+            },
+          },
+          { audioUrl: clip }
+        );
+        reveal.finish();
+      }
+      if (leftRef.current) return;
       setPhase(sttSupported ? "prep" : "text_fallback");
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [ttsSupported, sttSupported]
+    [ttsSupported, sttSupported, speechInfo, basePath]
   );
+
+  /** The interviewer's opening line (a fixed, generic sentence, so one recording serves everybody) — only when the real voice is on. */
+  const sayHello = useCallback(
+    async (resumed: boolean) => {
+      const line = resumed ? "welcome_back" : "greeting";
+      const text = speechInfo?.enabled ? speechInfo.lines[line] : undefined;
+      if (!text) return;
+
+      setIntro({ text });
+      reveal.hold();
+      setPhase("greeting");
+      setVoiceLoading(true);
+      const clip = await voiceCache.get(`line:${line}`, `/interviews-speech/lines/${line}`);
+      setVoiceLoading(false);
+      if (leftRef.current) return;
+
+      // The hello is only worth saying in the real voice. If its clip didn't arrive, skip it rather than greet in a different, robotic one
+      // and then ask the questions in the good one.
+      if (clip === null) {
+        setIntro(null);
+        return;
+      }
+
+      reveal.begin(text);
+      await engineRef.current.speak(
+        text,
+        {
+          onStart: reveal.markStarted,
+          onBoundary: (charIndex) => {
+            reveal.boundary(charIndex);
+            signal.pulse = 1;
+          },
+        },
+        { audioUrl: clip }
+      );
+      reveal.finish();
+      await new Promise((resolve) => setTimeout(resolve, timing.afterGreetingMs));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [speechInfo]
+  );
+
+  /**
+   * "Begin interview": the candidate says they are ready. Only now does anything happen — a 3-2-1, the interviewer's hello, then the first
+   * question. Before this the interview just waits, however long it takes; it used to start asking the moment proctoring went live, while
+   * the candidate was still clicking through the consent screen.
+   */
+  const handleBegin = useCallback(async () => {
+    const res = startResponseRef.current;
+    if (!res?.question || phase !== "ready") return;
+
+    interviewStartedAtRef.current = Date.now();
+    setPhase("countdown");
+    for (let n = timing.countdownSeconds; n >= 1; n--) {
+      setBeginCount(n);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (leftRef.current) return;
+    }
+    setBeginCount(0);
+
+    await sayHello(res.answered_count > 0);
+    if (leftRef.current) return;
+    await presentQuestion(res.question);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, sayHello, presentQuestion]);
 
   const startInterview = useCallback(async () => {
     setStarting(true);
@@ -333,6 +425,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     try {
       const res = await api.post<StartInterviewResponse>(`${basePath}/start`);
       startResponseRef.current = res;
+      setSpeechInfo(res.speech ?? null);
       setTotalQuestions(res.total_questions);
       setAnsweredCount(res.answered_count);
       if (res.complete || !res.question) {
@@ -362,27 +455,45 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     if (proctoring.phase !== "active" && !alreadyComplete) return;
 
     revealedRef.current = true;
-    interviewStartedAtRef.current = Date.now();
-    presentQuestion(res.question);
-  }, [proctoring.phase, alreadyComplete, presentQuestion]);
+    // Proctoring is live and the candidate is in fullscreen, but nothing is asked yet: they decide when (see handleBegin). The first clips
+    // are fetched meanwhile, so the voice is ready the instant they are.
+    setPhase("ready");
+    if (res.speech?.enabled) {
+      voiceCache.prefetch(`q:${res.question.interview_question_id}`, `${basePath}/questions/${res.question.interview_question_id}/speech`);
+      const line = res.answered_count > 0 ? "welcome_back" : "greeting";
+      voiceCache.prefetch(`line:${line}`, `/interviews-speech/lines/${line}`);
+    }
+  }, [proctoring.phase, alreadyComplete, basePath, voiceCache]);
+
+  // Enter begins, as it would on any "ready?" screen — unless the candidate is typing somewhere.
+  useEffect(() => {
+    if (phase !== "ready") return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Enter" || target?.closest("textarea, input, [contenteditable=true]")) return;
+      // A focused button handles Enter itself (and would otherwise be pressed twice).
+      if (target?.closest("button, a")) return;
+      event.preventDefault();
+      void handleBegin();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [phase, handleBegin]);
 
   const handleStartAnswering = useCallback(async () => {
     stopGuardRef.current = false;
     setTimedOut(false);
     setMicErrorMessage(null);
     setListenHint(null);
-    setInterimCaption("");
+    setInterim({ text: "", committed: "" });
+    signal.level = 0;
     setPhase("listening");
     listenStartedAtRef.current = Date.now();
     try {
       await engineRef.current.startListening({
-        onInterimTranscript: (text) => setInterimCaption(text),
+        onInterimTranscript: (text, parts) => setInterim({ text, committed: parts?.final ?? text }),
         onAudioLevel: (level) => {
-          // Throttled to ~20fps (every 3rd animation frame) — smooth enough
-          // to read as a live waveform without re-rendering on every frame.
-          levelFrameRef.current += 1;
-          if (levelFrameRef.current % 3 !== 0) return;
-          setLevelHistory((prev) => [...prev.slice(1), level]);
+          signal.level = level;
         },
         onError: (error: VoiceListenError) => {
           if (error === "permission_denied") return; // surfaced via the startListening() rejection below instead
@@ -400,6 +511,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       );
       setPhase("text_fallback");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStopAnswering = useCallback(async (fromTimeout = false) => {
@@ -409,13 +521,15 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     if (fromTimeout) setTimedOut(true);
     const { transcript, audioBlob: blob } = await engineRef.current.stopListening();
     setTranscriptDraft(transcript);
-    setInterimCaption("");
+    setInterim({ text: "", committed: "" });
     setListenHint(null);
+    signal.level = 0;
     if (blob) {
       setAudioBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
     }
     setPhase("reviewing_answer");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleTextFallbackContinue = useCallback((fromTimeout = false) => {
@@ -457,6 +571,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     try {
       const res = await api.postFormData<AnswerInterviewResponse>(`${basePath}/answer`, formData);
       setAnsweredCount((c) => c + 1);
+      // The question just answered moves up into the transcript history.
+      setAnswered((list) => [
+        ...list,
+        { id: question.interview_question_id, text: question.question_text, category: question.category, difficulty: question.difficulty, answer: transcriptDraft.trim() },
+      ]);
       if (res.complete || !res.next_question) {
         if (interviewStartedAtRef.current > 0) {
           setCompletionElapsedSeconds(Math.round((Date.now() - interviewStartedAtRef.current) / 1000));
@@ -472,7 +591,276 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     }
   };
 
-  if (status !== "ready") return <SessionLoader />;
+  const roomVisible = status === "ready" && !alreadyComplete && phase !== "error" && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost");
+  const elapsedSeconds = useElapsedSeconds(interviewStartedAtRef, roomVisible);
+
+  // ── What the room shows ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+  const typingOnly = !sttSupported || micErrorMessage !== null;
+  const questionWords = useMemo(() => (question ? splitWords(question.question_text).length : 0), [question]);
+  const stillSpeaking = question !== null && reveal.revealedWords < questionWords;
+  const introSpeaking = phase === "greeting";
+  const firstName = useMemo(() => (user?.name ?? "").trim().split(/\s+/)[0] || "there", [user?.name]);
+  const resumed = (startResponseRef.current?.answered_count ?? 0) > 0;
+  const minutes = estimatedSeconds ? Math.max(1, Math.round(estimatedSeconds / 60)) : null;
+
+  const turns = useMemo<TranscriptTurn[]>(() => {
+    const list: TranscriptTurn[] = [];
+
+    // How the interviewer opened — a turn like any other, written out as it is said, then receding as the interview goes on.
+    if (intro) {
+      list.push({
+        id: "intro",
+        role: "ai",
+        text: intro.text,
+        revealedWords: introSpeaking ? reveal.revealedWords : undefined,
+        caret: introSpeaking,
+        active: introSpeaking,
+        settled: !introSpeaking,
+      });
+    }
+
+    for (const entry of answered) {
+      list.push({ id: `q${entry.id}-ai`, role: "ai", text: entry.text, active: false, settled: true, meta: <QuestionChips category={entry.category} difficulty={entry.difficulty} /> });
+      list.push({ id: `q${entry.id}-you`, role: "you", text: entry.answer, active: false, settled: true });
+    }
+
+    if (question) {
+      list.push({
+        id: `q${question.interview_question_id}-ai`,
+        role: "ai",
+        text: question.question_text,
+        revealedWords: stillSpeaking ? reveal.revealedWords : undefined,
+        caret: stillSpeaking,
+        active: true,
+        settled: !stillSpeaking,
+        meta: <QuestionChips category={question.category} difficulty={question.difficulty} />,
+      });
+
+      const youId = `q${question.interview_question_id}-you`;
+      if (phase === "listening") {
+        list.push({
+          id: youId,
+          role: "you",
+          text: interim.text,
+          provisionalFrom: splitWords(interim.committed).length,
+          placeholder: "Listening — start speaking whenever you're ready",
+          caret: true,
+          active: true,
+          settled: false,
+        });
+      } else if (phase === "text_fallback") {
+        list.push({
+          id: youId,
+          role: "you",
+          text: transcriptDraft,
+          active: true,
+          settled: false,
+          editor: (
+            <AnswerEditor label="Type your answer" autoFocus value={transcriptDraft} onChange={setTranscriptDraft} placeholder="Write your answer here..." />
+          ),
+        });
+      } else if (phase === "reviewing_answer" || phase === "submitting") {
+        list.push({
+          id: youId,
+          role: "you",
+          text: transcriptDraft,
+          active: true,
+          settled: false,
+          editor: (
+            <AnswerEditor
+              label="Review your answer (edit if needed)"
+              value={transcriptDraft}
+              onChange={setTranscriptDraft}
+              onSubmit={handleSubmitAnswer}
+              disabled={phase === "submitting"}
+              audioUrl={audioUrl}
+            />
+          ),
+        });
+      } else {
+        // The question is still being asked, or the candidate is getting ready: show where their answer will go.
+        list.push({ id: youId, role: "you", text: "", placeholder: "Your answer will appear here as you speak", active: false, settled: false });
+      }
+    }
+
+    return list;
+    // handleSubmitAnswer is re-created on every render; the editor only calls it on a keystroke, by which time `transcriptDraft` is current.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [intro, introSpeaking, answered, question, phase, stillSpeaking, reveal.revealedWords, interim, transcriptDraft, audioUrl]);
+
+  const steps = useMemo<RoomStep[]>(() => {
+    const firstTracked = answeredCount - answered.length;
+    return Array.from({ length: totalQuestions }).map((_, i) => {
+      const tracked = i >= firstTracked && i < answeredCount ? answered[i - firstTracked] : i === answeredCount ? question : null;
+      return {
+        label: tracked ? `${i + 1} · ${CATEGORY_LABELS[tracked.category]}` : `Question ${i + 1}`,
+        state: i < answeredCount ? "done" : i === answeredCount ? "current" : "todo",
+      };
+    });
+  }, [totalQuestions, answeredCount, answered, question]);
+
+  const mode: OrbMode = voiceLoading
+    ? "thinking"
+    : phase === "speaking" || phase === "greeting" || stillSpeaking
+      ? "speaking"
+      : phase === "listening"
+        ? "listening"
+        : phase === "submitting" || phase === "loading" || phase === "countdown"
+          ? "thinking"
+          : "idle";
+
+  const roomStatus: RoomStatus = (() => {
+    switch (phase) {
+      case "ready":
+        return {
+          key: "ready",
+          title: resumed ? `Welcome back, ${firstName}.` : `You're all set, ${firstName}.`,
+          detail: resumed
+            ? `You've answered ${answeredCount} of ${totalQuestions}. We'll pick up at question ${Math.min(answeredCount + 1, totalQuestions)} — whenever you're ready.`
+            : "Take a breath, sit comfortably, look at the camera. The interviewer starts when you do.",
+        };
+      case "countdown":
+        return { key: "countdown", title: "Here we go", detail: resumed ? undefined : `${totalQuestions} question${totalQuestions === 1 ? "" : "s"}, one at a time.`, tone: "busy" };
+      case "greeting":
+        return { key: "greeting", title: voiceLoading ? "One moment…" : "AptRun is saying hello", tone: "busy" };
+      case "speaking":
+        return {
+          key: "speaking",
+          title: "AptRun is asking",
+          detail: voiceLoading ? "Getting the question ready…" : "The question appears in the transcript as it's asked.",
+          tone: "busy",
+        };
+      case "prep":
+        return {
+          key: "prep",
+          title: "Get ready to answer",
+          detail: "Recording starts automatically — or jump in now.",
+          countdown: { secondsLeft: prepSecondsLeft, totalSeconds: PREP_SECONDS, label: "until recording" },
+        };
+      case "listening":
+        return {
+          key: "listening",
+          title: "Listening…",
+          detail: interim.text ? "Take your time — stop whenever you're done." : "Start speaking whenever you're ready.",
+          countdown: { secondsLeft: listeningSecondsLeft, totalSeconds: responseSeconds, label: "left to answer" },
+          tone: "listening",
+        };
+      case "text_fallback":
+        return {
+          key: "typing",
+          title: "Type your answer",
+          detail: typingOnly ? "Voice isn't available, so you'll answer in writing." : undefined,
+          countdown: { secondsLeft: typingSecondsLeft, totalSeconds: responseSeconds, label: "left to answer" },
+        };
+      case "reviewing_answer":
+        return {
+          key: "reviewing",
+          title: timedOut ? "Time's up" : "Review your answer",
+          detail: timedOut ? "Here's what was captured. Review and submit, or re-record." : "Fix anything the transcript got wrong, then submit.",
+        };
+      case "submitting":
+        return { key: "submitting", title: "Sending your answer…", tone: "busy" };
+      default:
+        return {
+          key: "loading",
+          title: stillSpeaking ? "AptRun is asking" : "Preparing your interview…",
+          detail: stillSpeaking ? undefined : "Getting your first question ready.",
+          tone: "busy",
+        };
+    }
+  })();
+
+  const actions = (() => {
+    switch (phase) {
+      case "ready":
+        return (
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }} onClick={() => void handleBegin()} className={cn(PRIMARY_BUTTON, "px-9 py-4 text-base")}>
+            {resumed ? "Continue interview" : "Begin interview"}
+            <ArrowRight className="h-5 w-5" aria-hidden />
+          </motion.button>
+        );
+      case "prep":
+        return (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={handleStartAnswering} className={PRIMARY_BUTTON}>
+            <Zap className="h-4 w-4" aria-hidden />
+            Start now
+          </motion.button>
+        );
+      case "listening":
+        return (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={() => handleStopAnswering(false)} className={STOP_BUTTON}>
+            <Square className="h-4 w-4" aria-hidden />
+            Stop &amp; review
+          </motion.button>
+        );
+      case "text_fallback":
+        return (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={() => handleTextFallbackContinue(false)} disabled={!transcriptDraft.trim()} className={PRIMARY_BUTTON}>
+            Continue
+          </motion.button>
+        );
+      case "reviewing_answer":
+      case "submitting":
+        return (
+          <>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={handleReRecord} disabled={phase === "submitting"} title="Re-record your answer" className={SECONDARY_BUTTON}>
+              <RotateCcw className="h-4 w-4" aria-hidden />
+              Re-record
+            </motion.button>
+            <motion.button whileTap={{ scale: 0.96 }} onClick={handleSubmitAnswer} disabled={phase === "submitting" || !transcriptDraft.trim()} className={PRIMARY_BUTTON}>
+              {phase === "submitting" ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" aria-hidden />
+                  Submit answer
+                </>
+              )}
+            </motion.button>
+          </>
+        );
+      default:
+        return null;
+    }
+  })();
+
+  // Real-time health of the things an answer depends on: is anyone being heard, and is the connection up.
+  const online = useOnline();
+  const silent = useSilenceWatch(signal, phase === "listening");
+  const speaker: Speaker = phase === "speaking" || phase === "greeting" || stillSpeaking ? "ai" : phase === "listening" || phase === "text_fallback" ? "you" : "idle";
+
+  const notice = phase === "ready" ? (
+    <p className="text-2xs font-semibold text-text-muted">
+      or press <kbd className="rounded-md border border-border-strong bg-surface px-1.5 py-0.5 font-mono text-3xs text-primary shadow-sm">Enter ↵</kbd>
+    </p>
+  ) : errorMessage ? (
+    <p role="alert" className="text-2xs font-semibold text-status-danger">
+      {errorMessage}
+    </p>
+  ) : phase === "text_fallback" && micErrorMessage ? (
+    <p className="mx-auto flex max-w-xs items-start gap-1.5 text-left text-2xs text-text-secondary">
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-status-warning" aria-hidden />
+      <span>{micErrorMessage}</span>
+    </p>
+  ) : silent ? (
+    <p role="status" className="mx-auto flex max-w-xs items-start gap-1.5 text-left text-2xs text-text-secondary">
+      <MicOff className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+      <span>Take your time. If you&apos;re already speaking and the bars aren&apos;t moving, check that your microphone isn&apos;t muted.</span>
+    </p>
+  ) : listenHint ? (
+    <p className="text-2xs font-semibold text-status-warning">{listenHint}</p>
+  ) : null;
+
+  const micLabel = useMemo(() => proctoring.cameraStream?.getAudioTracks()[0]?.label?.trim() || null, [proctoring.cameraStream]);
+
+  if (status !== "ready") return <InterviewBoot />;
+
+  const sessionLabel = vault ? "Vault AI Interview" : "AI Interview";
+  const sessionNote = vault ? (setInfo?.series_number != null && setInfo?.set_number != null ? `Series ${setInfo.series_number} · Set ${setInfo.set_number} of 3` : "Counts toward your Vault series") : undefined;
 
   const needsProctoringGate = !alreadyComplete && phase !== "error";
   const showConsentGate =
@@ -480,10 +868,16 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const showLockedScreen = needsProctoringGate && proctoring.phase === "locked";
   const showContent = alreadyComplete || phase === "error" || proctoring.phase === "active" || proctoring.phase === "fullscreen_lost";
   const hudActive = needsProctoringGate && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost");
+  // The engine is still starting up (before the consent screen exists): hold the room's own loader on screen instead of an empty dashboard.
+  const booting = needsProctoringGate && !showConsentGate && !showLockedScreen && !showContent;
 
   return (
-    <DashboardShell role="user" title={vault ? "Vault AI Interview" : "AI Interview"} fullBleed={needsProctoringGate} hideChrome={hudActive}>
+    // The dashboard (sidebar, header, page title) is left out for the whole of the interview — setup included — and only returns for the
+    // result. It used to be left out only once the room was live, so the consent page, and the blank moment before it, were drawn inside it.
+    <DashboardShell role="user" title={sessionLabel} fullBleed hideChrome>
       <div className="flex-1 flex flex-col min-h-0">
+        {booting && <InterviewBoot />}
+
         {showConsentGate && (
           <InterviewProctoringConsentGate
             phase={proctoring.phase}
@@ -492,6 +886,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
             previewVideoRef={proctoring.previewVideoRef}
             onEnableDevices={proctoring.enableDevicePreview}
             onConsent={proctoring.grantConsentAndStart}
+            cameraStream={proctoring.cameraStream}
+            candidateName={user?.name ?? "Candidate"}
+            sessionLabel={sessionLabel}
+            sessionNote={sessionNote}
+            onLeave={() => router.push(home)}
           />
         )}
 
@@ -503,6 +902,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
           <>
             {hudActive && (
               <InterviewSessionHud
+                embedded
                 phase={proctoring.phase}
                 session={proctoring.session}
                 lastViolation={proctoring.lastViolation}
@@ -512,466 +912,49 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
               />
             )}
 
-            <div className="max-w-2xl mx-auto w-full p-4 sm:p-6 space-y-5 overflow-y-auto">
-              {vault && (
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/[0.08] to-transparent px-3.5 py-2.5">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
-                    <ShieldCheck className="h-4 w-4" aria-hidden />
-                  </span>
-                  <span className="text-xs font-extrabold text-primary">Vault AI Interview</span>
-                  {setInfo?.series_number != null && setInfo?.set_number != null && (
-                    <span className="rounded-full bg-surface/80 px-2.5 py-0.5 text-3xs font-semibold text-text-secondary ring-1 ring-inset ring-border-subtle">
-                      Series {setInfo.series_number} · Set {setInfo.set_number} of 3
-                    </span>
-                  )}
-                  <span className="ml-auto text-3xs font-semibold text-text-muted">Counts toward your Vault series</span>
-                </div>
-              )}
-
-              {totalQuestions > 0 && phase !== "complete" && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-2xs font-semibold text-text-muted">
-                    <span>
-                      Question {Math.min(answeredCount + 1, totalQuestions)} of {totalQuestions}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {Array.from({ length: totalQuestions }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "h-1.5 flex-1 rounded-full transition-colors duration-500",
-                          i < answeredCount
-                            ? "bg-status-success"
-                            : i === answeredCount
-                            ? vault
-                              ? "bg-gradient-to-r from-indigo-500 to-violet-500"
-                              : "bg-accent-primary"
-                            : "bg-elevated"
-                        )}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {phase === "loading" && (
-                <div className="p-16 flex flex-col items-center justify-center gap-3 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Starting your interview...
-                </div>
-              )}
-
-              {phase === "error" && (
-                <div className="p-10 text-center rounded-panel bg-surface border border-border-subtle space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-status-danger/10 border border-status-danger/25 flex items-center justify-center mx-auto">
-                    <AlertTriangle className="w-6 h-6 text-status-danger" />
-                  </div>
-                  <h2 className="text-sm font-bold text-primary">Couldn&apos;t start this interview</h2>
-                  <p className="text-xs text-text-muted max-w-sm mx-auto">{errorMessage}</p>
-                  <button
-                    onClick={startInterview}
-                    disabled={starting}
-                    className="mt-1 flex items-center gap-1.5 mx-auto px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-50"
-                  >
-                    {starting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                    Try Again
-                  </button>
-                </div>
-              )}
-
-              {phase === "complete" && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, ease: "easeOut" }}
-                  className="p-8 sm:p-10 text-center rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-5"
-                >
-                  <motion.div
-                    initial={{ scale: 0.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 200, damping: 14, delay: 0.1 }}
-                    className="w-16 h-16 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center mx-auto"
-                  >
-                    <PartyPopper className="w-8 h-8 text-accent-primary" />
-                  </motion.div>
-                  <div>
-                    <h2 className="text-lg font-bold text-primary">{vault ? "Set complete" : "Interview complete"}</h2>
-                    {!result || result.status === "scoring" ? (
-                      <p className="text-xs text-text-muted max-w-sm mx-auto mt-1.5 flex items-center justify-center gap-1.5">
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        Scoring your interview with AI...
-                      </p>
-                    ) : result.status === "needs_human_review" ? (
-                      <p className="text-xs text-text-muted max-w-sm mx-auto mt-1.5">
-                        Your answers have been saved. A real person will review your responses.
-                      </p>
-                    ) : (
-                      <p className="text-xs text-text-muted max-w-sm mx-auto mt-1.5">
-                        Here&apos;s how you did — a human reviewer can still adjust this afterward.
-                      </p>
-                    )}
-                  </div>
-
-                  {totalQuestions > 0 && (
-                    <div className="flex items-center justify-center gap-6 py-3 border-y border-border-subtle">
-                      <Stat value={String(Math.max(answeredCount, totalQuestions))} label="Questions answered" />
-                      {completionElapsedSeconds !== null && (
-                        <Stat value={formatClock(completionElapsedSeconds)} label="Time taken" />
-                      )}
-                    </div>
-                  )}
-
-                  {result?.status === "scored" ? (
-                    <div className="text-left space-y-4">
-                      <div className="flex items-center gap-4 p-4 rounded-control bg-elevated/60 border border-border-subtle">
-                        <div
-                          className={cn(
-                            "w-14 h-14 rounded-full flex items-center justify-center border-2 shrink-0",
-                            result.passed === false ? "border-status-danger text-status-danger" : "border-accent-primary text-accent-primary"
-                          )}
-                        >
-                          <span className="text-base font-black tabular-nums">{Math.round(result.composite_score_percent ?? 0)}%</span>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                            <Sparkles className="w-3.5 h-3.5 text-accent-primary" />
-                            {vault ? "Your score for this set" : "AI-Scored Result"}
-                          </div>
-                          {!vault && result.passed !== null && (
-                            <div
-                              className={cn(
-                                "flex items-center gap-1 text-2xs font-semibold mt-0.5",
-                                result.passed ? "text-status-success" : "text-status-danger"
-                              )}
-                            >
-                              {result.passed ? <ThumbsUp className="w-3 h-3" /> : <ThumbsDown className="w-3 h-3" />}
-                              {result.passed ? "You passed this round" : "Didn't clear this round's threshold"}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {vault && (
-                        <div className="p-4 rounded-control bg-indigo-500/[0.07] border border-indigo-500/20">
-                          <p className="text-2xs text-text-secondary leading-relaxed">
-                            This set counts toward your Mellow Vault series and is scored once. <strong className="font-semibold text-primary">Your average across all three sets decides whether you qualify</strong> (60% or higher), so one lower set can still be made up by the others.
-                          </p>
-                        </div>
-                      )}
-
-                      {!vault && Math.round(result.composite_score_percent ?? 0) < 60 && result.reattemptable !== false && (
-                        <div className="p-4 rounded-control bg-amber-500/10 border border-amber-500/25 space-y-2">
-                          <div className="flex items-start gap-3">
-                            <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-500 shrink-0 mt-0.5">
-                              <RotateCcw className="w-4 h-4" />
-                            </div>
-                            <div className="space-y-1">
-                              <h4 className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                Score below 60% — Re-attempt Recommended
-                              </h4>
-                              <p className="text-2xs text-text-secondary leading-relaxed">
-                                You scored <strong className="text-primary font-bold">{Math.round(result.composite_score_percent ?? 0)}%</strong>, which is below the 60% technical readiness benchmark required by top engineering firms and campus placements. Review the AI critiques below to identify your weak spots, then re-attempt this interview to improve your score!
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {result.responses.length > 0 && (
-                        <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                          <p className="text-3xs font-bold uppercase tracking-wide text-text-muted">Per-question feedback</p>
-                          {result.responses.map((r, i) => (
-                            <div key={i} className="p-2.5 rounded-control bg-elevated/60 border border-border-subtle">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-2xs font-semibold text-primary line-clamp-1">{r.question_text}</span>
-                                <span className="text-2xs font-bold text-accent-primary shrink-0">{r.score}/100</span>
-                              </div>
-                              <p className="text-3xs text-text-secondary mt-1 leading-relaxed">{r.feedback}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <p className="text-3xs text-text-muted text-center">Scored by AI — a human reviewer can still adjust this.</p>
-                    </div>
-                  ) : (
-                    <div className="text-left max-w-xs mx-auto space-y-3">
-                      <p className="text-3xs font-bold uppercase tracking-wide text-text-muted">What happens next</p>
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-6 h-6 rounded-full bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center shrink-0 mt-0.5">
-                          <UserCheck className="w-3.5 h-3.5 text-accent-primary" />
-                        </div>
-                        <p className="text-xs text-text-secondary">
-                          {result?.status === "needs_human_review"
-                            ? "A reviewer reads your transcripts and listens to your recordings."
-                            : "Your interview is being scored by AI right now."}
-                        </p>
-                      </div>
-                      <div className="flex items-start gap-2.5">
-                        <div className="w-6 h-6 rounded-full bg-elevated border border-border-subtle flex items-center justify-center shrink-0 mt-0.5">
-                          <Mail className="w-3.5 h-3.5 text-text-muted" />
-                        </div>
-                        <p className="text-xs text-text-secondary">You&apos;ll hear back through the platform once it&apos;s ready.</p>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                    {((result?.status === "scored" && !vault && Math.round(result.composite_score_percent ?? 0) < 60 && result.reattemptable !== false) ||
-                      (result?.status === "needs_human_review" && result.reattemptable === true)) && (
-                      <button
-                        onClick={handleReattempt}
-                        disabled={reattempting}
-                        className="px-5 py-2.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold transition-all inline-flex items-center gap-2 shadow-sm disabled:opacity-50"
-                      >
-                        {reattempting ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Starting fresh attempt...</span>
-                          </>
-                        ) : (
-                          <>
-                            <RotateCcw className="w-3.5 h-3.5" />
-                            <span>{vault ? "Sit this set again" : "Re-attempt Interview"}</span>
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => router.push(home)}
-                      className={cn(
-                        "px-5 py-2.5 rounded-control text-xs font-bold transition-all",
-                        vault
-                          ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/25 hover:shadow-lg hover:-translate-y-0.5"
-                          : "bg-surface border border-border-subtle hover:bg-surface-raised text-primary"
-                      )}
-                    >
-                      {vault ? "Back to Qualification Circuit" : "Back to Interviews"}
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              <AnimatePresence mode="wait">
-                {question && phase !== "loading" && phase !== "error" && phase !== "complete" && (
-                  <motion.div
-                    key={question.interview_question_id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.25, ease: "easeOut" }}
-                    className="rounded-panel bg-surface border border-border-subtle shadow-subtle overflow-hidden"
-                  >
-                    <div className="p-6 sm:p-7 space-y-5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={cn("px-1.5 py-0.5 text-3xs font-bold uppercase rounded border", CATEGORY_COLORS[question.category])}>
-                          {CATEGORY_LABELS[question.category]}
-                        </span>
-                        <span className={cn("px-1.5 py-0.5 text-3xs font-bold rounded capitalize", DIFFICULTY_COLORS[question.difficulty])}>
-                          {question.difficulty}
-                        </span>
-                        {phase === "speaking" && (
-                          <span className="flex items-center gap-1 text-3xs font-semibold text-accent-primary ml-auto">
-                            <Volume2 className="w-3 h-3 animate-pulse" />
-                            Reading question aloud...
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="text-lg sm:text-xl font-bold text-primary leading-snug">{question.question_text}</p>
-
-                      {phase === "prep" && (
-                        <div className="pt-2 flex flex-col items-center gap-4 text-center">
-                          <div className="relative w-24 h-24 flex items-center justify-center">
-                            <CountdownRing ratio={prepSecondsLeft / PREP_SECONDS} size={96} />
-                            <span className="text-3xl font-black text-primary tabular-nums">{prepSecondsLeft}</span>
-                          </div>
-                          <div>
-                            <p className="text-sm font-bold text-primary">Get ready to answer</p>
-                            <p className="text-2xs text-text-muted mt-0.5">Recording starts automatically — or jump in now.</p>
-                          </div>
-                          <motion.button
-                            whileTap={{ scale: 0.96 }}
-                            onClick={handleStartAnswering}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors"
-                          >
-                            <Zap className="w-3.5 h-3.5" />
-                            Start Now
-                          </motion.button>
-                        </div>
-                      )}
-
-                      {phase === "listening" && (
-                        <div className="pt-2 flex flex-col items-center gap-3 text-center">
-                          <div className="relative w-24 h-24 flex items-center justify-center">
-                            <motion.div
-                              className="absolute inset-1 rounded-full bg-status-danger/20"
-                              animate={{ scale: 1 + (levelHistory[levelHistory.length - 1] ?? 0) * 0.35 }}
-                              transition={{ duration: 0.12, ease: "easeOut" }}
-                            />
-                            <CountdownRing ratio={Math.max(0, listeningSecondsLeft / responseSeconds)} size={96} />
-                            <motion.button
-                              whileTap={{ scale: 0.94 }}
-                              onClick={() => handleStopAnswering(false)}
-                              className="relative w-16 h-16 rounded-full bg-status-danger/15 border-2 border-status-danger flex items-center justify-center animate-pulse hover:bg-status-danger/25 transition-colors"
-                              title="Stop & review"
-                            >
-                              <Mic className="w-6 h-6 text-status-danger" />
-                            </motion.button>
-                          </div>
-
-                          <AudioLevelBars levels={levelHistory} />
-
-                          <span
-                            className={cn(
-                              "text-sm font-mono font-bold tabular-nums",
-                              listeningSecondsLeft <= responseSeconds * 0.15 ? "text-status-danger" : "text-text-secondary"
-                            )}
-                          >
-                            {formatClock(listeningSecondsLeft)}
-                          </span>
-
-                          {interimCaption ? (
-                            <p className="max-w-sm min-h-[2.5em] text-2xs text-text-secondary italic leading-relaxed flex items-start gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-status-danger animate-pulse shrink-0 mt-1" />
-                              <span>{interimCaption.length > 180 ? `…${interimCaption.slice(-180)}` : interimCaption}</span>
-                            </p>
-                          ) : (
-                            <p className="text-2xs text-text-muted italic">Listening — start speaking whenever you&apos;re ready.</p>
-                          )}
-
-                          {listenHint && <p className="text-3xs font-semibold text-status-warning">{listenHint}</p>}
-
-                          <button
-                            onClick={() => handleStopAnswering(false)}
-                            className="flex items-center gap-1.5 px-4 py-2 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-bold text-primary transition-colors"
-                          >
-                            <Square className="w-3.5 h-3.5" />
-                            Stop &amp; Review
-                          </button>
-                        </div>
-                      )}
-
-                      {phase === "text_fallback" && (
-                        <div className="pt-2 space-y-2">
-                          {micErrorMessage && (
-                            <div className="flex items-start gap-2 px-3 py-2.5 rounded-control bg-status-warning/10 border border-status-warning/25 text-2xs text-text-secondary">
-                              <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0 mt-0.5" />
-                              <span>{micErrorMessage}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between">
-                            <label className="text-2xs font-semibold text-text-secondary flex items-center gap-1.5">
-                              <Edit3 className="w-3.5 h-3.5" />
-                              Type your answer
-                            </label>
-                            <span
-                              className={cn(
-                                "text-2xs font-mono font-bold tabular-nums flex items-center gap-1",
-                                typingSecondsLeft <= responseSeconds * 0.15 ? "text-status-danger" : "text-text-muted"
-                              )}
-                            >
-                              <Clock3 className="w-3 h-3" />
-                              {formatClock(typingSecondsLeft)}
-                            </span>
-                          </div>
-                          <div className="h-1 rounded-full bg-elevated overflow-hidden">
-                            <div
-                              className="h-full transition-[width] duration-1000 ease-linear"
-                              style={{
-                                width: `${Math.max(0, (typingSecondsLeft / responseSeconds) * 100)}%`,
-                                backgroundColor: urgencyColor(typingSecondsLeft / responseSeconds),
-                              }}
-                            />
-                          </div>
-                          <textarea
-                            autoFocus
-                            rows={5}
-                            value={transcriptDraft}
-                            onChange={(e) => setTranscriptDraft(e.target.value)}
-                            placeholder="Write your answer here..."
-                            className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-sm text-primary outline-none focus:border-accent-primary"
-                          />
-                          <button
-                            onClick={() => handleTextFallbackContinue(false)}
-                            disabled={!transcriptDraft.trim()}
-                            className="w-full py-2.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-50"
-                          >
-                            Continue
-                          </button>
-                        </div>
-                      )}
-
-                      {(phase === "reviewing_answer" || phase === "submitting") && (
-                        <div className="pt-2 space-y-3">
-                          {timedOut && (
-                            <div className="flex items-center gap-1.5 px-3 py-2 rounded-control bg-status-warning/10 border border-status-warning/25 text-2xs font-semibold text-status-warning">
-                              <Clock3 className="w-3.5 h-3.5" />
-                              Time&apos;s up — here&apos;s what was captured. Review and submit, or re-record.
-                            </div>
-                          )}
-                          <label className="text-2xs font-semibold text-text-secondary flex items-center gap-1.5">
-                            <Edit3 className="w-3.5 h-3.5" />
-                            Review your answer (edit if needed)
-                          </label>
-                          <textarea
-                            rows={5}
-                            value={transcriptDraft}
-                            onChange={(e) => setTranscriptDraft(e.target.value)}
-                            disabled={phase === "submitting"}
-                            className="w-full px-3 py-2.5 rounded-control bg-elevated border border-border-subtle text-sm text-primary outline-none focus:border-accent-primary disabled:opacity-60"
-                          />
-                          {audioUrl && (
-                            <div>
-                              <p className="text-3xs font-semibold text-text-muted mb-1">Your recording</p>
-                              <audio controls src={audioUrl} className="w-full h-9" />
-                            </div>
-                          )}
-                          {errorMessage && <p className="text-2xs text-status-danger">{errorMessage}</p>}
-                          <div className="flex items-center gap-2">
-                            <motion.button
-                              whileTap={{ scale: 0.96 }}
-                              onClick={handleReRecord}
-                              disabled={phase === "submitting"}
-                              title="Re-record your answer"
-                              className="shrink-0 flex items-center gap-1.5 px-3.5 py-2.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-xs font-bold text-text-secondary hover:text-primary transition-colors disabled:opacity-50"
-                            >
-                              <RotateCcw className="w-3.5 h-3.5" />
-                              <span className="hidden sm:inline">Re-record</span>
-                            </motion.button>
-                            <motion.button
-                              whileTap={{ scale: 0.98 }}
-                              onClick={handleSubmitAnswer}
-                              disabled={phase === "submitting" || !transcriptDraft.trim()}
-                              className="flex-1 py-2.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                            >
-                              {phase === "submitting" ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  Submitting...
-                                </>
-                              ) : (
-                                <>
-                                  <Send className="w-3.5 h-3.5" />
-                                  Submit Answer
-                                </>
-                              )}
-                            </motion.button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="px-6 py-3 bg-elevated/40 border-t border-border-subtle flex items-center gap-1.5 text-3xs text-text-muted">
-                      <CheckCircle2 className="w-3 h-3" />
-                      Nothing here is auto-scored — a real person reviews your recorded answer.
-                    </div>
-                  </motion.div>
+            {hudActive ? (
+              <InterviewRoom
+                sessionLabel={sessionLabel}
+                sessionNote={sessionNote}
+                steps={steps}
+                elapsedSeconds={elapsedSeconds}
+                strikes={proctoring.session ? <StrikePill session={proctoring.session} /> : null}
+                mode={mode}
+                signal={signal}
+                status={roomStatus}
+                actions={actions}
+                notice={notice}
+                cameraStream={proctoring.cameraStream}
+                candidateName={user?.name ?? "Candidate"}
+                micLabel={micLabel}
+                micLive={phase === "listening"}
+                micUnavailable={typingOnly}
+                turns={turns}
+                speaker={speaker}
+                online={online}
+                transcriptSlot={phase === "ready" ? <ReadyBrief questionCount={totalQuestions} minutes={minutes} resumed={resumed} /> : undefined}
+                orbOverlay={phase === "countdown" && beginCount > 0 ? <CountdownDigit value={beginCount} /> : null}
+              />
+            ) : (
+              <>
+                {phase === "error" && (
+                  <InterviewError message={errorMessage} retrying={starting} onRetry={startInterview} onBack={() => router.push(home)} backLabel={vault ? "Back to Qualification Circuit" : "Back to Interviews"} />
                 )}
-              </AnimatePresence>
-            </div>
+
+                {phase === "complete" && (
+                  <InterviewComplete
+                    vault={vault}
+                    result={result}
+                    totalQuestions={totalQuestions}
+                    answeredCount={answeredCount}
+                    elapsedSeconds={completionElapsedSeconds}
+                    reattempting={reattempting}
+                    onReattempt={handleReattempt}
+                    onBack={() => router.push(home)}
+                  />
+                )}
+              </>
+            )}
           </>
         )}
       </div>

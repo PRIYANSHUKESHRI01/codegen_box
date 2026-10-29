@@ -37,6 +37,8 @@ class StudentStatsController extends Controller
                 // What the components add up to, and what missed days have taken off it (score = base_score - decay.points).
                 'base_score' => $user->readinessBreakdown()['base_score'] ?? $user->readinessScore(),
                 'decay' => $user->readinessBreakdown()['decay'] ?? null,
+                // Set only while a superadmin has set this student's score by hand (the reason is never sent here).
+                'override' => $user->readinessBreakdown()['override'] ?? null,
             ],
             'rating' => [
                 'current_rating' => $user->current_rating,

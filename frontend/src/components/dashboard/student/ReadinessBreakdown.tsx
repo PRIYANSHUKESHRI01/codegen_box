@@ -1,8 +1,8 @@
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { ShieldCheck, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ReadinessComponent, ReadinessDecay } from "@/types/studentStats";
+import type { ReadinessComponent, ReadinessDecay, ReadinessOverride } from "@/types/studentStats";
 
 interface ReadinessBreakdownProps {
   components: ReadinessComponent[];
@@ -13,6 +13,8 @@ interface ReadinessBreakdownProps {
   profile?: "software" | "core" | "balanced" | "general";
   /** What missed days have taken off the score; drawn as the last row, in red, when it is more than nothing. */
   decay?: ReadinessDecay | null;
+  /** Set while the AptRun team has set the score by hand: said once, above the bars, so the numbers below are not read as the whole story. */
+  override?: ReadinessOverride | null;
 }
 
 function barTone(score: number) {
@@ -22,9 +24,18 @@ function barTone(score: number) {
   return "bg-status-danger";
 }
 
-export function ReadinessBreakdown({ components, nextSteps, compact = false, profile, decay }: ReadinessBreakdownProps) {
+export function ReadinessBreakdown({ components, nextSteps, compact = false, profile, decay, override }: ReadinessBreakdownProps) {
   return (
     <div className="space-y-4">
+      {override && (
+        <p data-testid="override-note" className="flex items-start gap-2 rounded-control border border-accent-primary/25 bg-accent-primary/5 px-3 py-2 text-3xs leading-relaxed text-text-secondary">
+          <ShieldCheck className="mt-px h-3.5 w-3.5 shrink-0 text-accent-primary" aria-hidden />
+          <span>
+            Your score of <strong className="text-primary">{override.score}</strong> was set by the AptRun team. Your own activity adds up to <strong className="text-primary">{override.calculated_score}</strong> — the bars below.
+            {override.expires_at ? ` It applies until ${new Date(override.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}, after which your activity decides it again.` : ""}
+          </span>
+        </p>
+      )}
       {/* Said once, plainly, so a student on Core Prep knows why coding and contests are not in their score. */}
       {!compact && profile && profile !== "software" && (
         <p className="rounded-control border border-border-subtle bg-elevated/50 px-3 py-2 text-3xs leading-relaxed text-text-muted">

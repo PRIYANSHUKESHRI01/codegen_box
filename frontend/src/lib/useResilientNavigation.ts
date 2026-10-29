@@ -27,19 +27,43 @@ export const NAVIGATION_STUCK_AFTER_MS = 3000;
  *
  * The fallback is cancelled the moment this component unmounts — which is exactly what a navigation
  * that worked does to the page it leaves — so a healthy navigation never sees it.
+ *
+ * A navigation that lands on the SAME page with a different query (a page that keeps its place in the address, like the Mock AI
+ * Interview's ?domain=…&stack=…) does not unmount anything, so the address itself is watched too: the moment it is the one asked for,
+ * the button is released (pending off, pressable again) and the fallback is cancelled. Without that, the arrow would spin, ignore the next
+ * press, and three seconds later reload a page that had already changed.
  */
+/** Is the address bar at this (same-site) path and query already? A trailing slash does not make a different page. */
+function addressIs(href: string): boolean {
+  try {
+    const wanted = new URL(href, "http://local");
+    const trim = (path: string) => (path.length > 1 ? path.replace(/\/+$/, "") : path);
+    return trim(window.location.pathname ?? "") === trim(wanted.pathname) && (window.location.search ?? "") === wanted.search;
+  } catch {
+    return false;
+  }
+}
+
 export function useResilientNavigation() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const started = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const watch = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopWaiting = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    if (watch.current) clearInterval(watch.current);
+    timer.current = null;
+    watch.current = null;
+  }, []);
 
   useEffect(() => {
     // Coming back to this page from the browser's back/forward cache: the page is exactly as it was left,
     // mid-navigation. Start fresh rather than leave it stuck on "pending".
     const onPageShow = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
-      if (timer.current) clearTimeout(timer.current);
+      stopWaiting();
       started.current = false;
       setPending(false);
     };
@@ -47,9 +71,9 @@ export function useResilientNavigation() {
     window.addEventListener("pageshow", onPageShow);
     return () => {
       window.removeEventListener("pageshow", onPageShow);
-      if (timer.current) clearTimeout(timer.current);
+      stopWaiting();
     };
-  }, []);
+  }, [stopWaiting]);
 
   const go = useCallback(
     (href: string) => {
@@ -59,11 +83,19 @@ export function useResilientNavigation() {
 
       router.push(href);
 
+      watch.current = setInterval(() => {
+        if (!addressIs(href)) return;
+        stopWaiting();
+        started.current = false;
+        setPending(false);
+      }, 80);
+
       timer.current = setTimeout(() => {
+        stopWaiting();
         window.location.assign(href);
       }, NAVIGATION_STUCK_AFTER_MS);
     },
-    [router]
+    [router, stopWaiting]
   );
 
   return { go, pending };

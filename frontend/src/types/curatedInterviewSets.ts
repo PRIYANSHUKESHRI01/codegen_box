@@ -10,6 +10,8 @@ export interface CuratedInterviewSetSummary {
   description: string;
   tags: string[];
   question_count: number;
+  /** Whether this set has enough questions to be sat. Absent on older servers: treat as ready. */
+  ready?: boolean;
   preview_questions: string[];
 }
 
@@ -27,6 +29,18 @@ export interface CuratedStack {
   name: string;
   blurb: string;
   icon: string;
+  /** The Mellow Vault domain names this stack covers ("AI/ML", "SQL Developer"), searchable. */
+  aliases?: string[];
+  tags?: string[];
+  /**
+   * Open to students: all 9 of its sets have questions. A stack that is not live is listed as "Coming soon" and cannot be started.
+   * Absent on older servers: treat as live.
+   */
+  live?: boolean;
+  ready_sets?: number;
+  total_sets?: number;
+  /** The student asked to be told when it opens. Only ever true for a stack that is not live. */
+  interested?: boolean;
   series_count?: number;
   series?: CuratedSeries[];
   sets_count: number;
@@ -41,6 +55,8 @@ export interface CuratedRole {
   badge?: string | null;
   color: string;
   stacks_count: number;
+  /** How many of its stacks are open. Absent on older servers: all of them. */
+  live_stacks_count?: number;
   sets_count: number;
   stacks: CuratedStack[];
 }
@@ -50,6 +66,7 @@ export interface CuratedCatalogResponse {
   stats: {
     total_roles: number;
     total_stacks: number;
+    live_stacks?: number;
     total_sets: number;
     total_questions: number;
   };
@@ -79,7 +96,19 @@ export interface QualificationSetDetail {
   interview_slug: string | null;
 }
 
+/** GET /vault-qualification/status for a stack that has no questions yet: nothing to sit, but they can ask to be told. */
+export interface VaultQualificationComingSoonResponse {
+  stack_live: false;
+  status: "coming_soon";
+  stack_key: string;
+  role_key: string;
+  ready_sets: number;
+  total_sets: number;
+  interested: boolean;
+}
+
 export interface VaultQualificationStatusResponse {
+  stack_live?: true;
   qualification_id: number;
   user_id: number;
   stack_key: string;

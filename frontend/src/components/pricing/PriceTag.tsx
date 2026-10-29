@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { formatInr, hasDiscount, monthlyEquivalent, termSuffix } from "@/lib/pricing";
+import { formatInr, hasDiscount, isRedeemable, monthlyEquivalent, termSuffix } from "@/lib/pricing";
 import type { PlanPricing } from "@/types/pricing";
 
 interface PriceTagProps {
@@ -40,6 +40,40 @@ export function PriceTag({ plan, size = "card", className }: PriceTagProps) {
       <div className={cn("flex items-baseline gap-1.5", className)}>
         <span className={cn("font-black tracking-tight text-primary font-mono", compact ? "text-xl" : "text-3xl sm:text-4xl")}>₹0</span>
         <span className="text-sm font-medium text-text-muted">forever</span>
+      </div>
+    );
+  }
+
+  // A priced plan the superadmin has discounted to nothing: claimed with one click, never paid for. It is a "Free" plan
+  // for as long as the offer lasts, with the real price still shown struck through so the saving is visible.
+  if (isRedeemable(plan)) {
+    return (
+      <div className={className}>
+        <div className="mb-1.5 flex flex-wrap items-center gap-2">
+          <span className={cn("font-mono font-semibold text-text-muted", compact ? "text-sm" : "text-lg")}>
+            <span className="sr-only">Original price </span>
+            <del className="decoration-status-danger/70 decoration-2">{formatInr(plan.list_price)}</del>
+          </span>
+          <span className="rounded-full border border-status-success/30 bg-status-success/15 px-2 py-0.5 text-3xs font-bold uppercase tracking-wide text-status-success">
+            100% off
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="sr-only">Now </span>
+          <motion.span
+            key="free"
+            initial={{ opacity: 0.2, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className={cn("font-black tracking-tight text-primary", compact ? "text-2xl" : "text-3xl sm:text-4xl")}
+          >
+            Free
+          </motion.span>
+          <span className="text-sm font-medium text-text-muted">{plan.term_unit ? `for a ${plan.term_unit}` : ""}</span>
+        </div>
+
+        {!compact && <p className="mt-1.5 text-xs text-text-muted">Redeem it in one click — no payment needed</p>}
       </div>
     );
   }

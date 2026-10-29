@@ -112,8 +112,11 @@ describe("resolveBack", () => {
   });
 
   it("can land on a query or section of the parent, in words of its own", () => {
-    expect(resolveBack("/dashboard/drives", STUDENT)).toEqual({ href: "/dashboard#placement-drives", label: "Placement drives" });
     expect(resolveBack("/admin/projects/review", OPS)).toEqual({ href: "/admin/projects?tab=review", label: "Review queue" });
+  });
+
+  it("leads Upcoming Drives (now a page of its own, not an anchor on the Overview) back to the student's home", () => {
+    expect(resolveBack("/dashboard/drives", STUDENT)).toEqual({ href: "/dashboard", label: "Developer Arena" });
   });
 
   it("ignores a trailing slash", () => {

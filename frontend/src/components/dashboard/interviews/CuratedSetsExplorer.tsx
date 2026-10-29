@@ -1,19 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion } from "framer-motion";
 import {
-  Server,
-  Layout,
-  Layers,
-  Brain,
-  Cloud,
-  Code2,
-  Terminal,
-  Cpu,
-  Sparkles,
   ArrowRight,
   ArrowLeft,
   Search,
@@ -32,109 +23,26 @@ import {
   RefreshCw,
   History,
   Flame,
+  Bell,
+  BellRing,
+  Hourglass,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { Aurora, ScoreRing, VAULT_EASE, VaSkeleton } from "@/components/dashboard/vaultAi/vaultKit";
+import { CARD, Rise, isLive, roleIconOf, shortName, stackIconOf, themeOf } from "./curatedKit";
+import { Aurora, ScoreRing, VaSkeleton } from "@/components/dashboard/vaultAi/vaultKit";
 import type {
   CuratedCatalogResponse,
   CuratedInterviewSetSummary,
   CuratedRole,
   CuratedStack,
   QualificationSetDetail,
+  VaultQualificationComingSoonResponse,
   VaultQualificationStatusResponse,
 } from "@/types/curatedInterviewSets";
 
-const ROLE_ICONS: Record<string, ComponentType<{ className?: string }>> = {
-  backend: Server,
-  frontend: Layout,
-  fullstack: Layers,
-  ai_ml: Brain,
-  devops: Cloud,
-};
-
-const STACK_ICONS: Record<string, ComponentType<{ className?: string }>> = {
-  laravel: Code2,
-  nodejs: Terminal,
-  python: Cpu,
-  java: Server,
-  golang: Cpu,
-  react_nextjs: Layout,
-  typescript: Code2,
-  mern: Layers,
-  nextjs_fullstack: Sparkles,
-  llm_rag: Brain,
-  deeplearning_pytorch: Brain,
-  docker_k8s: Cloud,
-};
-
-/** A role's colour, as the whole class strings Tailwind needs to see (it cannot build `from-${color}-500` at runtime). */
-const ROLE_THEMES: Record<string, { tile: string; glow: string; text: string; ring: string; chip: string }> = {
-  indigo: {
-    tile: "from-indigo-500 to-violet-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(99,102,241,0.6)]",
-    text: "group-hover:text-indigo-600 dark:group-hover:text-indigo-300",
-    ring: "group-hover:border-indigo-500/40",
-    chip: "bg-indigo-500/10 text-indigo-700 ring-indigo-500/25 dark:text-indigo-300",
-  },
-  emerald: {
-    tile: "from-emerald-500 to-teal-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(16,185,129,0.6)]",
-    text: "group-hover:text-emerald-600 dark:group-hover:text-emerald-300",
-    ring: "group-hover:border-emerald-500/40",
-    chip: "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300",
-  },
-  cyan: {
-    tile: "from-cyan-500 to-sky-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(6,182,212,0.6)]",
-    text: "group-hover:text-cyan-600 dark:group-hover:text-cyan-300",
-    ring: "group-hover:border-cyan-500/40",
-    chip: "bg-cyan-500/10 text-cyan-700 ring-cyan-500/25 dark:text-cyan-300",
-  },
-  violet: {
-    tile: "from-violet-500 to-fuchsia-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(139,92,246,0.6)]",
-    text: "group-hover:text-violet-600 dark:group-hover:text-violet-300",
-    ring: "group-hover:border-violet-500/40",
-    chip: "bg-violet-500/10 text-violet-700 ring-violet-500/25 dark:text-violet-300",
-  },
-  amber: {
-    tile: "from-amber-500 to-orange-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(245,158,11,0.6)]",
-    text: "group-hover:text-amber-600 dark:group-hover:text-amber-300",
-    ring: "group-hover:border-amber-500/40",
-    chip: "bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-300",
-  },
-  rose: {
-    tile: "from-rose-500 to-pink-600",
-    glow: "group-hover:shadow-[0_22px_50px_-22px_rgba(244,63,94,0.6)]",
-    text: "group-hover:text-rose-600 dark:group-hover:text-rose-300",
-    ring: "group-hover:border-rose-500/40",
-    chip: "bg-rose-500/10 text-rose-700 ring-rose-500/25 dark:text-rose-300",
-  },
-};
-const themeOf = (color: string | undefined) => ROLE_THEMES[color ?? "indigo"] ?? ROLE_THEMES.indigo;
-
 /** The benchmark a series average has to reach (mirrors VaultInterviewQualification::PASSING_THRESHOLD). */
 const BENCHMARK = 60;
-
-/** A card that rises into place, staggered by its position; plain (no motion) for people who ask for reduced motion. */
-function Rise({ i = 0, children, className }: { i?: number; children: ReactNode; className?: string }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      className={className}
-      initial={reduce ? false : { opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, ease: VAULT_EASE, delay: reduce ? 0 : Math.min(i, 8) * 0.06 }}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
-const CARD =
-  "group relative flex h-full w-full flex-col gap-4 overflow-hidden rounded-2xl border border-border-subtle bg-surface p-5 text-left shadow-subtle transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 /** Where the student is in the three steps, and a way back to any step already passed. */
 function StepNav({ step, role, stack, onRoles, onStacks }: { step: 1 | 2 | 3; role: CuratedRole | null; stack: CuratedStack | null; onRoles: () => void; onStacks: () => void }) {
@@ -181,6 +89,103 @@ function StepNav({ step, role, stack, onRoles, onStacks }: { step: 1 | 2 | 3; ro
         );
       })}
     </nav>
+  );
+}
+
+/** "Open" / "Coming soon" at a glance. */
+function StackStatusChip({ stack }: { stack: CuratedStack }) {
+  if (isLive(stack)) {
+    return <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-3xs font-extrabold uppercase tracking-wide text-emerald-700 ring-1 ring-inset ring-emerald-500/25 dark:text-emerald-300">Open</span>;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-3xs font-extrabold uppercase tracking-wide text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300">
+      <Hourglass className="h-3 w-3" aria-hidden /> Coming soon
+    </span>
+  );
+}
+
+/**
+ * A track whose questions are not written yet. It says so plainly, shows what the three rounds will assess (so the student can
+ * already prepare), and lets them ask to be told the moment it opens. Nothing here can be started.
+ */
+function ComingSoonPanel({ stack, interested, busy, error, onToggle }: { stack: CuratedStack; interested: boolean; busy: boolean; error: string | null; onToggle: () => void }) {
+  const rounds = stack.series?.[0]?.sets ?? stack.sets.slice(0, 3);
+  const ready = stack.ready_sets ?? 0;
+  const total = stack.total_sets ?? 9;
+
+  return (
+    <div className="space-y-5">
+      <Rise>
+        <div className="space-y-4 rounded-3xl border border-amber-500/30 bg-amber-500/[0.05] p-6 shadow-subtle md:p-8">
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg shadow-amber-500/30 ring-1 ring-inset ring-white/25">
+              <Hourglass className="h-7 w-7" aria-hidden />
+            </div>
+            <div className="space-y-1.5">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-3xs font-black uppercase tracking-wider text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-300">Coming soon</span>
+              <h4 className="text-base font-black text-primary sm:text-lg">The {stack.name} interview is being prepared</h4>
+              <p className="text-xs leading-relaxed text-text-secondary sm:text-sm">
+                We are finishing the question bank for this track. When it opens you will sit <strong className="font-bold text-primary">3 sets</strong> per series (up to 3 series), and a series average of{" "}
+                <strong className="font-bold text-primary">{BENCHMARK}% or higher</strong> qualifies you for Mellow Vault.
+              </p>
+              {ready > 0 && (
+                <p className="text-2xs font-semibold text-text-muted">
+                  {ready} of {total} rounds ready
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={onToggle}
+              disabled={busy}
+              aria-pressed={interested}
+              className={cn(
+                "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-xs font-extrabold shadow-subtle transition-all disabled:opacity-60",
+                interested ? "border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300" : "bg-accent-primary text-white hover:-translate-y-0.5 hover:bg-accent-primary-hover hover:shadow-card"
+              )}
+            >
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : interested ? <BellRing className="h-3.5 w-3.5" aria-hidden /> : <Bell className="h-3.5 w-3.5" aria-hidden />}
+              {interested ? "You'll be notified — tap to undo" : "Notify me when it opens"}
+            </button>
+            <Link href="/dashboard/interviews" className="text-xs font-bold text-accent-primary hover:underline">
+              Practise with a mock AI interview meanwhile →
+            </Link>
+          </div>
+          {error && (
+            <p role="alert" className="text-xs font-semibold text-status-danger">
+              {error}
+            </p>
+          )}
+        </div>
+      </Rise>
+
+      <div className="space-y-3">
+        <h5 className="flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-text-muted">
+          <Target className="h-3.5 w-3.5 text-accent-primary" aria-hidden />
+          <span>What you will be assessed on</span>
+        </h5>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {rounds.map((set, i) => (
+            <Rise key={set.id} i={i} className="h-full">
+              <div className={cn(CARD, "gap-2 hover:translate-y-0")}>
+                <span className="w-fit rounded-md border border-border-subtle bg-elevated px-2 py-0.5 font-mono text-3xs uppercase text-text-muted">Set {set.set_number ?? i + 1}</span>
+                <h6 className="text-sm font-bold text-primary">{set.title.replace(/^Set \d+:\s*/, "")}</h6>
+                <p className="text-xs leading-relaxed text-text-secondary">{set.description}</p>
+              </div>
+            </Rise>
+          ))}
+        </div>
+        {(stack.aliases ?? []).length > 0 && (
+          <p className="text-2xs text-text-muted">
+            Covers the Mellow Vault domain{(stack.aliases ?? []).length === 1 ? "" : "s"}: <span className="font-semibold text-text-secondary">{(stack.aliases ?? []).join(" · ")}</span>
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -468,8 +473,18 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   // Qualification Track State for Selected Stack
-  const [qualification, setQualification] = useState<VaultQualificationStatusResponse | null>(null);
+  const [qualificationOrSoon, setQualification] = useState<VaultQualificationStatusResponse | VaultQualificationComingSoonResponse | null>(null);
   const [loadingQualification, setLoadingQualification] = useState(false);
+  // Only an open stack has a track; a coming-soon one answers with a different, smaller shape.
+  const qualification: VaultQualificationStatusResponse | null = qualificationOrSoon && qualificationOrSoon.stack_live !== false ? qualificationOrSoon : null;
+
+  // "Notify me when it opens": what the student has chosen this visit, over what the catalog said when it loaded.
+  const [interestOverride, setInterestOverride] = useState<Record<string, boolean>>({});
+  const [notifyBusy, setNotifyBusy] = useState(false);
+  const [notifyError, setNotifyError] = useState<string | null>(null);
+
+  // Show only the roles that have at least one open stack.
+  const [openOnly, setOpenOnly] = useState(false);
 
   // Question Preview Toggles (set ID -> boolean)
   const [expandedSets, setExpandedSets] = useState<Record<string, boolean>>({});
@@ -502,9 +517,19 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
     };
   }, [reloadKey]);
 
+  // Whether the chosen stack is open, as the catalog says. A coming-soon stack has no track to fetch.
+  const selectedStackOpen = useMemo(() => {
+    if (!selectedStackKey || !catalog) return null;
+    for (const r of catalog.roles) {
+      const found = r.stacks.find((st) => st.key === selectedStackKey);
+      if (found) return isLive(found);
+    }
+    return null;
+  }, [catalog, selectedStackKey]);
+
   // 2. Fetch qualification status when stack is selected
   useEffect(() => {
-    if (!selectedStackKey) {
+    if (!selectedStackKey || selectedStackOpen === false) {
       setQualification(null);
       return;
     }
@@ -513,7 +538,7 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
     setLoadingQualification(true);
 
     api
-      .get<VaultQualificationStatusResponse>(`/vault-qualification/status?stack=${encodeURIComponent(selectedStackKey)}`)
+      .get<VaultQualificationStatusResponse | VaultQualificationComingSoonResponse>(`/vault-qualification/status?stack=${encodeURIComponent(selectedStackKey)}`)
       .then((res) => {
         if (!alive) return;
         setQualification(res);
@@ -530,35 +555,71 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
     return () => {
       alive = false;
     };
-  }, [selectedStackKey]);
+  }, [selectedStackKey, selectedStackOpen]);
+
+  // A set that is finished but not scored yet: look again every few seconds, so its score (and the series average) appears by itself instead of
+  // sitting on "scoring" until the student thinks to reload. Depends on the yes/no, not the data, so a refresh does not restart the count.
+  const anySetScoring = qualification?.active_series.sets.some((set) => set.status === "scoring") ?? false;
+  useEffect(() => {
+    if (!anySetScoring || !selectedStackKey) return;
+    let alive = true;
+    let looks = 0;
+    const timer = setInterval(() => {
+      if (++looks > 40) return clearInterval(timer);
+      api
+        .get<VaultQualificationStatusResponse | VaultQualificationComingSoonResponse>(`/vault-qualification/status?stack=${encodeURIComponent(selectedStackKey)}`)
+        .then((res) => alive && setQualification(res))
+        .catch(() => undefined);
+    }, 4000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [anySetScoring, selectedStackKey]);
 
   const roles = catalog?.roles ?? [];
   const currentRole = useMemo(() => roles.find((r) => r.key === selectedRoleKey) ?? null, [roles, selectedRoleKey]);
   const currentStack = useMemo(() => currentRole?.stacks.find((s) => s.key === selectedStackKey) ?? null, [currentRole, selectedStackKey]);
 
-  // Search matches across entire catalog when search is active
+  // Search is by stack: its name, its role, the Mellow Vault domains it covers ("AI/ML", "SQL Developer"), its tags and what its sets cover.
+  // Open stacks come first — they are the ones a student can act on.
   const searchResults = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q || !catalog) return null;
 
-    const matches: Array<{ role: CuratedRole; stack: CuratedStack; set: CuratedInterviewSetSummary }> = [];
+    const matches: Array<{ role: CuratedRole; stack: CuratedStack }> = [];
 
     for (const r of catalog.roles) {
-      for (const s of r.stacks) {
-        for (const st of s.sets) {
-          const matchRole = r.title.toLowerCase().includes(q);
-          const matchStack = s.name.toLowerCase().includes(q);
-          const matchSet = st.title.toLowerCase().includes(q) || st.description.toLowerCase().includes(q) || st.tags.some((t) => t.toLowerCase().includes(q));
+      for (const st of r.stacks) {
+        const haystack = [r.title, st.name, st.blurb, ...(st.aliases ?? []), ...(st.tags ?? [])].join(" ").toLowerCase();
+        const inSets = st.sets.some((set) => set.title.toLowerCase().includes(q) || set.description.toLowerCase().includes(q));
 
-          if (matchRole || matchStack || matchSet) {
-            matches.push({ role: r, stack: s, set: st });
-          }
-        }
+        if (haystack.includes(q) || inSets) matches.push({ role: r, stack: st });
       }
     }
 
-    return matches;
+    return [...matches.filter((m) => isLive(m.stack)), ...matches.filter((m) => !isLive(m.stack))];
   }, [catalog, searchQuery]);
+
+  const isInterested = (stack: CuratedStack) => interestOverride[stack.key] ?? (stack.interested === true);
+
+  const handleToggleInterest = async (stack: CuratedStack) => {
+    if (notifyBusy) return;
+    const next = !isInterested(stack);
+    setNotifyBusy(true);
+    setNotifyError(null);
+
+    try {
+      if (next) await api.post("/vault-qualification/interest", { stack: stack.key });
+      else await api.delete("/vault-qualification/interest", { stack: stack.key });
+      setInterestOverride((prev) => ({ ...prev, [stack.key]: next }));
+    } catch (err) {
+      // It may have opened while they were looking: the next catalog load says so.
+      setNotifyError(err instanceof ApiError ? err.message : "We couldn't save that. Please try again.");
+    } finally {
+      setNotifyBusy(false);
+    }
+  };
 
   const togglePreview = (setId: string) => setExpandedSets((prev) => ({ ...prev, [setId]: !prev[setId] }));
 
@@ -627,7 +688,9 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
           <span aria-hidden>·</span>
           <span>{catalog.stats.total_roles} roles</span>
           <span aria-hidden>·</span>
-          <span>{catalog.stats.total_stacks} stacks</span>
+          <span>
+            {catalog.stats.live_stacks ?? catalog.stats.total_stacks} of {catalog.stats.total_stacks} stacks open
+          </span>
           <span aria-hidden>·</span>
           <span>3 sets per series</span>
         </p>
@@ -643,8 +706,8 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search stack, role, or tag..."
-            aria-label="Search stacks, roles and tags"
+            placeholder="Search a stack, role or domain..."
+            aria-label="Search stacks, roles and domains"
             className="w-full rounded-xl border border-border-subtle bg-surface py-2.5 pl-10 pr-9 text-xs text-primary shadow-subtle transition-all placeholder:text-text-muted focus:border-accent-primary focus:outline-none focus:ring-2 focus:ring-accent-primary/20"
           />
           {searchQuery && (
@@ -672,7 +735,7 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between text-xs text-text-muted">
             <span>
-              Found <strong className="font-bold text-primary">{searchResults.length}</strong> sets matching &ldquo;{searchQuery}&rdquo;
+              Found <strong className="font-bold text-primary">{searchResults.length}</strong> {searchResults.length === 1 ? "track" : "tracks"} matching &ldquo;{searchQuery}&rdquo;
             </span>
             <button onClick={() => setSearchQuery("")} className="font-medium text-accent-primary hover:underline">
               Clear search
@@ -681,52 +744,88 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
 
           {searchResults.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border-strong bg-surface p-10 text-center text-xs text-text-muted">
-              No interview sets matched &ldquo;{searchQuery}&rdquo;. Try searching for &ldquo;Laravel&rdquo;, &ldquo;React&rdquo;, &ldquo;Docker&rdquo;, or &ldquo;Python&rdquo;.
+              No track matched &ldquo;{searchQuery}&rdquo;. Try a domain like &ldquo;Data Analytics&rdquo;, &ldquo;SQL&rdquo;, &ldquo;Cyber Security&rdquo;, &ldquo;Laravel&rdquo; or &ldquo;Docker&rdquo;.
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {searchResults.map(({ role, stack, set }, i) => (
-                <Rise key={set.id} i={i}>
-                  <div className={cn(CARD, "gap-3")}>
-                    <div className="flex items-center justify-between">
-                      <span className="rounded-md border border-border-subtle bg-elevated px-2 py-0.5 font-mono text-3xs uppercase text-text-muted">Set {set.set_number ?? 1}</span>
-                      <span className="text-3xs text-text-muted">
-                        ~{set.duration_minutes} min • {set.question_count} Qs
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-primary">{set.title}</h4>
-                    <p className="line-clamp-2 text-xs text-text-secondary">{set.description}</p>
-                    <div className="mt-auto flex items-center justify-between border-t border-border-subtle pt-3">
-                      <span className="text-3xs text-text-muted">{stack.name}</span>
-                      <button
-                        onClick={() => {
-                          setSelectedRoleKey(role.key);
-                          setSelectedStackKey(stack.key);
-                          setSearchQuery("");
-                        }}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-accent-primary hover:underline"
-                      >
-                        Enter Series <ArrowRight className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                </Rise>
-              ))}
+              {searchResults.map(({ role, stack }, i) => {
+                const StackIcon = stackIconOf(stack);
+                const theme = themeOf(role.color);
+                const open = isLive(stack);
+                return (
+                  <Rise key={stack.key} i={i} className="h-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedRoleKey(role.key);
+                        setSelectedStackKey(stack.key);
+                        setSearchQuery("");
+                      }}
+                      className={cn(CARD, "gap-3", open ? [theme.glow, theme.ring] : "opacity-95")}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ring-1 ring-inset ring-white/25", open ? theme.tile : "from-slate-400 to-slate-500")}>
+                          <StackIcon className="h-5 w-5" />
+                        </div>
+                        <StackStatusChip stack={stack} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-extrabold text-primary">{stack.name}</h4>
+                        <p className="mt-0.5 text-3xs font-semibold uppercase tracking-wider text-text-muted">{role.title}</p>
+                        <p className="mt-1.5 line-clamp-2 text-xs text-text-secondary">{stack.blurb}</p>
+                      </div>
+                      {(stack.aliases ?? []).length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {(stack.aliases ?? []).slice(0, 3).map((alias) => (
+                            <span key={alias} className="rounded-full border border-border-subtle bg-elevated/60 px-2 py-0.5 text-3xs font-medium text-text-secondary">
+                              {alias}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <div className="mt-auto flex items-center justify-end border-t border-border-subtle pt-3 text-xs font-bold text-accent-primary">
+                        <span className="inline-flex items-center gap-1">
+                          {open ? "Enter Series" : "View syllabus"} <ArrowRight className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </button>
+                  </Rise>
+                );
+              })}
             </div>
           )}
         </div>
       ) : !selectedRoleKey ? (
         /* STEP 1 — CHOOSE ENGINEERING ROLE */
         <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-bold text-primary">Step 1: Choose Engineering Role</h3>
-            <p className="text-xs text-text-secondary">Select your target engineering domain to view technical tracks.</p>
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-bold text-primary">Step 1: Choose Your Domain</h3>
+              <p className="text-xs text-text-secondary">Select the role you are aiming for to see its technical tracks.</p>
+            </div>
+            <div role="group" aria-label="Filter roles" className="inline-flex rounded-full border border-border-subtle bg-surface p-0.5 text-2xs font-bold shadow-subtle">
+              {[
+                { v: false, label: "All roles" },
+                { v: true, label: "Open now" },
+              ].map((o) => (
+                <button
+                  key={o.label}
+                  type="button"
+                  aria-pressed={openOnly === o.v}
+                  onClick={() => setOpenOnly(o.v)}
+                  className={cn("rounded-full px-3 py-1 transition-colors", openOnly === o.v ? "bg-accent-primary text-white" : "text-text-secondary hover:text-primary")}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {roles.map((role, i) => {
-              const RoleIcon = ROLE_ICONS[role.key] ?? Server;
+            {roles.filter((role) => !openOnly || (role.live_stacks_count ?? role.stacks_count) > 0).map((role, i) => {
+              const RoleIcon = roleIconOf(role);
               const theme = themeOf(role.color);
+              const liveStacks = role.live_stacks_count ?? role.stacks_count;
               return (
                 <Rise key={role.key} i={i} className="h-full">
                   <button type="button" onClick={() => setSelectedRoleKey(role.key)} className={cn(CARD, theme.glow, theme.ring)}>
@@ -746,15 +845,18 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
                     </div>
 
                     <div className="relative mt-auto flex flex-wrap gap-1.5 pt-1">
-                      {role.stacks.map((stack) => (
-                        <span key={stack.key} className="rounded-full border border-border-subtle bg-elevated/60 px-2.5 py-0.5 text-3xs font-medium text-text-secondary">
-                          {stack.name.split(" ")[0]}
+                      {role.stacks.slice(0, 4).map((stack) => (
+                        <span key={stack.key} className={cn("rounded-full border border-border-subtle bg-elevated/60 px-2.5 py-0.5 text-3xs font-medium", isLive(stack) ? "text-text-secondary" : "text-text-muted")}>
+                          {shortName(stack.name)}
                         </span>
                       ))}
+                      {role.stacks.length > 4 && <span className="rounded-full border border-border-subtle bg-elevated/60 px-2.5 py-0.5 text-3xs font-medium text-text-muted">+{role.stacks.length - 4} more</span>}
                     </div>
 
                     <div className="relative flex items-center justify-between border-t border-border-subtle pt-3 text-2xs text-text-muted">
-                      <span>{role.stacks_count} Stacks • 3 Sets per Series</span>
+                      <span>
+                        {role.stacks_count} {role.stacks_count === 1 ? "Stack" : "Stacks"} • {liveStacks === 0 ? "Coming soon" : liveStacks === role.stacks_count ? "All open" : `${liveStacks} open`}
+                      </span>
                       <span className="inline-flex items-center gap-1 font-bold text-accent-primary transition-transform group-hover:translate-x-0.5">
                         Explore Stacks <ArrowRight className="h-3 w-3" />
                       </span>
@@ -764,6 +866,9 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
               );
             })}
           </div>
+          {openOnly && roles.every((role) => (role.live_stacks_count ?? role.stacks_count) === 0) && (
+            <div className="rounded-2xl border border-dashed border-border-strong bg-surface p-8 text-center text-xs text-text-muted">No track is open yet. Switch to &ldquo;All roles&rdquo; to see what is coming.</div>
+          )}
         </div>
       ) : !selectedStackKey && currentRole ? (
         /* STEP 2 — TECH STACK PICKER */
@@ -772,23 +877,28 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
             <button onClick={resetToRoles} className="mb-1 inline-flex items-center gap-1 text-xs font-semibold text-accent-primary hover:underline">
               <ArrowLeft className="h-3.5 w-3.5" /> Back to all roles
             </button>
-            <h3 className="text-sm font-bold text-primary">Step 2: Choose Your Stack in {currentRole.title}</h3>
-            <p className="text-xs text-text-secondary">Select the programming framework to begin your Mellow Vault qualification assessment.</p>
+            <h3 className="text-sm font-bold text-primary">Step 2: Choose Your Track in {currentRole.title}</h3>
+            <p className="text-xs text-text-secondary">Select a track to begin your Mellow Vault qualification assessment. Tracks marked Coming soon are still being prepared — you can ask to be told when they open.</p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {currentRole.stacks.map((stack, i) => {
-              const StackIcon = STACK_ICONS[stack.key] ?? Code2;
+              const StackIcon = stackIconOf(stack);
               const theme = themeOf(currentRole.color);
+              const open = isLive(stack);
               return (
                 <Rise key={stack.key} i={i} className="h-full">
-                  <button type="button" onClick={() => setSelectedStackKey(stack.key)} className={cn(CARD, "gap-3.5", theme.glow, theme.ring)}>
+                  <button type="button" onClick={() => setSelectedStackKey(stack.key)} className={cn(CARD, "gap-3.5", open ? [theme.glow, theme.ring] : "hover:border-border-strong")}>
                     <div aria-hidden className={cn("pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-gradient-to-br opacity-[0.12] blur-2xl transition-opacity duration-300 group-hover:opacity-30", theme.tile)} />
                     <div className="relative flex items-start justify-between gap-2">
-                      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ring-1 ring-inset ring-white/25 transition-transform duration-300 group-hover:scale-110", theme.tile)}>
+                      <div className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-md ring-1 ring-inset ring-white/25 transition-transform duration-300 group-hover:scale-110", open ? theme.tile : "from-slate-400 to-slate-500")}>
                         <StackIcon className="h-5 w-5" />
                       </div>
-                      <span className="rounded-full border border-border-subtle bg-elevated/70 px-2.5 py-1 text-3xs font-bold uppercase tracking-wider text-text-secondary">3 Rounds</span>
+                      {open ? (
+                        <span className="rounded-full border border-border-subtle bg-elevated/70 px-2.5 py-1 text-3xs font-bold uppercase tracking-wider text-text-secondary">3 Rounds</span>
+                      ) : (
+                        <StackStatusChip stack={stack} />
+                      )}
                     </div>
 
                     <div className="relative">
@@ -797,10 +907,29 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
                     </div>
 
                     <div className="relative mt-auto flex items-center justify-between border-t border-border-subtle pt-3 text-2xs text-text-muted">
-                      <span className="inline-flex items-center gap-1 text-3xs font-bold text-emerald-600 dark:text-emerald-400">Set 1 • Set 2 • Set 3</span>
-                      <span className="inline-flex items-center gap-1 font-bold text-emerald-600 transition-transform group-hover:translate-x-0.5 dark:text-emerald-400">
-                        Launch Circuit <ArrowRight className="h-3 w-3" />
-                      </span>
+                      {open ? (
+                        <>
+                          <span className="inline-flex items-center gap-1 text-3xs font-bold text-emerald-600 dark:text-emerald-400">Set 1 • Set 2 • Set 3</span>
+                          <span className="inline-flex items-center gap-1 font-bold text-emerald-600 transition-transform group-hover:translate-x-0.5 dark:text-emerald-400">
+                            Launch Circuit <ArrowRight className="h-3 w-3" />
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="inline-flex items-center gap-1 text-3xs font-bold text-text-muted">
+                            {isInterested(stack) ? (
+                              <>
+                                <BellRing className="h-3 w-3 text-accent-primary" aria-hidden /> We&apos;ll tell you
+                              </>
+                            ) : (
+                              "Be the first to know"
+                            )}
+                          </span>
+                          <span className="inline-flex items-center gap-1 font-bold text-accent-primary transition-transform group-hover:translate-x-0.5">
+                            View syllabus <ArrowRight className="h-3 w-3" />
+                          </span>
+                        </>
+                      )}
                     </div>
                   </button>
                 </Rise>
@@ -818,9 +947,9 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3.5">
                 {(() => {
-                  const Icon = STACK_ICONS[currentStack.key] ?? Code2;
+                  const Icon = stackIconOf(currentStack);
                   return (
-                    <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg ring-1 ring-inset ring-white/25", themeOf(currentRole.color).tile)}>
+                    <span className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow-lg ring-1 ring-inset ring-white/25", isLive(currentStack) ? themeOf(currentRole.color).tile : "from-slate-400 to-slate-500")}>
                       <Icon className="h-6 w-6" />
                     </span>
                   );
@@ -830,7 +959,13 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
                     <span>{currentStack.name} Qualification Track</span>
                   </h3>
                   <p className="mt-0.5 text-xs text-text-secondary">
-                    Complete all 3 Sets below. Your overall series average must reach <strong className="font-bold text-primary">60% or higher</strong> to unlock Mellow Vault listing.
+                    {isLive(currentStack) ? (
+                      <>
+                        Complete all 3 Sets below. Your overall series average must reach <strong className="font-bold text-primary">60% or higher</strong> to unlock Mellow Vault listing.
+                      </>
+                    ) : (
+                      <>This track is still being prepared. Here is what it will assess.</>
+                    )}
                   </p>
                 </div>
               </div>
@@ -855,7 +990,9 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
             </div>
           </div>
 
-          {loadingQualification ? (
+          {!isLive(currentStack) ? (
+            <ComingSoonPanel stack={currentStack} interested={isInterested(currentStack)} busy={notifyBusy} error={notifyError} onToggle={() => void handleToggleInterest(currentStack)} />
+          ) : loadingQualification ? (
             <div role="status" className="space-y-4">
               <VaSkeleton className="h-28" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

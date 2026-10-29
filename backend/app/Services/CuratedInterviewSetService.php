@@ -6,8 +6,12 @@ use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewQuestionBank;
 use App\Models\User;
+use App\Models\VaultStackInterest;
+use App\Services\Vault\CuratedCatalog;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -19,33 +23,42 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 class CuratedInterviewSetService
 {
-    public function __construct(private readonly PlanGate $gate) {}
+    public function __construct(
+        private readonly PlanGate $gate,
+        private readonly CuratedCatalog $catalog,
+    ) {}
 
     /**
      * Get the full catalog of roles, stacks, and interview question sets/series.
      *
+     * Every stack is listed, but only a LIVE one (all 9 of its sets have enough questions) can be started; the rest carry
+     * `live: false` and show as "Coming soon". `$viewer` adds which not-yet-open stacks they asked to be told about.
+     *
      * @return array<string, mixed>
      */
-    public function catalog(): array
+    public function catalog(?User $viewer = null): array
     {
-        $rawRoles = config('curated_interview_sets.roles', []);
+        $interested = $this->interestsOf($viewer);
 
         $roles = [];
         $totalStacks = 0;
+        $liveStacks = 0;
         $totalSets = 0;
         $totalQuestions = 0;
 
-        foreach ($rawRoles as $roleKey => $roleData) {
+        foreach ($this->catalog->roles() as $roleKey => $roleData) {
             $stacks = [];
             $roleSetsCount = 0;
+            $roleLive = 0;
 
             foreach ($roleData['stacks'] ?? [] as $stackKey => $stackData) {
+                $progress = $this->catalog->progress($stackData);
                 $seriesList = [];
                 $allSets = [];
 
-                // Format Series
                 foreach ($stackData['series'] ?? [] as $sData) {
                     $seriesSets = [];
+
                     foreach ($sData['sets'] ?? [] as $setData) {
                         $questionCount = count($setData['questions'] ?? []);
                         $totalQuestions += $questionCount;
@@ -61,6 +74,7 @@ class CuratedInterviewSetService
                             'description' => $setData['description'] ?? '',
                             'tags' => $setData['tags'] ?? [],
                             'question_count' => $questionCount,
+                            'ready' => $this->catalog->isSetReady($setData),
                             'preview_questions' => array_slice(array_column($setData['questions'] ?? [], 'text'), 0, 3),
                         ];
 
@@ -78,34 +92,21 @@ class CuratedInterviewSetService
                     ];
                 }
 
-                // Fallback if raw sets provided without series wrapper
-                if (empty($seriesList) && ! empty($stackData['sets'])) {
-                    foreach ($stackData['sets'] as $setData) {
-                        $questionCount = count($setData['questions'] ?? []);
-                        $totalQuestions += $questionCount;
-                        $roleSetsCount++;
-                        $totalSets++;
-
-                        $allSets[] = [
-                            'id' => $setData['id'],
-                            'series_number' => $setData['series_number'] ?? 1,
-                            'set_number' => $setData['set_number'] ?? 1,
-                            'title' => $setData['title'],
-                            'duration_minutes' => $setData['duration_minutes'] ?? 15,
-                            'description' => $setData['description'] ?? '',
-                            'tags' => $setData['tags'] ?? [],
-                            'question_count' => $questionCount,
-                            'preview_questions' => array_slice(array_column($setData['questions'] ?? [], 'text'), 0, 3),
-                        ];
-                    }
-                }
-
                 $totalStacks++;
+                $liveStacks += $progress['live'] ? 1 : 0;
+                $roleLive += $progress['live'] ? 1 : 0;
+
                 $stacks[] = [
                     'key' => $stackKey,
                     'name' => $stackData['name'],
                     'blurb' => $stackData['blurb'],
                     'icon' => $stackData['icon'] ?? 'Code2',
+                    'aliases' => $stackData['aliases'] ?? [],
+                    'tags' => $stackData['tags'] ?? [],
+                    'live' => $progress['live'],
+                    'ready_sets' => $progress['ready_sets'],
+                    'total_sets' => $progress['total_sets'],
+                    'interested' => ! $progress['live'] && isset($interested[$stackKey]),
                     'series_count' => count($seriesList),
                     'series' => $seriesList,
                     'sets_count' => count($allSets),
@@ -121,6 +122,7 @@ class CuratedInterviewSetService
                 'badge' => $roleData['badge'] ?? null,
                 'color' => $roleData['color'] ?? 'indigo',
                 'stacks_count' => count($stacks),
+                'live_stacks_count' => $roleLive,
                 'sets_count' => $roleSetsCount,
                 'stacks' => $stacks,
             ];
@@ -131,6 +133,7 @@ class CuratedInterviewSetService
             'stats' => [
                 'total_roles' => count($roles),
                 'total_stacks' => $totalStacks,
+                'live_stacks' => $liveStacks,
                 'total_sets' => $totalSets,
                 'total_questions' => $totalQuestions,
             ],
@@ -144,45 +147,11 @@ class CuratedInterviewSetService
      */
     public function findSet(string $setId): ?array
     {
-        $rawRoles = config('curated_interview_sets.roles', []);
-
-        foreach ($rawRoles as $roleKey => $roleData) {
+        foreach ($this->catalog->roles() as $roleKey => $roleData) {
             foreach ($roleData['stacks'] ?? [] as $stackKey => $stackData) {
-                // Search in series
-                foreach ($stackData['series'] ?? [] as $sData) {
-                    foreach ($sData['sets'] ?? [] as $setData) {
-                        if ($setData['id'] === $setId) {
-                            return [
-                                'role' => [
-                                    'key' => $roleKey,
-                                    'title' => $roleData['title'],
-                                    'color' => $roleData['color'] ?? 'indigo',
-                                ],
-                                'stack' => [
-                                    'key' => $stackKey,
-                                    'name' => $stackData['name'],
-                                ],
-                                'set' => $setData,
-                            ];
-                        }
-                    }
-                }
-
-                // Search in flat sets
-                foreach ($stackData['sets'] ?? [] as $setData) {
+                foreach ($this->catalog->allSets($stackData) as $setData) {
                     if ($setData['id'] === $setId) {
-                        return [
-                            'role' => [
-                                'key' => $roleKey,
-                                'title' => $roleData['title'],
-                                'color' => $roleData['color'] ?? 'indigo',
-                            ],
-                            'stack' => [
-                                'key' => $stackKey,
-                                'name' => $stackData['name'],
-                            ],
-                            'set' => $setData,
-                        ];
+                        return $this->target((string) $roleKey, $roleData, (string) $stackKey, $stackData, $setData);
                     }
                 }
             }
@@ -196,13 +165,7 @@ class CuratedInterviewSetService
      */
     public function roleKeyForStack(string $stackKey): ?string
     {
-        foreach (config('curated_interview_sets.roles', []) as $roleKey => $roleData) {
-            if (isset($roleData['stacks'][$stackKey])) {
-                return (string) $roleKey;
-            }
-        }
-
-        return null;
+        return $this->catalog->stack($stackKey)['role']['key'] ?? null;
     }
 
     /**
@@ -212,40 +175,45 @@ class CuratedInterviewSetService
      */
     public function findSetBySeries(string $stackKey, int $seriesNumber, int $setNumber): ?array
     {
-        $rawRoles = config('curated_interview_sets.roles', []);
+        $found = $this->catalog->stack($stackKey);
 
-        foreach ($rawRoles as $roleKey => $roleData) {
-            foreach ($roleData['stacks'] ?? [] as $curStackKey => $stackData) {
-                if ($curStackKey !== $stackKey) {
-                    continue;
-                }
+        if ($found === null) {
+            return null;
+        }
 
-                foreach ($stackData['series'] ?? [] as $sData) {
-                    if ((int) ($sData['series_number'] ?? 0) !== $seriesNumber) {
-                        continue;
-                    }
-
-                    foreach ($sData['sets'] ?? [] as $setData) {
-                        if ((int) ($setData['set_number'] ?? 0) === $setNumber) {
-                            return [
-                                'role' => [
-                                    'key' => $roleKey,
-                                    'title' => $roleData['title'],
-                                    'color' => $roleData['color'] ?? 'indigo',
-                                ],
-                                'stack' => [
-                                    'key' => $stackKey,
-                                    'name' => $stackData['name'],
-                                ],
-                                'set' => $setData,
-                            ];
-                        }
-                    }
-                }
+        foreach ($this->catalog->allSets($found['stack']) as $setData) {
+            if ((int) ($setData['series_number'] ?? 0) === $seriesNumber && (int) ($setData['set_number'] ?? 0) === $setNumber) {
+                return $this->target($found['role']['key'], $found['role'], $stackKey, $found['stack'], $setData);
             }
         }
 
         return null;
+    }
+
+    /** @return array{role: array, stack: array, set: array} */
+    private function target(string $roleKey, array $roleData, string $stackKey, array $stackData, array $setData): array
+    {
+        return [
+            'role' => ['key' => $roleKey, 'title' => $roleData['title'], 'color' => $roleData['color'] ?? 'indigo'],
+            'stack' => ['key' => $stackKey, 'name' => $stackData['name']],
+            'set' => $setData,
+        ];
+    }
+
+    /** @return array<string, true> the stacks this student asked to be told about; none for a missing viewer or a server that has not migrated yet */
+    private function interestsOf(?User $viewer): array
+    {
+        if ($viewer === null) {
+            return [];
+        }
+
+        try {
+            return VaultStackInterest::where('user_id', $viewer->id)->pluck('stack_key')->mapWithKeys(fn ($key) => [(string) $key => true])->all();
+        } catch (QueryException $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**
@@ -264,6 +232,10 @@ class CuratedInterviewSetService
             throw new NotFoundHttpException("Curated question set [{$setId}] not found.");
         }
 
+        if (! $this->catalog->isSetReady($target['set'])) {
+            throw new ConflictHttpException('This interview set is still being prepared and cannot be started yet.');
+        }
+
         return $this->createInterviewFromTarget($user, $target, $extraPracticeConfig);
     }
 
@@ -276,7 +248,16 @@ class CuratedInterviewSetService
         $stack = $target['stack'];
         $setData = $target['set'];
 
-        return DB::transaction(function () use ($user, $role, $stack, $setData, $extraPracticeConfig) {
+        // Never an interview with nothing to ask: a set that has no questions yet is "coming soon", not startable.
+        if (empty($setData['questions'])) {
+            throw new ConflictHttpException('This interview set has no questions yet.');
+        }
+
+        // A target may name the branch of knowledge its answers are judged by (the Mock AI Interview's Merchant Navy stacks); every
+        // other target is a software interview, exactly as before.
+        $discipline = $target['discipline'] ?? 'software';
+
+        return DB::transaction(function () use ($user, $role, $stack, $setData, $extraPracticeConfig, $discipline) {
             // Seed / find questions in InterviewQuestionBank
             $bankQuestions = [];
             foreach ($setData['questions'] ?? [] as $q) {
@@ -285,7 +266,7 @@ class CuratedInterviewSetService
                 $bankQuestion = InterviewQuestionBank::firstOrCreate(
                     [
                         'question_text' => $q['text'],
-                        'discipline' => 'software',
+                        'discipline' => $discipline,
                     ],
                     [
                         'category' => $q['category'] ?? InterviewQuestionBank::CATEGORY_TECHNICAL,
@@ -297,6 +278,13 @@ class CuratedInterviewSetService
                         'created_by' => $user->id,
                     ]
                 );
+
+                // The bank row is shared by every interview that asks this question, and keeps the reference answer it was first made with.
+                // When staff correct that answer (a master mariner fixing a figure) the next interview must be scored against the corrected
+                // one, so a changed answer is carried over; the rows already scored are not touched.
+                if (! $bankQuestion->wasRecentlyCreated && ($q['note'] ?? null) !== null && $bankQuestion->notes_for_reviewer !== $q['note']) {
+                    $bankQuestion->update(['notes_for_reviewer' => $q['note']]);
+                }
 
                 $bankQuestions[] = $bankQuestion;
             }
@@ -326,7 +314,7 @@ class CuratedInterviewSetService
                 'is_mock' => true,
                 'created_by' => $user->id,
                 'audience_scope' => Interview::AUDIENCE_SCOPE_ALL,
-                'discipline' => 'software',
+                'discipline' => $discipline,
                 'practice_config' => $practiceConfig,
             ]);
 

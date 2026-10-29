@@ -78,8 +78,8 @@ when the plan is granted (as with every superadmin grant).
 **Superadmin → Plans & Pricing.** For Expert (the one plan with a price):
 
 - **List price** — the "real" price, in whole rupees per year (1 – ₹5,00,000).
-- **Discount** — whole percent taken off, 0 – 90. `0` removes the discount and the pricing page then shows a
-  single price with no strike-through.
+- **Discount** — whole percent taken off, 0 – 100. `0` removes the discount and the pricing page then shows a
+  single price with no strike-through. **`100` makes the plan free** — see §2a.
 
 The card previews exactly what students will see while you type. **Review & save** shows before → after and
 what happens to current subscribers; **Save & go live** applies it.
@@ -101,6 +101,38 @@ what happens to current subscribers; **Save & go live** applies it.
 
 Not editable here on purpose: what each plan includes (that is §2b), the billing term (365 days; Grandmaster's is
 1,095), college and company plans.
+
+## 2a. The free offer (a 100% discount)
+
+When the sale price reaches **₹0** (`Plan::isRedeemable()` — a priced, active, self-serve plan whose discount takes
+the whole price off; a ₹1 plan at 99% rounds to ₹0 too), the plan is a **free offer**:
+
+- **Students:** the card says **Free** (the real price struck through, "100% off"), and the button is **Redeem
+  offer**. One click → `POST /api/me/checkout/redeem` → the plan is active when it answers. **No payment gateway,
+  no payment page, no phone-number prompt** — it works even while PayU's credentials are not set up. They get an
+  in-app notification and the usual "your plan is active" e-mail (worded as something they did themselves).
+- **Any plan with a price from ₹1 up** still goes to the gateway exactly as before.
+- **The server enforces the money rule on both doors:** `POST /me/checkout` refuses a ₹0 cart (`nothing_to_pay`, so
+  nothing is ever sent to a gateway for ₹0) and `POST /me/checkout/redeem` refuses anything above ₹0 (409
+  `payment_required`). Both take the total the student saw; a mismatch is 409 `price_changed` — a student looking
+  at a paid price is never silently given the plan free, nor charged for a plan that just became free.
+- **Saving 100 needs a deliberate confirmation.** The review step shows a red warning and a tick-box ("anyone with
+  an account can get Expert for free"); the API refuses it without `confirm_free_offer: true`. Turning the offer
+  off needs no confirmation. Both are flagged in the Audit Log (`meta.free_offer` = `turned_on` / `turned_off`).
+- **It does not pile up.** A student who already holds the plan (bought, given or redeemed) can redeem it again
+  only in its **last 30 days** (`billing.redeem_renewal_window_days`, the same window as the Renew button) and the
+  new term stacks on the days left, like paying to renew. Outside that window: 409 `already_on_plan`. After the
+  plan has ended they can redeem again for as long as the offer is on.
+- **It is still a paid-tier plan.** `isFree()` is judged on the list price, so a redeemed Expert is not "the free
+  plan": the downgrade guard, college-cover guard and "paid students" filters treat it as paid. A student on
+  Grandmaster, or on Expert with time left, cannot redeem a lower plan.
+- **Where it shows up for the superadmin:** Plans & Pricing (a "Free offer live" badge and how many redeemed),
+  Subscriptions (source **Free offer redeemed**, filter + "Redeemed offers" card), and the Audit Log (`Redeemed a
+  free plan offer`). A redemption has `meta.source = offer_redeemed`, `price_paid = 0`, `list_price`,
+  `discount_percent`, `redemption_ref` — and **no** `purchase_ref`, no payment order. It is never revenue and never
+  converts a lead.
+- **Ending a redeemed plan** (Subscriptions → End plan) works as for any plan, but while the offer is still on the
+  student can simply redeem again. To stop someone coming back, switch the offer off first.
 
 ### How the numbers are derived
 

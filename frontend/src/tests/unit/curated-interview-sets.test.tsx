@@ -190,7 +190,7 @@ describe("CuratedSetsExplorer — Qualification Circuit", () => {
     // Step 1: Click Backend Developer
     fireEvent.click(screen.getByText("Backend Developer"));
 
-    expect(screen.getByText(/Step 2: Choose Your Stack in Backend Developer/i)).toBeTruthy();
+    expect(screen.getByText(/Step 2: Choose Your Track in Backend Developer/i)).toBeTruthy();
     expect(screen.getByText("Laravel (PHP)")).toBeTruthy();
 
     // Step 2: Click Laravel (PHP)
@@ -266,6 +266,40 @@ describe("CuratedSetsExplorer — Qualification Circuit", () => {
     expect(link.getAttribute("href")).toBe("/dashboard/vault-interviews/view?slug=laravel-s1-set1-test");
     // The set cannot be started a second time while it is being scored.
     expect(screen.queryByRole("button", { name: /Start Set 1/i })).toBeNull();
+  });
+
+  it("looks again while a set is being scored, so the score appears by itself — and stops looking once it has", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const statusWith = (set1: Record<string, unknown>) => ({
+        ...mockQualStatusInProgress,
+        active_series: { ...mockQualStatusInProgress.active_series, sets: mockQualStatusInProgress.active_series.sets.map((set, i) => (i === 0 ? { ...set, ...set1 } : set)) },
+      });
+      let asked = 0;
+      vi.mocked(api.get).mockImplementation((url: string) => {
+        if (url.startsWith("/vault-qualification/status")) {
+          asked += 1;
+          return Promise.resolve(asked === 1 ? statusWith({ status: "scoring", interview_slug: "laravel-s1-set1-test" }) : statusWith({ status: "completed", score_percent: 72, interview_slug: "laravel-s1-set1-test" }));
+        }
+        return Promise.resolve(mockCatalog);
+      });
+
+      render(<CuratedSetsExplorer />);
+      await waitFor(() => expect(screen.getByText("Backend Developer")).toBeTruthy());
+      fireEvent.click(screen.getByText("Backend Developer"));
+      fireEvent.click(screen.getByText("Laravel (PHP)"));
+      await waitFor(() => expect(screen.getByText("Scoring…")).toBeTruthy());
+
+      await vi.advanceTimersByTimeAsync(4200);
+
+      await waitFor(() => expect(screen.getByText("72%")).toBeTruthy());
+      expect(screen.queryByText("Scoring…")).toBeNull();
+      const askedWhenScored = asked;
+      await vi.advanceTimersByTimeAsync(12000);
+      expect(asked).toBe(askedWhenScored);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("renders 45-day cooldown lockout banner when 3 attempts are exhausted", async () => {
@@ -450,7 +484,7 @@ describe("CuratedSetsExplorer — Qualification Circuit", () => {
 
       fireEvent.click(within(screen.getByRole("navigation", { name: "Curated Sets Trail" })).getByRole("button", { name: /All Roles/ }));
 
-      expect(screen.getByText("Step 1: Choose Engineering Role")).toBeTruthy();
+      expect(screen.getByText("Step 1: Choose Your Domain")).toBeTruthy();
     });
   });
 });

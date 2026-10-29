@@ -20,6 +20,8 @@ import {
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { Modal } from "@/components/ui/Modal";
+import { VaultAiQuestionsTab } from "@/components/admin/vault/VaultAiQuestionsTab";
+import type { VaultAiCoverage } from "@/types/vaultAiAdmin";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { userHasPermission } from "@/lib/auth";
@@ -59,7 +61,7 @@ const EVENT_BADGE: Record<AdminVaultSyncEvent["status"], string> = {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—";
 
-type Tab = "overview" | "students" | "ai_qualifiers" | "sync";
+type Tab = "overview" | "students" | "ai_qualifiers" | "ai_questions" | "sync";
 
 /**
  * Mellow staff's oversight of the Vault — see AdminVaultController. Nothing is
@@ -93,6 +95,7 @@ export default function AdminVaultPage() {
                 ["overview", "Overview"],
                 ["students", "Students"],
                 ["ai_qualifiers", "AI Interview Qualifiers"],
+                ["ai_questions", "Vault AI questions"],
                 ["sync", "Mellow Vault sync"],
               ] as const
             ).map(([id, label]) => (
@@ -113,6 +116,8 @@ export default function AdminVaultPage() {
             <StudentsTab onToast={showToast} />
           ) : tab === "ai_qualifiers" ? (
             <AiInterviewQualifiersTab onToast={showToast} />
+          ) : tab === "ai_questions" ? (
+            <VaultAiQuestionsTab onToast={showToast} />
           ) : (
             <SyncTab onToast={showToast} />
           )}
@@ -615,6 +620,18 @@ function AiInterviewQualifiersTab({ onToast }: { onToast: ToastTrigger }) {
   const [search, setSearch] = useState("");
   const [selectedStack, setSelectedStack] = useState("");
   const [page, setPage] = useState(1);
+  // Every stack in the catalog, for the filter and for showing a stack by its name rather than its key.
+  const [stackOptions, setStackOptions] = useState<Array<{ key: string; name: string }>>([]);
+
+  /** A stack by its catalog name ("Data Analytics"), falling back to its key until the catalog has loaded. */
+  const stackName = (key: string) => stackOptions.find((o) => o.key === key)?.name ?? key.replace(/_/g, " ");
+
+  useEffect(() => {
+    api
+      .get<VaultAiCoverage>("/admin/vault-ai/coverage")
+      .then((res) => setStackOptions(res.roles.flatMap((role) => role.stacks.map((s) => ({ key: s.key, name: s.name })))))
+      .catch(() => setStackOptions([]));
+  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -656,7 +673,7 @@ function AiInterviewQualifiersTab({ onToast }: { onToast: ToastTrigger }) {
           </div>
           <div className="rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
             <div className="text-3xs uppercase font-extrabold tracking-wider text-text-muted">Top Tech Stack</div>
-            <div className="text-2xl font-black text-primary mt-1 capitalize">{stats.top_stack ? stats.top_stack.replace(/_/g, " ") : "None"}</div>
+            <div className="text-2xl font-black text-primary mt-1 capitalize">{stats.top_stack ? stackName(stats.top_stack) : "None"}</div>
             <div className="text-3xs text-text-muted mt-0.5">Most qualified stack</div>
           </div>
         </div>
@@ -688,18 +705,11 @@ function AiInterviewQualifiersTab({ onToast }: { onToast: ToastTrigger }) {
             className="rounded-control border border-border-subtle bg-surface px-3 py-1.5 text-xs text-primary focus:outline-none focus:border-accent-primary"
           >
             <option value="">All Tech Stacks</option>
-            <option value="laravel">Laravel (PHP)</option>
-            <option value="nodejs">Node.js</option>
-            <option value="python">Python</option>
-            <option value="java">Java</option>
-            <option value="golang">Go</option>
-            <option value="react_nextjs">React & Next.js</option>
-            <option value="typescript">TypeScript</option>
-            <option value="mern">MERN Stack</option>
-            <option value="nextjs_fullstack">Fullstack Next.js</option>
-            <option value="llm_rag">LLMs & RAG</option>
-            <option value="deeplearning_pytorch">Deep Learning (PyTorch)</option>
-            <option value="docker_k8s">Docker & Kubernetes</option>
+            {stackOptions.map((option) => (
+              <option key={option.key} value={option.key}>
+                {option.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
@@ -742,7 +752,7 @@ function AiInterviewQualifiersTab({ onToast }: { onToast: ToastTrigger }) {
                     </td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-3xs font-bold uppercase bg-surface-raised border border-border-subtle text-primary">
-                        {q.stack_key.replace(/_/g, " ")}
+                        {stackName(q.stack_key)}
                       </span>
                       <div className="text-3xs text-text-muted capitalize mt-0.5">{q.role_key.replace(/_/g, " ")}</div>
                     </td>

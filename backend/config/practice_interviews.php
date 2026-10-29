@@ -22,6 +22,13 @@ $departmentGroups = array_map(
 
 return [
 
+    /*
+    | The student-facing "Build your own practice interview" studio (role + kind + difficulty, with AI-written top-up questions) is
+    | PAUSED: students practise through the Mock AI Interview by domain and stack instead (config/mock_interviews.php). Set
+    | PRACTICE_BUILDER_ENABLED=true to bring the studio back; its page, its API and every link to it follow this one switch.
+    */
+    'student_builder_enabled' => (bool) env('PRACTICE_BUILDER_ENABLED', false),
+
     /* Hard stops, so one student cannot turn the question bank (or the AI top-up behind it) into a vending machine. */
     'limits' => [
         // Practice interviews a student may CREATE per day (taking one is limited separately, by their plan).

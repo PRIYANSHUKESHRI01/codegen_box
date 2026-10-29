@@ -41,6 +41,9 @@ class ScoreInterviewSessionJob implements ShouldQueue
 
     public function handle(GeminiInterviewScoringService $scoringService, InterviewTrackAdvancementService $advancementService): void
     {
+        // Run after an HTTP response, this inherits the request's time limit; the Gemini call alone may legitimately take 30 s.
+        @set_time_limit(120);
+
         $session = InterviewSession::with(['interview.track', 'interview.placementDrive', 'responses.interviewQuestion.questionBank'])
             ->find($this->interviewSessionId);
 

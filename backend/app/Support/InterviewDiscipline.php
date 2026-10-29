@@ -13,6 +13,9 @@ namespace App\Support;
  */
 final class InterviewDiscipline
 {
+    /** The Merchant Navy discipline key (fits the 20-character discipline columns). */
+    public const MARITIME_KEY = 'maritime';
+
     /** @var array<string, array{label: string, generate: string, score: string}> */
     private const FAMILIES = [
         'ece' => [
@@ -35,6 +38,26 @@ final class InterviewDiscipline
             'generate' => 'Technical questions should test civil fundamentals — structural analysis and design, geotechnical engineering, concrete and steel, surveying, transportation and highway engineering, water resources, and construction practice and safety — through reasoning the candidate can talk through aloud: explain how a structure or soil behaves, justify a design or method choice, or describe how they would handle a described site situation. Never ask for a drawing or long calculations; never ask software system-design questions.',
             'score' => 'For technical questions, judge the engineering reasoning: correct principles and units, sensible assumptions stated aloud, a clear verbal walk-through of the load path, soil behaviour or construction sequence, and practical awareness (codes, safety, site constraints, quality control). Do not mark a candidate down for not reciting an exact formula or clause number when the method is right.',
         ],
+    ];
+
+    /**
+     * Merchant Navy (deck) orals: the one discipline whose answers are a RECALLED standard, not an argued position. An examiner at the
+     * DG Shipping (MMD) oral marks the key points, the figures, the signal patterns and whether the action is safe, so this entry is
+     * stricter about facts than the field-based ones below and says so. It is only ever reached by an interview whose `discipline` is
+     * set to it (the Mock AI Interview's Merchant Navy stacks) - no other interview changes.
+     *
+     * @var array{label: string, generate: string, score: string}
+     */
+    private const MARITIME = [
+        'label' => 'Merchant Navy (deck officer certificate orals)',
+        'generate' => 'Technical questions should be asked the way an MMD examiner asks them at a deck officer oral: one clear spoken question on navigation, cargo work, stability, ship construction, fire-fighting, life-saving appliances, MARPOL, SOLAS or the collision regulations, answerable in under a minute by speaking. Prefer "what would you do", "what are the requirements" and "why" over definitions. Never ask for a chart, a diagram, a drawing or a written calculation; never ask software system-design questions.',
+        'score' => 'This is a Merchant Navy deck officer certificate oral, answered aloud the way a candidate answers an examiner at a DG Shipping (MMD) oral. "What a strong answer covers" is the examiner\'s reference answer: mark the spoken answer against it point by point. '
+            .'Give credit for every key point the candidate actually states, in their own words if they like; correct maritime terminology counts for more than correct phrasing. '
+            .'Figures, angles, distances, times, colours, light, shape and sound-signal patterns, and convention or regulation numbers that the reference gives are part of the answer: a wrong or swapped one (port for starboard, red for green, 28 seconds for 60, Region A for B) is a real error, not a slip, and costs marks. If the reference gives a range or says a figure is under review, accept any commonly accepted current figure and judge the concept. '
+            .'An answer that would be UNSAFE or illegal at sea (the wrong collision-avoidance action, emergency actions in a dangerous order, a wrong stability, cargo or fire-fighting decision) must score low however fluently it is delivered. '
+            .'Reward what a good officer does first: the immediate safe action, calling the Master when required, and naming the rule, convention or Annex that applies. '
+            .'Do not reward length or confidence: a fluent answer that misses the key points is a low score, and a short answer that states them correctly is a good one. If the candidate\'s answer differs from the reference but is correct seamanship, accept it. '
+            .'The transcript comes from speech recognition, so forgive obvious mis-hearings of technical terms (for example "ECDIS" heard as "ek dis") when the meaning is clear, and do not mark down for spoken grammar.',
     ];
 
     /**
@@ -75,6 +98,10 @@ final class InterviewDiscipline
             return self::FAMILIES[$discipline];
         }
 
+        if ($discipline === self::MARITIME_KEY) {
+            return self::MARITIME;
+        }
+
         if (! isset(self::FIELDS[$discipline])) {
             return null;
         }
@@ -91,7 +118,7 @@ final class InterviewDiscipline
     /** @return list<string> */
     public static function families(): array
     {
-        return array_merge(array_keys(self::FAMILIES), array_keys(self::FIELDS));
+        return array_merge(array_keys(self::FAMILIES), array_keys(self::FIELDS), [self::MARITIME_KEY]);
     }
 
     public static function isCore(?string $discipline): bool

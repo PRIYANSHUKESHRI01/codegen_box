@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Brain, CircuitBoard, Flame, Mic, Zap, MessagesSquare } from "lucide-react";
+import { ArrowRight, Brain, CircuitBoard, Flame, Mic, Target, Zap, MessagesSquare } from "lucide-react";
+import { HpCard, HpIconTile, HpPill, HpSectionHeader, HpSkeleton, type HpTone } from "@/components/portal/kit";
 import { api } from "@/lib/api";
 import { getSkill } from "@/lib/drills/catalog";
 import { REASON_TEXT } from "@/lib/drills/recommend";
@@ -16,7 +17,7 @@ import type { DrillsCard, InterviewCard, PracticeShelf as Shelf, ShelfCard, Soft
  * want to practise (those come first) and what they left half-done. It is how the modules every branch shares (AI interviews, soft skills,
  * communication) stay in front of a student who leads with their branch. If it cannot load, it simply isn't there: the home never breaks for it.
  */
-export function PracticeShelf({ className }: { className?: string }) {
+export function PracticeShelf({ className, compact = false }: { className?: string; compact?: boolean }) {
   const [shelf, setShelf] = useState<Shelf | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -34,26 +35,31 @@ export function PracticeShelf({ className }: { className?: string }) {
   if (failed) return null;
 
   return (
-    <section aria-labelledby="todays-practice" className={className}>
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="todays-practice" className="text-base font-extrabold text-primary">
-          Today&apos;s practice
-        </h2>
-        {shelf && shelf.streak.current > 0 && shelf.cards.some((c) => c.kind === "drills") && (
-          <Link href="/dashboard/drills" className="inline-flex items-center gap-1.5 text-2xs font-bold text-status-warning hover:underline">
-            <Flame className="h-3.5 w-3.5" aria-hidden /> {shelf.streak.current}-day drill streak
-          </Link>
-        )}
-      </div>
+    <section aria-labelledby="todays-practice" className={cn("space-y-4", className)}>
+      <HpSectionHeader
+        icon={Target}
+        tone="indigo"
+        title={<span id="todays-practice">Today&apos;s practice</span>}
+        subtitle="Picked for your branch and what you said you want to practise"
+        action={
+          shelf && shelf.streak.current > 0 && shelf.cards.some((c) => c.kind === "drills") ? (
+            <Link href="/dashboard/drills" className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500">
+              <HpPill tone="amber" icon={Flame}>
+                {shelf.streak.current}-day drill streak
+              </HpPill>
+            </Link>
+          ) : undefined
+        }
+      />
 
       {!shelf ? (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true" aria-label="Loading your suggestions">
+        <div className={cn("grid gap-3 sm:grid-cols-2", !compact && "xl:grid-cols-4")} aria-busy="true" aria-label="Loading your suggestions">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-36 animate-pulse rounded-panel border border-border-subtle bg-surface" />
+            <HpSkeleton key={i} className="h-36 rounded-[20px]" />
           ))}
         </div>
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <ul className={cn("grid gap-3 sm:grid-cols-2", !compact && "xl:grid-cols-4")}>
           {shelf.cards.map((card) => (
             <li key={card.id}>
               <Card card={card} />
@@ -112,9 +118,10 @@ function interviewView(card: InterviewCard, yours: string): View {
     title: "AI mock interview",
     body: card.role_title
       ? `${card.for_branch ? `Questions for ${yours}` : "Practise out loud"} — next up: ${card.role_title}.`
-      : "Build a round, answer aloud, and get scored by AI.",
-    href: card.role ? `/dashboard/interviews/practice?role=${encodeURIComponent(card.role)}` : "/dashboard/interviews/practice",
-    cta: "Build a round",
+      : "Pick your domain and tech stack, answer aloud, and get scored by AI.",
+    // The build-your-own studio is paused (config practice_interviews.student_builder_enabled): practice goes through the Mock AI Interview.
+    href: "/dashboard/interviews",
+    cta: "Practise",
     chip: card.recommended ? "Matches your interests" : undefined,
   };
 }
@@ -149,28 +156,30 @@ function Card({ card }: { card: ShelfCard }) {
   // Only the wording ("your branch" / "your programme" / "your subject") is needed, and it follows the department alone.
   const { yours } = domainPrepCopy(null, getStoredUser()?.department ?? null);
   const v = view(card, yours);
+  const tone: HpTone = v.urgent ? "amber" : "indigo";
   return (
     <Link
       href={v.href}
-      className={cn(
-        "group flex h-full flex-col rounded-panel border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary",
-        v.urgent ? "border-status-warning/40 bg-status-warning/[0.07] hover:bg-status-warning/10" : "border-border-subtle bg-surface hover:border-accent-primary/50 hover:bg-surface-hover"
-      )}
+      className="group block h-full rounded-[20px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <span className="flex items-start justify-between gap-2">
-        <span className={cn("flex h-9 w-9 items-center justify-center rounded-lg", v.urgent ? "bg-status-warning/15 text-status-warning" : "bg-accent-primary/10 text-accent-primary")}>
-          <v.icon className="h-4.5 w-4.5" aria-hidden />
+      <HpCard interactive className={cn("flex h-full flex-col p-4", v.urgent && "!border-amber-500/35 !bg-amber-500/[0.06]")}>
+        <span className="flex items-start justify-between gap-2">
+          <HpIconTile icon={v.icon as React.ComponentProps<typeof HpIconTile>["icon"]} tone={tone} size="md" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+          {card.pinned && (
+            <HpPill tone="indigo" size="sm">
+              You asked for this
+            </HpPill>
+          )}
         </span>
-        {card.pinned && <span className="rounded-full bg-accent-primary/10 px-2 py-0.5 text-3xs font-bold text-accent-primary">You asked for this</span>}
-      </span>
-      <span className="mt-3 block text-sm font-extrabold text-primary">{v.title}</span>
-      <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{v.body}</span>
-      <span className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-3.5">
-        <span className="inline-flex items-center gap-1 text-xs font-bold text-accent-primary">
-          {v.cta} <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden />
+        <span className="mt-3.5 block text-sm font-bold tracking-tight text-primary">{v.title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-text-secondary">{v.body}</span>
+        <span className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
+          <span className={cn("inline-flex items-center gap-1 text-xs font-bold", v.urgent ? "text-amber-700 dark:text-amber-300" : "text-indigo-600 dark:text-indigo-300")}>
+            {v.cta} <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" aria-hidden />
+          </span>
+          {v.chip && <span className="text-3xs font-semibold text-text-muted">{v.chip}</span>}
         </span>
-        {v.chip && <span className="text-3xs font-semibold text-text-muted">{v.chip}</span>}
-      </span>
+      </HpCard>
     </Link>
   );
 }

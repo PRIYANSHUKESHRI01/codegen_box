@@ -99,7 +99,7 @@ function Intro({ access }: { access: VaultAiAccess | null }) {
               Sit it when you&apos;re ready: you get <strong className="font-semibold text-primary">3 attempts</strong>, then a 45-day wait before you can try again.
             </span>
           </p>
-          <Link href="/dashboard/interviews/practice" className="inline-flex shrink-0 items-center gap-1 text-2xs font-bold text-accent-primary transition-all hover:gap-1.5 hover:underline">
+          <Link href="/dashboard/interviews" className="inline-flex shrink-0 items-center gap-1 text-2xs font-bold text-accent-primary transition-all hover:gap-1.5 hover:underline">
             Practice first <ArrowRight className="h-3 w-3" aria-hidden />
           </Link>
         </div>

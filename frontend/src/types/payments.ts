@@ -103,6 +103,11 @@ export interface PaymentsResponse {
 /** POST /me/checkout/verify: the new subscription state, plus the payment that produced it. */
 export type VerifyPaymentResponse = MySubscriptionResponse & { payment: PaymentReceipt };
 
+/** POST /me/checkout/redeem: a free offer claimed — the new subscription state, plus what was redeemed. No payment exists. */
+export type RedeemOfferResponse = MySubscriptionResponse & {
+  redemption: { plan_code: string; plan_name: string; current_period_end: string | null; days_remaining: number | null };
+};
+
 // ───────────────────────────── superadmin ─────────────────────────────
 
 /** A chargeback PayU reported against a payment — someone must respond before `due_date`. */

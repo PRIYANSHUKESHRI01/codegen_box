@@ -1,4 +1,4 @@
-import { Activity, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Zap } from "lucide-react";
+import { Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Trophy, Zap } from "lucide-react";
 import { DEFAULT_CAPABILITIES, type CapabilityMap } from "@/lib/departments";
 import { sidebarChip, sidebarTitle } from "@/lib/vaultAi";
 import type { VaultAiAccess } from "@/types/vaultAi";
@@ -55,11 +55,16 @@ export function buildStudentNav({
   const core: NavItem = { label: domainPrepLabel, href: "/dashboard/core", icon: CircuitBoard, matchPrefix: true, badge: "New", badgeTone: "new" };
   const drills: NavItem = { label: "Skill Drills", href: "/dashboard/drills", icon: Zap, matchPrefix: true, badge: "New", badgeTone: "new" };
 
+  // Three groups, by what the student is doing:
+  //   Your Arena  - building skill and watching it grow (practice, learn, projects, then the report that measures it all)
+  //   Placements  - getting hired (drives, what the companies ask, interview practice, the Vault that hiring partners browse)
+  //   Competition - measuring yourself against other students (contests, the leaderboard)
+  // The Overview sits at the top of the first group; everything it used to repeat now has exactly one home in this rail.
   const arena: NavItem[] = [
     overview,
     ...(caps.coding_practice ? [practice] : []),
-    { label: "Performance Report", href: "/dashboard/reports", icon: LineChart },
     ...(caps.learning_centre ? [{ label: "Learning Centre", href: "/dashboard/learning-centre", icon: Sparkles, badge: "AI", badgeTone: "new" as const }] : []),
+    ...(caps.soft_skills ? [{ label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain }] : []),
     // Visible to every student whose programme has it. Without Expert it wears a lock and its page is the upgrade screen — see ProjectLabPage.
     ...(caps.project_lab
       ? [
@@ -72,6 +77,8 @@ export function buildStudentNav({
           },
         ]
       : []),
+    // Last in the group: the record of everything above it - readiness roadmap, rating trend, topic mastery, activity and every submission.
+    { label: "Performance Report", href: "/dashboard/reports", icon: LineChart },
   ];
 
   if (coreAvailable && (legacy || caps.domain_prep)) {
@@ -81,10 +88,10 @@ export function buildStudentNav({
     arena.splice(at, 0, core, ...(legacy || caps.skill_drills ? [drills] : []));
   }
 
-  const competition: NavItem[] = [
-    { label: "Upcoming & Drives", href: "/dashboard#placement-drives", icon: Briefcase },
+  const placements: NavItem[] = [
+    // Its own page now (the list of the college's drives); a single drive, /dashboard/drives?driveId=…, keeps this item lit.
+    { label: "Upcoming Drives", href: "/dashboard/drives", icon: Briefcase, matchPrefix: true },
     ...(caps.company_prep ? [{ label: "Company PYQs", href: "/dashboard/company-prep", icon: Building2, matchPrefix: true, badge: "New", badgeTone: "new" as const }] : []),
-    ...(caps.contests ? [{ label: "Contests", href: "/dashboard/contests", icon: Swords }] : []),
     ...(caps.ai_interviews ? [{ label: "Mock AI Interview", href: "/dashboard/interviews", icon: Mic }] : []),
     // The final qualification interview. A college student who has not earned it yet sees it locked (with the days left); a year that
     // is not offered it does not see it at all. Everyone else - direct users, unlocked students - sees it open.
@@ -104,21 +111,26 @@ export function buildStudentNav({
           },
         ]
       : []),
-    ...(caps.soft_skills ? [{ label: "Soft Skills", href: "/dashboard/soft-skills", icon: Brain }] : []),
-    // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their readiness score and how to
-    // raise it are there), so the item wears a lock rather than hiding — see StudentVaultPage.
+    // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their readiness score, how the Vault helps
+    // and how far they are from the 60% line are there), so the item wears a lock rather than hiding — see StudentVaultPage.
+    // Named for what it is and what it is for: "Mellow Vault", with "Get Hired" as its badge.
     {
-      label: "Vault",
+      label: "Mellow Vault",
       href: "/dashboard/vault",
       icon: Award,
-      ...(vaultEnabled === false ? { locked: true } : { badge: "New", badgeTone: "new" as const }),
+      ...(vaultEnabled === false ? { locked: true } : { badge: "Get Hired", badgeTone: "new" as const }),
     },
-    ...(caps.coding_practice ? [{ label: "Submissions", href: "/dashboard#submissions", icon: Activity }] : []),
-    ...(caps.coding_practice ? [{ label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Swords }] : []),
+  ];
+
+  const competition: NavItem[] = [
+    ...(caps.contests ? [{ label: "Contests", href: "/dashboard/contests", icon: Swords }] : []),
+    ...(caps.coding_practice ? [{ label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Trophy }] : []),
   ];
 
   return [
     { title: "Your Arena", items: arena },
-    { title: "Competition", items: competition },
+    { title: "Placements", items: placements },
+    // A programme with neither contests nor a leaderboard (Management, Commerce, Arts …) has nothing to compete in: no empty heading.
+    ...(competition.length > 0 ? [{ title: "Competition", items: competition }] : []),
   ];
 }

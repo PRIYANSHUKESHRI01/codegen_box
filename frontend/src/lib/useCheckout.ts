@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { checkPayment, resumeAfterRedirect, runCheckout, type CheckoutOutcome, type CheckoutPhase, type CheckoutRequest } from "@/lib/checkout";
+import { checkPayment, redeemOffer, resumeAfterRedirect, runCheckout, type CheckoutOutcome, type CheckoutPhase, type CheckoutRequest } from "@/lib/checkout";
 import { forgetPayuAttempt } from "@/lib/payu";
 import type { PaymentReturnResult } from "@/types/payments";
 
@@ -68,6 +68,23 @@ export function useCheckout() {
   }, []);
 
   /**
+   * Claim a free offer. Shares the "one at a time" guard with `start`: a double-click, or a redeem while a payment is
+   * opening, is ignored (null) rather than sent twice.
+   */
+  const redeem = useCallback(async (planCode: string): Promise<CheckoutOutcome | null> => {
+    if (running.current) return null;
+    running.current = true;
+    setPending(null);
+
+    try {
+      return await redeemOffer(planCode, { onPhase: setPhase });
+    } finally {
+      running.current = false;
+      setPhase("idle");
+    }
+  }, []);
+
+  /**
    * The student is back from the gateway's page with `payment=<reference>` in the URL. Holds the screen on
    * "confirming your payment" while the server's answer is read — except when the return already says the
    * attempt ended without a payment, which needs no waiting room.
@@ -121,5 +138,5 @@ export function useCheckout() {
 
   const dismissPending = useCallback(() => setPending(null), []);
 
-  return { phase, pending, busy: phase !== "idle", start, resume, recover, recheck, dismissPending };
+  return { phase, pending, busy: phase !== "idle", start, redeem, resume, recover, recheck, dismissPending };
 }

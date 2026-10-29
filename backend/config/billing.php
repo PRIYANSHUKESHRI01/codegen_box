@@ -22,6 +22,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Free offer (a plan discounted by 100%)
+    |--------------------------------------------------------------------------
+    |
+    | A student who already holds a plan that is currently free may redeem it
+    | again only when it has this many days or fewer left — the new term stacks
+    | on the days remaining, exactly like paying to renew. Outside that window
+    | redeeming is refused (409 already_on_plan), so free time cannot pile up
+    | by clicking Redeem repeatedly. Keep it equal to the pricing page's Renew
+    | window (RENEW_WINDOW_DAYS in PricingPlans.tsx).
+    */
+    'redeem_renewal_window_days' => 30,
+
+    /*
+    |--------------------------------------------------------------------------
     | Which payment gateway takes the money
     |--------------------------------------------------------------------------
     |

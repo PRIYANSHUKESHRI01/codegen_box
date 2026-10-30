@@ -52,6 +52,8 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/drives": { title: "Upcoming Drives", parent: "/dashboard" },
   "/dashboard/interview-tracks": { title: "Mock AI Interview", parent: "/dashboard/interviews" },
   "/dashboard/interviews": { title: "Mock AI Interview", parent: "/dashboard" },
+  "/dashboard/merchant-navy": { title: "Merchant Navy", parent: "/dashboard" },
+  "/dashboard/merchant-navy/reports": { title: "My Reports", parent: "/dashboard/merchant-navy" },
   "/dashboard/interviews/practice": { title: "Practice interview", parent: "/dashboard/interviews" },
   "/dashboard/interviews/session": { title: "Interview", parent: "/dashboard/interviews" },
   "/dashboard/interviews/view": { title: "Interview", parent: "/dashboard/interviews" },

@@ -136,12 +136,43 @@ export interface TakeQuestionPayload {
   category: QuestionCategory;
   difficulty: QuestionDifficulty;
   expected_duration_seconds: number;
+  /** A question that is asked of a picture (a Rule of the Road card): the picture's address on this site. Absent or null for every other question. */
+  image?: string | null;
 }
 
 /** Whether the interviewer has a real (neural) voice on the server, and the fixed lines it says besides questions — the text a candidate also reads. */
 export interface InterviewSpeechInfo {
   enabled: boolean;
   lines: Record<string, string>;
+}
+
+/** How much of the model answer an answer covered: red below 30%, yellow 30-69%, green 70% and over (the server decides; see config/answer_match.php). */
+export type MatchBand = "red" | "yellow" | "green";
+
+/** One key point of the model answer: `text` is exactly as written (with its trailing space), `status` is what the answer did with it. */
+export interface StudyAnswerSegment {
+  text: string;
+  status: "covered" | "partial" | "missed";
+}
+
+/**
+ * Study mode (the Merchant Navy sets): what the student is shown after each answer, with no AI involved - their answer compared with the
+ * model answer by plain text matching. See backend StudyFeedbackService / AnswerMatcher.
+ */
+export interface StudyFeedback {
+  method: "text_match";
+  match_percent: number;
+  band: MatchBand;
+  label: string;
+  points: { covered: number; partial: number; missed: number; total: number };
+  /** The model answer, whole. */
+  reference_answer: string;
+  /** The model answer in its key points, each marked covered / partial / missed. */
+  segments: StudyAnswerSegment[];
+  /** What the answer left out, most important first, for the one-line summary. */
+  missed: string[];
+  /** The model answer has a figure still to be checked, or was written by AptRun and not yet reviewed. */
+  unverified: boolean;
 }
 
 export interface StartInterviewResponse {
@@ -151,11 +182,15 @@ export interface StartInterviewResponse {
   complete: boolean;
   question: TakeQuestionPayload | null;
   speech?: InterviewSpeechInfo;
+  /** A study interview: not scored by AI; after each answer the model answer and the match are shown. */
+  study?: boolean;
 }
 
 export interface AnswerInterviewResponse {
   complete: boolean;
   next_question?: TakeQuestionPayload;
+  /** Study interviews only: the match for the answer just given. */
+  feedback?: StudyFeedback;
 }
 
 export type InterviewResultStatus = "scoring" | "scored" | "needs_human_review";
@@ -163,6 +198,8 @@ export type InterviewResultStatus = "scoring" | "scored" | "needs_human_review";
 export interface InterviewResultQuestion {
   question_text: string;
   category: QuestionCategory;
+  /** The picture the question was asked of (a Rule of the Road card), if it had one. */
+  image?: string | null;
   /** The candidate's own answer, in full — what they actually said/typed. */
   transcript_text: string;
   has_audio: boolean;
@@ -170,10 +207,14 @@ export interface InterviewResultQuestion {
   response_id: number;
   score: number;
   feedback: string;
+  /** Study interviews only: the model answer and how this answer matched it (null for every other interview). */
+  study?: StudyFeedback | null;
 }
 
 /** GET /interviews/{interview}/result — polled by the completion screen right after a candidate finishes. See ScoreInterviewSessionJob on the backend. */
 export interface InterviewResult {
+  /** A study set only: where this sitting stands among the student's sittings of the set, and what to download the report with. */
+  attempt?: StudyAttemptStanding | null;
   status: InterviewResultStatus;
   composite_score_percent: number | null;
   /** Only ever non-null for a track round — a standalone interview has no pass/fail concept. */
@@ -182,6 +223,8 @@ export interface InterviewResult {
   is_qualification?: boolean;
   /** Whether the server will let the student sit this interview again (never for a track round or a scored qualification set). */
   reattemptable?: boolean;
+  /** A study interview: its "score" is the average match with the model answers, and every question carries its model answer. */
+  study?: boolean;
   responses: InterviewResultQuestion[];
 }
 
@@ -206,3 +249,29 @@ export const DIFFICULTY_COLORS: Record<QuestionDifficulty, string> = {
   medium: "bg-status-warning/15 text-status-warning",
   hard: "bg-status-danger/15 text-status-danger",
 };
+
+/** Where one finished study sitting stands among the student's sittings of the same set (the Merchant Navy score history). */
+export interface StudyAttemptStanding {
+  id: number;
+  /** Which sitting of this set it was: 1 for the first. */
+  number: number;
+  attempts: number;
+  previous_score: number | null;
+  /** This score minus the previous one; null on a first sitting. */
+  delta: number | null;
+  best_score: number;
+  /** Beat every earlier sitting of the set (never announced for a first sitting). */
+  is_personal_best: boolean;
+  history: StudyScorePoint[];
+}
+
+export interface StudyScorePoint {
+  id: number;
+  score: number;
+  completed_at: string | null;
+  /** The student left before the end: the score is the average of what they did answer. */
+  partial: boolean;
+  answered: number;
+  total: number;
+  duration_seconds: number | null;
+}

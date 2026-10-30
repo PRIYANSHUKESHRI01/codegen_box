@@ -47,6 +47,7 @@ import {
   CircuitBoard,
   Layers,
   Star,
+  Anchor,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -505,6 +506,7 @@ export function DashboardSidebar({
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
             { label: "Departments", href: "/superadmin?tab=departments", icon: Layers },
+            { label: "Merchant Navy", href: "/superadmin?tab=merchant_navy", icon: Anchor },
             { label: "Plans & Pricing", href: "/superadmin?tab=plans", icon: Wallet },
             { label: "Payments", href: "/superadmin?tab=payments", icon: CreditCard },
             { label: "Subscriptions", href: "/superadmin?tab=subscriptions", icon: BadgeCheck },
@@ -516,6 +518,7 @@ export function DashboardSidebar({
             { label: "Students", href: "/superadmin?tab=students", icon: GraduationCap },
             { label: "Leads", href: "/superadmin?tab=leads", icon: UserSearch },
             { label: "Marketing Performance", href: "/superadmin?tab=marketing", icon: Megaphone },
+            { label: "Marketing Team", href: "/superadmin?tab=marketing_team", icon: UserCog },
             { label: "Mellow Staff", href: "/superadmin?tab=staff", icon: Users2 },
             { label: "Accounts & Logins", href: "/superadmin?tab=accounts", icon: KeyRound },
             {

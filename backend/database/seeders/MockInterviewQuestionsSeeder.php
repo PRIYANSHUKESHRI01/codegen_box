@@ -55,6 +55,8 @@ class MockInterviewQuestionsSeeder extends Seeder
                                     'note' => $q['note'] ?? null,
                                     'topic' => $q['topic'] ?? null,
                                     'needs_review' => (bool) ($q['needs_review'] ?? false),
+                                    'origin' => $q['origin'] ?? 'document',
+                                    'image' => $q['image'] ?? null,
                                     'created_by' => $adminId,
                                 ]
                             );

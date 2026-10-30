@@ -64,6 +64,29 @@ return [
             ]) : [],
         ],
 
+        /*
+        | Mellow Vault's own database - used ONLY by the Vault hand-off when VAULT_SYNC_DRIVER=database (config/vault.php): AptRun writes
+        | listed students straight into its developer_details_tb. A temporary arrangement for the local XAMPP database; the production
+        | hand-off is the signed HTTP push. Blank MELLOW_VAULT_DB_DATABASE = not configured. Strict mode stays ON: a
+        | value that does not fit must fail loudly, never be silently cut.
+        */
+        'mellow_vault' => [
+            'driver' => 'mysql',
+            'host' => env('MELLOW_VAULT_DB_HOST', '127.0.0.1'),
+            'port' => env('MELLOW_VAULT_DB_PORT', '3306'),
+            'database' => env('MELLOW_VAULT_DB_DATABASE'),
+            'username' => env('MELLOW_VAULT_DB_USERNAME', 'root'),
+            'password' => env('MELLOW_VAULT_DB_PASSWORD', ''),
+            'unix_socket' => env('MELLOW_VAULT_DB_SOCKET', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_general_ci',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+            'options' => [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

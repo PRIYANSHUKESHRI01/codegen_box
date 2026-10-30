@@ -1,4 +1,4 @@
-import { Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Trophy, Zap } from "lucide-react";
+import { Anchor, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FileText, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Trophy, Zap } from "lucide-react";
 import { DEFAULT_CAPABILITIES, type CapabilityMap } from "@/lib/departments";
 import { sidebarChip, sidebarTitle } from "@/lib/vaultAi";
 import type { VaultAiAccess } from "@/types/vaultAi";
@@ -127,9 +127,22 @@ export function buildStudentNav({
     ...(caps.coding_practice ? [{ label: "Global Leaderboard", href: "/dashboard/leaderboard", icon: Trophy }] : []),
   ];
 
+  // Merchant Navy: oral-exam practice for deck officers. Its own group so a student on that path finds it at once (and one who is not is not
+  // asked to wade through it): the same card also stays in Mock AI Interview. It uses the same interview engine, so it needs the same module - and the superadmin can switch the whole section off for everyone (caps.merchant_navy).
+  // "My Reports" (the score history of every set and the downloadable reports) is a page under it, so Mock Orals must not claim that page too:
+  // it is the exact page, not the whole section.
+  const merchantNavy: NavItem[] =
+    caps.ai_interviews && caps.merchant_navy
+      ? [
+          { label: "Mock Orals", href: "/dashboard/merchant-navy", icon: Anchor, badge: "New", badgeTone: "new" as const },
+          { label: "My Reports", href: "/dashboard/merchant-navy/reports", icon: FileText },
+        ]
+      : [];
+
   return [
     { title: "Your Arena", items: arena },
     { title: "Placements", items: placements },
+    ...(merchantNavy.length > 0 ? [{ title: "Merchant Navy", items: merchantNavy }] : []),
     // A programme with neither contests nor a leaderboard (Management, Commerce, Arts …) has nothing to compete in: no empty heading.
     ...(competition.length > 0 ? [{ title: "Competition", items: competition }] : []),
   ];

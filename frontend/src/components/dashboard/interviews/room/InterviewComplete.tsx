@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { InterviewResult } from "@/types/interview";
 import { AptRunOrb } from "./AptRunOrb";
 import { RoomBackdrop } from "./RoomBackdrop";
+import { StudySummary } from "./StudySummary";
 import { formatClock } from "./format";
 import { useRoomSignal } from "./roomSignal";
 
@@ -71,6 +72,8 @@ export function InterviewError({ message, retrying, onRetry, onBack, backLabel }
  */
 export function InterviewComplete({
   vault,
+  study = false,
+  backLabel,
   result,
   totalQuestions,
   answeredCount,
@@ -80,6 +83,10 @@ export function InterviewComplete({
   onBack,
 }: {
   vault: boolean;
+  /** A study set (the Merchant Navy orals): no AI scoring, so the summary is the matches with the model answers, to revise from. */
+  study?: boolean;
+  /** What the way out says, when "Back to Interviews" is not right (a set opened from the Merchant Navy section). */
+  backLabel?: string;
   result: InterviewResult | null;
   totalQuestions: number;
   answeredCount: number;
@@ -94,7 +101,8 @@ export function InterviewComplete({
   const done = result?.status === "scored" ? result : null;
   const percent = Math.round(done?.composite_score_percent ?? 0);
   const belowBar = done !== null && !vault && percent < 60 && done.reattemptable !== false;
-  const canReattempt = belowBar || (result?.status === "needs_human_review" && result.reattemptable === true);
+  // A study set can always be practised again; any other interview only when it scored below the bar (or could not be scored).
+  const canReattempt = study ? done !== null && done.reattemptable !== false : belowBar || (result?.status === "needs_human_review" && result.reattemptable === true);
 
   const rise = (delay: number) => (reduce ? {} : { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay } });
 
@@ -104,16 +112,18 @@ export function InterviewComplete({
         <motion.div {...rise(0)} className="flex flex-col items-center gap-5">
           <AptRunOrb mode={scoring ? "thinking" : "idle"} signal={signal} className="w-[clamp(96px,19vh,176px)]" />
           <div>
-            <h2 className="text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">{vault ? "Set complete" : "Interview complete"}</h2>
+            <h2 className="text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">{vault || study ? "Set complete" : "Interview complete"}</h2>
             {scoring ? (
               <p className="mx-auto mt-2 flex max-w-sm items-center justify-center gap-2 text-sm text-text-muted">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-                Scoring your interview with AI...
+                {study ? "Preparing your summary..." : "Scoring your interview with AI..."}
               </p>
             ) : result?.status === "needs_human_review" ? (
               <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">Your answers have been saved. A real person will review your responses.</p>
             ) : (
-              <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">Here&apos;s how you did — a human reviewer can still adjust this afterward.</p>
+              <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
+                {study ? "Here is how much of each model answer you covered. Go through them below, then practise the set again." : "Here's how you did — a human reviewer can still adjust this afterward."}
+              </p>
             )}
           </div>
         </motion.div>
@@ -125,7 +135,9 @@ export function InterviewComplete({
           </motion.div>
         )}
 
-        {done ? (
+        {done && study ? (
+          <StudySummary result={done} />
+        ) : done ? (
           <div className="w-full space-y-7 text-left">
             <motion.div {...rise(0.16)} className="flex items-center gap-6">
               <ScoreRing value={percent} size={112} stroke={9} tone={done.passed === false || (!vault && percent < 60) ? "amber" : "emerald"} label={vault ? "Your score for this set" : "AI-scored result"}>
@@ -220,13 +232,13 @@ export function InterviewComplete({
               ) : (
                 <>
                   <RotateCcw className="h-4 w-4" aria-hidden />
-                  <span>{vault ? "Sit this set again" : "Re-attempt Interview"}</span>
+                  <span>{vault ? "Sit this set again" : study ? "Practise this set again" : "Re-attempt Interview"}</span>
                 </>
               )}
             </button>
           )}
           <button onClick={onBack} className={vault && !canReattempt ? PRIMARY : SECONDARY}>
-            {vault ? "Back to Qualification Circuit" : "Back to Interviews"}
+            {backLabel ?? (vault ? "Back to Qualification Circuit" : "Back to Interviews")}
           </button>
         </motion.div>
       </div>

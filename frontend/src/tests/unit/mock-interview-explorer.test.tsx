@@ -103,16 +103,20 @@ const catalog = (roles: MockRole[]): MockCatalogResponse => ({
   min_questions: 5,
 });
 
+const SET_TEXT = "A mixed oral set of about 25 questions across navigation, cargo handling and stowage, and ship operation and safety.";
 const MERCHANT_NAVY = role(
   "merchant_navy",
   "Merchant Navy",
   [
-    stack("second_mate_fg", "Second Mate (FG) Orals", [1], {
+    stack("second_mate_fg", "Second Mate (FG) Orals", [], {
+      live: true,
+      ready_rounds: 25,
+      total_rounds: 25,
       counts_toward_readiness: false,
-      rounds: [1, 2, 3].map((n) => round("second_mate_fg", n, n === 1 ? { ready: true, question_count: 200, sitting_questions: 20, duration_minutes: 30 } : {})),
+      rounds: Array.from({ length: 25 }, (_, i) => ({ ...round("second_mate_fg", i + 1, { ready: true, question_count: 25, sitting_questions: 25, duration_minutes: 30 }), title: `Set ${i + 1}`, description: SET_TEXT })),
     }),
   ],
-  { icon: "Anchor", color: "cyan", terms: { stack: "exam", stacks: "exams" } },
+  { icon: "Anchor", color: "cyan", terms: { stack: "exam", stacks: "exams", round: "set", rounds: "sets" } },
 );
 
 let roles: MockRole[] = [];
@@ -143,7 +147,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("<MockInterviewExplorer>", () => {
-  it("speaks of exams, not tech stacks, in a domain that names its own terms (Merchant Navy)", async () => {
+  it("speaks of exams and sets, not tech stacks and rounds, in a domain that names its own terms (Merchant Navy)", async () => {
     roles = [...ROLES, MERCHANT_NAVY];
     serve();
     render(<MockInterviewExplorer />);
@@ -151,14 +155,21 @@ describe("<MockInterviewExplorer>", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Merchant Navy/ }));
 
     expect(await screen.findByText("Step 2: Choose your exam in Merchant Navy")).toBeTruthy();
-    expect(screen.getByText(/Each exam has three practice rounds/)).toBeTruthy();
+    expect(screen.getByText(/Each exam is split into practice sets/)).toBeTruthy();
+    expect(screen.getByText("25 of 25 sets ready")).toBeTruthy();
     expect(screen.queryByText(/Choose your tech stack in Merchant Navy/)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /Second Mate \(FG\) Orals/ }));
 
-    // A 200-question bank is asked 20 at a time: the card says so instead of promising 200.
-    expect(await screen.findByText(/~30 min · 20 questions/)).toBeTruthy();
-    expect(screen.getByText("a sitting, from a bank of 200")).toBeTruthy();
+    // Twenty-five sets, not three function rounds: compact cards S1..S25, the one shared description shown once above them.
+    expect(await screen.findByText("Step 3: Practise a mock interview")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /Start practice/ })).toHaveLength(25);
+    expect(screen.getByRole("article", { name: "Set 1" })).toBeTruthy();
+    expect(screen.getByRole("article", { name: "Set 25" })).toBeTruthy();
+    expect(screen.getByText("S1")).toBeTruthy();
+    expect(screen.getAllByText(SET_TEXT)).toHaveLength(1);
+    expect(screen.getAllByText(/~30 min · 25 questions/)).toHaveLength(25);
+    expect(screen.queryByText(/Function 1/)).toBeNull();
     expect(screen.getByRole("button", { name: /Back to Merchant Navy exams/ })).toBeTruthy();
     // Exam preparation never moves the placement-readiness score, so the page must not promise that it does.
     expect(screen.getByText(/do not change your placement readiness score/)).toBeTruthy();

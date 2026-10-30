@@ -89,6 +89,11 @@ export interface PlanSignal {
   signature: string;
   /** What the college has filed about a student (year, section) — moves when a TPO edits it; null for staff. Separate from `signature`: it is never a plan change. */
   academic_signature?: string | null;
+  /** The college's name/code/place and the account's own name + login email — moves when a superadmin corrects them; null for accounts with no college. Never a plan change. */
+  profile_signature?: string | null;
+  /** Which whole sections the superadmin has switched on (Merchant Navy ...), and a fingerprint that moves when any of them flips. */
+  modules?: Record<string, boolean>;
+  modules_signature?: string | null;
   source: CoverageSource;
   /** The plan the account is on right now; null when none is running. */
   plan: { code: string; name: string } | null;

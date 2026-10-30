@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers } from "lucide-react";
+import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { cn } from "@/lib/utils";
@@ -33,17 +33,22 @@ import { AuditLogPanel } from "@/components/admin/superadmin/AuditLogPanel";
 import { PlansPricingPanel } from "@/components/admin/superadmin/PlansPricingPanel";
 import { PaymentsPanel } from "@/components/admin/superadmin/PaymentsPanel";
 import { SubscriptionsPanel } from "@/components/admin/superadmin/SubscriptionsPanel";
-import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";import { useToast } from "@/lib/toast";
+import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";
+import { MarketingTeamPanel } from "@/components/admin/superadmin/marketingTeam/MarketingTeamPanel";
+import { MerchantNavyPanel } from "@/components/admin/superadmin/MerchantNavyPanel";
+import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "students" | "leads" | "marketing" | "colleges" | "departments" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "students", label: "Students", icon: GraduationCap },
   { id: "leads", label: "Leads", icon: UserSearch },
   { id: "marketing", label: "Marketing Performance", icon: Megaphone },
+  { id: "marketing_team", label: "Marketing Team", icon: UserCog },
   { id: "colleges", label: "Colleges & TPOs", icon: Building2 },
   { id: "departments", label: "Departments", icon: Layers },
+  { id: "merchant_navy", label: "Merchant Navy", icon: Anchor },
   { id: "plans", label: "Plans & Pricing", icon: Wallet },
   { id: "subscriptions", label: "Subscriptions", icon: BadgeCheck },
   { id: "payments", label: "Payments", icon: CreditCard },  { id: "staff", label: "Mellow Staff", icon: Users2 },
@@ -135,8 +140,10 @@ function SuperAdminPageContent() {
       {activeTab === "students" && <StudentsPanel triggerToast={triggerToast} />}
       {activeTab === "leads" && <LeadsPanel triggerToast={triggerToast} />}
       {activeTab === "marketing" && <MarketingPerformancePanel />}
-      {activeTab === "colleges" && <PartnerCollegesPanel triggerToast={triggerToast} canDeleteColleges />}
+      {activeTab === "marketing_team" && <MarketingTeamPanel triggerToast={triggerToast} />}
+      {activeTab === "colleges" && <PartnerCollegesPanel triggerToast={triggerToast} canDeleteColleges canManageDetails />}
       {activeTab === "departments" && <DepartmentsPanel triggerToast={triggerToast} />}
+      {activeTab === "merchant_navy" && <MerchantNavyPanel triggerToast={triggerToast} />}
       {activeTab === "plans" && <PlansPricingPanel triggerToast={triggerToast} />}
       {activeTab === "subscriptions" && <SubscriptionsPanel triggerToast={triggerToast} />}
       {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}

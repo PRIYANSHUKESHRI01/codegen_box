@@ -5,6 +5,9 @@ export interface MockRoundProgress {
   attempts: number;
   /** Best score of their finished sittings, 0-100; null until one is scored. */
   best_score: number | null;
+  /** Study sets: the newest finished sitting's score and the one before it (null until there are that many). */
+  last_score?: number | null;
+  previous_score?: number | null;
   /** A finished sitting is still being scored. */
   scoring: boolean;
   /** An interview made for this round and not finished: starting the round resumes it. */
@@ -36,11 +39,21 @@ export interface MockStack {
   tags: string[];
   /** At least one round is ready. */
   live: boolean;
+  /** A study exam: not scored by AI; after each answer the model answer and the match are shown. */
+  study?: boolean;
   /** False for exam preparation (Merchant Navy): sittings never change the placement-readiness score. Absent from an older server = true. */
   counts_toward_readiness?: boolean;
   ready_rounds: number;
   total_rounds: number;
   rounds: MockRound[];
+}
+
+/** What a domain calls its parts when it is not "tech stack" / "round" (the Merchant Navy: exam, exams, set, sets). */
+export interface MockTerms {
+  stack: string;
+  stacks: string;
+  round?: string;
+  rounds?: string;
 }
 
 export interface MockRole {
@@ -51,7 +64,7 @@ export interface MockRole {
   badge: string | null;
   color: string;
   /** What this domain calls a stack ("exam" for the Merchant Navy); null = "tech stack". */
-  terms: { stack: string; stacks: string } | null;
+  terms: MockTerms | null;
   stacks_count: number;
   live_stacks_count: number;
   stacks: MockStack[];
@@ -86,7 +99,7 @@ export interface MockCoverageStack {
 export interface MockCoverage {
   min_questions: number;
   stats: { stacks: number; live: number; coming_soon: number };
-  roles: { key: string; title: string; color: string; stacks: MockCoverageStack[] }[];
+  roles: { key: string; title: string; color: string; terms?: MockTerms | null; stacks: MockCoverageStack[] }[];
 }
 
 export interface MockAdminQuestion {
@@ -99,6 +112,10 @@ export interface MockAdminQuestion {
   topic: string | null;
   /** The reference answer holds a figure still to be checked against the current text. */
   needs_review: boolean;
+  /** Where the question came from: the team's question bank ("document"), written by AptRun to fill a set ("generated"), or added here ("staff"). */
+  origin?: "document" | "generated" | "staff";
+  /** The picture this question is asked of (a Rule of the Road card), on this site; null for an ordinary question. Set when the cards are loaded, not editable. */
+  image?: string | null;
 }
 
 export interface MockAdminRound {
@@ -114,7 +131,7 @@ export interface MockAdminStack {
   key: string;
   name: string;
   blurb: string;
-  role: { key: string; title: string };
+  role: { key: string; title: string; terms?: MockTerms | null };
   live: boolean;
   min_questions: number;
   rounds: MockAdminRound[];

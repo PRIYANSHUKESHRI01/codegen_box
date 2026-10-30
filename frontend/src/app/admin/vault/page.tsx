@@ -179,13 +179,27 @@ function OverviewTab({ onToast, onGo }: { onToast: ToastTrigger; onGo: (tab: Tab
           </span>
         </div>
 
-        <ul className="mt-4 grid gap-2 sm:grid-cols-3">
-          <Check ok={sync.url_set} label="VAULT_SYNC_URL" hint="Where profiles are sent" />
-          <Check ok={sync.secret_set} label="VAULT_SYNC_SECRET" hint="Signs every delivery" />
-          <Check ok={sync.api_key_set} label="VAULT_API_KEY" hint="Lets Mellow Vault call AptRun" />
-        </ul>
+        {sync.driver === "database" ? (
+          <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Check ok={sync.configured} label="MELLOW_VAULT_DB_DATABASE" hint={sync.database_name ? `Writing into “${sync.database_name}”` : "The Mellow Vault database"} />
+            <Check ok={sync.database_reachable === true} label="Database reachable" hint="developer_details_tb can be read and written" />
+            <Check ok label="VAULT_SYNC_DRIVER=database" hint="Temporary local hand-off, not the signed HTTP push" />
+          </ul>
+        ) : (
+          <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+            <Check ok={sync.url_set} label="VAULT_SYNC_URL" hint="Where profiles are sent" />
+            <Check ok={sync.secret_set} label="VAULT_SYNC_SECRET" hint="Signs every delivery" />
+            <Check ok={sync.api_key_set} label="VAULT_API_KEY" hint="Lets Mellow Vault call AptRun" />
+          </ul>
+        )}
 
-        {!sync.configured && (
+        {sync.driver === "database" && sync.configured && sync.database_reachable === false && (
+          <p role="alert" className="mt-3 rounded-control border border-status-danger/30 bg-status-danger/10 p-3 text-2xs leading-relaxed text-status-danger">
+            AptRun can&apos;t reach the Mellow Vault database (or its <code>developer_details_tb</code> table). Nothing is lost: every change waits in the queue and is written as soon as it can.
+          </p>
+        )}
+
+        {!sync.configured && sync.driver !== "database" && (
           <p className="mt-3 rounded-control border border-status-warning/30 bg-status-warning/10 p-3 text-2xs leading-relaxed text-text-secondary">
             Nothing is being sent to Mellow Vault yet — and nothing is lost: every change is kept and goes out the moment both <strong>VAULT_SYNC_URL</strong> and <strong>VAULT_SYNC_SECRET</strong> are set in the server&apos;s <code>.env</code>.
             Students who agreed to be found are still visible to hiring partners on AptRun in the meantime.

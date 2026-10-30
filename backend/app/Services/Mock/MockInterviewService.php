@@ -6,7 +6,9 @@ use App\Models\Interview;
 use App\Models\InterviewSession;
 use App\Models\User;
 use App\Services\CuratedInterviewSetService;
+use App\Services\Interviews\StudyHistory;
 use App\Services\PlanGate;
+use App\Services\PlatformModules;
 use App\Support\InterviewDiscipline;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -27,6 +29,9 @@ class MockInterviewService
 {
     public const SOURCE = 'mock_round';
 
+    /** What a round shows for a student who has not touched it. */
+    private const EMPTY_PROGRESS = ['attempts' => 0, 'best_score' => null, 'last_score' => null, 'previous_score' => null, 'scoring' => false, 'open_slug' => null, 'open_status' => null];
+
     public function __construct(
         private readonly MockInterviewCatalog $catalog,
         private readonly CuratedInterviewSetService $curated,
@@ -42,7 +47,14 @@ class MockInterviewService
         $roles = [];
         $stats = ['total_roles' => 0, 'total_stacks' => 0, 'live_stacks' => 0, 'total_questions' => 0];
 
+        $modules = app(PlatformModules::class);
+
         foreach ($this->catalog->roles() as $role) {
+            // A domain whose module the superadmin has switched off does not exist for students: no card, no stacks, no counts.
+            if ($modules->hidesMockDomain((string) $role['key'])) {
+                continue;
+            }
+
             $stacks = [];
             $live = 0;
 
@@ -64,7 +76,7 @@ class MockInterviewService
                         // What one sitting asks: a round with 200 questions in its bank still takes ~20 at a time.
                         'sitting_questions' => min($count, $this->sittingLength($stack)),
                         'ready' => $this->catalog->isRoundReady($round),
-                        'my' => $mine[$round['id']] ?? ['attempts' => 0, 'best_score' => null, 'scoring' => false, 'open_slug' => null, 'open_status' => null],
+                        'my' => $mine[$round['id']] ?? self::EMPTY_PROGRESS,
                     ];
                 }
 
@@ -80,6 +92,8 @@ class MockInterviewService
                     'aliases' => $stack['aliases'],
                     'tags' => $stack['tags'],
                     'live' => $progress['live'],
+                    // A study exam: no AI scoring; after each answer the student is shown the model answer and how much of it they covered.
+                    'study' => (bool) ($stack['study_mode'] ?? false),
                     // Merchant Navy practice is exam preparation: it never moves the placement-readiness score (Interview::scopeCountsTowardReadiness).
                     'counts_toward_readiness' => ($stack['discipline'] ?? null) !== InterviewDiscipline::MARITIME_KEY,
                     'ready_rounds' => $progress['ready_rounds'],
@@ -118,6 +132,13 @@ class MockInterviewService
             throw new NotFoundHttpException('That mock interview round does not exist.');
         }
 
+        $modules = app(PlatformModules::class);
+        $module = $modules->moduleOfMockDomain((string) $target['role']['key']);
+
+        if ($module !== null && ! $modules->enabled($module)) {
+            throw PlatformModules::unavailable($module);
+        }
+
         if (! $this->catalog->isRoundReady($target['round'])) {
             throw new ConflictHttpException("This round is still being prepared — questions for {$target['stack']['name']} are on their way.");
         }
@@ -126,10 +147,20 @@ class MockInterviewService
             return $waiting;
         }
 
-        $this->gate->assertMockInterviewAllowed($user);
-
         $round = $target['round'];
-        $picked = array_map($this->forScorer(...), $this->pick($user, $roundId, $round['questions'], $this->sittingLength($target['stack'])));
+        $study = (bool) ($target['stack']['study_mode'] ?? false);
+
+        // A study set (Merchant Navy) is not rationed: no free-plan try, no daily limit. Every other mock interview still is.
+        if (! $study) {
+            $this->gate->assertMockInterviewAllowed($user);
+        }
+        $picked = $this->pick($user, $roundId, $round['questions'], $this->sittingLength($target['stack']));
+
+        // Scored by AI: the model answer is the scorer's rubric, with a note when its figures are unchecked. Study mode has no AI scorer, and
+        // the student READS this text, so it is kept exactly as written.
+        if (! $study) {
+            $picked = array_map($this->forScorer(...), $picked);
+        }
 
         return $this->curated->createInterviewFromTarget(
             $user,
@@ -153,6 +184,7 @@ class MockInterviewService
                 'source' => self::SOURCE,
                 'mock_round_id' => $roundId,
                 'mock_question_ids' => array_values(array_filter(array_column($picked, 'id'))),
+                'study' => $study,
             ]
         );
     }
@@ -271,7 +303,7 @@ class MockInterviewService
     /**
      * How this student has done on every round they have touched.
      *
-     * @return array<string, array{attempts: int, best_score: ?int, scoring: bool, open_slug: ?string, open_status: ?string}>
+     * @return array<string, array{attempts: int, best_score: ?int, last_score: ?int, previous_score: ?int, scoring: bool, open_slug: ?string, open_status: ?string}>
      */
     private function progress(User $user): array
     {
@@ -282,16 +314,15 @@ class MockInterviewService
             ->orderByDesc('id')
             ->get(['id', 'slug', 'practice_config']);
 
-        if ($interviews->isEmpty()) {
-            return [];
-        }
-
         $sessions = InterviewSession::where('user_id', $user->id)
             ->whereIn('interview_id', $interviews->pluck('id'))
             ->get(['interview_id', 'status', 'composite_score_percent'])
             ->keyBy('interview_id');
 
         $out = [];
+        // Study sets (Merchant Navy) are counted from the permanent attempt ledger, not from the interviews: "Practise again" resets the very same
+        // interview, so counting interviews would forget every sitting but the newest.
+        $ledger = app(StudyHistory::class)->byRound($user);
 
         foreach ($interviews as $interview) {
             $roundId = (string) ($interview->practice_config['mock_round_id'] ?? '');
@@ -300,7 +331,7 @@ class MockInterviewService
                 continue;
             }
 
-            $out[$roundId] ??= ['attempts' => 0, 'best_score' => null, 'scoring' => false, 'open_slug' => null, 'open_status' => null];
+            $out[$roundId] ??= self::EMPTY_PROGRESS;
             $session = $sessions[$interview->id] ?? null;
 
             if ($session?->status === InterviewSession::STATUS_COMPLETED) {
@@ -317,6 +348,14 @@ class MockInterviewService
                 $out[$roundId]['open_slug'] = $interview->slug;
                 $out[$roundId]['open_status'] = $session?->status === InterviewSession::STATUS_IN_PROGRESS ? 'in_progress' : 'ready';
             }
+        }
+
+        foreach ($ledger as $roundId => $row) {
+            $out[$roundId] ??= self::EMPTY_PROGRESS;
+            $out[$roundId]['attempts'] = max($out[$roundId]['attempts'], $row['attempts']);
+            $out[$roundId]['best_score'] = max($out[$roundId]['best_score'] ?? 0, $row['best_score']);
+            $out[$roundId]['last_score'] = $row['last_score'];
+            $out[$roundId]['previous_score'] = $row['previous_score'];
         }
 
         return $out;

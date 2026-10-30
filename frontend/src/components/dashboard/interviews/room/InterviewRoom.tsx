@@ -59,6 +59,8 @@ export interface InterviewRoomProps {
   transcriptSlot?: ReactNode;
   /** Drawn over the orb's centre — the 3-2-1 before the interview starts. */
   orbOverlay?: ReactNode;
+  /** A picture that goes with the question (a Rule of the Road card): above the transcript, so it stays in view while the question is read and answered. */
+  figure?: ReactNode;
   /** Who is talking right now, for the transcript's indicator. */
   speaker: Speaker;
   /** The browser's network connection. When it drops the header says so at once, while an answer can still be kept and sent later. */
@@ -127,7 +129,7 @@ function OrbRing({ ratio, color, counting }: { ratio: number; color: string; cou
  * three columns stack and the camera shrinks to a corner tile.
  */
 export function InterviewRoom(props: InterviewRoomProps) {
-  const { sessionLabel, sessionNote, steps, elapsedSeconds, strikes, mode, signal, status, actions, notice, cameraStream, candidateName, micLabel, micLive, micUnavailable, turns, transcriptSlot, orbOverlay, speaker, online } = props;
+  const { sessionLabel, sessionNote, steps, elapsedSeconds, strikes, mode, signal, status, actions, notice, cameraStream, candidateName, micLabel, micLive, micUnavailable, turns, transcriptSlot, orbOverlay, figure, speaker, online } = props;
 
   const countdown = status.countdown;
   const ratio = countdown ? countdown.secondsLeft / Math.max(1, countdown.totalSeconds) : 1;
@@ -222,7 +224,14 @@ export function InterviewRoom(props: InterviewRoomProps) {
           <div className="min-h-[1.25rem] text-center">{notice}</div>
         </section>
 
-        {transcriptSlot ?? <LiveTranscript turns={turns} speaker={speaker} />}
+        {figure ? (
+          <div className="flex min-h-0 min-w-0 flex-col gap-3 lg:pt-4">
+            {figure}
+            <div className="flex min-h-0 flex-1 flex-col">{transcriptSlot ?? <LiveTranscript turns={turns} speaker={speaker} />}</div>
+          </div>
+        ) : (
+          (transcriptSlot ?? <LiveTranscript turns={turns} speaker={speaker} />)
+        )}
       </div>
 
       {/* Sits in the strip the grid above leaves free along the bottom, so it never covers the end of the transcript. */}

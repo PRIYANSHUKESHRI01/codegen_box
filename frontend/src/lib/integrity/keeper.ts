@@ -21,6 +21,12 @@ export interface KeptAttempt {
   /** Stop everything the entry holds. */
   release: () => void;
   /**
+   * How long to wait for the next page before releasing (default 20 s). Only a contest moves between pages of one attempt; for everything else
+   * the only "next page" is the same page mounting again (React's dev double-mount, a reload of the route), which happens at once. A student
+   * who leaves an interview must not be left with the camera light on for twenty seconds.
+   */
+  graceMs?: number;
+  /**
    * Nobody took the entry over within a moment: the student has left the attempt's pages (not just moved to the next
    * problem). The streams are kept for the longer grace period in case they come straight back, but fullscreen should not
    * be left on a page that is no longer an exam.
@@ -38,7 +44,7 @@ export function park(key: string, entry: KeptAttempt): void {
   const timer = window.setTimeout(() => {
     parked.delete(key);
     entry.release();
-  }, GRACE_MS);
+  }, entry.graceMs ?? GRACE_MS);
   const quick = window.setTimeout(() => entry.onUnclaimed?.(), UNCLAIMED_MS);
   parked.set(key, { entry, timer, quick });
 }

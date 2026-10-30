@@ -476,6 +476,31 @@ describe("moving between pages of the same attempt", () => {
     expect(stopTrack).toHaveBeenCalled(); // released only when nobody takes them
   });
 
+  it("lets go of an interview's camera within moments of leaving it, but holds a contest's for the next problem", async () => {
+    vi.useFakeTimers();
+    try {
+      const interview = build({ surface: "interview", basePath: "/me/interviews/set-1", keepKey: "/me/interviews/set-1" });
+      await startAttempt(interview.engine);
+      stopTrack.mockClear();
+      interview.engine.destroy({ keep: true });
+      expect(stopTrack).not.toHaveBeenCalled(); // parked for an instant, for a remount of the same page
+      vi.advanceTimersByTime(2000);
+      expect(stopTrack).toHaveBeenCalled(); // nobody came: the camera light goes out, not 20 seconds later
+      expect(parkedCount()).toBe(0);
+
+      const contest = build();
+      await startAttempt(contest.engine);
+      stopTrack.mockClear();
+      contest.engine.destroy({ keep: true });
+      vi.advanceTimersByTime(5000);
+      expect(stopTrack).not.toHaveBeenCalled(); // the next problem's page still has its camera
+      expect(parkedCount()).toBe(1);
+      discard("contest:c1");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("the next page takes them over, keeps the same instance, and resumes without asking again", async () => {
     const first = build();
     await startAttempt(first.engine);

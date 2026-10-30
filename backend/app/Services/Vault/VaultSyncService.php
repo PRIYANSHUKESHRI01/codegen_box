@@ -37,11 +37,27 @@ class VaultSyncService
     /** A claimed event that has not finished after this long belongs to a crashed run, and is released. */
     private const STALE_CLAIM_MINUTES = 5;
 
-    public function __construct(private readonly VaultPayloadBuilder $payloads) {}
+    public function __construct(
+        private readonly VaultPayloadBuilder $payloads,
+        private readonly MellowVaultDeveloperWriter $writer,
+    ) {}
 
-    /** URL and secret both set. Without a secret nothing is ever sent — never an unsigned request. */
+    /** `http` (the signed push to Mellow Vault's endpoint) or `database` (straight into its developer_details_tb - the temporary local arrangement). */
+    public function driver(): string
+    {
+        return config('vault.driver') === 'database' ? 'database' : 'http';
+    }
+
+    /**
+     * Whether anything can be delivered. http: URL and secret both set (without a secret nothing is ever sent - never an unsigned request).
+     * database: the Mellow Vault database is named. Reachability is not judged here (this runs on every status read); health() checks it.
+     */
     public function isConfigured(): bool
     {
+        if ($this->driver() === 'database') {
+            return filled(config('database.connections.'.config('vault.database.connection', 'mellow_vault').'.database'));
+        }
+
         return filled(config('vault.sync_url')) && filled(config('vault.sync_secret'));
     }
 
@@ -129,7 +145,11 @@ class VaultSyncService
             'type' => VaultSyncEvent::TYPE_WITHDRAW,
             'reason' => $reason,
             'sequence' => $this->nextSequence($profile),
-            'payload' => ['profile' => ['id' => $profile->public_id]],
+            // `target` exists only for the database driver (who to take down); it is never part of an HTTP delivery and is scrubbed as soon
+            // as the withdrawal is delivered.
+            'payload' => ['profile' => ['id' => $profile->public_id]] + ($this->driver() === 'database'
+                ? ['target' => ['external_id' => $profile->external_id, 'email' => $profile->user?->email, 'user_id' => $profile->user_id]]
+                : []),
             'available_at' => now(),
         ]);
 
@@ -241,6 +261,10 @@ class VaultSyncService
     /** @return string the event's resulting status */
     private function deliver(VaultSyncEvent $event): string
     {
+        if ($this->driver() === 'database') {
+            return $this->deliverToDatabase($event);
+        }
+
         $body = json_encode($this->envelope($event), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $timestamp = (string) time();
 
@@ -276,6 +300,29 @@ class VaultSyncService
         }
 
         return $this->markFailed($event, $statusCode, $error);
+    }
+
+    /**
+     * The last hop for the `database` driver: write the listing into Mellow Vault's developer_details_tb. Everything around it - the outbox,
+     * the ordering, the retries with backoff, the dead-letter list - is the same code the HTTP push uses.
+     */
+    private function deliverToDatabase(VaultSyncEvent $event): string
+    {
+        try {
+            $result = $this->writer->apply($event);
+        } catch (MellowVaultWriteException $e) {
+            // 422 stands for "this payload is wrong, retrying cannot help" (the same convention the HTTP path uses).
+            return $this->markFailed($event, $e->permanent ? 422 : null, $e->getMessage());
+        } catch (Throwable $e) {
+            return $this->markFailed($event, null, mb_substr($e->getMessage(), 0, 400));
+        }
+
+        if ($event->type === VaultSyncEvent::TYPE_WITHDRAW) {
+            // Who was taken down is no longer needed - and for a deleted account must not be kept.
+            $event->update(['payload' => ['profile' => $event->payload['profile'] ?? ['id' => $event->profile_public_id], 'scrubbed' => true]]);
+        }
+
+        return $this->markDelivered($event, 200, $result['id'] !== null ? ['id' => (string) $result['id']] : []);
     }
 
     /** What Mellow Vault receives. `profile` is the whole listing for an upsert, just the id for a withdrawal. */
@@ -367,6 +414,17 @@ class VaultSyncService
 
     // ───────────────────────────── operating it ─────────────────────────────
 
+    private function databaseReachable(): bool
+    {
+        try {
+            $this->writer->connection()->getPdo();
+
+            return $this->writer->connection()->getSchemaBuilder()->hasTable((string) config('vault.database.table', 'developer_details_tb'));
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
     /** Gives parked events another full set of attempts — after the receiving end has been fixed. */
     public function retryDead(?int $eventId = null): int
     {
@@ -393,7 +451,7 @@ class VaultSyncService
      * The picture the admin Vault page shows: is Mellow Vault connected, and is
      * anything stuck.
      *
-     * @return array{configured: bool, url_set: bool, secret_set: bool, api_key_set: bool, pending: int, retrying: int, dead: int, delivered_24h: int, oldest_waiting_minutes: ?int}
+     * @return array{driver: string, configured: bool, database_name: ?string, database_reachable: ?bool, url_set: bool, secret_set: bool, api_key_set: bool, pending: int, retrying: int, dead: int, delivered_24h: int, oldest_waiting_minutes: ?int}
      */
     public function health(): array
     {
@@ -405,7 +463,10 @@ class VaultSyncService
         $oldest = VaultSyncEvent::whereIn('status', [VaultSyncEvent::STATUS_PENDING, VaultSyncEvent::STATUS_FAILED])->min('created_at');
 
         return [
+            'driver' => $this->driver(),
             'configured' => $this->isConfigured(),
+            'database_name' => $this->driver() === 'database' ? config('database.connections.'.config('vault.database.connection', 'mellow_vault').'.database') : null,
+            'database_reachable' => $this->driver() === 'database' ? $this->databaseReachable() : null,
             'url_set' => filled(config('vault.sync_url')),
             'secret_set' => filled(config('vault.sync_secret')),
             'api_key_set' => filled(config('vault.api_key')),

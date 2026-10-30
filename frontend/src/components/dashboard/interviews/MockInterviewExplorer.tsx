@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { MODULES_CHANGED_EVENT } from "@/lib/planSync";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Hourglass, Loader2, Mic, PlayCircle, RotateCcw, Search, X, AlertCircle, Trophy } from "lucide-react";
@@ -10,10 +11,10 @@ import { CARD, Rise, isLive, roleIconOf, shortName, stackIconOf, themeOf } from 
 import type { MockCatalogResponse, MockRole, MockRound, MockStack, MockStartResponse } from "@/types/mockInterview";
 
 /** Where the student is in the three steps, and a way back to any step already passed. */
-function StepNav({ step, role, stack, onRoles, onStacks }: { step: 1 | 2 | 3; role: MockRole | null; stack: MockStack | null; onRoles: () => void; onStacks: () => void }) {
+function StepNav({ step, role, stack, single = false, onRoles, onStacks }: { step: 1 | 2 | 3; role: MockRole | null; stack: MockStack | null; single?: boolean; onRoles: () => void; onStacks: () => void }) {
   const steps = [
-    { n: 1, label: "All domains", sub: "Choose a domain", go: onRoles },
-    { n: 2, label: role ? role.title : "Tech stack", sub: `Choose a ${role?.terms?.stack ?? "tech stack"}`, go: onStacks },
+    { n: 1, label: single ? "Start" : "All domains", sub: single ? "Open the card" : "Choose a domain", go: onRoles },
+    { n: 2, label: role ? role.title : "Tech stack", sub: `Choose a ${role?.terms?.stack ?? (single ? "exam" : "tech stack")}`, go: onStacks },
     { n: 3, label: stack ? stack.name : "Practise", sub: "Practise a mock interview", go: undefined },
   ] as const;
 
@@ -65,7 +66,7 @@ function StatusChip({ stack }: { stack: MockStack }) {
   );
 }
 
-function RoundCard({ round, starting, disabled, onStart }: { round: MockRound; starting: boolean; disabled: boolean; onStart: () => void }) {
+function RoundCard({ round, unit, compact, starting, disabled, onStart }: { round: MockRound; unit: string; compact: boolean; starting: boolean; disabled: boolean; onStart: () => void }) {
   const { my } = round;
   const action = my.open_status === "in_progress" ? "Resume" : my.open_status === "ready" ? "Start" : my.attempts > 0 ? "Practise again" : "Start practice";
   const ActionIcon = my.open_status === "in_progress" ? PlayCircle : my.attempts > 0 && !my.open_status ? RotateCcw : Mic;
@@ -73,7 +74,7 @@ function RoundCard({ round, starting, disabled, onStart }: { round: MockRound; s
   return (
     <article className={cn("flex h-full flex-col gap-3 rounded-2xl border bg-surface p-5 shadow-subtle", round.ready ? "border-border-subtle" : "border-dashed border-border-strong")} aria-label={round.title}>
       <div className="flex items-start justify-between gap-2">
-        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-extrabold", round.ready ? "bg-accent-primary/10 text-accent-primary" : "bg-elevated text-text-muted")}>R{round.round_number}</span>
+        <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-extrabold", round.ready ? "bg-accent-primary/10 text-accent-primary" : "bg-elevated text-text-muted")}>{unit.charAt(0).toUpperCase()}{round.round_number}</span>
         {round.ready ? (
           <span className="inline-flex items-start gap-1 text-left text-3xs font-bold leading-snug text-text-muted">
             <Clock className="mt-px h-3 w-3 shrink-0" aria-hidden />
@@ -97,7 +98,7 @@ function RoundCard({ round, starting, disabled, onStart }: { round: MockRound; s
 
       <div>
         <h4 className="text-sm font-extrabold text-primary">{round.title}</h4>
-        <p className="mt-1 text-xs leading-relaxed text-text-secondary">{round.description}</p>
+        {!compact && <p className="mt-1 text-xs leading-relaxed text-text-secondary">{round.description}</p>}
       </div>
 
       <div className="mt-auto space-y-3">
@@ -113,6 +114,18 @@ function RoundCard({ round, starting, disabled, onStart }: { round: MockRound; s
                 "Scoring your answers…"
               )}
             </span>
+            {/* Study sets keep every sitting's score: the newest one and how it moved from the one before. */}
+            {my.last_score != null && my.attempts > 1 && (
+              <span data-testid="set-last-score">
+                Last <strong className="tabular font-bold text-primary">{my.last_score}%</strong>
+                {my.previous_score != null && my.last_score !== my.previous_score && (
+                  <span className={my.last_score > my.previous_score ? "ml-1 font-bold text-status-success" : "ml-1 font-bold text-status-danger"}>
+                    {my.last_score > my.previous_score ? "▲" : "▼"}
+                    {Math.abs(my.last_score - my.previous_score)}
+                  </span>
+                )}
+              </span>
+            )}
             <span>
               {my.attempts} {my.attempts === 1 ? "sitting" : "sittings"}
             </span>
@@ -145,15 +158,29 @@ function RoundCard({ round, starting, disabled, onStart }: { round: MockRound; s
   );
 }
 
-const BASE = "/dashboard/interviews";
+const DEFAULT_BASE = "/dashboard/interviews";
 
 /**
  * The Mock AI Interview's practice area: Step 1 choose a domain, Step 2 choose a tech stack, Step 3 practise one of its three rounds —
  * the same shape as the Vault AI Interview, minus the qualification (no attempts to lose, no pass mark, practise as often as the plan
  * allows). A stack whose questions have not been written yet shows as "Coming soon" with what its rounds will cover.
  */
-export function MockInterviewExplorer({ className }: { className?: string }) {
+export function MockInterviewExplorer({
+  className,
+  basePath = DEFAULT_BASE,
+  onlyDomain,
+  launchFrom,
+}: {
+  className?: string;
+  /** The page the explorer lives on: its steps are kept in that page's address (?domain=&stack=). */
+  basePath?: string;
+  /** Show only this domain (the Merchant Navy page): its one card is Step 1, the exams are Step 2, the sets Step 3. No search, no domain filter. */
+  onlyDomain?: string;
+  /** Where a started interview should lead back to ("merchant-navy"); added to the interview's address as ?from=. */
+  launchFrom?: string;
+}) {
   const router = useRouter();
+  const BASE = basePath;
   const [catalog, setCatalog] = useState<MockCatalogResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -190,17 +217,26 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
     };
   }, [reloadKey]);
 
-  const roles = catalog?.roles ?? [];
+  // The superadmin switched a whole domain (Merchant Navy) on or off while this page is open: ask the server again, quietly (the old tree stays up until the new one lands).
+  useEffect(() => {
+    const onModules = () => setReloadKey((k) => k + 1);
+    window.addEventListener(MODULES_CHANGED_EVENT, onModules);
+    return () => window.removeEventListener(MODULES_CHANGED_EVENT, onModules);
+  }, []);
+
+  const roles = useMemo(() => (catalog?.roles ?? []).filter((r) => !onlyDomain || r.key === onlyDomain), [catalog, onlyDomain]);
   const role = useMemo(() => roles.find((r) => r.key === roleKey) ?? null, [roles, roleKey]);
   const stack = useMemo(() => role?.stacks.find((s) => s.key === stackKey) ?? null, [role, stackKey]);
   const step: 1 | 2 | 3 = !role ? 1 : !stack ? 2 : 3;
+  // A stack split into many sets (the Merchant Navy orals) gets compact cards and its one shared description shown once above them.
+  const setsLayout = !!stack && stack.rounds.length > 6 && new Set(stack.rounds.map((r) => r.description)).size === 1;
 
   // A link to a domain or stack that does not exist (a stale bookmark) drops back to the nearest step that does.
   useEffect(() => {
     if (!catalog) return;
     if (roleKey && !role) router.replace(BASE);
     else if (stackKey && role && !stack) router.replace(`${BASE}?domain=${encodeURIComponent(role.key)}`);
-  }, [catalog, roleKey, stackKey, role, stack, router]);
+  }, [catalog, roleKey, stackKey, role, stack, router, BASE]);
 
   // Opening or leaving a card brings the explorer back into view - the card that was clicked may have been far down the page.
   useEffect(() => {
@@ -228,7 +264,7 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
     setActionError(null);
     try {
       const res = await api.post<MockStartResponse>(`/mock-interviews/rounds/${encodeURIComponent(round.id)}/start`);
-      router.push(`/dashboard/interviews/view?slug=${encodeURIComponent(res.interview.slug)}`);
+      router.push(`/dashboard/interviews/view?slug=${encodeURIComponent(res.interview.slug)}${launchFrom ? `&from=${encodeURIComponent(launchFrom)}` : ""}`);
     } catch (err) {
       setActionError({ message: err instanceof ApiError ? err.message : "Something went wrong starting this interview. Please try again.", upgrade: err instanceof ApiError && err.status === 402 });
       setStartingId(null);
@@ -261,7 +297,8 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
   return (
     <section ref={sectionRef} className={cn("space-y-5 scroll-mt-20", className)} aria-label="Practise a mock interview by domain">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <StepNav step={step} role={role} stack={stack} onRoles={() => go(null)} onStacks={() => go(roleKey)} />
+        <StepNav step={step} role={role} stack={stack} single={!!onlyDomain} onRoles={() => go(null)} onStacks={() => go(roleKey)} />
+        {!onlyDomain && (
         <label className="relative w-full sm:w-72">
           <span className="sr-only">Search domains and tech stacks</span>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" aria-hidden />
@@ -277,11 +314,12 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
             </button>
           )}
         </label>
+        )}
       </div>
 
       {results === null && step > 1 && role && (
         <button type="button" onClick={() => (step === 3 ? go(role.key) : go(null))} className="inline-flex items-center gap-1.5 text-xs font-bold text-accent-primary hover:underline">
-          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {step === 3 ? `Back to ${role.title} ${role.terms?.stacks ?? "tech stacks"}` : "Back to all domains"}
+          <ArrowLeft className="h-3.5 w-3.5" aria-hidden /> {step === 3 ? `Back to ${role.title} ${role.terms?.stacks ?? "tech stacks"}` : onlyDomain ? "Back to the start" : "Back to all domains"}
         </button>
       )}
 
@@ -334,9 +372,12 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
         <div className="space-y-4">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-primary">Step 1: Choose your domain</h3>
-              <p className="text-xs text-text-secondary">Pick the field you are preparing for to see what you can practise.</p>
+              <h3 className="text-sm font-bold text-primary">{onlyDomain ? "Practise for your oral exam" : "Step 1: Choose your domain"}</h3>
+              <p className="text-xs text-text-secondary">
+                {onlyDomain ? "Open the card to choose your exam, then work through a set of questions." : "Pick the field you are preparing for to see what you can practise."}
+              </p>
             </div>
+            {!onlyDomain && (
             <div role="group" aria-label="Filter domains" className="inline-flex rounded-full border border-border-subtle bg-surface p-0.5 text-2xs font-bold shadow-subtle">
               {[
                 { v: false, label: "All domains" },
@@ -353,6 +394,7 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
                 </button>
               ))}
             </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -407,7 +449,7 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-bold text-primary">Step 2: Choose your {role.terms?.stack ?? "tech stack"} in {role.title}</h3>
-            <p className="text-xs text-text-secondary">Each {role.terms?.stack ?? "stack"} has three practice rounds. Those marked Coming soon are still being prepared.</p>
+            <p className="text-xs text-text-secondary">{role.terms?.rounds ? `Each ${role.terms.stack} is split into practice ${role.terms.rounds}.` : "Each stack has three practice rounds."} Those marked Coming soon are still being prepared.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {role.stacks.map((s, i) => (
@@ -438,15 +480,16 @@ export function MockInterviewExplorer({ className }: { className?: string }) {
 
           {!isLive(stack) && (
             <div className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-4 text-xs leading-relaxed text-text-secondary">
-              <strong className="font-bold text-primary">Mock interviews for {stack.name} are coming soon.</strong> The questions are being written. Here is what the three rounds will cover, so you can start preparing.
+              <strong className="font-bold text-primary">Mock interviews for {stack.name} are coming soon.</strong> The questions are being written. Here is what the {role.terms?.rounds ?? "three rounds"} will cover, so you can start preparing.
             </div>
           )}
 
           <h3 className="text-sm font-bold text-primary">Step 3: Practise a mock interview</h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {setsLayout && <p className="max-w-3xl text-xs leading-relaxed text-text-secondary">{stack.rounds[0].description}</p>}
+          <div className={cn("grid gap-4", setsLayout ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1 md:grid-cols-3")}>
             {stack.rounds.map((round, i) => (
               <Rise key={round.id} i={i} className="h-full">
-                <RoundCard round={round} starting={startingId === round.id} disabled={startingId !== null} onStart={() => void start(round)} />
+                <RoundCard round={round} unit={role.terms?.round ?? "round"} compact={setsLayout} starting={startingId === round.id} disabled={startingId !== null} onStart={() => void start(round)} />
               </Rise>
             ))}
           </div>
@@ -483,10 +526,10 @@ function StackCard({ role, stack, i, onOpen }: { role: MockRole; stack: MockStac
         </div>
         <div className="relative mt-auto flex items-center justify-between border-t border-border-subtle pt-3 text-2xs text-text-muted">
           <span className={cn("text-3xs font-bold", open ? "text-emerald-600 dark:text-emerald-400" : "text-text-muted")}>
-            {open ? `${stack.ready_rounds} of ${stack.total_rounds} rounds ready` : "3 rounds · questions on the way"}
+            {open ? `${stack.ready_rounds} of ${stack.total_rounds} ${role.terms?.rounds ?? "rounds"} ready` : `${stack.total_rounds} ${role.terms?.rounds ?? "rounds"} · questions on the way`}
           </span>
           <span className="inline-flex items-center gap-1 font-bold text-accent-primary transition-transform group-hover:translate-x-0.5">
-            {open ? "Practise" : "See rounds"} <ArrowRight className="h-3 w-3" />
+            {open ? "Practise" : `See ${role.terms?.rounds ?? "rounds"}`} <ArrowRight className="h-3 w-3" />
           </span>
         </div>
       </button>

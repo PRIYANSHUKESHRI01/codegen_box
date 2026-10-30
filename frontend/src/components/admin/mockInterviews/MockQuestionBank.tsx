@@ -126,7 +126,7 @@ export function MockQuestionBank({ onToast }: { onToast: ToastTrigger }) {
             <h3 className="border-b border-border-subtle bg-elevated/50 px-4 py-2.5 text-xs font-extrabold text-primary">{role.title}</h3>
             <ul className="divide-y divide-border-subtle">
               {role.stacks.map((s) => (
-                <StackRow key={s.key} stack={s} min={min} onOpen={() => setStackKey(s.key)} />
+                <StackRow key={s.key} stack={s} min={min} unit={role.terms?.round ?? "round"} units={role.terms?.rounds ?? "rounds"} onOpen={() => setStackKey(s.key)} />
               ))}
             </ul>
           </section>
@@ -146,7 +146,7 @@ function Stat({ label, value, hint, tone }: { label: string; value: number; hint
   );
 }
 
-function StackRow({ stack, min, onOpen }: { stack: MockCoverageStack; min: number; onOpen: () => void }) {
+function StackRow({ stack, min, unit, units, onOpen }: { stack: MockCoverageStack; min: number; unit: string; units: string; onOpen: () => void }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div className="min-w-0">
@@ -163,18 +163,18 @@ function StackRow({ stack, min, onOpen }: { stack: MockCoverageStack; min: numbe
           )}
         </div>
         <p className="mt-0.5 text-3xs text-text-muted">
-          {stack.questions} {stack.questions === 1 ? "question" : "questions"} · {stack.ready_rounds} of {stack.total_rounds} rounds ready
+          {stack.questions} {stack.questions === 1 ? "question" : "questions"} · {stack.ready_rounds} of {stack.total_rounds} {units} ready
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex gap-1.5" aria-label={`Questions per round for ${stack.name}`}>
+        <div className="flex max-w-md flex-wrap justify-end gap-1.5" aria-label={`Questions per ${unit} for ${stack.name}`}>
           {stack.grid.map((count, i) => (
             <span
               key={i}
-              title={`Round ${i + 1}: ${count} of ${min} needed`}
+              title={`${unit.charAt(0).toUpperCase()}${unit.slice(1)} ${i + 1}: ${count} of ${min} needed`}
               className={cn("rounded-lg px-2 py-1 font-mono text-2xs font-bold ring-1 ring-inset", count >= min ? "bg-status-success/10 text-status-success ring-status-success/25" : count > 0 ? "bg-status-warning/10 text-status-warning ring-status-warning/25" : "bg-elevated text-text-muted ring-border-subtle")}
             >
-              R{i + 1} · {count}
+              {unit.charAt(0).toUpperCase()}{i + 1} · {count}
             </span>
           ))}
         </div>
@@ -236,7 +236,7 @@ function ImportPanel({ onToast, onDone }: { onToast: ToastTrigger; onDone: () =>
             <FileSpreadsheet className="h-4 w-4 text-accent-primary" aria-hidden /> Load questions from a spreadsheet
           </h3>
           <p className="mt-1 text-2xs leading-relaxed text-text-secondary">
-            One row per question: stack, round (1–3), question, category, seconds, note — and, if you use them, topic (the syllabus section) and review (yes = the answer has a figure still to be checked). Uploading a corrected file again is safe — questions already in a round are skipped, and a row with a problem is reported by line number and skipped.
+            One row per question: stack, round (the set number for stacks split into sets), question, category, seconds, note — and, if you use them, topic (the syllabus section) and review (yes = the answer has a figure still to be checked). Uploading a corrected file again is safe — questions already in a round are skipped, and a row with a problem is reported by line number and skipped.
           </p>
         </div>
         <button type="button" onClick={() => void downloadTemplate()} className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-elevated px-3 py-1.5 text-2xs font-bold text-primary hover:bg-surface-hover">
@@ -340,7 +340,7 @@ function StackEditor({ stackKey, onBack, onToast }: { stackKey: string; onBack: 
           <div>
             <h2 className="text-base font-extrabold text-primary">{stack.name}</h2>
             <p className="text-2xs text-text-muted">
-              {stack.role.title} · a round opens to students at {stack.min_questions} questions; {stack.live ? "this stack is open" : "this stack opens with its first ready round"}.
+              {stack.role.title} · {stack.role.terms?.round ? `a ${stack.role.terms.round}` : "a round"} opens to students at {stack.min_questions} questions; {stack.live ? "this stack is open" : "this stack opens with its first ready round"}.
             </p>
           </div>
 
@@ -375,6 +375,16 @@ function StackEditor({ stackKey, onBack, onToast }: { stackKey: string; onBack: 
                           <span className="rounded-full bg-elevated px-2 py-0.5 font-bold uppercase">{q.category}</span>
                           <span>{q.duration_seconds}s</span>
                           {q.topic && <span className="rounded-full border border-border-subtle px-2 py-0.5 font-semibold">{q.topic}</span>}
+                          {q.image && (
+                            <a href={q.image} target="_blank" rel="noreferrer" className="rounded-full bg-sky-500/10 px-2 py-0.5 font-bold uppercase text-sky-700 ring-1 ring-inset ring-sky-500/25 hover:underline dark:text-sky-300" title={`This question is asked of a picture (${q.image}). Pictures are loaded with the cards, not edited here.`}>
+                              Picture
+                            </a>
+                          )}
+                          {q.origin === "generated" && (
+                            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 font-bold uppercase text-violet-700 ring-1 ring-inset ring-violet-500/25 dark:text-violet-300" title="Written by AptRun to fill a set, not taken from the question bank. A master mariner must check the answer before it is relied on.">
+                              AI-written
+                            </span>
+                          )}
                           {q.needs_review && (
                             <span className="rounded-full bg-amber-500/10 px-2 py-0.5 font-bold uppercase text-amber-700 ring-1 ring-inset ring-amber-500/25 dark:text-amber-300" title="The reference answer has a figure that still has to be checked against the current text">
                               Needs review

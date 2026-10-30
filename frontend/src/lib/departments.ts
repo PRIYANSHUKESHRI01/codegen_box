@@ -23,7 +23,9 @@ export type Capability =
   | "domain_prep"
   | "ai_interviews"
   | "soft_skills"
-  | "learning_centre";
+  | "learning_centre"
+  /** A platform-wide switch (Superadmin -> Merchant Navy), not a department matter: false = the section is switched off for everyone. */
+  | "merchant_navy";
 
 export type CapabilityMap = Record<Capability, boolean>;
 
@@ -39,6 +41,7 @@ export const DEFAULT_CAPABILITIES: CapabilityMap = {
   ai_interviews: true,
   soft_skills: true,
   learning_centre: true,
+  merchant_navy: true,
 };
 
 /** A user's resolved capabilities. Anything missing (an old cached user, a staff account) is the engineering default. */

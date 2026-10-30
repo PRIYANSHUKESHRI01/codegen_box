@@ -34,6 +34,17 @@ export const PLAN_SYNC_POLL_MS = 30_000;
 /** Fired (on window) when the college changed this student's year or section while the page was open. Not a plan change: no plan notice goes with it. */
 export const ACADEMIC_CHANGED_EVENT = "aptrun:academic-changed";
 
+/** Fired (on window) when Mellow corrected the college's name/code/place, or this account's own name/email, while the page was open. Not a plan change. */
+export const PROFILE_CHANGED_EVENT = "aptrun:profile-changed";
+
+/** Fired (on window) when the superadmin switched a whole section (Merchant Navy ...) on or off while the page was open. `detail` = { modules, previous }. */
+export const MODULES_CHANGED_EVENT = "aptrun:modules-changed";
+
+export interface ModulesChangedDetail {
+  modules: Record<string, boolean>;
+  previous: Record<string, boolean>;
+}
+
 export type PlanChangeKind = "upgraded" | "extended" | "changed" | "ended";
 
 export interface PlanChangeNotice {
@@ -53,6 +64,8 @@ const PLAN_RANK: Record<string, number> = { coder: 0, expert: 1, grandmaster: 2 
 let baseline: PlanSignal | null = null;
 let baselineOwner: number | null = null;
 let academicBaseline: string | null = null;
+let profileBaseline: string | null = null;
+let modulesBaseline: { signature: string; modules: Record<string, boolean> } | null = null;
 let inFlight: Promise<void> | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let starts = 0;
@@ -124,6 +137,20 @@ export function checkPlanNow({ silent = false }: { silent?: boolean } = {}): Pro
         window.dispatchEvent(new Event(ACADEMIC_CHANGED_EVENT));
       }
 
+      // Mellow renamed the college / changed its code or the TPO's login details: tell whoever shows them (AuthProvider reloads the user).
+      const profileBefore = profileBaseline;
+      profileBaseline = next.profile_signature ?? null;
+      if (previous !== null && profileBefore !== null && profileBaseline !== null && profileBefore !== profileBaseline) {
+        window.dispatchEvent(new Event(PROFILE_CHANGED_EVENT));
+      }
+
+      // The superadmin switched a whole section on or off: tell whoever shows it (the sidebar, the open catalogue). Nothing to do with the plan.
+      const modulesBefore = modulesBaseline;
+      modulesBaseline = typeof next.modules_signature === "string" ? { signature: next.modules_signature, modules: next.modules ?? {} } : null;
+      if (previous !== null && modulesBefore !== null && modulesBaseline !== null && modulesBefore.signature !== modulesBaseline.signature) {
+        window.dispatchEvent(new CustomEvent<ModulesChangedDetail>(MODULES_CHANGED_EVENT, { detail: { modules: modulesBaseline.modules, previous: modulesBefore.modules } }));
+      }
+
       if (previous === null || previous.signature === next.signature) return;
 
       dispatching = true;
@@ -164,6 +191,8 @@ export function startPlanSync(userId: number): () => void {
   if (baselineOwner !== userId) {
     baseline = null;
     academicBaseline = null;
+    profileBaseline = null;
+    modulesBaseline = null;
     baselineOwner = userId;
   }
 
@@ -217,6 +246,8 @@ export function __resetPlanSyncForTests(): void {
   starts = 0;
   baseline = null;
   academicBaseline = null;
+  profileBaseline = null;
+  modulesBaseline = null;
   baselineOwner = null;
   inFlight = null;
   dispatching = false;

@@ -105,7 +105,10 @@ use App\Http\Controllers\Api\StudentVaultController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SuperAdminAccountController;
+use App\Http\Controllers\Api\SuperAdminCollegeController;
 use App\Http\Controllers\Api\SuperAdminController;
+use App\Http\Controllers\Api\SuperAdminMarketingTeamController;
+use App\Http\Controllers\Api\SuperAdminPlatformModuleController;
 use App\Http\Controllers\Api\SuperAdminCredentialController;
 use App\Http\Controllers\Api\SuperAdminPaymentController;
 use App\Http\Controllers\Api\SuperAdminReadinessController;
@@ -135,6 +138,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
+
+// MellowVault 1-Click Single Sign-On (SSO)
+Route::get('/sso/login', [SSOController::class, 'handleSSOLogin'])->name('sso.login');
 
 // The AptRun Guardian (the Windows desktop agent that watches the operating system during a proctored attempt). It is a
 // separate program with its own credentials, so these sit outside the student login: pairing redeems a one-time code, and
@@ -695,12 +701,27 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/credentials/lock', [SuperAdminCredentialController::class, 'lock']);
             Route::post('/users/{user}/credentials', [SuperAdminCredentialController::class, 'reveal'])
                 ->middleware('throttle:superadmin-credentials');
+            // Rename a partner college, change its code / location, or correct its TPO's name and login email. Open TPO and
+            // student screens pick it up on their next plan-signal check (profile_signature). A new TPO email re-asks for the caller's password.
+            Route::put('/colleges/{college}', [SuperAdminCollegeController::class, 'update'])
+                ->middleware('throttle:superadmin-sensitive');
             Route::get('/colleges/{college}/deletion-preview', [SuperAdminController::class, 'collegeDeletionPreview']);
             Route::delete('/colleges/{college}', [SuperAdminController::class, 'destroyCollege'])
                 ->middleware('throttle:superadmin-sensitive');
             Route::get('/marketing-performance', [SuperAdminController::class, 'marketingPerformance']);
+            // The marketing team: who is on it, what each is carrying, hand their work over, delete one (re-asks for the caller's password).
+            Route::get('/marketing-team', [SuperAdminMarketingTeamController::class, 'index']);
+            Route::get('/marketing-team/{user}/workload', [SuperAdminMarketingTeamController::class, 'workload']);
+            Route::post('/marketing-team/{user}/reassign', [SuperAdminMarketingTeamController::class, 'reassign'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::delete('/marketing-team/{user}', [SuperAdminMarketingTeamController::class, 'destroy'])
+                ->middleware('throttle:superadmin-sensitive');
             Route::get('/audit-logs', [SuperAdminController::class, 'auditLogs']);
             Route::get('/judge-nodes', [SuperAdminController::class, 'judgeNodes']);
+            // Whole sections switched on/off for every student (Merchant Navy). The switch is explicit and audited.
+            Route::get('/platform-modules', [SuperAdminPlatformModuleController::class, 'index']);
+            Route::put('/platform-modules/{key}', [SuperAdminPlatformModuleController::class, 'update'])
+                ->middleware('throttle:superadmin-sensitive');
             Route::get('/feature-flags', [SuperAdminController::class, 'featureFlags']);
             Route::post('/feature-flags/{flag}/toggle', [SuperAdminController::class, 'toggleFeatureFlag']);
 
@@ -1334,6 +1355,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
             Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
+
+            // The student's own study history (Merchant Navy): the score of every set they have sat, and a full report of any sitting to download.
+            Route::get('/study-attempts', [\App\Http\Controllers\Api\StudyAttemptController::class, 'index'])->middleware('capability:ai_interviews');
+            Route::get('/study-attempts/{attempt}', [\App\Http\Controllers\Api\StudyAttemptController::class, 'show'])->middleware('capability:ai_interviews');
             // The interviewer's voice (neural text-to-speech, cached). 503 speech_unavailable = use the browser's own voice.
             Route::get('/interviews/{interview}/questions/{interviewQuestion}/speech', [InterviewSpeechController::class, 'question'])->middleware(['capability:ai_interviews', 'throttle:120,1']);
             Route::get('/interviews-speech/lines/{line}', [InterviewSpeechController::class, 'line'])->middleware(['capability:ai_interviews', 'throttle:120,1']);

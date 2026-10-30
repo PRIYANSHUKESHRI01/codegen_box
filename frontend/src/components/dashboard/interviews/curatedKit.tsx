@@ -34,6 +34,7 @@ import {
   Pickaxe,
   Anchor,
   Ship,
+  Lightbulb,
 } from "lucide-react";
 import { VAULT_EASE } from "@/components/dashboard/vaultAi/vaultKit";
 
@@ -98,6 +99,7 @@ const NAMED_ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Pickaxe,
   Anchor,
   Ship,
+  Lightbulb,
 };
 export const roleIconOf = (role: { key: string; icon?: string }) => ROLE_ICONS[role.key] ?? NAMED_ICONS[role.icon ?? ""] ?? Server;
 export const stackIconOf = (stack: { key: string; icon?: string }) => STACK_ICONS[stack.key] ?? NAMED_ICONS[stack.icon ?? ""] ?? Code2;

@@ -151,9 +151,9 @@ class VaultService
      *
      * @param  array<string, int>  $scores  set number => percent
      */
-    public function applyAiInterviewQualification(User $user, string $stackKey, string $roleKey, float $average, array $scores, int $attempt): VaultProfile
+    public function applyAiInterviewQualification(User $user, string $stackKey, string $roleKey, float $average, array $scores, int $attempt, bool $override = false): VaultProfile
     {
-        return $this->mutate($this->profileFor($user), function (VaultProfile $p) use ($stackKey, $roleKey, $average, $scores, $attempt) {
+        return $this->mutate($this->profileFor($user), function (VaultProfile $p) use ($stackKey, $roleKey, $average, $scores, $attempt, $override) {
             if (! $p->is_eligible) {
                 $p->is_eligible = true;
                 $p->eligible_since = now();
@@ -164,6 +164,14 @@ class VaultService
             $p->qualified_at ??= now();
             // The student is told about this qualification by its own notification, not the readiness "you're Vault-ready" mail.
             $p->ready_notified_at ??= now();
+            // A student who qualifies again (another stack) keeps the BEST result on their profile: a lower average never replaces a
+            // higher one, and an equal one changes nothing. The score, its stack, role, set scores and attempt are kept together,
+            // so the profile always describes one real qualification. (The new qualification itself is still recorded in full.) A superadmin's
+            // deliberate correction passes $override and is applied exactly as given.
+            if (! $override && $p->ai_interview_score !== null && $average <= (float) $p->ai_interview_score) {
+                return;
+            }
+
             $p->ai_interview_score = $average;
             $p->ai_interview_stack = $stackKey;
             $p->ai_interview_role = $roleKey;

@@ -196,6 +196,8 @@ class LeadAssignmentService
         $employee = $this->leastLoadedEmployeeForContactRequests();
 
         if ($employee === null) {
+            $this->warnSuperadminsNobodyCanTake($request);
+
             return;
         }
 
@@ -207,6 +209,27 @@ class LeadAssignmentService
             'data' => ['contact_request_id' => $request->id],
             'group_key' => "contact.assigned:{$request->id}",
         ]);
+    }
+
+    /**
+     * With no active marketing employee a "Talk to Our Team" enquiry is saved but nobody hears of it - while the submitter is told "we'll be
+     * in touch". So the superadmins are told instead (once per enquiry; the sweep that re-tries it later must not repeat the alert).
+     */
+    private function warnSuperadminsNobodyCanTake(ContactRequest $request): void
+    {
+        if (! $request->wasRecentlyCreated) {
+            return;
+        }
+
+        $from = $request->organization_name ? "{$request->name} from {$request->organization_name}" : $request->name;
+
+        app(NotificationService::class)->notifyMany(
+            User::where('role', User::ROLE_SUPERADMIN)->where('is_blocked', false)->pluck('id')->all(),
+            NotificationType::LeadNew,
+            'An enquiry has nobody to take it',
+            "{$from} asked to talk to the team ({$request->audience}), but there is no active marketing employee. Add or unblock one in Marketing Team and it is assigned at once.",
+            ['url' => '/superadmin?tab=marketing_team', 'group_key' => "contact.unassigned:{$request->id}"]
+        );
     }
 
     /** The contact-request analog of assignUnassignedLeads() above, for the same self-correcting reason. */

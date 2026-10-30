@@ -35,6 +35,8 @@ import { InterviewRoom, type RoomStatus, type RoomStep } from "./room/InterviewR
 import type { Speaker, TranscriptTurn } from "./room/LiveTranscript";
 import { CountdownDigit } from "./room/CountdownDigit";
 import { ReadyBrief } from "./room/ReadyBrief";
+import { StudyFeedbackPanel } from "./room/StudyFeedbackPanel";
+import { CardFigure } from "./room/CardFigure";
 import { useRoomSignal } from "./room/roomSignal";
 import { timing } from "./room/timing";
 import { useOnline, useSilenceWatch } from "./room/useRoomHealth";
@@ -48,6 +50,7 @@ import {
   type QuestionCategory,
   type QuestionDifficulty,
   type StartInterviewResponse,
+  type StudyFeedback,
   type StudentInterviewSummary,
   type TakeQuestionPayload,
 } from "@/types/interview";
@@ -63,6 +66,7 @@ type Phase =
   | "text_fallback"
   | "reviewing_answer"
   | "submitting"
+  | "feedback" // study mode: the answer was sent; its match and the model answer are on screen until the candidate goes on
   | "complete"
   | "error";
 
@@ -166,9 +170,10 @@ export function InterviewSessionView({ variant = "mock" }: { variant?: Interview
 
 function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVariant }) {
   const vault = variant === "vault";
-  const home = vault ? "/dashboard/vault-interviews" : "/dashboard/interviews";
   const { status, user } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
+  // Opened from the Merchant Navy section (it adds ?from=merchant-navy), "back" leads there rather than to the Mock AI Interview.
+  const home = vault ? "/dashboard/vault-interviews" : searchParams.get("from") === "merchant-navy" ? "/dashboard/merchant-navy" : "/dashboard/interviews";
   const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
 
@@ -202,6 +207,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [voiceLoading, setVoiceLoading] = useState(false);
   const [speechInfo, setSpeechInfo] = useState<InterviewSpeechInfo | null>(null);
   const [estimatedSeconds, setEstimatedSeconds] = useState<number | null>(null);
+  /** A study interview (the Merchant Navy sets): no AI scoring; after each answer the model answer and the match are shown. */
+  const [studyMode, setStudyMode] = useState(false);
+  const [feedback, setFeedback] = useState<StudyFeedback | null>(null);
+  /** What "Next question" does: the question to ask next, or null when the answer just given was the last one. */
+  const [pendingNext, setPendingNext] = useState<TakeQuestionPayload | null>(null);
 
   const handleReattempt = async () => {
     if (reattempting) return;
@@ -426,6 +436,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       const res = await api.post<StartInterviewResponse>(`${basePath}/start`);
       startResponseRef.current = res;
       setSpeechInfo(res.speech ?? null);
+      setStudyMode(res.study === true);
       setTotalQuestions(res.total_questions);
       setAnsweredCount(res.answered_count);
       if (res.complete || !res.question) {
@@ -570,6 +581,16 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
     try {
       const res = await api.postFormData<AnswerInterviewResponse>(`${basePath}/answer`, formData);
+
+      // Study mode: nothing moves on yet. The answer is kept on screen with the model answer and the match; the candidate goes on when they
+      // have read it (handleNext), which is also when this question moves up into the transcript and the count goes up.
+      if (res.feedback) {
+        setFeedback(res.feedback);
+        setPendingNext(res.complete ? null : (res.next_question ?? null));
+        setPhase("feedback");
+        return;
+      }
+
       setAnsweredCount((c) => c + 1);
       // The question just answered moves up into the transcript history.
       setAnswered((list) => [
@@ -590,6 +611,52 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       setPhase("reviewing_answer");
     }
   };
+
+  /** Study mode: the candidate has read the feedback. The question just answered moves into the transcript; then the next one, or the end. */
+  const handleNext = useCallback(() => {
+    if (phase !== "feedback" || !question) return;
+
+    setAnswered((list) => [
+      ...list,
+      { id: question.interview_question_id, text: question.question_text, category: question.category, difficulty: question.difficulty, answer: transcriptDraft.trim() },
+    ]);
+    setAnsweredCount((c) => c + 1);
+    setFeedback(null);
+
+    const next = pendingNext;
+    setPendingNext(null);
+
+    if (next) {
+      void presentQuestion(next);
+      return;
+    }
+
+    if (interviewStartedAtRef.current > 0) {
+      setCompletionElapsedSeconds(Math.round((Date.now() - interviewStartedAtRef.current) / 1000));
+    }
+    proctoring.endSession();
+    setPhase("complete");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, question, transcriptDraft, pendingNext, presentQuestion]);
+
+  // The set is over: let go of the microphone now, not when the page is eventually left (the browser keeps showing "recording" on the tab
+  // while the voice engine holds it, and the summary can stay open for as long as the student likes). The camera is released by endSession().
+  useEffect(() => {
+    if (phase === "complete") engineRef.current.cancel();
+  }, [phase]);
+
+  // Enter goes on, as it does on the "ready" screen - unless the candidate is on a control that handles Enter itself.
+  useEffect(() => {
+    if (phase !== "feedback") return;
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.key !== "Enter" || target?.closest("textarea, input, button, a, [contenteditable=true]")) return;
+      event.preventDefault();
+      handleNext();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [phase, handleNext]);
 
   const roomVisible = status === "ready" && !alreadyComplete && phase !== "error" && (proctoring.phase === "active" || proctoring.phase === "fullscreen_lost");
   const elapsedSeconds = useElapsedSeconds(interviewStartedAtRef, roomVisible);
@@ -761,6 +828,12 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         };
       case "submitting":
         return { key: "submitting", title: "Sending your answer…", tone: "busy" };
+      case "feedback":
+        return {
+          key: "feedback",
+          title: feedback ? feedback.label : "Here's how you did",
+          detail: feedback ? `You covered ${feedback.points.covered} of ${feedback.points.total} key ${feedback.points.total === 1 ? "point" : "points"}. Read the model answer, then go on.` : undefined,
+        };
       default:
         return {
           key: "loading",
@@ -800,6 +873,13 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
             Continue
           </motion.button>
         );
+      case "feedback":
+        return (
+          <motion.button whileTap={{ scale: 0.96 }} onClick={handleNext} className={PRIMARY_BUTTON}>
+            {pendingNext ? "Next question" : "Finish set"}
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </motion.button>
+        );
       case "reviewing_answer":
       case "submitting":
         return (
@@ -833,7 +913,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const silent = useSilenceWatch(signal, phase === "listening");
   const speaker: Speaker = phase === "speaking" || phase === "greeting" || stillSpeaking ? "ai" : phase === "listening" || phase === "text_fallback" ? "you" : "idle";
 
-  const notice = phase === "ready" ? (
+  const notice = phase === "feedback" ? (
+    <p className="text-2xs font-semibold text-text-muted">
+      or press <kbd className="rounded-md border border-border-strong bg-surface px-1.5 py-0.5 font-mono text-3xs text-primary shadow-sm">Enter ↵</kbd>
+    </p>
+  ) : phase === "ready" ? (
     <p className="text-2xs font-semibold text-text-muted">
       or press <kbd className="rounded-md border border-border-strong bg-surface px-1.5 py-0.5 font-mono text-3xs text-primary shadow-sm">Enter ↵</kbd>
     </p>
@@ -859,8 +943,14 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   if (status !== "ready") return <InterviewBoot />;
 
-  const sessionLabel = vault ? "Vault AI Interview" : "AI Interview";
-  const sessionNote = vault ? (setInfo?.series_number != null && setInfo?.set_number != null ? `Series ${setInfo.series_number} · Set ${setInfo.set_number} of 3` : "Counts toward your Vault series") : undefined;
+  const sessionLabel = vault ? "Vault AI Interview" : studyMode ? "Merchant Navy Orals" : "AI Interview";
+  const sessionNote = vault
+    ? setInfo?.series_number != null && setInfo?.set_number != null
+      ? `Series ${setInfo.series_number} · Set ${setInfo.set_number} of 3`
+      : "Counts toward your Vault series"
+    : studyMode
+      ? "Study mode · not scored by AI"
+      : undefined;
 
   const needsProctoringGate = !alreadyComplete && phase !== "error";
   const showConsentGate =
@@ -932,8 +1022,23 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
                 turns={turns}
                 speaker={speaker}
                 online={online}
-                transcriptSlot={phase === "ready" ? <ReadyBrief questionCount={totalQuestions} minutes={minutes} resumed={resumed} /> : undefined}
+                transcriptSlot={
+                  phase === "ready" ? (
+                    <ReadyBrief questionCount={totalQuestions} minutes={minutes} resumed={resumed} study={studyMode} />
+                  ) : phase === "feedback" && feedback && question ? (
+                    <StudyFeedbackPanel
+                      question={question.question_text}
+                      answer={transcriptDraft.trim()}
+                      feedback={feedback}
+                      index={answeredCount}
+                      total={totalQuestions}
+                      onNext={handleNext}
+                      nextLabel={pendingNext ? "Next question" : "Finish set"}
+                    />
+                  ) : undefined
+                }
                 orbOverlay={phase === "countdown" && beginCount > 0 ? <CountdownDigit value={beginCount} /> : null}
+                figure={question?.image && phase !== "ready" && phase !== "countdown" && phase !== "greeting" ? <CardFigure key={question.image} src={question.image} /> : undefined}
               />
             ) : (
               <>
@@ -944,6 +1049,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
                 {phase === "complete" && (
                   <InterviewComplete
                     vault={vault}
+                    study={studyMode}
+                    backLabel={studyMode ? (home === "/dashboard/merchant-navy" ? "Back to Merchant Navy" : "Back to Mock Interviews") : undefined}
                     result={result}
                     totalQuestions={totalQuestions}
                     answeredCount={answeredCount}

@@ -257,23 +257,39 @@ class CuratedInterviewSetService
         // other target is a software interview, exactly as before.
         $discipline = $target['discipline'] ?? 'software';
 
-        return DB::transaction(function () use ($user, $role, $stack, $setData, $extraPracticeConfig, $discipline) {
+        $study = (bool) ($extraPracticeConfig['study'] ?? false);
+
+        return DB::transaction(function () use ($user, $role, $stack, $setData, $extraPracticeConfig, $discipline, $study) {
             // Seed / find questions in InterviewQuestionBank
             $bankQuestions = [];
             foreach ($setData['questions'] ?? [] as $q) {
                 $tags = array_values(array_unique(array_merge($setData['tags'] ?? [], [$stack['key'], $role['key']])));
 
+                // A study question is shown WITH its model answer, and two exams can ask the same words with different answers (the Second
+                // Mate and the Chief Mate "What is a Mate's Receipt?"), so the answer is part of the row's identity: one exam must never
+                // overwrite, or be shown, the other's.
+                $identity = ['question_text' => $q['text'], 'discipline' => $discipline];
+                if ($study && ($q['note'] ?? null) !== null) {
+                    $identity['notes_for_reviewer'] = $q['note'];
+                }
+                // A picture question is its picture too: "Which Rule applies, and what is your action?" is asked of a hundred different cards,
+                // and a set must never reach for another card's row (an interview holds a bank row once).
+                if (! empty($q['image'])) {
+                    $identity['image'] = $q['image'];
+                } elseif ($study) {
+                    $identity['image'] = null;
+                }
+
                 $bankQuestion = InterviewQuestionBank::firstOrCreate(
-                    [
-                        'question_text' => $q['text'],
-                        'discipline' => $discipline,
-                    ],
+                    $identity,
                     [
                         'category' => $q['category'] ?? InterviewQuestionBank::CATEGORY_TECHNICAL,
                         'difficulty' => $q['difficulty'] ?? 'standard',
                         'expected_duration_seconds' => $q['duration_seconds'] ?? 180,
                         'tags' => $tags,
                         'notes_for_reviewer' => $q['note'] ?? null,
+                        'reference_unverified' => (bool) ($q['needs_review'] ?? false),
+                        'image' => $q['image'] ?? null,
                         'is_active' => true,
                         'created_by' => $user->id,
                     ]
@@ -282,8 +298,20 @@ class CuratedInterviewSetService
                 // The bank row is shared by every interview that asks this question, and keeps the reference answer it was first made with.
                 // When staff correct that answer (a master mariner fixing a figure) the next interview must be scored against the corrected
                 // one, so a changed answer is carried over; the rows already scored are not touched.
-                if (! $bankQuestion->wasRecentlyCreated && ($q['note'] ?? null) !== null && $bankQuestion->notes_for_reviewer !== $q['note']) {
-                    $bankQuestion->update(['notes_for_reviewer' => $q['note']]);
+                if (! $bankQuestion->wasRecentlyCreated) {
+                    $changes = [];
+
+                    if (($q['note'] ?? null) !== null && $bankQuestion->notes_for_reviewer !== $q['note']) {
+                        $changes['notes_for_reviewer'] = $q['note'];
+                    }
+
+                    if (array_key_exists('needs_review', $q) && (bool) $bankQuestion->reference_unverified !== (bool) $q['needs_review']) {
+                        $changes['reference_unverified'] = (bool) $q['needs_review'];
+                    }
+
+                    if ($changes !== []) {
+                        $bankQuestion->update($changes);
+                    }
                 }
 
                 $bankQuestions[] = $bankQuestion;

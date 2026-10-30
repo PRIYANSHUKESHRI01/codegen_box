@@ -128,6 +128,15 @@ class Interview extends Model
         return \App\Support\InterviewDiscipline::isCore($discipline) ? $discipline : null;
     }
 
+    /**
+     * A STUDY interview (the Merchant Navy orals): the student's answers are not scored by AI but compared, by plain text matching, with
+     * the model answer, which is shown to them straight after each answer. See App\Services\Interviews\StudyFeedbackService.
+     */
+    public function isStudyMode(): bool
+    {
+        return ($this->practice_config['study'] ?? false) === true;
+    }
+
     public function getRouteKeyName(): string
     {
         return 'slug';
@@ -147,6 +156,22 @@ class Interview extends Model
             // Merchant Navy certificate-oral practice is exam preparation for a different profession: it must not move a student's
             // placement-readiness score, which decides their way into the Vault (an IT recruiter's pool).
             ->where(fn (Builder $q) => $q->whereNull('interviews.discipline')->orWhere('interviews.discipline', '!=', \App\Support\InterviewDiscipline::MARITIME_KEY));
+    }
+
+    /**
+     * The sittings that use up a student's mock-interview allowance: the free plan's one try and the plan's daily limit. Practice (is_mock) and
+     * TPO mock interviews only - never a Final Interview track round, a Vault qualification set, or a STUDY interview (the Merchant Navy sets).
+     * A study interview is not scored by AI and costs nothing to run, so there is nothing to ration: a student may sit as many sets as they like,
+     * and sitting them does not eat the allowance they have for ordinary mock interviews.
+     *
+     * The ONE definition: PlanGate (the check), PlanGate::used (the free try) and SubscriptionPresenter (the "used today" count) all read it.
+     */
+    public function scopeUsesMockAllowance(Builder $query): Builder
+    {
+        return $query->whereNull('interviews.interview_track_id')
+            ->whereNull('interviews.practice_config->qualification_id')
+            ->where(fn (Builder $q) => $q->whereNull('interviews.practice_config->study')->orWhere('interviews.practice_config->study', false))
+            ->where(fn (Builder $q) => $q->where('interviews.is_mock', true)->orWhere('interviews.interview_type', self::INTERVIEW_TYPE_TPO_MOCK));
     }
 
     public function interviewQuestions(): HasMany

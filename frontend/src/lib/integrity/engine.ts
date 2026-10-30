@@ -86,6 +86,8 @@ interface StartResponse {
 }
 
 const STILL_MIN_GAP_MS = 5000;
+/** How long a leaving page's camera is held for the same attempt's next page, outside contests (see KeptAttempt.graceMs): just long enough for a remount. */
+const NON_CONTEST_GRACE_MS = 1500;
 
 /**
  * Everything the browser does for one proctored attempt, behind one object so the five proctored pages share it:
@@ -195,6 +197,7 @@ export class IntegrityEngine {
         screen,
         instance: this.instance,
         deviceId: this.ids,
+        graceMs: this.o.surface === "contest" ? undefined : NON_CONTEST_GRACE_MS,
         release: () => {
           stopStream(camera);
           stopStream(screen);

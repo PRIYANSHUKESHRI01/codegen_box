@@ -25,7 +25,11 @@ use Illuminate\Database\QueryException;
  */
 class MockInterviewCatalog
 {
+    /** Rounds in an IT stack (the three themes of its Vault interview). */
     public const ROUNDS = 3;
+
+    /** The most rounds (or sets) any stack may have; a round id carries up to three digits. */
+    public const MAX_ROUNDS = 99;
 
     /** @var array<string, array<string, mixed>>|null */
     private ?array $roles = null;
@@ -81,7 +85,7 @@ class MockInterviewCatalog
      */
     public function round(string $roundId): ?array
     {
-        if (! preg_match('/^mock-([a-z0-9_]+)-r([1-9])$/', $roundId, $m)) {
+        if (! preg_match('/^mock-([a-z0-9_]+)-r([1-9][0-9]{0,2})$/', $roundId, $m)) {
             return null;
         }
 
@@ -178,6 +182,24 @@ class MockInterviewCatalog
     }
 
     /**
+     * The rounds of a Mock-only stack, as [title, description] pairs. A stack either lists its rounds (`rounds`: a themed handful, like
+     * the IT stacks) or names a number of SETS (`sets`): "Set 1" .. "Set N", all with the stack's `set_description` - a bank too big for
+     * three rounds (the Merchant Navy orals) is dealt into sets of about the same size, each a complete sitting.
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private function extraRounds(array $stack): array
+    {
+        if (isset($stack['sets'])) {
+            $description = (string) ($stack['set_description'] ?? '');
+
+            return array_map(fn (int $n) => ["Set {$n}", $description], range(1, max(1, min(self::MAX_ROUNDS, (int) $stack['sets']))));
+        }
+
+        return array_slice(array_values((array) ($stack['rounds'] ?? [])), 0, self::ROUNDS);
+    }
+
+    /**
      * The domains that exist only in the Mock AI Interview (config mock_interviews.extra_roles), each stack naming its own rounds.
      * They are merged AFTER the Vault's, so the Vault catalogue never sees them (no qualification, no Mellow Vault hand-off), and a
      * key that already exists in the Vault is skipped rather than shadowing it.
@@ -209,17 +231,24 @@ class MockInterviewCatalog
 
                 $rounds = [];
 
-                foreach (array_slice(array_values((array) ($stack['rounds'] ?? [])), 0, self::ROUNDS) as $index => [$title, $description]) {
+                $sitting = (int) ($stack['questions_per_interview'] ?? config('mock_interviews.questions_per_interview', 10));
+
+                foreach ($this->extraRounds($stack) as $index => [$title, $description]) {
                     $number = $index + 1;
+                    $questions = $custom[$stackKey][$number] ?? [];
 
                     $rounds[] = [
                         'id' => self::roundId($stackKey, $number),
                         'round_number' => $number,
                         'title' => $title,
                         'description' => $description,
-                        'duration_minutes' => (int) ($stack['duration_minutes'] ?? 15),
+                        // What the briefing page will say: the answer times of the questions one sitting asks, not a guess. The configured
+                        // number only stands in until a round has questions.
+                        'duration_minutes' => $questions === []
+                            ? (int) ($stack['duration_minutes'] ?? 15)
+                            : max(1, (int) ceil(array_sum(array_column($questions, 'duration_seconds')) / count($questions) * min(count($questions), $sitting) / 60)),
                         'tags' => array_values(array_unique(array_merge([$stackKey, $roleKey, 'mock'], $stack['tags'] ?? []))),
-                        'questions' => $custom[$stackKey][$number] ?? [],
+                        'questions' => $questions,
                     ];
                 }
 
@@ -231,6 +260,7 @@ class MockInterviewCatalog
                     'aliases' => array_values($stack['aliases'] ?? []),
                     'tags' => array_values($stack['tags'] ?? []),
                     'discipline' => $stack['discipline'] ?? null,
+                    'study_mode' => (bool) ($stack['study_mode'] ?? false),
                     'questions_per_interview' => isset($stack['questions_per_interview']) ? (int) $stack['questions_per_interview'] : null,
                     'rounds' => $rounds,
                 ];

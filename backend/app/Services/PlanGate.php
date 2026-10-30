@@ -195,13 +195,7 @@ class PlanGate
 
         $startedToday = InterviewSession::where('user_id', $user->id)
             ->whereDate('started_at', today())
-            ->whereHas('interview', function ($q) {
-                $q->whereNull('interview_track_id')
-                    ->whereNull('practice_config->qualification_id')
-                    ->where(function ($q2) {
-                        $q2->where('is_mock', true)->orWhere('interview_type', Interview::INTERVIEW_TYPE_TPO_MOCK);
-                    });
-            })
+            ->whereHas('interview', fn ($q) => $q->usesMockAllowance())
             ->count();
 
         abort_if(
@@ -245,13 +239,7 @@ class PlanGate
             // A practice interview only — never a Final Interview track round or a real company
             // interview (the same predicate InterviewController's daily limit uses).
             self::TRIAL_MOCK_INTERVIEW => InterviewSession::where('user_id', $user->id)
-                ->whereHas('interview', function ($q) {
-                    $q->whereNull('interview_track_id')
-                        ->whereNull('practice_config->qualification_id')
-                        ->where(function ($q2) {
-                            $q2->where('is_mock', true)->orWhere('interview_type', Interview::INTERVIEW_TYPE_TPO_MOCK);
-                        });
-                })
+                ->whereHas('interview', fn ($q) => $q->usesMockAllowance())
                 ->count(),
             // A take that failed to score gave the student nothing, so it does not spend the try.
             self::TRIAL_SPEAKING_TAKE => SpeakingAttempt::where('user_id', $user->id)->whereNull('scoring_failed_at')->count(),

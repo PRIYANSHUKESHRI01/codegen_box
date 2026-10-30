@@ -173,12 +173,14 @@ describe("PartnerCollegesPanel delete button", () => {
 
     const { unmount } = render(<PartnerCollegesPanel triggerToast={toast} />);
     await screen.findByText("Tulas University");
-    expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /manage tulas university/i }));
+    expect(screen.queryByRole("menuitem", { name: /delete/i })).toBeNull();
     unmount();
 
     render(<PartnerCollegesPanel triggerToast={toast} canDeleteColleges />);
     await screen.findByText("Tulas University");
-    expect(screen.getByRole("button", { name: /delete/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /manage tulas university/i }));
+    expect(screen.getByRole("menuitem", { name: /delete/i })).toBeTruthy();
   });
 });
 

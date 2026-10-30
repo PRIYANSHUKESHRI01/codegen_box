@@ -27,6 +27,7 @@ class InterviewResponse extends Model
         'answered_at',
         'score',
         'review_notes',
+        'match_details',
         'scored_by',
         'scored_at',
         'ai_scored',
@@ -40,6 +41,7 @@ class InterviewResponse extends Model
             'score' => 'integer',
             'scored_at' => 'datetime',
             'ai_scored' => 'boolean',
+            'match_details' => 'array',
         ];
     }
 

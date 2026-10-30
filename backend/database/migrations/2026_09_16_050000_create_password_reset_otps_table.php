@@ -17,7 +17,9 @@ return new class extends Migration
             // re-entering the OTP (see PasswordResetService).
             $table->string('reset_token_hash')->nullable();
             $table->unsignedTinyInteger('attempts')->default(0);
-            $table->timestamp('expires_at');
+            // useCurrent() = an explicit default, which stops MariaDB < 10.10 from adding
+            // ON UPDATE CURRENT_TIMESTAMP and resetting the expiry on every save.
+            $table->timestamp('expires_at')->useCurrent();
             $table->timestamp('consumed_at')->nullable();
             $table->timestamps();
 

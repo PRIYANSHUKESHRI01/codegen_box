@@ -160,6 +160,10 @@ export interface AdminVaultSummary {
   ai_qualifiers?: number;
   thresholds: { enter: number; exit: number };
   sync: {
+    /** `http` = the signed push to Mellow Vault's endpoint; `database` = written straight into its developer_details_tb (the temporary local arrangement). Older servers send neither. */
+    driver?: "http" | "database";
+    database_name?: string | null;
+    database_reachable?: boolean | null;
     configured: boolean;
     url_set: boolean;
     secret_set: boolean;

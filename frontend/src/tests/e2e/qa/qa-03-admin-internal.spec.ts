@@ -61,7 +61,7 @@ test.describe("Mellow internal staff (admin_internal) dashboard", () => {
     await page.getByPlaceholder("e.g. tpo@iitb.ac.in").fill(NEW_TPO_EMAIL);
     await page.getByRole("button", { name: "Provision TPO & Partner University" }).click();
     await expect(page.locator("body")).not.toContainText("Onboard Partner University & TPO", { timeout: 10000 });
-    await page.getByPlaceholder("Search university or TPO...").fill(NEW_COLLEGE);
+    await page.getByLabel("Search universities").fill(NEW_COLLEGE);
     await page.waitForTimeout(700);
     await expect(page.locator("body")).toContainText(NEW_COLLEGE, { timeout: 10000 });
     reportIssues("onboard college (staff)", issues);
@@ -85,10 +85,11 @@ test.describe("Mellow internal staff (admin_internal) dashboard", () => {
     test.setTimeout(90000);
     const issues = watchForErrors(page);
     await login(page, "admin_internal");
-    await page.getByPlaceholder("Search university or TPO...").fill(NEW_COLLEGE);
+    await page.getByLabel("Search universities").fill(NEW_COLLEGE);
     await page.waitForTimeout(700);
-    const collegeCard = page.locator("div", { hasText: NEW_COLLEGE }).last();
-    await page.getByRole("button", { name: "Import Students" }).first().click();
+    // The college's actions live in its "Manage" menu now (list and cards alike).
+    await page.getByRole("button", { name: `Manage ${NEW_COLLEGE}` }).first().click();
+    await page.getByRole("menuitem", { name: "Import Students" }).click();
 
     await expect(page.locator("text=Bulk Import for")).toBeVisible();
     const fileInput = page.locator('input[type="file"]');

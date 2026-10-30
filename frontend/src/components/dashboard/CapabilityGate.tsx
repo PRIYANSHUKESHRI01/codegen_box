@@ -20,6 +20,7 @@ const WHAT: Record<Capability, { title: string; what: string }> = {
   ai_interviews: { title: "AI interviews", what: "AI mock interviews" },
   soft_skills: { title: "Soft skills", what: "Aptitude, reasoning and English assessments" },
   learning_centre: { title: "Learning Centre", what: "Speaking, Listening and Vocabulary" },
+  merchant_navy: { title: "Merchant Navy", what: "Merchant Navy practice" },
 };
 
 /** What a student may switch on for themselves in Settings (mirrors config/departments.php → student_opt_in). */

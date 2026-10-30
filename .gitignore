@@ -25,3 +25,7 @@ Thumbs.db
 # Python cache
 __pycache__/
 *.py[cod]
+
+# Scratch or temporary dumps at repository root
+/*.docx
+/*.txt

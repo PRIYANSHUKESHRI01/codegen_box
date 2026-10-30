@@ -160,3 +160,87 @@ real browser (grant → the student's open page switches within one poll → end
 - Plan **hand-written feature bullets** on the pricing cards are still edited in `frontend/src/data/pricing.ts`.
 - TPO-only screens (drive mapping, mock contests, cohort reports) are not duplicated for the superadmin; **View as** a TPO
   shows them (read-only), and Mellow Ops routes the superadmin already had cover college-level management.
+
+## 9. Partner Universities: edit a college, set the TPO's password (2026-10-30)
+
+**Superadmin → Colleges & TPOs** (`PartnerCollegesPanel`, cards in `CollegeCard`):
+
+- **Edit details** → `PUT /api/superadmin/colleges/{college}` (`SuperAdminCollegeController`): college name, short code (upper-cased,
+  unique, `A-Z 0-9 . _ & -`), city, state, and the TPO's name and **login email**. A new TPO email re-asks for the superadmin's own
+  password (it is where "forgot password" codes go), must not belong to any other account, and clears `email_verified_at`. Only a TPO
+  of *that* college can be targeted (`tpo_user_id`; anything else is a 404). Audited (`college_changes` / `tpo_changes`, before → after).
+- **TPO password** → the existing `POST /superadmin/users/{id}/reset-password` (`ResetPasswordModal`): generate or type one, ask the TPO to
+  change it at next sign-in or not, optionally email it; signs the TPO out everywhere. Nothing new on the server.
+- Both are hidden for Mellow Ops staff (the panel is shared with `/admin`): the page passes `canManageDetails`, like `canDeleteColleges`.
+- **How the TPO's open screen follows:** `GET /me/plan-signal` now carries `profile_signature` (college name/code/city/state + the
+  account's name/email) for every account with a college. `lib/planSync.ts` fires `aptrun:profile-changed` when it moves;
+  `PlanSyncWatcher` reloads `/me` (sidebar, header chip, hero and every college label re-render) and toasts "Details updated". Same
+  cadence as plans: ≤30 s, instantly on focus/visibility/online. The TPO also gets a bell notification (`college.profile_changed`).
+- Not a plan change: the signature is separate from the plan signature, so nothing reads "your plan changed".
+- **Deploy:** no migration. `php artisan route:cache` (new route). Frontend rebuild.
+- **Verified:** `SuperadminCollegeEditTest` (7), `partner-colleges-edit.test.tsx` (8), plan-sync tests, and a browser run on a scratch
+  API (rename + code + TPO email in the dialog → the TPO's already-open page switched itself in 22 s; no horizontal overflow from 390 px to
+  1902 px). Section coordinators have no `PlanSyncWatcher`, so their open page picks the new name up on next load.
+
+### 9b. The list is built for ~100 colleges (same day)
+
+- **List view (default)** = a sortable table, 24 rows per page; **Cards** = compact 3-4-across cards. The choice and page size are remembered
+  per browser (`aptrun:partner-colleges-view`); a phone with no saved choice starts on Cards.
+- **Find things:** search (name, code, city, TPO name/email), plan-tier and department dropdowns, status chips (All / Active / Renewing soon /
+  No plan / Suspended) whose counts follow the other filters, sort (click a header, or the Sort dropdown), "Clear filters", pagination
+  (12 / 24 / 48 / 96). Sorting by plan expiry puts a college with no running plan first. All of it is client-side over `GET /admin/colleges`
+  (one request, no server paging) — fine for hundreds; if it ever reaches thousands, move filtering and paging into that endpoint.
+- **Every action** is in one "Manage" menu (`ActionMenu`, a reusable keyboard-operable popover drawn on `<body>`, flips up near the bottom):
+  Edit details · TPO password · Renew / Change Plan · Adjust Seats · Import Students · Departments · Coordinators · Block TPO · Delete.
+  Same menu in the row and on the card.
+- Tests: `partner-colleges-scale.test.tsx` (100 colleges: paging, sort, filters, view memory, menu keyboard). Browser run with 100 seeded
+  colleges at 390 → 1902 px, no page overflow in either view.
+
+## 10. Merchant Navy on/off (2026-10-31)
+
+**Superadmin -> Merchant Navy** (new tab + sidebar item, `MerchantNavyPanel`): ONE switch that shows or hides the whole Merchant Navy section for
+**every student**: the sidebar group ("Merchant Navy -> Mock Orals", `/dashboard/merchant-navy`) **and** the "Merchant Navy" domain card in the
+Mock AI Interview. The panel also shows where students see it, each exam's sets/questions/Open-or-Coming-soon, who changed it last, and the
+last 10 changes. Deactivating asks first; activating when no exam is open yet warns first.
+
+- **Storage:** table `platform_modules` (`key`, `enabled`, `updated_by`), module definitions in `config/platform_modules.php`, read through
+  `App\Services\PlatformModules` (scoped, one query per request, no cache -> the next request anyone makes sees it). **Ships ON** (the migration
+  inserts the row enabled), so deploying changes nothing. No row / no table yet = module default (on): a deploy that has not migrated never 500s.
+- **API:** `GET /superadmin/platform-modules`, `PUT /superadmin/platform-modules/{key}` `{enabled: true|false}` - explicit, never a blind flip, so a
+  double click or a second tab cannot undo the other; audited once per real change (`ActivityLog`, target "Platform module"); superadmin-only.
+- **Enforced on the server, not just hidden:** `MockInterviewService::catalog()` leaves the domain out; `start()` answers 403
+  `{code: "module_unavailable"}`; `InterviewController::reattempt` refuses a Merchant Navy (discipline `maritime`) sitting. Staff keep full access to the
+  Mock question bank while it is off (prepare content, then activate).
+- **Student capability:** `DepartmentCapabilities::forUser()` adds `merchant_navy` (platform switch, not a department matter; deliberately NOT in
+  `config/departments.php`). `/me` carries it, `studentNav` hides the group on `caps.merchant_navy === false`, and `ModuleGate` (in
+  `app/dashboard/merchant-navy/layout.tsx`) shows "isn't available right now" if a student is on / bookmarks the page.
+- **Real time:** `GET /me/plan-signal` now carries `modules` + `modules_signature` (a marker separate from the plan signature, so nobody is told their plan
+  changed). `planSync` fires `aptrun:modules-changed`; `PlanSyncWatcher` reloads `/me` (sidebar) and toasts once; `MockInterviewExplorer` re-fetches its
+  catalogue. <= 30 s on an open screen, instant on focus/tab-return.
+- **Decisions I made unasked:** a student already inside a sitting may finish it; past results/history are kept (not hidden); the TPO / Mellow
+  Vault / readiness are untouched; one switch for both places (not two) as asked.
+- **Deploy:** `php artisan migrate` (new table), `php artisan route:cache` (new routes), `config:cache` if cached (new `config/platform_modules.php`), frontend rebuild.
+- **Verified:** backend `PlatformModuleSwitchTest` (10), frontend `merchant-navy-switch.test.tsx` (13), plus a browser run (below).
+
+## 11. Marketing Team (2026-10-31)
+
+**Superadmin -> Marketing Team** (new tab + sidebar item, `marketingTeam/MarketingTeamPanel`): add, manage and remove the people who answer
+"Talk to Our Team" enquiries and chase leads (role `admin_marketing`). The older "Mellow Staff" tab still lists them too; this is the team view.
+
+- **See:** each person's access, what they carry (open leads / open enquiries / converted), status (Active / Blocked / Not signed in yet), search +
+  status filter, and a banner + "Waiting for an owner" tile when leads or enquiries have nobody holding them.
+- **Add:** name + work email + which sections (View & Manage Leads, Send Bulk Lead Emails) -> `POST /superadmin/users` (existing); the one-time password is
+  emailed and shown once. Hiring (and **unblocking**) deals out anything that was waiting, evenly.
+- **Account & password / sign-out / activity:** the existing Manage drawer. **Edit access:** existing `POST /users/{id}/permissions`. **Block:** existing
+  toggle-block, then offers to hand over what they still hold.
+- **Reassign work** (`POST /superadmin/marketing-team/{user}/reassign`): move OPEN leads/enquiries (new/contacted/engaged) to one colleague, share evenly (least-loaded
+  first, leads and enquiries balanced separately), or leave unassigned; optional "also closed" (won/lost). Receivers get a bell notification. Never to a blocked person.
+- **Delete** (`DELETE /superadmin/marketing-team/{user}`): must say where the work goes (to / distribute / leave), type the email, re-enter your password; ALL their
+  leads and enquiries move (closed too - otherwise they fall back into the unassigned pile and the next hire's sweep would take them), tokens and any issued
+  credential are removed, avatar deleted, audited. If the work cannot be placed (e.g. "share" with nobody to share with) NOTHING is deleted. Marketing only (404 otherwise).
+- **New safety net:** an enquiry that arrives when no active marketing employee exists now alerts every superadmin once (bell, links here) - before, the
+  submitter was told "we'll be in touch" and nobody heard of it (`LeadAssignmentService::warnSuperadminsNobodyCanTake`).
+- **Deploy:** no migration; `php artisan route:cache` (new routes); frontend rebuild.
+- **Verified:** `SuperadminMarketingTeamTest` (11), `marketing-team.test.tsx` (17), backend lead/marketing/contact/superadmin regression (283), full frontend 2540; browser run on a
+  scratch API (add -> waiting enquiries dealt out -> reassign -> block + hand-over offer -> delete with share-out -> edit access -> account drawer); phone has no overflow.
+- **Not done:** a shared `sales@` copy-to address (enquiry mail still goes only to the assigned employee's own email); no per-employee "last active" column.

@@ -78,13 +78,7 @@ class SubscriptionPresenter
 
         $mockInterviewsUsedToday = InterviewSession::where('user_id', $user->id)
             ->whereDate('started_at', today())
-            ->whereHas('interview', function ($q) {
-                $q->whereNull('interview_track_id')
-                    ->whereNull('practice_config->qualification_id')
-                    ->where(function ($q2) {
-                        $q2->where('is_mock', true)->orWhere('interview_type', Interview::INTERVIEW_TYPE_TPO_MOCK);
-                    });
-            })
+            ->whereHas('interview', fn ($q) => $q->usesMockAllowance())
             ->count();
 
         return [

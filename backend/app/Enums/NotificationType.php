@@ -17,6 +17,7 @@ namespace App\Enums;
  *   assessment.scheduled         AssessmentNotifier (the TPO / Mellow / company contest, interview, soft-skill and core-test controllers)
  *   plan.changed, payment.*      PlanNotifier (SubscriptionService, CheckoutService, the payment webhooks)
  *   account.password_changed     LifecycleMailService::passwordChanged
+ *   college.profile_changed      SuperAdminCollegeController::update (name / code / TPO details edited by the superadmin)
  *   vault.activity               the Vault interest / interview / offer services
  *   readiness.slip               ReadinessHistoryService::nudge (the refresh, on a student's 1st / 3rd / 7th idle day)
  *   announcement.message         StudentBulkNotificationService (TPO / coordinator → students)
@@ -50,6 +51,7 @@ enum NotificationType: string
     case PaymentRefunded = 'payment.refunded';
 
     case PasswordChanged = 'account.password_changed';
+    case CollegeProfileChanged = 'college.profile_changed';
 
     case ImportCompleted = 'import.completed';
     case LeadNew = 'lead.new';
@@ -65,7 +67,7 @@ enum NotificationType: string
             self::VaultActivity => NotificationCategory::Vault,
             self::ReadinessSlip => NotificationCategory::Progress,
             self::PlanChanged, self::PaymentSucceeded, self::PaymentFailed, self::PaymentRefunded => NotificationCategory::Plan,
-            self::PasswordChanged => NotificationCategory::Account,
+            self::PasswordChanged, self::CollegeProfileChanged => NotificationCategory::Account,
             self::ImportCompleted, self::LeadNew, self::PaymentReceived => NotificationCategory::Operations,
         };
     }

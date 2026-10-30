@@ -9,7 +9,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 import { SUBSCRIPTION_CHANGED_EVENT, notifySubscriptionChanged } from "@/lib/projectLab";
-import { ACADEMIC_CHANGED_EVENT, PLAN_SYNC_POLL_MS, __resetPlanSyncForTests, checkPlanNow, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
+import { ACADEMIC_CHANGED_EVENT, PROFILE_CHANGED_EVENT, PLAN_SYNC_POLL_MS, __resetPlanSyncForTests, checkPlanNow, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
 
 const signal = (signature: string, plan: { code: string; name: string } | null, days = 100): PlanSignal => ({ signature, source: plan ? "individual" : "none", plan, days_remaining: plan ? days : null });
 
@@ -219,6 +219,46 @@ describe("live plan sync", () => {
     get.mockClear();
     await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS * 3);
     expect(get).not.toHaveBeenCalled();
+  });
+
+  describe("when Mellow corrects the college's name, code or the TPO's login details", () => {
+    const withProfile = (base: PlanSignal, profile: string | null): PlanSignal => ({ ...base, profile_signature: profile });
+    let profileEvents: number;
+    const onProfile = () => {
+      profileEvents += 1;
+    };
+
+    beforeEach(() => {
+      profileEvents = 0;
+      window.addEventListener(PROFILE_CHANGED_EVENT, onProfile);
+    });
+    afterEach(() => window.removeEventListener(PROFILE_CHANGED_EVENT, onProfile));
+
+    it("fires its own event on the next beat, once, and never reads as a plan change", async () => {
+      get.mockResolvedValue(withProfile(CODER, "name-a"));
+      const stop = startPlanSync(1);
+      await flush();
+      expect(profileEvents).toBe(0);
+
+      get.mockResolvedValue(withProfile(CODER, "name-b"));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+
+      expect(profileEvents).toBe(1);
+      expect(notices).toHaveLength(0);
+      expect(changedEvents).toBe(0);
+      stop();
+    });
+
+    it("says nothing for the first answer, or for an account that has no college (no marker)", async () => {
+      get.mockResolvedValue(withProfile(CODER, null));
+      const stop = startPlanSync(1);
+      await flush();
+      get.mockResolvedValue(withProfile(CODER, null));
+      await vi.advanceTimersByTimeAsync(PLAN_SYNC_POLL_MS);
+      expect(profileEvents).toBe(0);
+      stop();
+    });
   });
 
   describe("when the college changes a student's year or section", () => {

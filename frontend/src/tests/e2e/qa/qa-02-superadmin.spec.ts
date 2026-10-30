@@ -29,7 +29,7 @@ test.describe("Superadmin dashboard", () => {
     await page.getByPlaceholder(/tpo@iitb\.ac\.in/).fill(NEW_TPO_EMAIL);
     await page.getByRole("button", { name: "Provision TPO & Partner University" }).click();
     await expect(page.locator("body")).not.toContainText("Onboard Partner University & TPO", { timeout: 10000 });
-    await page.locator("#colleges").getByPlaceholder(/Search university or TPO/).fill(NEW_COLLEGE);
+    await page.locator("#colleges").getByLabel("Search universities").fill(NEW_COLLEGE);
     await page.waitForTimeout(600);
     await expect(page.locator("#colleges")).toContainText(NEW_COLLEGE, { timeout: 10000 });
     await expect(page.locator("#colleges")).toContainText(NEW_TPO_EMAIL);

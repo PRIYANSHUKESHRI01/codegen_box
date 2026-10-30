@@ -46,6 +46,38 @@ return [
 
     'api_key' => env('VAULT_API_KEY'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | How a listing reaches Mellow Vault
+    |--------------------------------------------------------------------------
+    |
+    | http      (production) the signed POST to sync_url described above. Mellow Vault runs the receiving endpoint.
+    | database  (temporary, local) AptRun writes straight into Mellow Vault's `developer_details_tb` through the `mellow_vault`
+    |           database connection (config/database.php, MELLOW_VAULT_DB_*). Same outbox, same ordering, same retries - only the last
+    |           hop differs, so switching back is one line.
+    */
+    'driver' => env('VAULT_SYNC_DRIVER', 'http'),
+
+    'database' => [
+        'connection' => 'mellow_vault',
+        'table' => env('MELLOW_VAULT_TABLE', 'developer_details_tb'),
+
+        /*
+        | `pro_id` (NOT NULL) is Mellow Vault's profession/domain id. Which id each AptRun domain is cannot be derived from this repo:
+        | give a JSON map of AptRun stack or role key => pro_id, e.g. {"laravel_developer": 24, "react_developer": 50}, and a default for
+        | anyone not in it (0 = "unspecified", which Mellow Vault's own data already contains).
+        */
+        'pro_ids' => json_decode((string) env('MELLOW_VAULT_PRO_ID_MAP', '{}'), true) ?: [],
+        'default_pro_id' => (int) env('MELLOW_VAULT_DEFAULT_PRO_ID', 0),
+
+        /*
+        | A student whose college onboarded them (their TPO imported or created the account) is already vouched for by that college, so
+        | their TPO's email is filed as the HOD/TPO contact and `hod_verified` is set - otherwise Mellow Vault's own verification mail would
+        | go to a TPO who has already vetted them. Turn off to leave verification entirely to Mellow Vault.
+        */
+        'college_verified' => (bool) env('MELLOW_VAULT_COLLEGE_VERIFIED', true),
+    ],
+
     /* Seconds to wait for Mellow Vault before treating a delivery as failed. */
     'sync_timeout' => (int) env('VAULT_SYNC_TIMEOUT', 10),
 

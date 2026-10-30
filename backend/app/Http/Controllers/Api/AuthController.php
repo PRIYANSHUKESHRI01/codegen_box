@@ -8,6 +8,7 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use App\Services\IssuedCredentialVault;
 use App\Services\LifecycleMailService;
+use App\Services\PasswordResetService;
 use App\Support\SingleMail;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -327,6 +328,9 @@ class AuthController extends Controller
 
         // The owner now has their own password: whatever temporary one was kept for a superadmin to look up is obsolete.
         app(IssuedCredentialVault::class)->forget($user);
+
+        // A reset code emailed earlier must not outlive the password they just chose.
+        app(PasswordResetService::class)->expirePendingResets($user);
 
         app(LifecycleMailService::class)->passwordChanged($user, 'settings');
 

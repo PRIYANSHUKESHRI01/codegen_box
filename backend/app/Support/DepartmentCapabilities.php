@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\User;
+use App\Services\PlatformModules;
 
 /**
  * Which modules a student sees — the ONE place that answers it. Resolved from the catalogue, layer by layer, last wins:
@@ -77,6 +78,10 @@ final class DepartmentCapabilities
                 }
             }
         }
+
+        // Platform-wide modules the superadmin can switch off for everyone (config/platform_modules.php). Not a department matter, so it is
+        // laid over the department answer here and is deliberately absent from config/departments.php (the Departments screen's matrix).
+        $caps['merchant_navy'] = app(PlatformModules::class)->enabled('merchant_navy');
 
         return $caps;
     }

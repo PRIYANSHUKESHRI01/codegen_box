@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ScoreInterviewSessionJob;
+use App\Services\Interviews\StudyFeedbackService;
 use App\Models\Interview;
 use App\Models\InterviewQuestion;
 use App\Models\InterviewResponse;
@@ -189,7 +190,7 @@ class InterviewController extends Controller
             $audioPath = $request->file('audio')->store("interviews/{$interview->id}/sessions/{$session->id}", 'local');
         }
 
-        InterviewResponse::updateOrCreate(
+        $response = InterviewResponse::updateOrCreate(
             ['interview_session_id' => $session->id, 'interview_question_id' => $currentQuestion->id],
             [
                 'transcript_text' => $validated['transcript_text'],
@@ -199,6 +200,11 @@ class InterviewController extends Controller
             ]
         );
 
+        // A STUDY interview (the Merchant Navy orals) is not scored by AI at all: the answer is compared with the model answer on the spot
+        // and the student is shown both, so they can learn from it before going on. See StudyFeedbackService.
+        $study = $interview->isStudyMode() ? app(StudyFeedbackService::class) : null;
+        $feedback = $study?->record($response, $currentQuestion->questionBank);
+
         $session->current_question_order += 1;
         $nextQuestion = $questions->get($session->current_question_order);
 
@@ -206,6 +212,13 @@ class InterviewController extends Controller
             $session->status = InterviewSession::STATUS_COMPLETED;
             $session->completed_at = now();
             $session->save();
+
+            if ($study !== null) {
+                // Every answer already has its match: the session is finished here and now, no job, no wait, no AI.
+                $study->finalize($session);
+
+                return response()->json(['complete' => true, 'feedback' => $feedback]);
+            }
 
             // After the response, not inline (keeps the answer fast) and NOT on the queue: the queue here is a database queue that only the
             // once-a-minute scheduler drains, which measured 23-83 s from "submit" to "score" (and never, on a machine with no scheduler). Run
@@ -224,7 +237,7 @@ class InterviewController extends Controller
         return response()->json([
             'complete' => false,
             'next_question' => $this->questionPayload($nextQuestion, $session->current_question_order, $questions->count()),
-        ]);
+        ] + ($feedback !== null ? ['feedback' => $feedback] : []));
     }
 
     /**
@@ -255,13 +268,16 @@ class InterviewController extends Controller
         $responses = [];
         if ($status === 'scored') {
             $responses = $session->responses()
-                ->with('interviewQuestion.questionBank:id,question_text,category,difficulty')
+                ->with('interviewQuestion.questionBank:id,question_text,category,difficulty,notes_for_reviewer,reference_unverified,image')
                 ->get()
                 ->sortBy(fn (InterviewResponse $r) => $r->interviewQuestion->display_order)
                 ->values()
                 ->map(fn (InterviewResponse $r) => [
+                    // Study mode only: the model answer and how much of it this answer covered (null for every other interview).
+                    'study' => $interview->isStudyMode() ? app(StudyFeedbackService::class)->stored($r, $r->interviewQuestion->questionBank) : null,
                     'question_text' => $r->interviewQuestion->questionBank->question_text,
                     'category' => $r->interviewQuestion->questionBank->category,
+                    'image' => $r->interviewQuestion->questionBank->image,
                     // The candidate's own answer, in full — previously
                     // omitted here even though InterviewResponse has always
                     // stored it; a student could see their score and AI
@@ -277,7 +293,12 @@ class InterviewController extends Controller
                 ]);
         }
 
+        // A study sitting is kept for good once it is over (and, for one finished before that existed, kept now): the summary shows where this
+        // sitting stands among the student's sittings of the set, and offers the report to download.
+        $attempt = $status === 'scored' && $interview->isStudyMode() ? app(\App\Services\Interviews\StudyAttemptRecorder::class)->recordQuietly($session) : null;
+
         return response()->json([
+            'attempt' => $attempt !== null ? app(\App\Services\Interviews\StudyHistory::class)->summaryFor($attempt) : null,
             'status' => $status,
             'composite_score_percent' => $status === 'scored' ? $session->composite_score_percent : null,
             'passed' => $status === 'scored' && $interview->isTrackRound()
@@ -285,6 +306,7 @@ class InterviewController extends Controller
                 : null,
             'is_qualification' => $this->isQualificationInterview($interview),
             'reattemptable' => $this->canReattempt($interview, $session),
+            'study' => $interview->isStudyMode(),
             'responses' => $responses,
         ]);
     }
@@ -316,6 +338,11 @@ class InterviewController extends Controller
 
         if ($session->status !== InterviewSession::STATUS_COMPLETED) {
             $session->update(['status' => InterviewSession::STATUS_COMPLETED, 'completed_at' => now()]);
+
+            // Bailing out of a study interview: what was answered already has its match, so there is nothing to wait for.
+            if ($interview->isStudyMode() && $session->responses()->exists()) {
+                app(StudyFeedbackService::class)->finalize($session->fresh());
+            }
         }
 
         return response()->json(['session' => $session->fresh()]);
@@ -334,12 +361,17 @@ class InterviewController extends Controller
             ->firstOrFail();
 
         abort_unless($session->status === InterviewSession::STATUS_COMPLETED, 422, 'Only completed interviews can be re-attempted.');
+
+        // A section the superadmin has switched off (Merchant Navy) cannot be sat again; a sitting already under way is left to finish.
+        if (($blockedBy = app(\App\Services\PlatformModules::class)->moduleBlocking($interview)) !== null) {
+            throw \App\Services\PlatformModules::unavailable($blockedBy);
+        }
         abort_unless($this->canReattempt($interview, $session), 422, $this->isQualificationInterview($interview)
             ? 'A Vault AI Interview qualification set is scored once per attempt and cannot be re-sat.'
             : 'This interview cannot be re-attempted.');
 
-        // Assert plan allowance for taking another mock interview round (a Vault AI Interview set needs no plan)
-        if (! $this->isQualificationInterview($interview)) {
+        // Assert plan allowance for taking another mock interview round (a Vault AI Interview set needs no plan, and neither does a study set)
+        if (! $this->isQualificationInterview($interview) && ! $interview->isStudyMode()) {
             app(PlanGate::class)->assertMockInterviewAllowed($request->user());
         }
 
@@ -416,8 +448,10 @@ class InterviewController extends Controller
     private function assertWithinDailyMockInterviewLimit(Request $request, Interview $interview): void
     {
         // A Vault AI Interview set is open to every student who has unlocked it: no plan, no trial, no daily cap.
+        // Nor is a study interview (the Merchant Navy sets): it costs nothing to run, so a student may sit as many as they like.
         $isPracticeType = ! $interview->isTrackRound()
             && ! $this->isQualificationInterview($interview)
+            && ! $interview->isStudyMode()
             && ($interview->is_mock || $interview->interview_type === Interview::INTERVIEW_TYPE_TPO_MOCK);
 
         if (! $isPracticeType) {
@@ -476,6 +510,7 @@ class InterviewController extends Controller
                 'logo' => $interview->company->logo,
             ] : null,
             'question_count' => $questions->count(),
+            'study' => $interview->isStudyMode(),
             'estimated_total_seconds' => $questions->count() > 0
                 ? (int) $questions->sum(fn (InterviewQuestion $q) => ($q->questionBank->expected_duration_seconds ?? 0) + self::PREP_SECONDS_PER_QUESTION)
                 : null,
@@ -507,6 +542,8 @@ class InterviewController extends Controller
             'total_questions' => $totalQuestions,
             'answered_count' => min($session->current_question_order, $totalQuestions),
             'complete' => $currentQuestion === null,
+            // Study mode: after each answer the model answer and the match are returned (see answer()).
+            'study' => $interview->isStudyMode(),
             'question' => $currentQuestion ? $this->questionPayload($currentQuestion, $session->current_question_order, $totalQuestions) : null,
             // Whether the interviewer has a real voice (the page then asks for the audio of each question), and what it says besides questions.
             'speech' => $this->speechInfo(),
@@ -546,6 +583,8 @@ class InterviewController extends Controller
             'category' => $interviewQuestion->questionBank->category,
             'difficulty' => $interviewQuestion->questionBank->difficulty,
             'expected_duration_seconds' => $interviewQuestion->questionBank->expected_duration_seconds,
+            // A picture question (a Rule of the Road card): the room shows this beside the question. Null for every other question.
+            'image' => $interviewQuestion->questionBank->image,
         ];
     }
 }

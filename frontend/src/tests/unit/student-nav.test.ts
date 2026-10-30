@@ -4,8 +4,8 @@ import { buildStudentNav } from "@/components/dashboard/studentNav";
 const flat = (opts: Parameters<typeof buildStudentNav>[0]) => buildStudentNav(opts).map((s) => ({ title: s.title, items: s.items.map((i) => `${i.label}|${i.href}${i.locked ? "|locked" : ""}${i.badge ? `|${i.badge}` : ""}`) }));
 
 /**
- * The rail a CSE student gets: three groups by purpose — Your Arena (build skill, then the report that measures it),
- * Placements (get hired) and Competition (measure yourself). Every Overview section that has a page of its own is reached from
+ * The rail a CSE student gets: groups by purpose — Your Arena (build skill, then the report that measures it),
+ * Placements (get hired), Merchant Navy (oral-exam practice for deck officers) and Competition (measure yourself). Every Overview section that has a page of its own is reached from
  * here, once; there are no #anchors back into the Overview any more.
  */
 const ORIGINAL = [
@@ -18,12 +18,35 @@ const ORIGINAL = [
     items: ["Upcoming Drives|/dashboard/drives", "Company PYQs|/dashboard/company-prep|New", "Mock AI Interview|/dashboard/interviews", "Vault AI Interview|/dashboard/vault-interviews", "Mellow Vault|/dashboard/vault|Get Hired"],
   },
   {
+    title: "Merchant Navy",
+    items: ["Mock Orals|/dashboard/merchant-navy|New", "My Reports|/dashboard/merchant-navy/reports"],
+  },
+  {
     title: "Competition",
     items: ["Contests|/dashboard/contests", "Global Leaderboard|/dashboard/leaderboard"],
   },
 ];
 
 describe("student navigation", () => {
+  it("has a Merchant Navy group of its own, between Placements and Competition, that leads to the Merchant Navy page", () => {
+    const rail = buildStudentNav({ projectLabEnabled: true, vaultEnabled: true });
+    expect(rail.map((s) => s.title)).toEqual(["Your Arena", "Placements", "Merchant Navy", "Competition"]);
+
+    const group = rail.find((s) => s.title === "Merchant Navy")!;
+    expect(group.items).toHaveLength(2);
+    // the exact page, not the whole section: "My Reports" lives under it and must not light up both items
+    expect(group.items[0]).toMatchObject({ label: "Mock Orals", href: "/dashboard/merchant-navy" });
+    expect(group.items[0].matchPrefix).toBeFalsy();
+    expect(group.items[1]).toMatchObject({ label: "My Reports", href: "/dashboard/merchant-navy/reports" });
+    // ...and the Mock AI Interview keeps its own item: the card is in both places
+    expect(rail.find((s) => s.title === "Placements")!.items.map((i) => i.href)).toContain("/dashboard/interviews");
+  });
+
+  it("leaves the Merchant Navy group out for a programme without the AI interviews module (it runs on that engine)", () => {
+    const rail = buildStudentNav({ projectLabEnabled: true, vaultEnabled: true, capabilities: { ai_interviews: false } });
+    expect(rail.map((s) => s.title)).not.toContain("Merchant Navy");
+  });
+
   it("never points back into the Overview with an anchor (Upcoming Drives and Submissions used to bounce to /dashboard#…)", () => {
     for (const s of buildStudentNav({ projectLabEnabled: true, vaultEnabled: true })) for (const i of s.items) expect(i.href, i.label).not.toContain("#");
   });
@@ -152,7 +175,7 @@ describe("student navigation", () => {
     });
 
     it("has no empty Competition heading when there is nothing to compete in", () => {
-      expect(rail().map((s) => s.title)).toEqual(["Your Arena", "Placements"]);
+      expect(rail().map((s) => s.title)).toEqual(["Your Arena", "Placements", "Merchant Navy"]);
     });
 
     it("puts the department's own prep right under Overview, under its own name", () => {

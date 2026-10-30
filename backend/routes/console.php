@@ -32,6 +32,9 @@ Schedule::call(fn () => app(\App\Services\ReadinessHistoryService::class)->prune
 // nothing, and loses nothing, until VAULT_SYNC_URL and VAULT_SYNC_SECRET are set.
 Schedule::command('vault:sync')->everyMinute()->withoutOverlapping(5);
 
+// Every five minutes: when Mellow Vault books a student AptRun delivered (VAULT_SYNC_DRIVER=database only; a no-op otherwise), mark them hired here.
+Schedule::command('vault:pull-outcomes')->everyFiveMinutes()->withoutOverlapping(5);
+
 // Daily: drop delivered Vault outbox events past their retention.
 Schedule::command('vault:prune')->daily();
 

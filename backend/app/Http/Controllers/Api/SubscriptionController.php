@@ -90,6 +90,23 @@ class SubscriptionController extends Controller
             'academic_signature' => $user->role === User::ROLE_USER
                 ? substr(sha1(json_encode([$user->college_id, $user->getRawOriginal('graduation_year'), $user->section])), 0, 16)
                 : null,
+            // The college's name, code and place, and this account's own name and login email — what a superadmin can correct from
+            // the Partner Universities screen. Moves => the browser reloads the signed-in user, so the sidebar, the TPO's hero and
+            // every student's college label change without a refresh. Never part of the plan signature: renaming a college is not a plan change.
+            'profile_signature' => $user->college_id !== null
+                ? substr(sha1(json_encode([
+                    $user->college?->name,
+                    $user->college?->short_code,
+                    $user->college?->city,
+                    $user->college?->state,
+                    $user->name,
+                    $user->email,
+                ])), 0, 16)
+                : null,
+            // Which whole sections (Merchant Navy …) the superadmin has switched on. Its own marker, never part of the plan signature:
+            // switching a section off is not a plan change. The browser reloads the signed-in user and the open catalogue when it moves.
+            'modules' => app(\App\Services\PlatformModules::class)->states(),
+            'modules_signature' => app(\App\Services\PlatformModules::class)->signature(),
             'source' => $coverage['source'],
             'plan' => $plan && $running ? ['code' => $plan->code, 'name' => $plan->name] : null,
             'days_remaining' => $running ? $coverage['days_remaining'] : null,

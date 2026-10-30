@@ -9,8 +9,8 @@ use Illuminate\Console\Command;
 /**
  * Hands whatever is waiting in the Vault outbox to Mellow Vault. The scheduler
  * runs it every minute; it needs only the cron that already runs `schedule:run`,
- * not a queue worker. With VAULT_SYNC_URL / VAULT_SYNC_SECRET unset it sends
- * nothing and loses nothing — events wait until they are set.
+ * not a queue worker. With the hand-off unconfigured (VAULT_SYNC_URL / VAULT_SYNC_SECRET, or
+ * for VAULT_SYNC_DRIVER=database the MELLOW_VAULT_DB_* settings) it sends nothing and loses nothing — events wait.
  *
  *   php artisan vault:sync                 deliver what is due
  *   php artisan vault:sync --retry-dead    first give parked events another full set of attempts
@@ -33,7 +33,9 @@ class SyncVault extends Command
             $waiting = VaultSyncEvent::whereIn('status', [VaultSyncEvent::STATUS_PENDING, VaultSyncEvent::STATUS_FAILED])->count();
 
             if ($waiting > 0) {
-                $this->warn("Mellow Vault is not connected (set VAULT_SYNC_URL and VAULT_SYNC_SECRET). {$waiting} update(s) are waiting.");
+                $this->warn($sync->driver() === 'database'
+                    ? "Mellow Vault's database is not configured (set MELLOW_VAULT_DB_DATABASE). {$waiting} update(s) are waiting."
+                    : "Mellow Vault is not connected (set VAULT_SYNC_URL and VAULT_SYNC_SECRET). {$waiting} update(s) are waiting.");
             }
 
             return self::SUCCESS;

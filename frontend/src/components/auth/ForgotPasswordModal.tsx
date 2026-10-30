@@ -161,7 +161,7 @@ export function ForgotPasswordModal({ open, onClose }: ForgotPasswordModalProps)
           {step === "code" && (
             <form onSubmit={handleCodeSubmit} className="space-y-4">
               <p className="text-xs text-text-secondary">
-                We sent a 6-digit code to <strong className="text-primary">{email}</strong>. It expires in 10 minutes.
+                We sent a 6-digit code to <strong className="text-primary">{email}</strong>. It stays valid for 7 days, or until you set a new password.
               </p>
               <FormField
                 label="Verification Code *"

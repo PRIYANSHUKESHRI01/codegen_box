@@ -543,6 +543,12 @@ class SuperAdminController extends Controller
             array_filter(['role' => $user->role, 'reason' => $validated['reason'] ?? null])
         );
 
+        // A marketing employee coming back is the same moment a new hire is: whatever piled up while nobody could take it gets dealt out.
+        if ($user->role === User::ROLE_ADMIN_MARKETING && ! $user->is_blocked) {
+            app(LeadAssignmentService::class)->assignUnassignedLeads();
+            app(LeadAssignmentService::class)->assignUnassignedContactRequests();
+        }
+
         return response()->json(['user' => $user->fresh(['college:id,name'])]);
     }
 

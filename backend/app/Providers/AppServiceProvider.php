@@ -60,6 +60,9 @@ class AppServiceProvider extends ServiceProvider
         // consulted per student per drive in cohort paths) — see App\Support\BranchCatalog.
         $this->app->scoped(BranchCatalog::class);
 
+        // Which whole sections are switched on (Superadmin -> Merchant Navy): read once per request, so a switch is live on the very next one.
+        $this->app->scoped(\App\Services\PlatformModules::class);
+
         // One catalog per request, so the explorer, the qualification service and the admin screen all see the same tree.
         $this->app->singleton(\App\Services\Vault\CuratedCatalog::class);
         // Same reason: one Mock AI Interview catalog per request, so a write that flushes it flushes the one every reader holds.
@@ -112,17 +115,22 @@ class AppServiceProvider extends ServiceProvider
         // independent of and complements PasswordResetOtp's own per-row
         // `attempts` cap — this limiter stops volume/spam, `attempts` stops
         // sustained guessing against one still-valid code.
+        // The IP caps are deliberately high: a whole class at one college shares one public address and activates
+        // its accounts together (each student = request + verify + reset + sign-in). What protects an account is the
+        // per-email limit and the per-code attempts cap, not the IP.
         RateLimiter::for('password-reset-request', function (Request $request) {
             return [
                 Limit::perMinute(3)->by('otp-request-email:'.Str::lower((string) $request->input('email'))),
-                Limit::perMinute(10)->by('otp-request-ip:'.$request->ip()),
+                Limit::perMinute(120)->by('otp-request-ip:'.$request->ip()),
             ];
         });
 
         RateLimiter::for('password-reset-verify', function (Request $request) {
             return [
                 Limit::perMinute(10)->by('otp-verify-email:'.Str::lower((string) $request->input('email'))),
-                Limit::perMinute(20)->by('otp-verify-ip:'.$request->ip()),
+                // A reset code now lives for a week, so cap guessing over an hour too, not just a minute.
+                Limit::perHour(30)->by('otp-verify-hour-email:'.Str::lower((string) $request->input('email'))),
+                Limit::perMinute(300)->by('otp-verify-ip:'.$request->ip()),
             ];
         });
 
@@ -130,12 +138,13 @@ class AppServiceProvider extends ServiceProvider
         // and had zero throttling at all before this despite guarding every
         // account on the platform, superadmin included. 5/minute per email is
         // generous enough for a real user fat-fingering their password a
-        // couple of times; 20/minute per IP stops a script from brute-forcing
-        // its way through many accounts from one source.
+        // couple of times; 150/minute per IP still stops a script from brute-forcing
+        // many accounts from one source, yet leaves room for a whole class sharing one
+        // college address to sign in (twice each when activating) at the same time.
         RateLimiter::for('login', function (Request $request) {
             return [
                 Limit::perMinute(5)->by('login-email:'.Str::lower((string) $request->input('email'))),
-                Limit::perMinute(20)->by('login-ip:'.$request->ip()),
+                Limit::perMinute(150)->by('login-ip:'.$request->ip()),
             ];
         });
 

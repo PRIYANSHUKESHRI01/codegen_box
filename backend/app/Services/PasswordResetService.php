@@ -33,7 +33,11 @@ class PasswordResetService
 
     public const INVALID_TOKEN_MESSAGE = 'This reset link has expired. Please start over.';
 
-    private const OTP_LIFETIME_MINUTES = 10;
+    /**
+     * A code (and the reset token it earns) is good for a week from when it was first issued, and stays good until
+     * the person sets a new password — however many times they ask for the code again.
+     */
+    public const OTP_LIFETIME_DAYS = 7;
 
     private const MAX_ATTEMPTS = 5;
 
@@ -43,6 +47,10 @@ class PasswordResetService
      * self-service reset either — this silently does nothing for one, so
      * the controller's identical generic response for every outcome never
      * leaks which emails belong to a superadmin.
+     *
+     * While the person still has a live code this RE-SENDS it (a new request never invalidates what they already
+     * hold — an older email, or a code they already verified, keeps working) and gives them a fresh set of
+     * attempts. Otherwise a new code is issued, valid for OTP_LIFETIME_DAYS.
      */
     public function requestOtp(User $user): void
     {
@@ -50,15 +58,28 @@ class PasswordResetService
             return;
         }
 
-        PasswordResetOtp::where('user_id', $user->id)->whereNull('consumed_at')->delete();
+        $live = PasswordResetOtp::active()
+            ->where('user_id', $user->id)
+            ->whereNotNull('code_encrypted')
+            ->latest('id')
+            ->first();
 
-        $code = (string) random_int(100000, 999999);
+        if ($live) {
+            $live->forceFill(['attempts' => 0])->save();
+            $code = $live->code_encrypted;
+        } else {
+            // Anything still here is expired, or predates re-sendable codes and can never be re-sent.
+            PasswordResetOtp::where('user_id', $user->id)->whereNull('consumed_at')->delete();
 
-        PasswordResetOtp::create([
-            'user_id' => $user->id,
-            'code_hash' => Hash::make($code),
-            'expires_at' => now()->addMinutes(self::OTP_LIFETIME_MINUTES),
-        ]);
+            $code = (string) random_int(100000, 999999);
+
+            PasswordResetOtp::create([
+                'user_id' => $user->id,
+                'code_hash' => Hash::make($code),
+                'code_encrypted' => $code,
+                'expires_at' => now()->addDays(self::OTP_LIFETIME_DAYS),
+            ]);
+        }
 
         SingleMail::afterResponse(new SendPasswordResetOtpEmail($user->id, $code));
     }
@@ -66,14 +87,16 @@ class PasswordResetService
     /** @return string the raw reset token to hand back to the caller — never stored in plaintext */
     public function verifyOtp(User $user, string $code): string
     {
-        $otp = PasswordResetOtp::where('user_id', $user->id)->whereNull('consumed_at')->latest()->first();
+        // Normally one row; two only if two "send me a code" requests raced each other — both are real, so accept either.
+        $candidates = PasswordResetOtp::active()
+            ->where('user_id', $user->id)
+            ->where('attempts', '<', self::MAX_ATTEMPTS)
+            ->get();
 
-        if (! $otp || $otp->isExpired() || $otp->attempts >= self::MAX_ATTEMPTS) {
-            throw ValidationException::withMessages(['code' => [self::INVALID_CODE_MESSAGE]]);
-        }
+        $otp = $candidates->first(fn (PasswordResetOtp $row) => Hash::check($code, $row->code_hash));
 
-        if (! Hash::check($code, $otp->code_hash)) {
-            $otp->increment('attempts');
+        if (! $otp) {
+            $candidates->each(fn (PasswordResetOtp $row) => $row->increment('attempts'));
 
             throw ValidationException::withMessages(['code' => [self::INVALID_CODE_MESSAGE]]);
         }
@@ -86,13 +109,13 @@ class PasswordResetService
 
     public function resetPassword(User $user, string $rawToken, string $newPassword): void
     {
-        $otp = PasswordResetOtp::where('user_id', $user->id)
-            ->whereNull('consumed_at')
+        $otp = PasswordResetOtp::active()
+            ->where('user_id', $user->id)
             ->whereNotNull('reset_token_hash')
-            ->latest()
-            ->first();
+            ->get()
+            ->first(fn (PasswordResetOtp $row) => Hash::check($rawToken, $row->reset_token_hash));
 
-        if (! $otp || $otp->isExpired() || ! Hash::check($rawToken, $otp->reset_token_hash)) {
+        if (! $otp) {
             throw ValidationException::withMessages(['reset_token' => [self::INVALID_TOKEN_MESSAGE]]);
         }
 
@@ -110,7 +133,7 @@ class PasswordResetService
 
         app(IssuedCredentialVault::class)->forget($user);
 
-        $otp->forceFill(['consumed_at' => now()])->save();
+        $this->expirePendingResets($user);
 
         // A password reset should invalidate any session an attacker might
         // already hold — same tokens() relation AuthController::sessions()/
@@ -122,5 +145,14 @@ class PasswordResetService
         if (! ($firstActivation && $mail->welcomeActivated($user))) {
             $mail->passwordChanged($user, 'reset');
         }
+    }
+
+    /**
+     * Ends every outstanding reset code and token for this user at once. Called the moment they set a password of
+     * their own — here, or from Settings — so nothing they were sent earlier can be used afterwards.
+     */
+    public function expirePendingResets(User $user): void
+    {
+        PasswordResetOtp::where('user_id', $user->id)->whereNull('consumed_at')->update(['consumed_at' => now()]);
     }
 }

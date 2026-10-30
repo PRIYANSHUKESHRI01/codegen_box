@@ -31,7 +31,7 @@ class MockQuestionAdmin
     // ───────────────────────────── reading ─────────────────────────────
 
     /**
-     * Every domain and stack with how ready it is and the question count of each of its 3 rounds.
+     * Every domain and stack with how ready it is and the question count of each of its rounds (or sets).
      *
      * @return array<string, mixed>
      */
@@ -61,7 +61,7 @@ class MockQuestionAdmin
                 ];
             }
 
-            $roles[] = ['key' => $role['key'], 'title' => $role['title'], 'color' => $role['color'], 'stacks' => $rows];
+            $roles[] = ['key' => $role['key'], 'title' => $role['title'], 'color' => $role['color'], 'terms' => $role['terms'] ?? null, 'stacks' => $rows];
         }
 
         return [
@@ -86,7 +86,7 @@ class MockQuestionAdmin
             'key' => $stack['key'],
             'name' => $stack['name'],
             'blurb' => $stack['blurb'],
-            'role' => ['key' => $found['role']['key'], 'title' => $found['role']['title']],
+            'role' => ['key' => $found['role']['key'], 'title' => $found['role']['title'], 'terms' => $found['role']['terms'] ?? null],
             'live' => $this->catalog->progress($stack)['live'],
             'min_questions' => $this->catalog->minQuestions(),
             'rounds' => array_map(fn (array $r) => [
@@ -127,7 +127,7 @@ class MockQuestionAdmin
         $text = $this->clean($data['text']);
 
         DB::transaction(function () use ($question, $target, $text, $data) {
-            $this->assertNotDuplicate($target['round'], $text, $question->id);
+            $this->assertNotDuplicate($target['round'], $text, $question->id, $question->image);
 
             $question->forceFill([
                 'text' => $text,
@@ -242,22 +242,22 @@ class MockQuestionAdmin
         }
         $sheet->getStyle('C2:G3000')->getAlignment()->setWrapText(true);
         $this->dropdown($sheet, 'D2:D3000', '"'.implode(',', InterviewQuestionBank::CATEGORIES).'"');
-        $this->dropdown($sheet, 'B2:B3000', '"1,2,3"');
+        $this->wholeNumber($sheet, 'B2:B3000', 1, MockInterviewCatalog::MAX_ROUNDS);
 
         $stacks = new Worksheet($book, 'Stacks');
         $book->addSheet($stacks);
-        $stacks->fromArray(['stack (use this exact key)', 'name', 'domain', 'status'], null, 'A1');
-        $stacks->getStyle('A1:D1')->getFont()->setBold(true);
+        $stacks->fromArray(['stack (use this exact key)', 'name', 'domain', 'status', 'rounds / sets (the round number goes up to this)'], null, 'A1');
+        $stacks->getStyle('A1:E1')->getFont()->setBold(true);
         $row = 2;
         $live = $this->catalog->liveMap();
 
         foreach ($this->catalog->roles() as $role) {
             foreach ($role['stacks'] as $key => $stack) {
-                $stacks->fromArray([$key, $stack['name'], $role['title'], ($live[(string) $key] ?? false) ? 'open' : 'coming soon'], null, "A{$row}");
+                $stacks->fromArray([$key, $stack['name'], $role['title'], ($live[(string) $key] ?? false) ? 'open' : 'coming soon', count($stack['rounds'])], null, "A{$row}");
                 $row++;
             }
         }
-        foreach (['A' => 28, 'B' => 42, 'C' => 28, 'D' => 14] as $col => $width) {
+        foreach (['A' => 28, 'B' => 42, 'C' => 28, 'D' => 14, 'E' => 24] as $col => $width) {
             $stacks->getColumnDimension($col)->setWidth($width);
         }
 
@@ -266,7 +266,7 @@ class MockQuestionAdmin
         $guide->fromArray([
             ['Column', 'What to put there'],
             ['stack', 'The stack key from the "Stacks" sheet, e.g. data_analytics.'],
-            ['round', '1, 2 or 3 - each stack has three practice rounds; their themes are shown in Admin -> AI Interviews -> Mock interview questions.'],
+            ['round', 'The round number within the stack (a column named "set" works too). Most stacks have 3 rounds; some have more, called sets - the "Stacks" sheet shows how many each stack has.'],
             ['question', 'What the AI interviewer asks aloud (15-800 characters). Write it so it can be answered by speaking in 2-3 minutes.'],
             ['category', 'technical (default), behavioral, hr, situational or aptitude.'],
             ['seconds', 'How long to allow for the answer. Blank = 180.'],
@@ -318,6 +318,7 @@ class MockQuestionAdmin
             'note' => $this->nullable($data['note'] ?? null),
             'topic' => $this->topic($data['topic'] ?? null),
             'needs_review' => (bool) ($data['needs_review'] ?? false),
+            'origin' => 'staff',
             'created_by' => $actor->id,
         ];
     }
@@ -347,12 +348,17 @@ class MockQuestionAdmin
         return $value === '' ? null : mb_substr($value, 0, 1000);
     }
 
-    private function isDuplicate(array $round, string $text, ?int $ignoreId = null): bool
+    /** A question is a duplicate only of one with the same words AND the same picture: a hundred ROR cards ask "What are your Rule, role and action?". */
+    private function isDuplicate(array $round, string $text, ?int $ignoreId = null, ?string $image = null): bool
     {
         $needle = mb_strtolower($text);
 
         foreach ($round['questions'] as $existing) {
             if ($ignoreId !== null && ($existing['id'] ?? null) === $ignoreId) {
+                continue;
+            }
+
+            if (($existing['image'] ?? null) !== $image) {
                 continue;
             }
 
@@ -364,9 +370,9 @@ class MockQuestionAdmin
         return false;
     }
 
-    private function assertNotDuplicate(array $round, string $text, ?int $ignoreId = null): void
+    private function assertNotDuplicate(array $round, string $text, ?int $ignoreId = null, ?string $image = null): void
     {
-        if ($this->isDuplicate($round, $text, $ignoreId)) {
+        if ($this->isDuplicate($round, $text, $ignoreId, $image)) {
             throw ValidationException::withMessages(['text' => ['This question is already in the round.']]);
         }
     }
@@ -375,15 +381,17 @@ class MockQuestionAdmin
     private function checkImportRow(array $row): array|string
     {
         $stack = trim((string) ($row['stack'] ?? ''));
-        $round = (int) ($row['round'] ?? 0);
+        $round = (int) ($row['round'] ?? $row['set'] ?? 0);
         $text = $this->clean((string) ($row['question'] ?? ''));
 
         if ($stack === '' || $this->catalog->stack($stack) === null) {
             return $stack === '' ? 'The stack is empty.' : "Unknown stack \"{$stack}\" - use a key from the Stacks sheet.";
         }
 
-        if ($round < 1 || $round > MockInterviewCatalog::ROUNDS) {
-            return 'Round must be 1, 2 or 3.';
+        $rounds = count($this->catalog->stack($stack)['stack']['rounds']);
+
+        if ($round < 1 || $round > $rounds) {
+            return "Round must be a number from 1 to {$rounds} for this stack.";
         }
 
         $length = mb_strlen($text);
@@ -399,6 +407,14 @@ class MockQuestionAdmin
         }
 
         return [$this->locate(MockInterviewCatalog::roundId($stack, $round)), $text];
+    }
+
+    private function wholeNumber(Worksheet $sheet, string $range, int $min, int $max): void
+    {
+        $validation = $sheet->getCell(explode(':', $range)[0])->getDataValidation();
+        $validation->setType(DataValidation::TYPE_WHOLE)->setOperator(DataValidation::OPERATOR_BETWEEN)->setFormula1((string) $min)->setFormula2((string) $max);
+        $validation->setShowErrorMessage(true);
+        $sheet->setDataValidation($range, $validation);
     }
 
     private function dropdown(Worksheet $sheet, string $range, string $list): void

@@ -20,8 +20,7 @@ use Illuminate\Support\Facades\Mail;
  * No idempotency guard — unlike a welcome/credentials email, re-sending on
  * a queue retry is exactly the desired behavior here (every genuine
  * request-a-code action should result in an email), and PasswordResetOtp's
- * own expiry + single-active-row invariant is what actually guards replay,
- * not this job.
+ * own expiry + consumed_at is what actually guards replay, not this job.
  */
 class SendPasswordResetOtpEmail implements ShouldQueue, ShouldBeEncrypted
 {

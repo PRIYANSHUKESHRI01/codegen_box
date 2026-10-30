@@ -163,7 +163,7 @@ class VaultQualificationAdminService
             app(ScoreLedger::class)->vaultAi((int) $qual->user_id, $average);
 
             $profile = $this->vault->applyAiInterviewQualification(
-                $user, $qual->stack_key, $qual->role_key, $average, array_map('intval', $qual->series_scores), (int) $qual->current_attempt
+                $user, $qual->stack_key, $qual->role_key, $average, array_map('intval', $qual->series_scores), (int) $qual->current_attempt, override: true
             );
 
             return $qual;
@@ -258,7 +258,7 @@ class VaultQualificationAdminService
         $qual->save();
 
         return $this->vault->applyAiInterviewQualification(
-            User::findOrFail($qual->user_id), $qual->stack_key, $qual->role_key, $average, $merged, (int) $qual->current_attempt
+            User::findOrFail($qual->user_id), $qual->stack_key, $qual->role_key, $average, $merged, (int) $qual->current_attempt, override: true
         );
     }
 
@@ -281,7 +281,7 @@ class VaultQualificationAdminService
         $qual->save();
 
         return $this->vault->applyAiInterviewQualification(
-            User::findOrFail($qual->user_id), $qual->stack_key, $qual->role_key, $average, $merged, (int) $qual->current_attempt
+            User::findOrFail($qual->user_id), $qual->stack_key, $qual->role_key, $average, $merged, (int) $qual->current_attempt, override: true
         );
     }
 

@@ -33,6 +33,9 @@ function InterviewDetailPageContent() {
   const { status } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
+  // Opened from the Merchant Navy section: the room and the way back stay in that section (see InterviewSessionView).
+  const from = searchParams.get("from");
+  const fromQs = from ? `&from=${encodeURIComponent(from)}` : "";
   const router = useRouter();
   const [interview, setInterview] = useState<StudentInterviewSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,7 +52,7 @@ function InterviewDetailPageContent() {
     setReattempting(true);
     try {
       await api.post(`/interviews/${encodeURIComponent(slug)}/reattempt`, {});
-      router.push(`/dashboard/interviews/session?slug=${encodeURIComponent(slug)}`);
+      router.push(`/dashboard/interviews/session?slug=${encodeURIComponent(slug)}${fromQs}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to reset interview session for re-attempt.");
       setReattempting(false);
@@ -117,7 +120,7 @@ function InterviewDetailPageContent() {
   const inProgress = interview?.my_session_status === "in_progress";
 
   return (
-    <DashboardShell role="user" title="AI Interview">
+    <DashboardShell role="user" title="AI Interview" back={from === "merchant-navy" ? { href: "/dashboard/merchant-navy", label: "Merchant Navy" } : undefined}>
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -336,7 +339,7 @@ function InterviewDetailPageContent() {
                     disabled={opening}
                     onClick={() => {
                       setOpening(true);
-                      router.push(`/dashboard/interviews/session?slug=${interview.slug}`);
+                      router.push(`/dashboard/interviews/session?slug=${interview.slug}${fromQs}`);
                     }}
                     className="w-full py-3.5 rounded-xl bg-accent-primary hover:bg-accent-primary-hover text-white text-sm font-bold shadow-lg shadow-accent-primary/30 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-80"
                   >

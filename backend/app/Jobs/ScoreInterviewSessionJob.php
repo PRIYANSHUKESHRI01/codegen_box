@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\InterviewSession;
 use App\Services\GeminiInterviewScoringService;
 use App\Services\InterviewTrackAdvancementService;
+use App\Services\Interviews\StudyFeedbackService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -67,6 +68,14 @@ class ScoreInterviewSessionJob implements ShouldQueue
 
         if (empty($items)) {
             $session->update(['scoring_failed_at' => now()]);
+
+            return;
+        }
+
+        // A study interview (the Merchant Navy orals) never goes to an AI: each answer was matched with the model answer when it was given,
+        // so finishing it is only averaging. This is the path for one the live scoring missed (the sweeper) or that was left early.
+        if ($interview->isStudyMode()) {
+            app(StudyFeedbackService::class)->finalize($session);
 
             return;
         }

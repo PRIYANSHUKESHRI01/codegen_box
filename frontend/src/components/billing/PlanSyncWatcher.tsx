@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect } from "react";
-import { ArrowUpCircle, Info, TimerOff } from "lucide-react";
+import { Anchor, ArrowUpCircle, EyeOff, Info, TimerOff } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
-import { ACADEMIC_CHANGED_EVENT, startPlanSync, subscribeToPlanNotices, type PlanChangeNotice } from "@/lib/planSync";
+import { ACADEMIC_CHANGED_EVENT, MODULES_CHANGED_EVENT, PROFILE_CHANGED_EVENT, startPlanSync, subscribeToPlanNotices, type ModulesChangedDetail, type PlanChangeNotice } from "@/lib/planSync";
 import { toast, type ToastTone } from "@/lib/toast";
 
 const NOTICE_MS = 14_000;
+
+/** How the superadmin's whole-section switches are named to a student. */
+const MODULE_NAMES: Record<string, string> = { merchant_navy: "Merchant Navy" };
 
 function wording(notice: PlanChangeNotice, audience: "student" | "college") {
   const owner = audience === "college" ? "Your college's plan" : "Your plan";
@@ -64,6 +67,55 @@ export function PlanSyncWatcher({ audience }: { audience: "student" | "college" 
 
     window.addEventListener(ACADEMIC_CHANGED_EVENT, onAcademicChange);
     return () => window.removeEventListener(ACADEMIC_CHANGED_EVENT, onAcademicChange);
+  }, [audience, userId, refresh]);
+
+  // The superadmin switched a whole section (Merchant Navy) on or off: reload the signed-in user so the sidebar follows at once (the open
+  // Mock AI Interview catalogue listens to the same event), and say so once. Staff and hiring partners never see these sections.
+  useEffect(() => {
+    if (audience !== "student" || userId === null) return;
+
+    const onModulesChange = (event: Event) => {
+      void refresh();
+      const { modules, previous } = (event as CustomEvent<ModulesChangedDetail>).detail;
+
+      for (const key of Object.keys(MODULE_NAMES)) {
+        if (modules[key] === previous[key] || modules[key] === undefined) continue;
+        const name = MODULE_NAMES[key];
+        const on = modules[key];
+
+        toast(on ? `${name} practice is open — find it in the sidebar and in Mock AI Interview.` : `${name} practice has been switched off for now. Anything you were in can be finished; it will be back when it is switched on again.`, {
+          id: `module-${key}`,
+          tone: on ? "success" : "info",
+          title: on ? `${name} is now available` : `${name} is unavailable`,
+          duration: NOTICE_MS,
+          icon: on ? Anchor : EyeOff,
+          action: on ? { label: "Open it", href: "/dashboard/merchant-navy" } : undefined,
+        });
+      }
+    };
+
+    window.addEventListener(MODULES_CHANGED_EVENT, onModulesChange);
+    return () => window.removeEventListener(MODULES_CHANGED_EVENT, onModulesChange);
+  }, [audience, userId, refresh]);
+
+  // Mellow corrected the college's name / code (or the TPO's own details): reload the signed-in user so the sidebar, the hero and every
+  // college label change in place, and say so once.
+  useEffect(() => {
+    if (userId === null) return;
+
+    const onProfileChange = () => {
+      void refresh();
+      toast(audience === "college" ? "Your college's name or details were corrected by the AptRun team. Everything on screen is up to date." : "Your college's details were corrected by the AptRun team.", {
+        id: "profile-sync",
+        tone: "info",
+        title: "Details updated",
+        duration: NOTICE_MS,
+        icon: Info,
+      });
+    };
+
+    window.addEventListener(PROFILE_CHANGED_EVENT, onProfileChange);
+    return () => window.removeEventListener(PROFILE_CHANGED_EVENT, onProfileChange);
   }, [audience, userId, refresh]);
 
   useEffect(() => {

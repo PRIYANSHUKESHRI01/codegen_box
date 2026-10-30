@@ -50,6 +50,8 @@ class InterviewQuestionBank extends Model
         'expected_duration_seconds',
         'tags',
         'notes_for_reviewer',
+        'reference_unverified',
+        'image',
         'discipline',
         'is_active',
         'created_by',
@@ -60,6 +62,7 @@ class InterviewQuestionBank extends Model
         return [
             'tags' => 'array',
             'is_active' => 'boolean',
+            'reference_unverified' => 'boolean',
             'expected_duration_seconds' => 'integer',
         ];
     }

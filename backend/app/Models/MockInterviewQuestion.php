@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class MockInterviewQuestion extends Model
 {
-    protected $fillable = ['stack_key', 'round_number', 'topic', 'position', 'text', 'category', 'duration_seconds', 'note', 'needs_review', 'created_by'];
+    protected $fillable = ['stack_key', 'round_number', 'topic', 'position', 'text', 'category', 'duration_seconds', 'note', 'needs_review', 'origin', 'image', 'created_by'];
 
     protected function casts(): array
     {
@@ -39,6 +39,8 @@ class MockInterviewQuestion extends Model
             'note' => $this->note,
             'topic' => $this->topic,
             'needs_review' => (bool) $this->needs_review,
+            'origin' => $this->origin ?? 'document',
+            'image' => $this->image,
         ];
     }
 }

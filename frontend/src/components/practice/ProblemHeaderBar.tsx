@@ -58,7 +58,7 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
             )}
           </div>
           <div className="hidden sm:flex items-center gap-1.5 mt-0.5">
-            {problem.tags.slice(0, 3).map((tag, idx, shown) => (
+            {(problem.tags ?? []).slice(0, 3).map((tag, idx, shown) => (
               <span key={tag} className="text-3xs font-mono text-text-muted">
                 {tag}
                 {idx < shown.length - 1 && " ·"}

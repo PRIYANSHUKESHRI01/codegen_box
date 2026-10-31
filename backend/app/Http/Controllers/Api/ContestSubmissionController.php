@@ -56,10 +56,10 @@ class ContestSubmissionController extends Controller
                 'slug' => $problem->slug,
                 'title' => $problem->title,
                 'difficulty' => $problem->difficulty,
-                'tags' => $problem->tags,
+                'tags' => $problem->tags ?? [],
                 'description' => $problem->description,
-                'constraints' => $problem->constraints,
-                'hints' => $problem->hints,
+                'constraints' => $problem->constraints ?? [],
+                'hints' => $problem->hints ?? [],
                 'examples' => $problem->sampleTestCases()->take(3)->get()->map(fn (ProblemTestCase $tc) => [
                     'input' => $tc->prettyInput($problem->params),
                     'output' => json_encode($tc->expected_output),

@@ -67,6 +67,12 @@ class ProjectEnrollment extends Model
         return $this->hasOne(ProjectWorkspace::class);
     }
 
+    /** The checkpoints the student saved from the editor ("Save progress"), see ProjectSave. */
+    public function saves(): HasMany
+    {
+        return $this->hasMany(ProjectSave::class);
+    }
+
     public function submissions(): HasMany
     {
         return $this->hasMany(ProjectSubmission::class)->orderByDesc('attempt');

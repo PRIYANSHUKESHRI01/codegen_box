@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contest;
 use App\Models\ContestParticipant;
+use App\Services\DailyChallengeService;
 use Illuminate\Http\Request;
 
 /**
@@ -77,6 +78,11 @@ class ContestController extends Controller
             return response()->json(['message' => 'This contest has already ended.'], 422);
         }
 
+        // The Daily Challenge is a scheduled event: you sign up in its window (opens 15 h before, closes 1 min before the start).
+        if ($refusal = app(DailyChallengeService::class)->registrationRefusal($contest)) {
+            return response()->json(['message' => $refusal], 422);
+        }
+
         $participant = ContestParticipant::firstOrCreate(
             ['contest_id' => $contest->id, 'user_id' => $request->user()->id],
             ['registered_at' => now()]
@@ -131,7 +137,8 @@ class ContestController extends Controller
     {
         return [
             'id' => $contest->id,
-            'title' => $contest->title,
+            // The daily contest always reads "AptRun Daily Challenge — date", including editions made before the rename.
+            'title' => app(DailyChallengeService::class)->displayTitle($contest),
             'slug' => $contest->slug,
             'description' => $contest->description,
             'start_at' => $contest->start_at,
@@ -144,6 +151,8 @@ class ContestController extends Controller
             'problem_count' => $contest->contestProblems()->count(),
             'total_points' => (int) $contest->contestProblems()->sum('points'),
             'contest_type' => $contest->contest_type,
+            // Daily editions only: when registration opens/closes and whether it is open right now (null for every other contest).
+            'registration' => app(DailyChallengeService::class)->registrationPayload($contest),
             'company' => $contest->company ? ['id' => $contest->company->id, 'name' => $contest->company->name, 'logo' => $contest->company->logo] : null,
         ];
     }

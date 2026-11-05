@@ -4,13 +4,15 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle, RotateCcw, ArrowLeft } from "lucide-react";
+import { Mic, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle, RotateCcw, ArrowLeft, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BeforeYouStart, BriefingGrid, BriefingHero, HowItWorks, Rise } from "@/components/dashboard/interviews/briefing/BriefingParts";
 import { InterviewerCard } from "@/components/dashboard/interviews/briefing/InterviewerCard";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { canStartNow, scheduleNote } from "@/lib/interviewSchedule";
+import { downloadStoredReport, type ReportRecord } from "@/lib/reportDocuments";
 import { cn } from "@/lib/utils";
 import { hasSpeechRecognition, hasSpeechSynthesis } from "@/lib/voice/VoiceEngine";
 import type { InterviewResult, StudentInterviewSummary } from "@/types/interview";
@@ -38,6 +40,7 @@ function InterviewDetailPageContent() {
   const fromQs = from ? `&from=${encodeURIComponent(from)}` : "";
   const router = useRouter();
   const [interview, setInterview] = useState<StudentInterviewSummary | null>(null);
+  const [makingReport, setMakingReport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<InterviewResult | null>(null);
@@ -110,6 +113,21 @@ function InterviewDetailPageContent() {
     }
   };
 
+  // The student's own result as a PDF: every question, their answer, the score and feedback on each. Saved, so it can be downloaded again.
+  const downloadReport = async () => {
+    if (makingReport) return;
+    setMakingReport(true);
+    try {
+      const res = await api.post<{ report: ReportRecord }>(`/me/interviews/${encodeURIComponent(slug)}/report`);
+      await downloadStoredReport(`/me/reports/${res.report.id}/download`, res.report.filename);
+      toast.success("Your interview report is ready.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't make the report. Please try again.");
+    } finally {
+      setMakingReport(false);
+    }
+  };
+
   if (status !== "ready" || interview?.is_qualification) return <SessionLoader />;
 
   const ttsSupported = hasSpeechSynthesis();
@@ -118,6 +136,8 @@ function InterviewDetailPageContent() {
 
   const completed = interview?.my_session_status === "completed";
   const inProgress = interview?.my_session_status === "in_progress";
+  const canStart = interview ? canStartNow(interview) : true;
+  const windowNote = interview ? scheduleNote(interview) : null;
 
   return (
     <DashboardShell role="user" title="AI Interview" back={from === "merchant-navy" ? { href: "/dashboard/merchant-navy", label: "Merchant Navy" } : undefined}>
@@ -201,6 +221,15 @@ function InterviewDetailPageContent() {
                         </div>
                         <p className="text-2xs text-text-muted mt-0.5">Scored by AI — a human reviewer can still adjust this.</p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => void downloadReport()}
+                        disabled={makingReport}
+                        className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-accent-primary/40 bg-accent-primary/10 px-3 py-1.5 text-2xs font-bold text-accent-primary transition-colors hover:bg-accent-primary/15 disabled:opacity-60"
+                      >
+                        {makingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <FileText className="h-3.5 w-3.5" aria-hidden />}
+                        {makingReport ? "Preparing…" : "Download report (PDF)"}
+                      </button>
                     </div>
                     {result.is_qualification && (
                       <div className="p-4 rounded-control bg-emerald-500/10 border border-emerald-500/25 flex flex-wrap items-center justify-between gap-3 mt-3">
@@ -330,13 +359,13 @@ function InterviewDetailPageContent() {
                 <InterviewerCard title="Interview complete" subtitle="Your result and the feedback on every answer are alongside." showChecks={false} />
               ) : (
                 <InterviewerCard
-                  title={inProgress ? "Pick up where you left off" : "Ready when you are"}
-                  subtitle="You choose when the first question starts — nothing begins until you say so."
+                  title={canStart ? (inProgress ? "Pick up where you left off" : "Ready when you are") : interview.schedule_state === "upcoming" ? "Not open yet" : "This interview has closed"}
+                  subtitle={canStart ? "You choose when the first question starts — nothing begins until you say so." : windowNote?.text ?? "Ask your placement cell if you need another chance."}
                   voicePreview={interview.voice_preview}
                   footnote={estimatedTime ? `About ${estimatedTime.replace("~", "")} in all. You'll get a moment to get ready first.` : "You'll get a moment to get ready first."}
                 >
                   <button
-                    disabled={opening}
+                    disabled={opening || !canStart}
                     onClick={() => {
                       setOpening(true);
                       router.push(`/dashboard/interviews/session?slug=${interview.slug}${fromQs}`);
@@ -344,7 +373,7 @@ function InterviewDetailPageContent() {
                     className="w-full py-3.5 rounded-xl bg-accent-primary hover:bg-accent-primary-hover text-white text-sm font-bold shadow-lg shadow-accent-primary/30 transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2 disabled:opacity-80"
                   >
                     {opening ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mic className="w-4 h-4" />}
-                    {opening ? "Opening your interview..." : inProgress ? "Continue Interview" : "Start Interview"}
+                    {opening ? "Opening your interview..." : !canStart ? (interview.schedule_state === "upcoming" ? "Opens soon" : "Closed") : inProgress ? "Continue Interview" : "Start Interview"}
                   </button>
                 </InterviewerCard>
               )}

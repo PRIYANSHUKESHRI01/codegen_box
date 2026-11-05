@@ -92,7 +92,7 @@ class CorePrepAuthoringTest extends TestCase
         $codes = array_column($json, 'code');
         $this->assertEmpty(array_diff(['ece', 'eee', 'mech', 'civil'], $codes));
         $this->assertContains('mba', $codes);
-        $this->assertNotContains('cse', $codes);
+        $this->assertContains('cse', $codes, 'CSE / IT has Domain Prep too: the CS core (DBMS, OS, networks ...)');
         $this->assertContains('other', $codes, 'Chemical, Biotech, Aerospace, Agri and Mining have Domain Prep too');
         $ece = collect($json)->firstWhere('code', 'ece');
         $this->assertContains('analog_circuits', array_column($ece['subjects'], 'code'));
@@ -623,7 +623,8 @@ class CorePrepAuthoringTest extends TestCase
         Sanctum::actingAs($this->superadmin());
 
         $this->postJson('/api/superadmin/core/disciplines/mech/live', ['live' => true, 'force' => true])->assertOk()->assertJsonPath('discipline.is_live', true);
-        $this->postJson('/api/superadmin/core/disciplines/cse/live', ['live' => true, 'force' => true])->assertStatus(422);   // no Core Prep for CSE
+        $this->postJson('/api/superadmin/core/disciplines/cse/live', ['live' => true, 'force' => true])->assertOk()->assertJsonPath('discipline.is_live', true);   // CSE has Domain Prep now
+        $this->postJson('/api/superadmin/core/disciplines/not_a_discipline/live', ['live' => true, 'force' => true])->assertStatus(404);
     }
 
     public function test_the_taxonomy_can_be_extended_but_not_emptied_of_questions(): void

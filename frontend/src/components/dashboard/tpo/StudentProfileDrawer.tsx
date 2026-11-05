@@ -13,8 +13,6 @@ import {
   AlertTriangle,
   ShieldCheck,
   ShieldAlert,
-  FileDown,
-  Loader2,
   BarChart3,
   CheckCircle2,
   BookOpen,
@@ -34,12 +32,12 @@ import { HpOverlayPortal } from "@/components/portal/cohortKit";
 import { EngagementPill, LanguageChips, lastPracticeText } from "./cohortProgress";
 import { daysAgo, relativeDays } from "@/lib/languageInsights";
 import { languageLabel } from "@/lib/judgeLanguages";
+import { StudentReportPanel } from "@/components/reports/StudentReportPanel";
+import { StudentManagePanel } from "./StudentManagePanel";
 
 interface StudentProfileDrawerProps {
   student: CohortStudent | null;
   onClose: () => void;
-  /** Used only for the "Download Report" PDF's header/filename — defaults to a generic label so this drawer never breaks if a caller omits it. */
-  collegeName?: string;
   /**
    * "premium" is the College TPO portal treatment (identity header, score
    * rings, kit surfaces). When omitted it follows the signed-in role — a
@@ -52,6 +50,10 @@ interface StudentProfileDrawerProps {
    * TPO's read-only view of it. The drawer itself knows nothing about them.
    */
   extra?: React.ReactNode;
+  /** A TPO's own roster: the student after an edit / block / unblock (omit and the drawer shows no Manage section). */
+  onStudentChanged?: (student: CohortStudent) => void;
+  /** The TPO removed an account that had never been used. */
+  onStudentRemoved?: (id: number) => void;
 }
 
 const TIER_STYLE: Record<CohortStudent["readiness_tier"], string> = {
@@ -66,33 +68,12 @@ const TIER_TONE: Record<CohortStudent["readiness_tier"], HpTone> = {
   "Needs Training": "amber",
 };
 
-export function StudentProfileDrawer({ student, onClose, collegeName = "your college", variant, extra }: StudentProfileDrawerProps) {
-  const [downloading, setDownloading] = useState(false);
+export function StudentProfileDrawer({ student, onClose, variant, extra, onStudentChanged, onStudentRemoved }: StudentProfileDrawerProps) {
   const { user } = useAuth();
   const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
 
-  const handleDownloadReport = async () => {
-    if (!student) return;
-    setDownloading(true);
-    try {
-      // jsPDF (~300kB) only ever loaded when someone actually opens a
-      // profile and clicks Download — not bundled into every page that
-      // renders this drawer (e.g. the whole Student Cohort table).
-      const { generateIndividualStudentReport } = await import("@/lib/generateTpoReports");
-      const { blob, filename } = generateIndividualStudentReport(student, collegeName);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-    } finally {
-      setDownloading(false);
-    }
-  };
-
   if (premium) {
-    return <PremiumDrawer student={student} onClose={onClose} downloading={downloading} onDownload={handleDownloadReport} extra={extra} />;
+    return <PremiumDrawer student={student} onClose={onClose} extra={extra} onStudentChanged={onStudentChanged} onStudentRemoved={onStudentRemoved} />;
   }
 
   return (
@@ -309,14 +290,7 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
                   <BarChart3 className="h-3.5 w-3.5" />
                   <span>View Full Activity Report</span>
                 </Link>
-                <button
-                  onClick={handleDownloadReport}
-                  disabled={downloading}
-                  className="flex w-full items-center justify-center gap-2 rounded-control border border-border-subtle bg-elevated py-2.5 text-xs font-bold text-text-secondary transition-colors hover:text-primary disabled:opacity-70"
-                >
-                  {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileDown className="w-3.5 h-3.5" />}
-                  <span>{downloading ? "Preparing..." : "Download PDF Summary"}</span>
-                </button>
+                <StudentReportPanel studentId={student.id} studentName={student.name} />
               </div>
             </div>
           </motion.div>
@@ -331,15 +305,15 @@ export function StudentProfileDrawer({ student, onClose, collegeName = "your col
 function PremiumDrawer({
   student,
   onClose,
-  downloading,
-  onDownload,
   extra,
+  onStudentChanged,
+  onStudentRemoved,
 }: {
   student: CohortStudent | null;
   onClose: () => void;
-  downloading: boolean;
-  onDownload: () => void;
   extra?: React.ReactNode;
+  onStudentChanged?: (student: CohortStudent) => void;
+  onStudentRemoved?: (id: number) => void;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -599,6 +573,9 @@ function PremiumDrawer({
                   </section>
 
                   {extra}
+
+                  {/* A TPO runs their own students' accounts from here (the roster passes the callbacks; a coordinator's drawer has none). */}
+                  {student && onStudentChanged && <StudentManagePanel student={student} onChanged={onStudentChanged} onRemoved={onStudentRemoved} />}
                 </div>
 
                 {/* Actions */}
@@ -611,10 +588,7 @@ function PremiumDrawer({
                     <BarChart3 className="h-4 w-4" />
                     View Full Activity Report
                   </Link>
-                  <button type="button" onClick={onDownload} disabled={downloading} className={hpBtn("secondary", "md", "w-full")}>
-                    {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />}
-                    {downloading ? "Preparing..." : "Download PDF Summary"}
-                  </button>
+                  <StudentReportPanel studentId={student.id} studentName={student.name} />
                 </div>
               </motion.aside>
             </>

@@ -221,6 +221,9 @@ function ContestProblemSolvePageContent() {
             previewVideoRef={proctoring.previewVideoRef}
             onEnableDevices={proctoring.enableDevicePreview}
             onConsent={proctoring.grantConsentAndStart}
+            cameraStream={proctoring.cameraStream}
+            candidateName={user?.name ?? ""}
+            onLeave={() => nav.go(slug ? `/dashboard/contests/view?slug=${slug}` : "/dashboard/contests")}
           />
         )}
 

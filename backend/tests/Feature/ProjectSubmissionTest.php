@@ -181,7 +181,7 @@ class ProjectSubmissionTest extends TestCase
         $this->assertSame(1, ProjectSubmission::count());
     }
 
-    public function test_without_an_open_workspace_a_submission_needs_a_repository_link(): void
+    public function test_without_an_open_workspace_nothing_can_be_submitted_not_even_with_a_repository_link(): void
     {
         $student = $this->studentWithLab();
         $enrollment = $this->enroll($student);
@@ -190,7 +190,20 @@ class ProjectSubmissionTest extends TestCase
 
         $this->postJson($this->submitUrl($enrollment), ['notes' => 'only notes'])
             ->assertStatus(409)->assertJsonPath('code', 'workspace_not_running');
+
+        // The code has to come from the AptRun editor: a link to code written somewhere else is not a submission.
+        $this->postJson($this->submitUrl($enrollment), ['repo_url' => 'https://github.com/a/b'])
+            ->assertStatus(409)->assertJsonPath('code', 'workspace_not_running');
         $this->assertSame(0, ProjectSubmission::count());
+    }
+
+    public function test_the_old_repository_only_hand_in_comes_back_only_when_the_switch_is_turned_off(): void
+    {
+        config(['project_lab.require_snapshot' => false]);
+        $student = $this->studentWithLab();
+        $enrollment = $this->enroll($student);
+        app(WorkspaceManager::class)->provision($enrollment);
+        Sanctum::actingAs($student);
 
         $this->postJson($this->submitUrl($enrollment), ['repo_url' => 'https://github.com/a/b'])
             ->assertCreated()
@@ -268,6 +281,9 @@ class ProjectSubmissionTest extends TestCase
         Sanctum::actingAs($student);
         $this->getJson("/api/project-lab/enrollments/{$enrollment->id}")
             ->assertJsonPath('enrollment.submissions.0.feedback', 'Passwords are stored in plain text.');
+        // The workspace was stopped at the first hand-in; the student reopens it (same files) and submits from it again.
+        $manager = app(WorkspaceManager::class);
+        $manager->start($enrollment->fresh()->workspace, $student);
         $this->postJson($this->submitUrl($enrollment), ['repo_url' => 'https://github.com/a/b'])
             ->assertCreated()->assertJsonPath('submission.attempt', 2);
 

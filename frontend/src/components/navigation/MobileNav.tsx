@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "lucide-react";
-import { ThemeToggle } from "./ThemeToggle";
+import { ThemeSwitch } from "./ThemeSwitch";
 
 interface MobileNavProps {
   onToggleMenu: () => void;
@@ -10,7 +10,7 @@ interface MobileNavProps {
 export function MobileNav({ onToggleMenu }: MobileNavProps) {
   return (
     <div className="flex xl:hidden items-center gap-2">
-      <ThemeToggle />
+      <ThemeSwitch className="h-10 w-10" />
       <button
         type="button"
         onClick={onToggleMenu}

@@ -26,6 +26,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Modal } from "@/components/ui/Modal";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { LeadDetailDrawer } from "@/components/leads/LeadDetailDrawer";
+import { EnquiryBanner } from "@/components/marketing-site/EnquiryBanner";
 import { LeadPipelineBar } from "@/components/leads/LeadPipelineBar";
 import { LeadKanbanBoard } from "@/components/leads/LeadKanbanBoard";
 import { cn } from "@/lib/utils";
@@ -259,6 +260,9 @@ function MarketingLeadsPageContent() {
       }
     >
       <div className="space-y-6">
+        {/* Enquiries from the "Talk to Our Team" form waiting on the desk, when there are any. */}
+        <EnquiryBanner isSuperadmin={me?.role === "superadmin"} />
+
         {/* KPI strip — real aggregates from the backend, not derived from the current page */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {loading && !kpis ? (

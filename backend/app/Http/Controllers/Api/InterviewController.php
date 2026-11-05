@@ -111,6 +111,21 @@ class InterviewController extends Controller
 
         $existingSession = InterviewSession::where('interview_id', $interview->id)->where('user_id', $request->user()->id)->first();
 
+        // A college mock with a window: a student who has not started cannot start before it opens or after it closes. Someone already
+        // part-way through may finish after it closes, and a finished sitting can always be looked at again.
+        if ($existingSession === null && $interview->isTpoMock() && ! $interview->acceptsNewSittings()) {
+            $upcoming = $interview->scheduleState() === Interview::SCHEDULE_UPCOMING;
+
+            return response()->json([
+                'message' => $upcoming
+                    ? 'This interview has not opened yet. It opens on '.$interview->opens_at->timezone(config('app.display_timezone', 'Asia/Kolkata'))->format('j M Y, g:i A').' (IST).'
+                    : 'This interview has closed. Ask your placement cell if you need another chance.',
+                'code' => $upcoming ? 'interview_not_open_yet' : 'interview_closed',
+                'opens_at' => $interview->opens_at?->toIso8601String(),
+                'closes_at' => $interview->closes_at?->toIso8601String(),
+            ], $upcoming ? 423 : 410);
+        }
+
         // A completed session has nothing left to protect — a stray or
         // adversarial lock recorded after finishing (e.g. proctoring/start
         // called again out-of-band) must never block re-viewing the
@@ -510,6 +525,10 @@ class InterviewController extends Controller
                 'logo' => $interview->company->logo,
             ] : null,
             'question_count' => $questions->count(),
+            // The college's window for this mock (all null = no window): when it opens, when it closes, and where that leaves it now.
+            'opens_at' => $interview->opens_at?->toIso8601String(),
+            'closes_at' => $interview->closes_at?->toIso8601String(),
+            'schedule_state' => $interview->isTpoMock() ? $interview->scheduleState() : Interview::SCHEDULE_UNSCHEDULED,
             'study' => $interview->isStudyMode(),
             'estimated_total_seconds' => $questions->count() > 0
                 ? (int) $questions->sum(fn (InterviewQuestion $q) => ($q->questionBank->expected_duration_seconds ?? 0) + self::PREP_SECONDS_PER_QUESTION)

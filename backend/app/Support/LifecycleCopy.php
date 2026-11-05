@@ -93,7 +93,7 @@ final class LifecycleCopy
                 'Complete your profile so your readiness score is as accurate as it can be.',
             ],
             'cta' => ['label' => 'Go to my dashboard', 'url' => self::app('/dashboard')],
-            'note' => 'You are receiving this because an AptRun account was created for this email address and you have just set its password.',
+            'note' => 'You are receiving this because AptRun set up an account for this email address and you have just set its password.',
         ];
     }
 
@@ -174,7 +174,7 @@ final class LifecycleCopy
             ],
             User::ROLE_ADMIN_MARKETING => [
                 'Marketing team member',
-                'Mellow',
+                'Mellow Vault',
                 'You work the leads and website inquiries that come in to AptRun.',
                 self::permissionAreas($user, [
                     User::PERM_LEADS => 'Follow up your assigned leads and move them from new to converted.',
@@ -184,7 +184,7 @@ final class LifecycleCopy
             ],
             default => [   // User::ROLE_ADMIN_INTERNAL
                 'Internal team member',
-                'Mellow',
+                'Mellow Vault',
                 'You can use the parts of the admin workspace that your administrator has switched on for you.',
                 self::permissionAreas($user, [
                     User::PERM_COLLEGES => 'Colleges and their plans',
@@ -221,8 +221,8 @@ final class LifecycleCopy
             'list' => array_values($list),
             'cta' => ['label' => 'Open my workspace', 'url' => self::app($home)],
             'note' => $mellowStaff
-                ? 'You are receiving this because an AptRun account was created for this email address and you have just set its password.'
-                : "You are receiving this because {$org} (or Mellow, on its behalf) created an AptRun account for this email address and you have just set its password.",
+                ? 'You are receiving this because AptRun set up an account for this email address and you have just set its password.'
+                : "You are receiving this because {$org} (or AptRun, on its behalf) set up an AptRun account for this email address and you have just set its password.",
         ];
     }
 
@@ -595,7 +595,7 @@ final class LifecycleCopy
 
     public static function app(string $path): string
     {
-        return rtrim((string) config('app.frontend_url'), '/').$path;
+        return rtrim((string) config('brand.site_url'), '/').$path;
     }
 
     private static function money(int $rupees): string

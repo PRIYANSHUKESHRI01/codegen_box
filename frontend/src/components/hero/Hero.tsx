@@ -1,16 +1,16 @@
 import { Container } from "@/components/layout/Container";
 import { HeroBackground } from "./HeroBackground";
 import { HeroContent } from "./HeroContent";
-import { ProductPreview } from "./ProductPreview";
+import { HeroStage } from "./HeroStage";
 
 export function Hero() {
   return (
-    <section className="relative isolate w-full pt-4 pb-16 sm:pb-24 overflow-hidden">
+    <section aria-label="AptRun" className="relative isolate w-full overflow-hidden pb-20 pt-2 sm:pb-28">
       <HeroBackground />
       <Container size="xl">
         <HeroContent />
-        <div className="relative mt-2 sm:mt-6 z-10 px-2 sm:px-0">
-          <ProductPreview />
+        <div className="relative z-10 px-1 sm:px-0">
+          <HeroStage />
         </div>
       </Container>
     </section>

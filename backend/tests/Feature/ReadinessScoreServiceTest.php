@@ -365,6 +365,7 @@ class ReadinessScoreServiceTest extends TestCase
     {
         // The branch / department catalogue is read once and cached across requests: a fixed cost, not a per-student one.
         \App\Support\BranchCatalog::instance()->departments();
+        app(\App\Services\PlatformModules::class)->enabled('merchant_navy');   // read once, then remembered: also a fixed cost
 
         $count = function (int $students): int {
             $cohort = collect(range(1, $students))->map(fn () => $this->readinessStudent());

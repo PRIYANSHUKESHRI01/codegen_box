@@ -4,6 +4,7 @@ import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { NotificationRuntime } from "@/components/notifications/NotificationRuntime";
+import { ActivityRuntime } from "@/components/system/ActivityRuntime";
 import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
 import { Toaster } from "@/components/ui/Toaster";
 import { DialogHost } from "@/components/ui/DialogHost";
@@ -45,7 +46,7 @@ export const metadata: Metadata = {
   ...(siteUrl ? { metadataBase: new URL(siteUrl) } : {}),
   applicationName: "AptRun",
   title: "AptRun — The Placement Sandbox for Colleges",
-  description: "Run every campus placement drive from one platform: recruiter mapping, bulk student onboarding, proctored assessments, AI interviews and a personal learning centre for every student.",
+  description: "Run every campus placement drive from one platform: bulk student onboarding, recruiter mapping, proctored assessments and AI interviews. Students get a learning centre, weekly contest vouchers and a path to employers on Mellow Vault.",
   keywords: [
     "campus placements",
     "placement management system",
@@ -54,14 +55,15 @@ export const metadata: Metadata = {
     "proctored assessments",
     "AI interviews",
     "placement preparation",
-    "coding practice",
     "TPO software",
     "job portal for students",
+    "Mellow Vault",
+    "weekly contest rewards",
   ],
   authors: [{ name: "AptRun Team" }],
   openGraph: {
     title: "AptRun — The Placement Sandbox for Colleges",
-    description: "The placement sandbox for colleges: campus drives, student learning centres and a hiring-partner network.",
+    description: "The placement sandbox for colleges: campus drives, a learning centre and weekly contest rewards for every student, and a path to employers on Mellow Vault.",
     type: "website",
     locale: "en_US",
     siteName: "AptRun",
@@ -125,6 +127,8 @@ export default function RootLayout({
           <ImpersonationBanner />
           {/* The notification poll and the "it just happened" toasts, for whoever is signed in, on any page. */}
           <NotificationRuntime />
+          {/* Where the signed-in person is (screen, time, scroll depth) for Superadmin → Live Activity. Silent; see lib/activityTracker. */}
+          <ActivityRuntime />
         </AuthProvider>
         {/* The app's feedback toasts and confirm/prompt dialogs (lib/toast, lib/dialogs): mounted once, above every page,
             modal and drawer, so any handler anywhere can raise one without owning the markup. */}

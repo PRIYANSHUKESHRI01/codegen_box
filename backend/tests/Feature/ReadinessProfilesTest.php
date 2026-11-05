@@ -443,6 +443,7 @@ class ReadinessProfilesTest extends TestCase
         config(['readiness.core.grace_days' => 0]);
         $this->live('ece');
         $this->bank('ece');
+        app(\App\Services\PlatformModules::class)->enabled('merchant_navy');   // read once, then remembered: a fixed cost, not a per-student one
 
         $small = $this->load([$this->student('CSE', null), $this->student('ECE', 'core_first')]);
         $big = $this->load(array_merge([$this->student('CSE', null)], array_map(fn ($i) => $this->student('ECE', $i % 2 ? 'balanced' : 'core_first'), range(1, 12))));

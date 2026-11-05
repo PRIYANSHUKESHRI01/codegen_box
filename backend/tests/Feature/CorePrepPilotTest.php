@@ -195,7 +195,7 @@ class CorePrepPilotTest extends TestCase
 
         $this->putJson('/api/superadmin/core/disciplines/ece/pilots', ['college_ids' => [999999]])->assertStatus(422)->assertJsonValidationErrors('college_ids.0');
         $this->putJson('/api/superadmin/core/disciplines/ece/pilots', [])->assertStatus(422)->assertJsonValidationErrors('college_ids');
-        $this->putJson('/api/superadmin/core/disciplines/cse/pilots', ['college_ids' => []])->assertNotFound();   // no Core Prep for CSE
+        $this->putJson('/api/superadmin/core/disciplines/not_a_discipline/pilots', ['college_ids' => []])->assertNotFound();
     }
 
     public function test_coverage_reports_the_stage_and_offers_colleges_to_superadmins_only(): void

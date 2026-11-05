@@ -244,3 +244,12 @@ last 10 changes. Deactivating asks first; activating when no exam is open yet wa
 - **Verified:** `SuperadminMarketingTeamTest` (11), `marketing-team.test.tsx` (17), backend lead/marketing/contact/superadmin regression (283), full frontend 2540; browser run on a
   scratch API (add -> waiting enquiries dealt out -> reassign -> block + hand-over offer -> delete with share-out -> edit access -> account drawer); phone has no overflow.
 - **Not done:** a shared `sales@` copy-to address (enquiry mail still goes only to the assigned employee's own email); no per-employee "last active" column.
+
+## 11b. Marketing enquiry desk (2026-11-07)
+How a "Talk to Our Team" enquiry reaches the marketing team, end to end (all of it was already built except what is marked NEW):
+1. Public form → `POST /contact-requests` → saved, **auto-assigned to the least-loaded unblocked marketing employee**, who gets a bell + an e-mail at their login address (**Reply-To is now the enquirer**, so Reply answers them). The submitter gets a confirmation.
+2. **NEW: team inbox.** Set `MARKETING_ENQUIRY_EMAIL` (config `brand.enquiry_email`) and every enquiry is also copied there, assigned or not ("waiting in the unassigned queue" / "assigned to X"); skipped when it is the employee's own address. Empty = no copy.
+3. **NEW: enquiry desk** (`/marketing/inquiries`): tabs *My enquiries* / *Unassigned* (counted), the superadmin gets *All* / *Unassigned*; search (name, e-mail, phone, organisation), status filter, pagination, "waiting" age and an **Overdue** flag (new and uncontacted for > 24 h), tiles (awaiting first contact, overdue, unassigned queue, new this week), per-row e-mail / call, and in the drawer **Reply by e-mail / Call / WhatsApp**.
+4. **NEW: unassigned queue + Claim** (`POST /marketing/contact-requests/{id}/claim`): an enquiry nobody could take (no one hired, everyone blocked) is visible to every marketing employee, who can read it and claim it (first press wins, 409 for the loser); status and notes need ownership. A colleague's book stays invisible (404). The superadmin never claims (uses Marketing Team → reassign).
+5. **NEW:** the marketing home shows a banner when enquiries are waiting (count, overdue, unassigned).
+Deploy: `php artisan route:cache` (new route); optionally set `MARKETING_ENQUIRY_EMAIL`. No migration. With several marketing employees, enquiries are SPLIT between them by load; to have one person handle everything, keep only one active (or block the others).

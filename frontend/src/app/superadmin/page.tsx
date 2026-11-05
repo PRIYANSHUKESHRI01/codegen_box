@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog } from "lucide-react";
+import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog, Gift, Activity } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { cn } from "@/lib/utils";
@@ -36,12 +36,15 @@ import { SubscriptionsPanel } from "@/components/admin/superadmin/SubscriptionsP
 import { DepartmentsPanel } from "@/components/admin/superadmin/DepartmentsPanel";
 import { MarketingTeamPanel } from "@/components/admin/superadmin/marketingTeam/MarketingTeamPanel";
 import { MerchantNavyPanel } from "@/components/admin/superadmin/MerchantNavyPanel";
+import { WeeklyRewardsPanel } from "@/components/admin/superadmin/WeeklyRewardsPanel";
+import { ActivityPanel } from "@/components/admin/superadmin/activity/ActivityPanel";
 import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "activity" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "activity", label: "Live Activity", icon: Activity },
   { id: "students", label: "Students", icon: GraduationCap },
   { id: "leads", label: "Leads", icon: UserSearch },
   { id: "marketing", label: "Marketing Performance", icon: Megaphone },
@@ -49,6 +52,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "colleges", label: "Colleges & TPOs", icon: Building2 },
   { id: "departments", label: "Departments", icon: Layers },
   { id: "merchant_navy", label: "Merchant Navy", icon: Anchor },
+  { id: "weekly_rewards", label: "Contest Rewards", icon: Gift },
   { id: "plans", label: "Plans & Pricing", icon: Wallet },
   { id: "subscriptions", label: "Subscriptions", icon: BadgeCheck },
   { id: "payments", label: "Payments", icon: CreditCard },  { id: "staff", label: "Mellow Staff", icon: Users2 },
@@ -82,10 +86,12 @@ function SuperAdminPageContent() {
   // /superadmin?tab=... — without this, clicking any of them just landed
   // back on this same client-side tab-shell with activeTab stuck at its
   // useState default ("overview"), since nothing here ever read the URL.
-  const goToTab = (tab: Tab) => {
+  const goToTab = (tab: Tab, collegeId?: number) => {
     setActiveTab(tab);
-    router.replace(`/superadmin?tab=${tab}`, { scroll: false });
+    router.replace(collegeId ? `/superadmin?tab=${tab}&college=${collegeId}` : `/superadmin?tab=${tab}`, { scroll: false });
   };
+  // Live Activity can be opened on one college (from the Overview's attention list): ?tab=activity&college=12
+  const collegeParam = Number(searchParams?.get("college")) || null;
 
   // The sidebar's links (and browser back/forward) change the URL without
   // remounting this component, so useState's initial value alone won't
@@ -136,7 +142,8 @@ function SuperAdminPageContent() {
         })}
       </div>
 
-      {activeTab === "overview" && <OverviewPanel onViewAuditLog={() => goToTab("audit")} />}
+      {activeTab === "overview" && <OverviewPanel onViewAuditLog={() => goToTab("audit")} onOpenTab={(tab, collegeId) => isTab(tab) && goToTab(tab, collegeId)} />}
+      {activeTab === "activity" && <ActivityPanel key={collegeParam ?? "all"} initialCollegeId={collegeParam} />}
       {activeTab === "students" && <StudentsPanel triggerToast={triggerToast} />}
       {activeTab === "leads" && <LeadsPanel triggerToast={triggerToast} />}
       {activeTab === "marketing" && <MarketingPerformancePanel />}
@@ -144,6 +151,7 @@ function SuperAdminPageContent() {
       {activeTab === "colleges" && <PartnerCollegesPanel triggerToast={triggerToast} canDeleteColleges canManageDetails />}
       {activeTab === "departments" && <DepartmentsPanel triggerToast={triggerToast} />}
       {activeTab === "merchant_navy" && <MerchantNavyPanel triggerToast={triggerToast} />}
+      {activeTab === "weekly_rewards" && <WeeklyRewardsPanel triggerToast={triggerToast} />}
       {activeTab === "plans" && <PlansPricingPanel triggerToast={triggerToast} />}
       {activeTab === "subscriptions" && <SubscriptionsPanel triggerToast={triggerToast} />}
       {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}

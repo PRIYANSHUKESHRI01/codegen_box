@@ -143,9 +143,13 @@ class DepartmentsTest extends TestCase
             $this->assertTrue($caps[$key], "engineering keeps {$key}");
         }
 
-        $this->assertFalse($caps['domain_prep'], 'CSE has no Core Prep, exactly as before');
-        // A student with no recorded department is engineering, never stripped of a module.
-        $this->assertSame($caps, DepartmentCapabilities::resolve(null, null, null));
+        $this->assertTrue($caps['domain_prep'], 'CSE has Domain Prep: the CS core (DBMS, OS, networks ...)');
+        $this->assertFalse($caps['skill_drills'], 'but no Skill Drills');
+        // A student with no recorded department is engineering, never stripped of a module (the CS core is the one thing that is
+        // specific to a known CSE / IT branch).
+        $unknown = DepartmentCapabilities::resolve(null, null, null);
+        $this->assertSame(array_diff_key($caps, ['domain_prep' => true]), array_diff_key($unknown, ['domain_prep' => true]));
+        $this->assertFalse($unknown['domain_prep'], 'an unclassified student sees the product exactly as before');
     }
 
     public function test_core_engineering_branches_gain_domain_prep_but_keep_coding(): void

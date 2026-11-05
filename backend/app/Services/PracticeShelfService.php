@@ -107,7 +107,8 @@ class PracticeShelfService
         return [
             'id' => 'interview', 'kind' => 'interview', 'resume' => false,
             'role' => $role['key'] ?? null, 'role_title' => $role['title'] ?? null, 'recommended' => (bool) ($role['recommended'] ?? false),
-            'for_branch' => CoreAccess::isFamily($user->discipline),
+            // True when the roles on offer include a group made for the student's own branch (not merely the software roles for everyone).
+            'for_branch' => collect($options['groups'])->contains('is_your_branch', true),
         ];
     }
 

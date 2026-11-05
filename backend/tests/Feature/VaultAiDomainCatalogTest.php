@@ -39,7 +39,13 @@ class VaultAiDomainCatalogTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // The 2026_11_19 migration ships the C# & .NET and ASP.NET Core questions (see DotNetStacksTest). These tests are about a bank that
+        // starts empty, so they start from one.
+        CuratedSetQuestion::query()->delete();
+
         $this->catalog = app(CuratedCatalog::class);
+        $this->catalog->flush();
     }
 
     private function student(): User
@@ -130,10 +136,10 @@ class VaultAiDomainCatalogTest extends TestCase
         }
 
         $this->assertSame(13, count($roles));
-        $this->assertSame(41, $stacks, '12 hand-written stacks + 29 new domains');
+        $this->assertSame(43, $stacks, '12 hand-written stacks + 31 domain stacks');
         $this->assertSame(count($setIds), count(array_unique($setIds)), 'set ids are unique');
         $this->assertSame(count($seriesIds), count(array_unique($seriesIds)), 'series ids are unique');
-        $this->assertSame(41 * 9, count($setIds));
+        $this->assertSame(43 * 9, count($setIds));
     }
 
     public function test_the_original_stacks_are_untouched_and_all_open(): void
@@ -151,7 +157,7 @@ class VaultAiDomainCatalogTest extends TestCase
         $this->assertSame('backend', $this->catalog->stack('laravel')['role']['key']);
 
         // New stacks join the existing roles; the existing roles keep their original stacks first.
-        $this->assertSame(['laravel', 'nodejs', 'python', 'java', 'golang', 'php', 'cms', 'api_design'], array_keys($this->catalog->roles()['backend']['stacks']));
+        $this->assertSame(['laravel', 'nodejs', 'python', 'java', 'golang', 'php', 'csharp_dotnet', 'aspnet_core', 'cms', 'api_design'], array_keys($this->catalog->roles()['backend']['stacks']));
     }
 
     public function test_the_example_a_student_asked_about_exists_data_analyst(): void
@@ -201,7 +207,7 @@ class VaultAiDomainCatalogTest extends TestCase
 
         $response = $this->getJson('/api/curated-interview-sets')->assertOk()
             ->assertJsonPath('stats.total_roles', 13)
-            ->assertJsonPath('stats.total_stacks', 41)
+            ->assertJsonPath('stats.total_stacks', 43)
             ->assertJsonPath('stats.live_stacks', 12);
 
         $stacks = collect($response->json('roles'))->flatMap(fn ($r) => $r['stacks'])->keyBy('key');
@@ -215,7 +221,7 @@ class VaultAiDomainCatalogTest extends TestCase
         $this->assertFalse($stacks['sql']['interested']);
 
         $backend = collect($response->json('roles'))->firstWhere('key', 'backend');
-        $this->assertSame(8, $backend['stacks_count']);
+        $this->assertSame(10, $backend['stacks_count']);
         $this->assertSame(5, $backend['live_stacks_count']);
     }
 
@@ -378,9 +384,9 @@ class VaultAiDomainCatalogTest extends TestCase
 
         $response = $this->getJson('/api/admin/vault-ai/coverage')->assertOk()
             ->assertJsonPath('min_questions', 5)
-            ->assertJsonPath('stats.stacks', 41)
+            ->assertJsonPath('stats.stacks', 43)
             ->assertJsonPath('stats.live', 12)
-            ->assertJsonPath('stats.coming_soon', 29);
+            ->assertJsonPath('stats.coming_soon', 31);
 
         $stacks = collect($response->json('roles'))->flatMap(fn ($r) => $r['stacks'])->keyBy('key');
         $this->assertSame(8, $stacks['sql']['ready_sets']);

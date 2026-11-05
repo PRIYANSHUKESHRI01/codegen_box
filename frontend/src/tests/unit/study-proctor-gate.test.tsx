@@ -66,7 +66,7 @@ describe("<StudyProctorGate>", () => {
   it("opens a sitting for the kind and subject and shows the consent screen — never the practice page — until the student starts", async () => {
     renderGate();
 
-    expect(await screen.findByText("This is a proctored practice sitting")).toBeTruthy();
+    expect(await screen.findByText("Proctored practice")).toBeTruthy();
     expect(post).toHaveBeenCalledWith("/me/sittings", { kind: "drill", subject: "gray_code" });
     expect(hookBasePath).toBe("/me/sittings/41");
     expect(screen.queryByText(/the practice page/)).toBeNull();
@@ -111,7 +111,7 @@ describe("<StudyProctorGate>", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start a new sitting" }));
 
     await waitFor(() => expect(hookBasePath).toBe("/me/sittings/77"));
-    expect(await screen.findByText("This is a proctored practice sitting")).toBeTruthy();
+    expect(await screen.findByText("Proctored practice")).toBeTruthy();
   });
 
   it("blocks a browser that cannot do camera or fullscreen, with the reason", async () => {
@@ -171,7 +171,7 @@ describe("<StudyProctorGate>", () => {
     ctx!.restart();
 
     await waitFor(() => expect(hookBasePath).toBe("/me/sittings/42"));
-    expect(await screen.findByText("This is a proctored practice sitting")).toBeTruthy();
+    expect(await screen.findByText("Proctored practice")).toBeTruthy();
   });
 
   it("recognises the server saying the sitting is over or locked, and nothing else", async () => {
@@ -190,7 +190,7 @@ describe("<StudyProctorGate>", () => {
     renderGate();
 
     expect(await screen.findByText("the practice page (sitting null)")).toBeTruthy();
-    expect(screen.queryByText("This is a proctored practice sitting")).toBeNull();
+    expect(screen.queryByText("Proctored practice")).toBeNull();
   });
 
   it("explains a refusal (the cool-down after a lock) and lets the student retry or go back", async () => {
@@ -202,6 +202,6 @@ describe("<StudyProctorGate>", () => {
     expect(screen.getByRole("link", { name: "Go back" }).getAttribute("href")).toBe("/dashboard/drills");
 
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(await screen.findByText("This is a proctored practice sitting")).toBeTruthy();
+    expect(await screen.findByText("Proctored practice")).toBeTruthy();
   });
 });

@@ -6,6 +6,7 @@ use App\Models\College;
 use App\Models\User;
 use App\Services\Vault\VaultSyncService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Permanently deletes a partner university and everything that belongs to it.
@@ -90,6 +91,8 @@ class CollegePurgeService
 
             $userIds = User::where('college_id', $id)->whereIn('role', self::PURGED_ROLES)->pluck('id')->all();
             $files = $this->users->collectFiles($userIds);
+            // Interview and section reports belong to the college itself, not to one student.
+            $files['local'] = array_merge($files['local'], \App\Services\Reports\ReportArchive::pathsForCollege($id));
 
             $this->deleteOwnedContent($id);
 
@@ -114,6 +117,14 @@ class CollegePurgeService
                 // Every table that points at users cascades or nulls on delete (checked
                 // against the live schema) — nothing here can be vetoed by a child row.
                 User::whereIn('id', $chunk)->delete();
+            }
+
+            // The college's activity history (the rows of its people already went with them; these also catch sign-in attempts
+            // from addresses that were removed earlier). There is no foreign key to colleges on purpose.
+            foreach (['auth_events', 'activity_visits', 'activity_page_views', 'user_activity_days'] as $table) {
+                if (Schema::hasTable($table)) {
+                    DB::table($table)->where('college_id', $id)->delete();
+                }
             }
 
             $college->subscriptions()->delete();

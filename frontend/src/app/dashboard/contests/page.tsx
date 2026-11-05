@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Swords, CheckCircle2, Trophy, Radio, CalendarClock, History } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
+import { DailyChallengeHero, DailyChallengeLogo } from "@/components/contests/DailyChallenge";
+import { MyRewards, WeeklyRewardsBanner } from "@/components/leaderboard/WeeklyRewardsBanner";
 import { HpCard, HpEmptyState, HpIconTile, HpPill, HpSectionHeader, HpSkeletonCards, hpBtn, type HpTone } from "@/components/portal/kit";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
@@ -42,6 +44,15 @@ export default function ContestsListPage() {
       title="Contests"
       subtitle="Real, timed, rated rounds — your rating moves based on how you actually place."
     >
+      {/* The AptRun Daily Challenge: every day at 8:00 PM IST. It brings its own data, so the list below never waits on it. */}
+      <DailyChallengeHero />
+
+      {/* This week's leaderboard vouchers, when the superadmin has put any live. */}
+      <WeeklyRewardsBanner variant="compact" />
+
+      {/* Vouchers this student has won, with the code once it has been sent. Draws nothing until they have won one. */}
+      <MyRewards />
+
       {loading ? (
         <HpSkeletonCards count={3} />
       ) : contests.length === 0 ? (
@@ -118,7 +129,11 @@ function ContestSection({
                 />
 
                 <div className="flex items-start justify-between gap-2">
-                  <HpIconTile icon={Swords} tone={accent === "danger" ? "rose" : accent === "muted" ? "slate" : "indigo"} size="lg" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+                  {contest.contest_type === "daily" ? (
+                    <DailyChallengeLogo size="sm" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+                  ) : (
+                    <HpIconTile icon={Swords} tone={accent === "danger" ? "rose" : accent === "muted" ? "slate" : "indigo"} size="lg" className="transition-transform duration-300 group-hover:-rotate-3 group-hover:scale-110" />
+                  )}
                   <div className="flex flex-col items-end gap-1.5">
                     {contest.contest_type === "daily" && <HpPill tone="sky" size="sm">Daily</HpPill>}
                     {contest.company && <HpPill tone="violet" size="sm">{contest.company.name}</HpPill>}

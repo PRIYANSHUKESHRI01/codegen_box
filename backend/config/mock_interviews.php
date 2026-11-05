@@ -43,6 +43,104 @@ return [
     */
     'extra_roles' => [
 
+        // The subjects every CSE / IT campus-placement interview asks, as spoken questions: DBMS, operating systems, networks, OOP, data
+        // structures and software engineering. Software discipline (scored like every other IT interview), practised in the Mock AI
+        // Interview AND drawable into a college TPO's own mock interview (CollegeInterviewBuilder::library). Questions live in
+        // database/seeders/data/mock_questions/cs_core_mock.php.
+        'cs_core' => [
+            'title' => 'Computer Science Core',
+            'blurb' => 'The core subjects every CSE and IT placement interview asks: DBMS, operating systems, computer networks, OOP, data structures and software engineering.',
+            'icon' => 'Cpu',
+            'badge' => 'New',
+            'color' => 'indigo',
+            'stacks' => [
+                'cs_dbms' => [
+                    'name' => 'DBMS & SQL',
+                    'blurb' => 'Keys, SQL, normalization, transactions, concurrency and indexing: the database questions every placement round asks.',
+                    'icon' => 'Database',
+                    'aliases' => ['DBMS', 'Database', 'SQL', 'RDBMS', 'Normalization', 'Transactions', 'Indexing'],
+                    'tags' => ['cs-core', 'dbms', 'sql', 'database'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: Fundamentals and SQL', 'Keys, ACID, SQL joins and clauses, and the differences interviewers love to ask.'],
+                        ['Round 2: Normalization and Transactions', 'Normal forms up to BCNF, transactions, isolation levels and locking.'],
+                        ['Round 3: Indexing, Tuning and Design', 'Indexes, slow queries, deadlocks, SQL vs NoSQL and designing a schema.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+                'cs_os' => [
+                    'name' => 'Operating Systems',
+                    'blurb' => 'Processes and threads, scheduling, memory management, synchronisation and deadlocks.',
+                    'icon' => 'Cpu',
+                    'aliases' => ['OS', 'Operating System', 'Processes', 'Scheduling', 'Deadlock', 'Virtual Memory'],
+                    'tags' => ['cs-core', 'os', 'operating-systems'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: Processes, Threads and Scheduling', 'Process states, context switches, scheduling algorithms and IPC.'],
+                        ['Round 2: Memory Management', 'Paging, virtual memory, page faults, page replacement and thrashing.'],
+                        ['Round 3: Synchronisation, Deadlocks and Files', 'Critical sections, semaphores, deadlock, classic problems and file systems.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+                'cs_cn' => [
+                    'name' => 'Computer Networks',
+                    'blurb' => 'OSI and TCP/IP, IP addressing and subnetting, TCP and UDP, routing, DNS, HTTP and TLS.',
+                    'icon' => 'Globe',
+                    'aliases' => ['CN', 'Networking', 'Computer Networks', 'TCP/IP', 'OSI', 'DNS', 'HTTP'],
+                    'tags' => ['cs-core', 'cn', 'networks', 'tcp-ip'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: Layers and Devices', 'OSI and TCP/IP models, switches and routers, ARP and error control.'],
+                        ['Round 2: IP, Routing and Transport', 'Subnetting, TCP vs UDP, the handshake, congestion control, routing and NAT.'],
+                        ['Round 3: Application Layer and Security', 'What happens when you type a URL, DNS, HTTP, TLS, firewalls and troubleshooting.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+                'cs_oop' => [
+                    'name' => 'OOP Concepts',
+                    'blurb' => 'The four pillars, polymorphism, abstract classes vs interfaces, SOLID and common design patterns.',
+                    'icon' => 'Boxes',
+                    'aliases' => ['OOP', 'Object Oriented Programming', 'OOPS', 'SOLID', 'Design Patterns', 'Polymorphism'],
+                    'tags' => ['cs-core', 'oop', 'design-patterns'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: Core Principles', 'Classes and objects, constructors, encapsulation, abstraction and access control.'],
+                        ['Round 2: Inheritance and Polymorphism', 'Overloading vs overriding, abstract class vs interface, composition and dynamic dispatch.'],
+                        ['Round 3: Design Principles and Patterns', 'SOLID, Singleton, Factory, Observer, exceptions and memory management.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+                'cs_dsa' => [
+                    'name' => 'Data Structures & Algorithms (Theory)',
+                    'blurb' => 'Explain-it-aloud DSA: complexity, linked lists, trees, graphs, hashing, sorting and dynamic programming.',
+                    'icon' => 'Workflow',
+                    'aliases' => ['DSA', 'Data Structures', 'Algorithms', 'Complexity', 'Sorting', 'Graphs', 'Trees'],
+                    'tags' => ['cs-core', 'dsa', 'algorithms', 'data-structures'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: Lists, Stacks, Queues and Complexity', 'Arrays vs linked lists, cycle detection, stacks and queues, and Big-O.'],
+                        ['Round 2: Trees, Graphs and Hashing', 'BSTs, traversals, BFS vs DFS, hash tables, heaps and Dijkstra.'],
+                        ['Round 3: Sorting, Searching and DP', 'Sorting trade-offs, binary search, dynamic programming, two pointers and tries.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+                'cs_se' => [
+                    'name' => 'Software Engineering',
+                    'blurb' => 'SDLC, Agile and Scrum, testing, Git, CI/CD, architecture and how you work in a team.',
+                    'icon' => 'Layers',
+                    'aliases' => ['SE', 'SDLC', 'Agile', 'Scrum', 'Testing', 'Git', 'CI/CD', 'Software Engineering'],
+                    'tags' => ['cs-core', 'se', 'sdlc', 'agile'],
+                    'discipline' => 'software',
+                    'rounds' => [
+                        ['Round 1: SDLC and Requirements', 'Process models, Agile and Scrum, requirements and user stories.'],
+                        ['Round 2: Testing, Git and Delivery', 'Testing levels, TDD, version control, CI/CD and handling a production bug.'],
+                        ['Round 3: Design and Teamwork', 'Monolith vs microservices, coupling and cohesion, REST, technical debt and code review.'],
+                    ],
+                    'duration_minutes' => 15,
+                ],
+            ],
+        ],
+
         'merchant_navy' => [
             'title' => 'Merchant Navy',
             'blurb' => 'Deck officer certificate orals for the DG Shipping (MMD) examinations - navigation, cargo work, ship operation and safety, asked the way an examiner asks them.',

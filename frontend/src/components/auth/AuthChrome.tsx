@@ -67,7 +67,7 @@ export function AuthChrome({ altLabel, altLabelShort, altHref, children }: AuthC
       </main>
 
       <footer className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 text-center text-xs text-text-muted border-t border-border-subtle flex flex-col sm:flex-row items-center justify-between gap-2">
-        <span>&copy; {new Date().getFullYear()} Mellow Vault. A Unit of Prayukti Development Private Limited.</span>
+        <span>&copy; {new Date().getFullYear()} AptRun. All Rights Reserved. A product of Mellow Vault.</span>
         <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
           {FOOTER_LINKS.map((l) => (
             <Link

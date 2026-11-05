@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
  */
 return new class extends Migration
 {
-    private const FILES = ['management', 'commerce', 'arts', 'engineering_other'];
+    private const FILES = ['management', 'commerce', 'arts', 'engineering_other', 'cse'];
 
     public function up(): void
     {

@@ -1,8 +1,9 @@
 "use client";
 
-import { ExternalLink, FileArchive, MessageSquareText, TriangleAlert } from "lucide-react";
+import { Download, ExternalLink, FileArchive, MessageSquareText, TriangleAlert } from "lucide-react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { SUBMISSION_STATUS_META, formatBytes } from "@/lib/projectLab";
+import { SUBMISSION_STATUS_META, formatBytes, saveBlob } from "@/lib/projectLab";
 import type { SubmissionData } from "@/types/projectLab";
 
 function formatWhen(iso: string | null): string {
@@ -70,6 +71,20 @@ export function SubmissionHistory({ submissions }: { submissions: SubmissionData
                 <span className="inline-flex items-center gap-1.5">
                   <FileArchive className="h-3.5 w-3.5" />
                   Code snapshot · {formatBytes(s.snapshot_size_bytes)}
+                  {s.enrollment_id !== undefined && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void api
+                          .getFile(`/project-lab/enrollments/${s.enrollment_id}/submissions/${s.id}/download`)
+                          .then((b) => saveBlob(b, `project-attempt-${s.attempt}.zip`))
+                          .catch(() => undefined)
+                      }
+                      className="ml-1 inline-flex items-center gap-1 rounded-control border border-border-strong bg-elevated px-2 py-0.5 font-bold text-primary hover:bg-surface-hover"
+                    >
+                      <Download className="h-3 w-3" aria-hidden /> .zip
+                    </button>
+                  )}
                 </span>
               )}
               {s.repo_url && (

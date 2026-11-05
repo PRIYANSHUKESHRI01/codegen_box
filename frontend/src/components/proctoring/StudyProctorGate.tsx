@@ -176,6 +176,9 @@ function ProctoredSitting({
         previewVideoRef={proctoring.previewVideoRef}
         onEnableDevices={proctoring.enableDevicePreview}
         onConsent={proctoring.grantConsentAndStart}
+        cameraStream={proctoring.cameraStream}
+        candidateName={user?.name ?? ""}
+        onLeave={() => router.push(backHref)}
       />
     );
   }

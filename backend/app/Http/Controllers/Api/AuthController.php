@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendWelcomeEmail;
 use App\Models\ActivityLog;
+use App\Models\AuthEvent;
 use App\Models\User;
+use App\Services\Activity\AuthEventRecorder;
 use App\Services\IssuedCredentialVault;
 use App\Services\LifecycleMailService;
 use App\Services\PasswordResetService;
@@ -72,14 +74,22 @@ class AuthController extends Controller
         ]);
 
         $user = User::where('email', $validated['email'])->first();
+        $portal = $validated['portal'] ?? null;
+        $log = app(AuthEventRecorder::class);
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
+            // Kept even when the address matched nobody, and when it matched somebody: a college that tried its demo login and
+            // mistyped it is a very different story from one that never opened it.
+            $log->record(AuthEvent::LOGIN_FAILED, $user, $request, $validated['email'], $user ? 'bad_password' : 'unknown_email', $portal);
+
             throw ValidationException::withMessages([
                 'email' => ['These credentials do not match our records.'],
             ]);
         }
 
         if ($user->is_blocked) {
+            $log->record(AuthEvent::LOGIN_BLOCKED, $user, $request, null, 'blocked', $portal);
+
             throw ValidationException::withMessages([
                 'email' => ['This account has been blocked. Contact an administrator.'],
             ]);
@@ -87,9 +97,9 @@ class AuthController extends Controller
 
         // Only after the password is proven — telling a stranger which kind of account an address is would be a leak —
         // and before anything is issued: no token, and no one-time-password flow either, for the wrong tab.
-        $portal = $validated['portal'] ?? null;
-
         if ($portal !== null && ! $user->canSignInThrough($portal)) {
+            $log->record(AuthEvent::LOGIN_FAILED, $user, $request, null, 'wrong_portal', $portal);
+
             throw ValidationException::withMessages(['email' => [$this->wrongPortalMessage($user, $portal)]]);
         }
 
@@ -102,6 +112,8 @@ class AuthController extends Controller
         // account stays locked out of the dashboard until its owner proves
         // control of the inbox and sets their own permanent password.
         if ($user->must_change_password) {
+            $log->record(AuthEvent::TEMP_PASSWORD, $user, $request, null, null, $portal);
+
             return response()->json([
                 'must_change_password' => true,
                 'email' => $user->email,
@@ -112,6 +124,7 @@ class AuthController extends Controller
         $token = $user->createToken('auth')->plainTextToken;
 
         $this->touchLastSeen($user, force: true);
+        $log->record(AuthEvent::LOGIN, $user, $request, null, null, $portal);
 
         return response()->json([
             'user' => $user->load(['college.collegeDepartments', 'company']),
@@ -333,6 +346,7 @@ class AuthController extends Controller
         app(PasswordResetService::class)->expirePendingResets($user);
 
         app(LifecycleMailService::class)->passwordChanged($user, 'settings');
+        app(AuthEventRecorder::class)->record(AuthEvent::PASSWORD_CHANGED, $user, $request, null, 'settings');
 
         return response()->json(['message' => 'Password updated.']);
     }

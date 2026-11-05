@@ -3,78 +3,60 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
+use App\Services\ContestLeaderboardService;
+use App\Services\WeeklyRewardService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 /**
- * Real replacement for frontend/src/data/leaderboard.ts's 8 hardcoded rows.
- * Ranked by a difficulty-weighted "Solved Score" (real, comparable, and
- * available for every student from day one) rather than contest rating —
- * rating only exists for students who've entered a rated contest, and
- * mixing a ~1200-centered rating scale with an unbounded solved-score scale
- * into one ranking would be apples-to-oranges. A per-contest leaderboard
- * ranked by that contest's score/penalty already exists separately
- * (ContestController::leaderboard) — this is the all-time, always-available
- * one. `display_rating` is still surfaced per row so a rated student's
- * real rating is visible alongside their solved-score rank.
+ * The global leaderboard — contest scores only (see ContestLeaderboardService for exactly what counts). Two boards:
+ *
+ *   weekly    this week's contest points, starting again from zero every Monday 00:00 (India time). When the superadmin has put
+ *             voucher cards live for the week, the global board also says which rank wins which voucher.
+ *   all_time  every platform-wide contest a student has ever scored in.
+ *
+ * `scope=global|college` narrows either board to the student's own college. A per-contest leaderboard exists separately
+ * (ContestController::leaderboard), and the Daily Challenge's own board and rating ladder in DailyChallengeController.
  */
 class LeaderboardController extends Controller
 {
+    public function __construct(
+        private readonly ContestLeaderboardService $boards,
+        private readonly WeeklyRewardService $rewards,
+    ) {}
+
     public function index(Request $request)
     {
+        $period = $request->query('period', ContestLeaderboardService::PERIOD_WEEKLY);
         $scope = $request->query('scope', 'global'); // global | college
         $user = $request->user();
 
-        $query = $this->baseQuery();
+        abort_unless(in_array($period, ContestLeaderboardService::PERIODS, true), 422, 'Unknown leaderboard period.');
+        abort_unless(in_array($scope, ['global', 'college'], true), 422, 'Unknown scope.');
 
         if ($scope === 'college') {
             abort_unless($user->college_id, 422, 'You are not linked to a college.');
-            $query->where('users.college_id', $user->college_id);
         }
 
-        $ranked = $query->orderByDesc('solved_score')->orderBy('users.name')->get()->values();
+        $weekly = $period === ContestLeaderboardService::PERIOD_WEEKLY;
+        $week = $weekly ? $this->boards->week() : null;
 
-        $myIndex = $ranked->search(fn ($row) => (int) $row->id === $user->id);
-        $myRank = $myIndex !== false ? $myIndex + 1 : null;
+        $ranked = $this->boards->standings($period, $scope === 'college' ? $user->college_id : null, $week);
+
+        // Prizes belong to the global weekly board: a rank inside one college is not a rank on the whole platform.
+        $prizes = $weekly && $scope === 'global' ? $this->rewards->prizes($week) : collect();
+        $withPrize = fn (array $row) => $row + ['prize' => $prizes->isEmpty() ? null : $this->rewards->prizeForRank($prizes, $row['rank'])];
+
+        $mine = $ranked->first(fn (array $row) => $row['user']['id'] === $user->id);
 
         return response()->json([
+            'period' => $period,
             'scope' => $scope,
-            'leaderboard' => $ranked->take(50)->map(fn ($row, $i) => $this->formatRow($row, $i + 1))->all(),
-            'my_rank' => $myRank,
-            'my_row' => $myIndex !== false ? $this->formatRow($ranked[$myIndex], $myRank) : null,
+            'week' => $week ? $this->boards->weekPayload($week) : null,
+            'prizes' => $prizes->values(),
+            'leaderboard' => $ranked->take(ContestLeaderboardService::BOARD_SIZE)->map($withPrize)->values(),
+            'total' => $ranked->count(),
+            'my_rank' => $mine['rank'] ?? null,
+            'my_row' => $mine ? $withPrize($mine) : null,
         ]);
-    }
-
-    private function baseQuery()
-    {
-        $solvedScoreSql = "COALESCE(SUM(CASE p.difficulty WHEN 'easy' THEN 10 WHEN 'medium' THEN 25 WHEN 'hard' THEN 50 ELSE 0 END), 0)";
-
-        return User::query()
-            ->leftJoin(
-                DB::raw("(SELECT DISTINCT user_id, problem_id FROM submissions WHERE status = 'accepted') as s"),
-                's.user_id',
-                '=',
-                'users.id'
-            )
-            ->leftJoin('problems as p', 'p.id', '=', 's.problem_id')
-            ->where('users.role', User::ROLE_USER)
-            // Every non-aggregate column is listed explicitly (not just
-            // users.id) — MySQL's ONLY_FULL_GROUP_BY mode doesn't always
-            // detect that these are functionally dependent on the primary
-            // key once a join is involved.
-            ->groupBy('users.id', 'users.name', 'users.handle', 'users.college_id', 'users.current_rating', 'users.rated_contests_count')
-            ->select('users.id', 'users.name', 'users.handle', 'users.college_id', 'users.current_rating', 'users.rated_contests_count')
-            ->selectRaw("{$solvedScoreSql} as solved_score");
-    }
-
-    private function formatRow($row, int $rank): array
-    {
-        return [
-            'rank' => $rank,
-            'user' => ['id' => $row->id, 'name' => $row->name, 'handle' => $row->handle],
-            'solved_score' => (int) $row->solved_score,
-            'display_rating' => $row->rated_contests_count > 0 ? (string) $row->current_rating : 'Unrated',
-        ];
     }
 }

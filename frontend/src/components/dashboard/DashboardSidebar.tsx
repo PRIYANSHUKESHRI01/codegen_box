@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import {
+  Archive,
   ChevronLeft,
   ChevronRight,
   LayoutDashboard,
@@ -13,6 +14,8 @@ import {
   Building2,
   Users2,
   Activity,
+  Gift,
+  ShieldCheck,
   FileCode2,
   CheckCircle2,
   GraduationCap,
@@ -504,7 +507,9 @@ export function DashboardSidebar({
           title: "Executive",
           items: [
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
+            { label: "Live Activity", href: "/superadmin?tab=activity", icon: Activity, badge: "Live", badgeTone: "live" },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
+            { label: "Contest Rewards", href: "/superadmin?tab=weekly_rewards", icon: Gift },
             { label: "Departments", href: "/superadmin?tab=departments", icon: Layers },
             { label: "Merchant Navy", href: "/superadmin?tab=merchant_navy", icon: Anchor },
             { label: "Plans & Pricing", href: "/superadmin?tab=plans", icon: Wallet },
@@ -594,6 +599,8 @@ export function DashboardSidebar({
           items: [
             { label: "Readiness Analytics", href: "/admin/analytics", icon: BarChart3 },
             { label: "Placement Reports", href: "/admin/reports", icon: CheckCircle2 },
+            { label: "Report Archive", href: "/admin/reports/archive", icon: Archive },
+            { label: "Vault AI Results", href: "/admin/vault-ai", icon: ShieldCheck },
             { label: "Proctoring", href: "/admin/proctoring", icon: ShieldAlert },
           ],
         },

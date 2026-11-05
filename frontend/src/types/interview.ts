@@ -37,6 +37,19 @@ export interface InterviewSummary {
   /** Which branches this is for; null = everyone. */
   branch_audience?: { disciplines?: string[]; branches?: string[] } | null;
   sessions_count?: number;
+  /** College mock interviews: the window students may start it in (null = no window), and the audience beyond branch. */
+  opens_at?: string | null;
+  closes_at?: string | null;
+  qualifying_score_percent?: string | number | null;
+  audience_filter?: { years: number[]; sections: string[]; student_ids: number[] } | null;
+  schedule_state?: "unscheduled" | "upcoming" | "open" | "closed";
+  audience_label?: string;
+  audience_size?: number | null;
+  completed_count?: number;
+  in_progress_count?: number;
+  average_score?: number | null;
+  question_count?: number;
+  announced_at?: string | null;
   placement_drive?: { id: number; title: string; role_title: string } | null;
   company?: { id: number; name: string; logo: string | null } | null;
 }
@@ -53,6 +66,10 @@ export interface StudentInterviewSummary {
   /** Sum of each question's expected_duration_seconds plus a flat prep allowance — null if the interview has no questions yet. */
   estimated_total_seconds: number | null;
   my_session_status: InterviewSessionStatus | null;
+  /** The college's window for this interview (all null/"unscheduled" = none): students cannot start before it opens or after it closes. */
+  opens_at?: string | null;
+  closes_at?: string | null;
+  schedule_state?: "unscheduled" | "upcoming" | "open" | "closed";
   /** Made for the student's branch (not merely open to it); these are listed first. Absent from an older API. */
   for_your_branch?: boolean;
   /** A Vault AI Interview qualification set: sat in the Vault AI Interview's own pages, never in the Mock AI Interview's. Absent from an older API. */

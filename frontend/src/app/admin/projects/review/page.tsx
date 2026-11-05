@@ -7,6 +7,7 @@ import { CheckCircle2, Circle, Download, ExternalLink, FileArchive, Loader2, Plu
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { AuthorshipCard } from "@/components/admin/projectLab/AuthorshipCard";
+import { SubmissionFilesPanel } from "@/components/admin/projectLab/SubmissionFilesPanel";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { api, ApiError } from "@/lib/api";
 import { userHasPermission } from "@/lib/auth";
@@ -98,7 +99,8 @@ function ReviewContent() {
     if (!s) return;
     setBusy("download");
     try {
-      saveBlob(await api.getFile(`/admin/project-lab/submissions/${s.id}/snapshot`), `${s.student.name.replace(/\W+/g, "-")}-${s.topic.slug}-attempt-${s.attempt}.tgz`);
+      // A .zip any reviewer can open (AptRun converts the stored archive; the original is never altered).
+      saveBlob(await api.getFile(`/admin/project-lab/submissions/${s.id}/snapshot?format=zip`), `${s.student.name.replace(/\W+/g, "-")}-${s.topic.slug}-attempt-${s.attempt}.zip`);
     } catch (err) {
       setFormError(errorMessage(err, "We couldn't download the snapshot."));
     } finally {
@@ -156,7 +158,7 @@ function ReviewContent() {
                     className="inline-flex items-center gap-2 rounded-btn bg-accent-primary px-4 py-2 text-xs font-bold text-white hover:bg-accent-primary-hover disabled:opacity-60"
                   >
                     {busy === "download" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    Download code ({formatBytes(s.snapshot_size_bytes)})
+                    Download .zip ({formatBytes(s.snapshot_size_bytes)} archive)
                   </button>
                 ) : (
                   <span className="inline-flex items-center gap-2 text-xs font-semibold text-text-secondary">
@@ -194,6 +196,8 @@ function ReviewContent() {
                 </div>
               )}
             </section>
+
+            {s.has_snapshot && <SubmissionFilesPanel submissionId={s.id} saves={s.saves ?? []} />}
 
             <AuthorshipCard evidence={s.integrity} timeline={s.integrity_events} />
 

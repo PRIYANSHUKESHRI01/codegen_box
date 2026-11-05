@@ -621,6 +621,42 @@ return [
     // ═════════════════════════════ ENGINEERING · OTHER BRANCHES ═════════════════
     // The engineering branches outside CSE and the four core families: Chemical, Biotechnology, Aerospace, Agricultural, Mining / Metallurgy.
     // A shared core of fundamentals that every one of them studies, plus one specialisation each (only that branch is offered it).
+    // ═════════════════════════════ ENGINEERING · CSE / IT ═════════════════════════════
+    // The Computer Science core every placement technical round asks (GATE CS spine plus the interview staples).
+    // Practised as MCQs and numericals here; the same subjects are spoken in the Mock AI Interview's "Computer Science Core" domain.
+    'cse' => [
+        'dbms' => ['Database Management Systems', [
+            'ER model and keys', 'Relational algebra and SQL', 'Normalization', 'Transactions and concurrency', 'Indexing and storage', 'NoSQL and recent trends',
+        ]],
+        'operating_systems' => ['Operating Systems', [
+            'Processes and threads', 'CPU scheduling', 'Synchronisation and deadlocks', 'Memory management', 'Virtual memory', 'File systems and I/O',
+        ]],
+        'computer_networks' => ['Computer Networks', [
+            'Layered models', 'Data link and LAN', 'IP addressing and subnetting', 'Routing', 'Transport layer', 'Application layer and security',
+        ]],
+        'oop' => ['Object-Oriented Programming', [
+            'OOP principles', 'Inheritance and polymorphism', 'Abstract classes and interfaces', 'Design principles and patterns', 'Exceptions and memory',
+        ]],
+        'data_structures' => ['Data Structures', [
+            'Arrays and linked lists', 'Stacks and queues', 'Trees', 'Graphs', 'Hashing', 'Heaps',
+        ]],
+        'algorithms' => ['Algorithms', [
+            'Complexity analysis', 'Sorting and searching', 'Divide and conquer', 'Greedy', 'Dynamic programming', 'Graph algorithms',
+        ]],
+        'computer_organization' => ['Computer Organization & Architecture', [
+            'Number systems and arithmetic', 'Instruction cycle and pipelining', 'Memory hierarchy and cache', 'I/O organization',
+        ]],
+        'theory_of_computation' => ['Theory of Computation & Compiler Design', [
+            'Finite automata and regular expressions', 'Context-free grammars and PDA', 'Turing machines and decidability', 'Compiler phases',
+        ]],
+        'software_engineering' => ['Software Engineering', [
+            'SDLC models', 'Requirements and UML', 'Testing', 'Maintenance and metrics',
+        ]],
+        'discrete_math' => ['Discrete Mathematics & Probability', [
+            'Logic and sets', 'Counting and combinatorics', 'Graph theory basics', 'Probability',
+        ]],
+    ],
+
     'other' => [
         'engineering_mathematics' => ['Engineering Mathematics', [
             'Calculus and limits', 'Linear algebra', 'Ordinary differential equations', 'Probability and statistics', 'Numerical methods',

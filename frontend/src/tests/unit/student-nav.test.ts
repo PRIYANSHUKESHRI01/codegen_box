@@ -15,7 +15,7 @@ const ORIGINAL = [
   },
   {
     title: "Placements",
-    items: ["Upcoming Drives|/dashboard/drives", "Company PYQs|/dashboard/company-prep|New", "Mock AI Interview|/dashboard/interviews", "Vault AI Interview|/dashboard/vault-interviews", "Mellow Vault|/dashboard/vault|Get Hired"],
+    items: ["Upcoming Drives|/dashboard/drives", "Vault AI Interview|/dashboard/vault-interviews", "Company PYQs|/dashboard/company-prep|New", "Mock AI Interview|/dashboard/interviews", "Mellow Vault|/dashboard/vault|Get Hired"],
   },
   {
     title: "Merchant Navy",
@@ -63,6 +63,13 @@ describe("student navigation", () => {
     expect(labels).toContain("Mock AI Interview");
     expect(labels).toContain("Vault AI Interview");
     expect(labels).not.toContain("AI Interviews");
+  });
+
+  it("puts the Vault AI Interview second in Placements, right under Upcoming Drives", () => {
+    const base = { projectLabEnabled: true, vaultEnabled: true };
+    const labels = buildStudentNav({ ...base, vaultAi: { state: "open", reasons: [], days_remaining: null, readiness: null } })[1].items.map((i) => i.label);
+    expect(labels.slice(0, 3)).toEqual(["Upcoming Drives", "Vault AI Interview", "Company PYQs"]);
+    expect(labels.indexOf("Vault AI Interview")).toBe(1);
   });
 
   describe("the Vault AI Interview item", () => {

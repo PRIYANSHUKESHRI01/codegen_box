@@ -2,7 +2,7 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, ArrowUpDown, CalendarClock, CheckCircle2, FileDown, GitBranch, LifeBuoy, Mail, RefreshCw, ShieldAlert, SlidersHorizontal, Users, X } from "lucide-react";
+import { Activity, ArrowUpDown, CalendarClock, CheckCircle2, FileDown, FileText, GitBranch, LayoutDashboard, LifeBuoy, ListChecks, Mail, Mic, RefreshCw, ShieldAlert, SlidersHorizontal, Users, X } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
 import { BulkNotifyModal } from "@/components/dashboard/tpo/BulkNotifyModal";
@@ -12,7 +12,9 @@ import { CoordinatorRoster } from "@/components/coordinator/CoordinatorRoster";
 import { BlockStudentModal, FollowUpModal, UnblockStudentModal } from "@/components/coordinator/CoordinatorModals";
 import { NotesPanel } from "@/components/coordinator/NotesPanel";
 import { AttentionQueue, ReadinessMix, SectionKpis } from "@/components/coordinator/SectionOverview";
-import { HP_TONES, HpButton, HpCard, HpEmptyState, HpIconTile, HpItem, HpPill, HpSearch, HpSkeletonCards, HpStagger } from "@/components/portal/kit";
+import { HP_TONES, HpButton, HpCard, HpEmptyState, HpIconTile, HpItem, HpPill, HpSearch, HpSkeletonCards, HpStagger, HpTabs } from "@/components/portal/kit";
+import { SectionLeaders, SectionTrendCard } from "@/components/coordinator/SectionInsights";
+import { FollowUpBoard, SectionEvents, SectionReports, WeekAtAGlance } from "@/components/coordinator/SectionWorkbench";
 import { HpErrorCard, HpSelect } from "@/components/portal/pipeline-kit";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -37,7 +39,9 @@ import {
 import { DEFAULT_EXTRA_FILTERS, attentionById, buildCallList, hasExtraFilters, matchesExtraFilters, type CoordinatorExtraFilters } from "@/lib/coordinatorView";
 import type { CohortStudent } from "@/types/cohort";
 import { useToast } from "@/lib/toast";
-import type { CoordinatorRoster as RosterResponse, CoordinatorStudent } from "@/types/coordinator";
+import type { CoordinatorInsights, CoordinatorRoster as RosterResponse, CoordinatorStudent } from "@/types/coordinator";
+
+type TabId = "overview" | "students" | "followups" | "events" | "reports";
 
 const AT_RISK_THRESHOLD = 60;
 const TIERS = ["ALL", "Placement Ready", "In Progress", "Needs Training"] as const;
@@ -78,6 +82,9 @@ export default function CoordinatorDashboardPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
+  const [tab, setTab] = useState<TabId>("overview");
+  const [insights, setInsights] = useState<CoordinatorInsights | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
   const [now, setNow] = useState(() => Date.now());
 
   const [filters, setFilters] = useState<CohortFilters>(DEFAULT_FILTERS);
@@ -113,9 +120,22 @@ export default function CoordinatorDashboardPage() {
     }
   }, [say]);
 
+  // The numbers beyond the roster (trend, movers, scheduled interviews, follow-ups). A failure here never hides the roster.
+  const loadInsights = useCallback(async () => {
+    try {
+      setInsights(await api.get<CoordinatorInsights>("/coordinator/insights"));
+    } catch {
+      setInsights(null);
+    } finally {
+      setInsightsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (status === "ready") void load();
-  }, [status, load]);
+    if (status !== "ready") return;
+    void load();
+    void loadInsights();
+  }, [status, load, loadInsights]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30_000);
@@ -237,7 +257,10 @@ export default function CoordinatorDashboardPage() {
               <span className="text-2xs text-text-muted" aria-live="polite">Updated {timeAgo(loadedAt, now)}</span>
               <button
                 type="button"
-                onClick={() => load({ silent: true })}
+                onClick={() => {
+                  void load({ silent: true });
+                  void loadInsights();
+                }}
                 disabled={refreshing}
                 aria-label="Refresh the roster"
                 className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-2xs font-semibold text-text-secondary transition-colors hover:bg-elevated hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-60"
@@ -246,6 +269,25 @@ export default function CoordinatorDashboardPage() {
               </button>
             </div>
           </HpItem>
+
+          {summary.size > 0 && (
+            <HpItem>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <HpTabs<TabId>
+                  value={tab}
+                  onChange={setTab}
+                  tabs={[
+                    { id: "overview", label: "Overview", icon: LayoutDashboard },
+                    { id: "students", label: "Students", count: students.length, icon: Users },
+                    { id: "followups", label: "Follow-ups", count: summary.open_follow_ups, icon: ListChecks },
+                    { id: "events", label: "Interviews", count: (insights?.events ?? []).filter((e) => e.not_started > 0 && e.schedule_state !== "closed").length || undefined, icon: Mic },
+                    { id: "reports", label: "Reports", icon: FileText },
+                  ]}
+                />
+                <WeekAtAGlance insights={insights} overdue={summary.overdue_follow_ups} attention={attention.length} />
+              </div>
+            </HpItem>
+          )}
 
           {summary.size === 0 ? (
             <HpItem>
@@ -258,7 +300,11 @@ export default function CoordinatorDashboardPage() {
             </HpItem>
           ) : (
             <>
+              {tab === "overview" && (
+                <>
               <HpItem><SectionKpis summary={summary} attentionCount={attention.length} scopeLabel={scopeLabel} /></HpItem>
+
+              <HpItem><SectionTrendCard insights={insights} currentAverage={summary.avg_readiness} /></HpItem>
 
               <HpItem>
                 <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -279,7 +325,30 @@ export default function CoordinatorDashboardPage() {
                 </div>
               </HpItem>
 
+              <HpItem><SectionLeaders students={students} insights={insights} onOpen={(id) => setOpenId(id)} /></HpItem>
+                </>
+              )}
+
+              {tab === "followups" && (
+                <HpItem>
+                  <FollowUpBoard items={insights?.follow_ups ?? []} onOpen={(id) => setOpenId(id)} onChanged={() => { void load({ silent: true }); void loadInsights(); }} />
+                </HpItem>
+              )}
+
+              {tab === "events" && (
+                <HpItem>
+                  <SectionEvents events={insights?.events ?? []} loading={insightsLoading} onOpen={(id) => setOpenId(id)} />
+                </HpItem>
+              )}
+
+              {tab === "reports" && (
+                <HpItem>
+                  <SectionReports studentCount={students.length} sectionLabel={roster.section ?? ""} />
+                </HpItem>
+              )}
+
               {/* Roster */}
+              {tab === "students" && (
               <HpItem>
                 <HpCard spotlight={false} className="overflow-hidden">
                   <div className="flex flex-col gap-3 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
@@ -418,6 +487,7 @@ export default function CoordinatorDashboardPage() {
                   )}
                 </HpCard>
               </HpItem>
+              )}
             </>
           )}
         </HpStagger>
@@ -441,7 +511,6 @@ export default function CoordinatorDashboardPage() {
       <StudentProfileDrawer
         student={activeStudent}
         onClose={() => setOpenId(null)}
-        collegeName={user?.college?.name ?? "your college"}
         variant="premium"
         extra={
           activeStudent && (

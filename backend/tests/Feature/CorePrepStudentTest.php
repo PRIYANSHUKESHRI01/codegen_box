@@ -720,7 +720,7 @@ class CorePrepStudentTest extends TestCase
         $row = collect($this->getJson('/api/tpo/core-tests/pool?discipline=ece')->assertOk()->json('subjects'))->firstWhere('name', 'Analog Circuits');
         $this->assertSame($expected, array_intersect_key($row, $expected));
 
-        $this->getJson('/api/tpo/core-tests/pool?discipline=cse')->assertStatus(422);
+        $this->getJson('/api/tpo/core-tests/pool?discipline=not_a_discipline')->assertStatus(422);
     }
 
     public function test_a_test_needs_questions_to_publish_and_freezes_once_started(): void

@@ -491,7 +491,8 @@ class User extends Authenticatable
             return ! ($this->branch_source === 'self' && trim((string) $this->branch) !== '');
         }
 
-        if ($this->track_focus !== null || ! $this->hasDomainPrepFamily()) {
+        // CSE / IT has Domain Prep (the CS core) but no "core or IT first?" choice: IT is what they already lead with.
+        if ($this->track_focus !== null || ! $this->hasDomainPrepFamily() || $this->discipline === Discipline::CSE) {
             return false;
         }
 

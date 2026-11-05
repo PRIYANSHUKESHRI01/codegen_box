@@ -342,7 +342,11 @@ class PracticeInterviewService
 
     private function family(User $user): ?string
     {
-        return CoreAccess::isFamily($user->discipline) && $user->hasDomainPrepFamily() ? $user->discipline : null;
+        // A family is offered its own role group only when one is written for it: CSE / IT has Domain Prep (the CS core) but its interview
+        // roles are the software ones everyone gets, so it has no group of its own.
+        return CoreAccess::isFamily($user->discipline) && $user->hasDomainPrepFamily() && config("practice_interviews.groups.{$user->discipline}") !== null
+            ? $user->discipline
+            : null;
     }
 
     /**

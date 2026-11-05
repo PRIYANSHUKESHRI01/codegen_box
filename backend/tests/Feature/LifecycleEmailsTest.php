@@ -226,8 +226,8 @@ class LifecycleEmailsTest extends TestCase
         return [
             'TPO' => [User::ROLE_ADMIN_TPO, [], 'Welcome to AptRun — Training & Placement Officer at XYZ University', '/admin?view=tpo'],
             'company hiring team' => [User::ROLE_ADMIN_COMPANY, [], 'Welcome to AptRun — Hiring Team member at Acme Technologies', '/admin?view=company'],
-            'Mellow internal staff' => [User::ROLE_ADMIN_INTERNAL, ['permissions' => [User::PERM_CONTESTS, User::PERM_VAULT]], 'Welcome to AptRun — Internal team member at Mellow', '/admin?view=mellow'],
-            'Mellow marketing' => [User::ROLE_ADMIN_MARKETING, ['permissions' => [User::PERM_LEADS]], 'Welcome to AptRun — Marketing team member at Mellow', '/marketing'],
+            'Mellow internal staff' => [User::ROLE_ADMIN_INTERNAL, ['permissions' => [User::PERM_CONTESTS, User::PERM_VAULT]], 'Welcome to AptRun — Internal team member at Mellow Vault', '/admin?view=mellow'],
+            'Mellow marketing' => [User::ROLE_ADMIN_MARKETING, ['permissions' => [User::PERM_LEADS]], 'Welcome to AptRun — Marketing team member at Mellow Vault', '/marketing'],
         ];
     }
 

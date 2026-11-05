@@ -18,12 +18,18 @@ import {
   EyeOff,
   Sparkles,
   AudioLines,
+  CalendarClock,
+  Copy,
+  BarChart3,
   type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ManageInterviewQuestionsModal } from "@/components/dashboard/interviews/ManageInterviewQuestionsModal";
 import { ReviewSessionsModal } from "@/components/dashboard/interviews/ReviewSessionsModal";
 import { GenerateQuestionsPanel } from "@/components/dashboard/interviews/GenerateQuestionsPanel";
+import { ScheduleInterviewModal } from "@/components/dashboard/interviews/ScheduleInterviewModal";
+import { whenLabel } from "@/lib/interviewSchedule";
+import Link from "next/link";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -43,6 +49,7 @@ import {
   HpStagger,
   HpStatCard,
   HpTabs,
+  hpBtn,
   hpInput,
   hpLabel,
   type HpTone,
@@ -77,6 +84,7 @@ export default function MockInterviewsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [managing, setManaging] = useState<InterviewSummary | null>(null);
   const [reviewing, setReviewing] = useState<InterviewSummary | null>(null);
+  const [scheduling, setScheduling] = useState<InterviewSummary | null>(null);
   // View-only list controls (client-side filtering of the already-loaded list).
   const [filter, setFilter] = useState<FilterId>("all");
   const [query, setQuery] = useState("");
@@ -101,13 +109,13 @@ export default function MockInterviewsPage() {
 
   if (status !== "ready") return <SessionLoader />;
 
-  const handlePublish = async (interview: InterviewSummary) => {
+  const handleDuplicate = async (interview: InterviewSummary) => {
     try {
-      await api.post(`${BASE_PATH}/${interview.slug}`, { status: "published" });
-      triggerToast(`"${interview.title}" is now published.`);
+      await api.post(`${BASE_PATH}/${interview.slug}/duplicate`);
+      triggerToast(`A draft copy of "${interview.title}" was created.`);
       load();
     } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
+      triggerToast(err instanceof ApiError ? err.message : "Failed to duplicate.", "error");
     }
   };
 
@@ -236,7 +244,8 @@ export default function MockInterviewsPage() {
                       interview={interview}
                       onResponses={() => setReviewing(interview)}
                       onManage={() => setManaging(interview)}
-                      onPublish={() => handlePublish(interview)}
+                      onSchedule={() => setScheduling(interview)}
+                      onDuplicate={() => handleDuplicate(interview)}
                       onDelete={() => handleDelete(interview)}
                     />
                   </ScReveal>
@@ -262,8 +271,24 @@ export default function MockInterviewsPage() {
           basePath={BASE_PATH}
           interviewSlug={managing.slug}
           interviewTitle={managing.title}
-          onClose={() => setManaging(null)}
+          enableLibrary
+          onClose={() => {
+            setManaging(null);
+            load();
+          }}
           onToast={triggerToast}
+        />
+      )}
+
+      {scheduling && (
+        <ScheduleInterviewModal
+          interview={scheduling}
+          onClose={() => setScheduling(null)}
+          onSaved={(message) => {
+            setScheduling(null);
+            triggerToast(message);
+            load();
+          }}
         />
       )}
 
@@ -282,22 +307,32 @@ export default function MockInterviewsPage() {
 
 /* ── Mock interview card ────────────────────────────────────────────────── */
 
+const SCHEDULE_META: Record<NonNullable<InterviewSummary["schedule_state"]>, { label: string; tone: HpTone } | null> = {
+  unscheduled: null,
+  upcoming: { label: "Scheduled", tone: "indigo" },
+  open: { label: "Open now", tone: "emerald" },
+  closed: { label: "Closed", tone: "slate" },
+};
+
 function MockInterviewCard({
   interview,
   onResponses,
   onManage,
-  onPublish,
+  onSchedule,
+  onDuplicate,
   onDelete,
 }: {
   interview: InterviewSummary;
   onResponses: () => void;
   onManage: () => void;
-  onPublish: () => void;
+  onSchedule: () => void;
+  onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const meta = STATUS_META[interview.status] ?? STATUS_META.draft;
   const isPublished = interview.status === "published";
   const taken = interview.sessions_count ?? 0;
+  const schedule = SCHEDULE_META[interview.schedule_state ?? "unscheduled"];
 
   return (
     <HpCard className="hp-card-hover group flex h-full flex-col p-5 sm:p-6">
@@ -328,30 +363,65 @@ function MockInterviewCard({
 
         {interview.description && <p className="mt-3.5 line-clamp-2 text-13 leading-relaxed text-text-secondary">{interview.description}</p>}
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
+        {/* When it runs and who it is for */}
+        <div className="mt-3.5 space-y-1.5 rounded-control border border-border-subtle bg-elevated/40 px-3 py-2.5 text-2xs">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-text-secondary">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+            {interview.opens_at || interview.closes_at ? (
+              <span>
+                {interview.opens_at ? `Opens ${whenLabel(interview.opens_at)}` : "Open already"}
+                {interview.closes_at ? ` · closes ${whenLabel(interview.closes_at)}` : " · no deadline"}
+              </span>
+            ) : (
+              <span className="text-text-muted">{isPublished ? "Open any time" : "Not scheduled yet"}</span>
+            )}
+            {isPublished && schedule && <HpPill tone={schedule.tone} size="sm">{schedule.label}</HpPill>}
+          </p>
+          <p className="flex items-center gap-2 text-text-secondary">
+            <Users className="h-3.5 w-3.5 shrink-0 text-text-muted" aria-hidden />
+            <span className="min-w-0 truncate">{interview.audience_label ?? "Every student of your college"}</span>
+            {typeof interview.audience_size === "number" && <span className="shrink-0 font-bold text-primary">{interview.audience_size} students</span>}
+          </p>
+          {isPublished && typeof interview.audience_size === "number" && interview.audience_size > 0 && (
+            <div className="flex items-center gap-2 pt-0.5">
+              <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border-subtle">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.min(100, Math.round(((interview.completed_count ?? 0) / interview.audience_size) * 100))}%` }} />
+              </div>
+              <span className="tabular shrink-0 text-3xs font-bold text-text-muted">{interview.completed_count ?? 0}/{interview.audience_size} done</span>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2.5">
           <ScMetric icon={Users} label="Taken" value={taken} tone="violet" />
           <ScMetric
             icon={isPublished ? Eye : EyeOff}
-            label="Visibility"
-            value={isPublished ? "Your students" : interview.status === "cancelled" ? "Withdrawn" : "Hidden"}
+            label={interview.average_score != null ? "Average score" : "Visibility"}
+            value={interview.average_score != null ? `${Math.round(interview.average_score)}%` : isPublished ? "Your students" : interview.status === "cancelled" ? "Withdrawn" : "Hidden"}
             tone={isPublished ? "sky" : "slate"}
           />
         </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-        <HpButton variant="secondary" size="sm" leftIcon={<FileText className="h-3.5 w-3.5" />} onClick={onResponses}>
+        {taken > 0 && (
+          <Link href={`/admin/mock-interviews/results?slug=${encodeURIComponent(interview.slug)}`} className={hpBtn("secondary", "sm")}>
+            <BarChart3 className="h-3.5 w-3.5" aria-hidden /> Results
+          </Link>
+        )}
+        <HpButton variant="ghost" size="sm" leftIcon={<FileText className="h-3.5 w-3.5" />} onClick={onResponses}>
           Responses
         </HpButton>
         <HpButton variant="ghost" size="sm" leftIcon={<ListChecks className="h-3.5 w-3.5" />} onClick={onManage}>
-          Manage Questions
+          Questions
         </HpButton>
         <div className="ml-auto flex items-center gap-1.5">
-          {interview.status === "draft" && (
-            <HpButton size="sm" leftIcon={<Rocket className="h-3.5 w-3.5" />} onClick={onPublish}>
-              Publish
+          {interview.status !== "cancelled" && (
+            <HpButton size="sm" variant={interview.status === "draft" ? "primary" : "secondary"} leftIcon={interview.status === "draft" ? <Rocket className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />} onClick={onSchedule}>
+              {interview.status === "draft" ? "Schedule & publish" : "Schedule"}
             </HpButton>
           )}
+          <ScIconButton icon={Copy} label={`Duplicate ${interview.title}`} onClick={onDuplicate} />
           <ScIconButton icon={Trash2} label={`Delete ${interview.title}`} tone="danger" onClick={onDelete} />
         </div>
       </div>
@@ -407,7 +477,7 @@ function CreateMockInterviewModal({ onClose, onCreated }: { onClose: () => void;
       }
     >
       <ScNotice tone="indigo" className="mb-5">
-        Only your own students can ever see this. Starts as a draft — generate questions with AI or add them from the shared bank, then publish.
+        Only your own students can ever see this. It starts as a draft: generate questions with AI, draw them from the AptRun library (DBMS, OS, networks, OOP and more) or pick from the shared bank, then choose when it opens and who it is for.
       </ScNotice>
 
       <form id="create-mock-interview-form" onSubmit={handleSubmit} className="space-y-4">

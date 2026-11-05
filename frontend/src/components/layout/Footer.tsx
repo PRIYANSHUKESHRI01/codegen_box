@@ -113,9 +113,10 @@ const COLUMNS: FooterColumn[] = [
     links: [
       { label: "About", href: "/about" },
       { label: "Pricing", href: "/pricing" },
+      { label: "Rewards", href: "/rewards" },
       { label: "FAQ", href: "/#faq" },
       { label: "Contact", href: "/contact" },
-      { label: "Mellow Vault", href: "https://mellowvault.com", external: true },
+      { label: "Mellow Vault", href: "/vault" },
     ],
   },
 ];
@@ -229,7 +230,7 @@ export function Footer() {
             </Link>
 
             <p className={cn("mt-5 max-w-xs text-sm leading-relaxed", INK_DIM)}>
-              Campus drives, a personal learning centre for every student, and a network of hiring partners.
+              Campus drives, a personal learning centre for every student, and a path to employers on Mellow Vault.
             </p>
 
             <a
@@ -360,7 +361,7 @@ export function Footer() {
         {/* 3 — Legal: who we are on the left, what to read and how we're secured on the right */}
         <div className="mt-10 flex flex-col gap-6 border-t border-white/10 pb-8 pt-7 xl:flex-row xl:items-center xl:justify-between xl:gap-8">
           <div className="space-y-2.5">
-            <p className={cn("text-xs font-semibold leading-relaxed", INK)}>&copy; {new Date().getFullYear()} Mellow Vault. All rights reserved.</p>
+            <p className={cn("text-xs font-semibold leading-relaxed", INK)}>&copy; {new Date().getFullYear()} AptRun. All Rights Reserved.</p>
             <p className={cn("text-2xs font-medium leading-relaxed", INK_DIM)}>
               A Unit of {LEGAL_ENTITY} <span aria-hidden="true">&bull;</span> <span className={cn("whitespace-nowrap font-mono", INK_FAINT)}>CIN: {CIN}</span>
             </p>

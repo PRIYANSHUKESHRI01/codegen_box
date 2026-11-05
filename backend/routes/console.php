@@ -42,6 +42,9 @@ Schedule::command('vault:prune')->daily();
 // one that was left unscored (a restart mid-scoring) so no student is stuck on "scoring...".
 Schedule::command('interview:score-pending')->everyMinute()->withoutOverlapping(5);
 
+// Every ten minutes: the "starting soon" / "closing soon" reminders for college mock AI interviews that have a window (sent once each).
+Schedule::command('interviews:remind')->everyTenMinutes()->withoutOverlapping(10);
+
 // Daily: remove practice interviews a student built but never took (kept once they have a session).
 Schedule::command('interview:prune-practice')->dailyAt('03:50');
 
@@ -88,17 +91,40 @@ Schedule::command('integrity:prune')->dailyAt('03:20')->withoutOverlapping(120);
 // without a real server cron" caveat as report:weekly-readiness above.
 Schedule::command('contests:finalize')->everyFiveMinutes();
 
-// Daily, just after midnight IST (well before the 7-8 PM slot itself) so
-// the contest is visible in every student's "Upcoming" list and registrable
-// all day. onOneServer() is safe here (default CACHE_STORE is 'database',
-// which supports atomic locks) but the real idempotency guard is
-// Contest::daily_key's unique DB index — see GenerateDailyContest.
+// The AptRun Daily Challenge: the NEXT edition is created the moment each day's slot closes (the 9 PM IST minute after an
+// 8 PM start + 60 minutes — DailyChallengeService::closeTime()), so tomorrow's is on every student's calendar, with a bell
+// notification, as soon as tonight's is over. The hourly run is only a net under a missed one (a server that was down at
+// 9 PM): by then the edition exists and it does nothing — or, if one was made for the old slot and has not opened, moves
+// it to the current name and time. onOneServer() is safe here (default CACHE_STORE is 'database', which supports atomic
+// locks) but the real idempotency guard is Contest::daily_key's unique DB index — see GenerateDailyContest.
 Schedule::command('contests:generate-daily')
     ->timezone(config('contests.daily.timezone'))
-    ->dailyAt('00:05')
+    ->dailyAt(app(\App\Services\DailyChallengeService::class)->closeTime())
+    ->onOneServer();
+Schedule::command('contests:generate-daily')
+    ->timezone(config('contests.daily.timezone'))
+    ->hourlyAt(7)
     ->onOneServer();
 
-// Daily, mid-morning IST (a sensible hour to receive a nudge, and well clear of the 00:05 contest generation): the due
+// Every day just after midnight IST: close out the weekly contest leaderboard that has just finished — one ledger row and one bell
+// notification per prize winner (only Monday's run has anything to do; the rest find it already written). The superadmin then sends
+// the vouchers from Superadmin → Contest Rewards.
+Schedule::command('rewards:finalize-weekly')
+    ->timezone(config('weekly_rewards.timezone'))
+    ->dailyAt('00:15')
+    ->withoutOverlapping(30)
+    ->onOneServer();
+
+// Every minute: the scheduler's own heartbeat. Superadmin → Overview raises "the scheduler is not running" when it goes quiet, because
+// everything on this page (contests, e-mails, scoring, reports) stops without the server cron and nothing else would say so.
+Schedule::call(fn () => \Illuminate\Support\Facades\Cache::put(\App\Services\Activity\AttentionService::HEARTBEAT_KEY, now()->toIso8601String(), 3600))
+    ->name('scheduler:heartbeat')
+    ->everyMinute();
+
+// Daily, a quiet hour: drop live-activity data (page views, visits, daily roll-ups, the sign-in log) past its retention.
+Schedule::command('activity:prune')->dailyAt('03:55')->withoutOverlapping(120);
+
+// Daily, mid-morning IST (a sensible hour to receive a nudge, and well clear of the contest generation): the due
 // lifecycle e-mails — plans about to end, students a few points short of the Vault, Vault-ready students whose plan
 // has no Vault, free-plan students who have not bought, and win-backs for students who stopped coming. Every message
 // carries its own once-only key, so a double run (or two servers) cannot double-send; `php artisan lifecycle:send

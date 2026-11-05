@@ -47,6 +47,7 @@ import { NotesPanel } from "@/components/coordinator/NotesPanel";
 import { CohortEngagementCard, CohortLanguagesCard, CohortPagination, SortHeader } from "@/components/dashboard/tpo/cohortPanels";
 import { SetYearModal, VaultAiChip, YearBreakdown, YearChip, YearSwitcher } from "@/components/dashboard/tpo/cohortYear";
 import { EditStudentModal, SetSectionModal, UnfiledStudentsPanel } from "@/components/dashboard/tpo/cohortEdit";
+import { prefixForDiscipline, sectionPrefix } from "@/lib/sectionNaming";
 import { ALL_YEARS, YEAR_NOT_SET, departmentBranchBreakdown, inYear, yearName, yearTabs } from "@/lib/studyYear";
 import { confirmDialog } from "@/lib/dialogs";
 import { CoreCell, LanguageChips } from "@/components/dashboard/tpo/cohortProgress";
@@ -1383,9 +1384,17 @@ export default function StudentCohortPage() {
         }}
       />
 
-      {showSetSection && <SetSectionModal count={selectedIds.size} sections={allSections} onClose={() => setShowSetSection(false)} onConfirm={handleSetSection} />}
+      {showSetSection && (
+        <SetSectionModal
+          count={selectedIds.size}
+          sections={allSections}
+          prefix={sectionPrefix(catalog, filters.branch, allStudents.filter((s) => selectedIds.has(s.id)))}
+          onClose={() => setShowSetSection(false)}
+          onConfirm={handleSetSection}
+        />
+      )}
 
-      {editing && <EditStudentModal student={editing} sections={allSections} onClose={() => setEditing(null)} onSaved={handleStudentSaved} />}
+      {editing && <EditStudentModal student={editing} sections={allSections} sectionPrefix={prefixForDiscipline(catalog, editing.discipline)} onClose={() => setEditing(null)} onSaved={handleStudentSaved} />}
 
       {showSetYear && <SetYearModal count={selectedIds.size} onClose={() => setShowSetYear(false)} onConfirm={handleSetYear} />}
 
@@ -1400,8 +1409,15 @@ export default function StudentCohortPage() {
       <StudentProfileDrawer
         student={activeStudent}
         onClose={() => setActiveStudent(null)}
-        collegeName={user?.college?.name ?? "your college"}
         variant="premium"
+        onStudentChanged={(row) => {
+          setAllStudents((prev) => prev.map((s) => (s.id === row.id ? { ...s, ...row } : s)));
+          setActiveStudent((prev) => (prev && prev.id === row.id ? { ...prev, ...row } : prev));
+        }}
+        onStudentRemoved={(id) => {
+          setAllStudents((prev) => prev.filter((s) => s.id !== id));
+          setActiveStudent(null);
+        }}
         extra={
           activeStudent && (
             <section className="space-y-2.5" aria-label="Coordinator follow-up log">

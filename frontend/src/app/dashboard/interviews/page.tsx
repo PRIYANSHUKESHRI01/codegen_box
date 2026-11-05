@@ -4,7 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Mic, CheckCircle2, Loader2, PlayCircle, Layers, ArrowDown } from "lucide-react";
+import { Mic, CheckCircle2, Loader2, PlayCircle, Layers, ArrowDown, CalendarClock } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MockInterviewExplorer } from "@/components/dashboard/interviews/MockInterviewExplorer";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
@@ -12,6 +12,7 @@ import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { canStartNow, scheduleNote } from "@/lib/interviewSchedule";
 import type { StudentInterviewSummary } from "@/types/interview";
 import type { StudentInterviewTrackSummary } from "@/types/interviewTrack";
 import type { MySubscriptionResponse } from "@/types/subscription";
@@ -62,11 +63,15 @@ function InterviewsListContent() {
   // The student's own practice interviews live in their own section, so the ones set by their college stay easy to find.
   const practice = interviews.filter((i) => i.interview_type === "practice");
   const assigned = interviews.filter((i) => i.interview_type !== "practice");
-  const notStarted = assigned.filter((i) => !i.my_session_status || i.my_session_status === "invited");
+  const notStartedAll = assigned.filter((i) => !i.my_session_status || i.my_session_status === "invited");
+  // A college mock with a window: what is open now, what is coming, and what closed before the student started it.
+  const notStarted = notStartedAll.filter((i) => i.schedule_state !== "upcoming" && i.schedule_state !== "closed");
+  const scheduled = notStartedAll.filter((i) => i.schedule_state === "upcoming");
+  const missed = notStartedAll.filter((i) => i.schedule_state === "closed");
   const inProgress = assigned.filter((i) => i.my_session_status === "in_progress");
   const completed = assigned.filter((i) => i.my_session_status === "completed");
   // What still needs the student: scheduled for them and not finished.
-  const assignedCount = tracks.length + notStarted.length + inProgress.length;
+  const assignedCount = tracks.length + notStarted.length + inProgress.length + scheduled.length;
 
   return (
     <DashboardShell
@@ -116,7 +121,9 @@ function InterviewsListContent() {
           {tracks.length > 0 && <TrackSection tracks={tracks} />}
           {inProgress.length > 0 && <InterviewSection title="Resume" interviews={inProgress} accent="warning" />}
           {notStarted.length > 0 && <InterviewSection title="Available" interviews={notStarted} accent="primary" />}
+          {scheduled.length > 0 && <InterviewSection title="Scheduled" interviews={scheduled} accent="primary" />}
           {completed.length > 0 && <InterviewSection title="Completed" interviews={completed} accent="muted" />}
+          {missed.length > 0 && <InterviewSection title="Closed" interviews={missed} accent="muted" />}
           {practice.length > 0 && <InterviewSection title="Your practice interviews" interviews={practice} accent="primary" />}
         </div>
       )}
@@ -220,6 +227,21 @@ function InterviewSection({
 
             <h3 className="text-sm font-bold text-primary leading-snug">{interview.title}</h3>
             {interview.description && <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{interview.description}</p>}
+            {(() => {
+              const note = scheduleNote(interview);
+              return note ? (
+                <p
+                  className={cn(
+                    "inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-3xs font-bold",
+                    note.tone === "info" && "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300",
+                    note.tone === "success" && "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+                    note.tone === "danger" && "border-rose-500/25 bg-rose-500/10 text-rose-600 dark:text-rose-300"
+                  )}
+                >
+                  <CalendarClock className="h-3 w-3" aria-hidden /> {note.text}
+                </p>
+              ) : null;
+            })()}
 
             <div className="flex items-center justify-between text-2xs text-text-muted mt-auto pt-2 border-t border-border-subtle">
               <span>{interview.question_count} questions</span>
@@ -229,7 +251,11 @@ function InterviewSection({
                   Continue
                 </span>
               ) : interview.my_session_status !== "completed" ? (
-                <span className="font-bold text-accent-primary">Start →</span>
+                canStartNow(interview) ? (
+                  <span className="font-bold text-accent-primary">Start →</span>
+                ) : (
+                  <span className="font-bold text-text-muted">{interview.schedule_state === "upcoming" ? "Not open yet" : "Closed"}</span>
+                )
               ) : null}
             </div>
           </Link>

@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function StudentsPage() {
   return (
-    <MarketingShell>
+    <MarketingShell scrollMotion={false}>
       <StudentsPageContent />
     </MarketingShell>
   );

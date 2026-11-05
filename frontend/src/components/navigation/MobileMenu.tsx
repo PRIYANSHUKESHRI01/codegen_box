@@ -2,19 +2,17 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { X, Search, Sparkles, LogIn } from "lucide-react";
+import { X, LogIn } from "lucide-react";
 import { NAV_LINKS } from "@/data/navigation";
-import { ThemeToggle } from "./ThemeToggle";
-import { Button } from "@/components/ui/Button";
+import { ThemeSwitch } from "./ThemeSwitch";
 import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 
 interface MobileMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenSearch: () => void;
 }
 
-export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
+export function MobileMenu({ isOpen, onClose }: MobileMenuProps) {
   // Lock body scroll when mobile menu is open
   useEffect(() => {
     if (isOpen) {
@@ -73,26 +71,6 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
             </button>
           </div>
 
-          {/* Quick Search */}
-          <div className="mt-6">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenSearch();
-              }}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-control bg-elevated border border-border-subtle text-text-muted text-sm text-left"
-            >
-              <span className="flex items-center gap-2.5">
-                <Search className="w-4 h-4" />
-                <span>Search problems...</span>
-              </span>
-              <kbd className="px-1.5 py-0.5 text-3xs font-mono bg-surface border border-border-subtle rounded">
-                ⌘K
-              </kbd>
-            </button>
-          </div>
-
           {/* Nav Links */}
           <nav className="mt-6 flex flex-col gap-1">
             {NAV_LINKS.map((link) => {
@@ -126,7 +104,7 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
         <div className="pt-6 mt-6 border-t border-border-subtle flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-text-muted">Theme</span>
-            <ThemeToggle showLabels />
+            <ThemeSwitch />
           </div>
 
           <div className="flex flex-col gap-2.5 pt-2">
@@ -144,7 +122,6 @@ export function MobileMenu({ isOpen, onClose, onOpenSearch }: MobileMenuProps) {
               className="w-full py-2.5 rounded-btn bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold text-center transition-all shadow-subtle flex items-center justify-center gap-2"
             >
               <span>Get Started Free</span>
-              <Sparkles className="w-4 h-4" />
             </Link>
           </div>
         </div>

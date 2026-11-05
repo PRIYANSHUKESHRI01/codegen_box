@@ -1,11 +1,12 @@
 "use client";
 
 import { AlertTriangle, Camera, ClipboardX, Maximize, Mic } from "lucide-react";
+import { InterviewLobby, type LobbyRule } from "@/components/dashboard/interviews/room/InterviewLobby";
 import { useIntegrityUi } from "@/lib/integrity/store";
 import type { ProctoringPhase } from "@/lib/proctoring/types";
-import { ConsentScreen, type ConsentRule } from "./ConsentScreen";
 import { IntegrityDisclosure } from "./IntegrityDisclosure";
 import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
+import { ProctoringScreenFrame } from "./ProctoringScreenFrame";
 
 /**
  * Shown BEFORE any contest problem content is ever rendered — a student
@@ -24,7 +25,9 @@ import { CONSENT_COPY, type ProctoringActivity } from "./proctoringCopy";
  * the single-screen check and the Guardian, each with what to do about it — and Start stays disabled until
  * every required row is green. What is recorded and for how long is spelled out from the server's own policy.
  *
- * The layout itself (get ready · what to expect · the pinned Start bar) is ConsentScreen, shared with the interview gate.
+ * The screen itself is the AI interview's lobby (InterviewLobby) — full-window, on the room's own backdrop, with the microphone meter —
+ * so every proctored surface (contests, Core tests and practice, Soft Skills tests, Skill Drills, interviews) is entered the same way. It
+ * is drawn over the whole window by ProctoringScreenFrame, so the page around the gate does not matter.
  */
 export function ProctoringConsentGate({
   phase,
@@ -34,6 +37,9 @@ export function ProctoringConsentGate({
   onEnableDevices,
   onConsent,
   activity = "contest",
+  cameraStream = null,
+  candidateName = "",
+  onLeave,
 }: {
   phase: ProctoringPhase;
   consentError: string | null;
@@ -43,11 +49,17 @@ export function ProctoringConsentGate({
   onConsent: () => void;
   /** Which kind of attempt this gates — only changes the wording (see proctoringCopy.ts). Defaults to the original contest copy. */
   activity?: ProctoringActivity;
+  /** The same stream the attempt will use; the lobby reads it to show the microphone level. Without it the meter simply stays quiet. */
+  cameraStream?: MediaStream | null;
+  /** For the greeting. Left out, the heading drops the name. */
+  candidateName?: string;
+  /** Leaves without starting. When given, the lobby shows a "Leave" button. */
+  onLeave?: () => void;
 }) {
   const copy = CONSENT_COPY[activity];
   const integrity = useIntegrityUi().policy !== null;
 
-  const rules: ConsentRule[] = [
+  const rules: LobbyRule[] = [
     { icon: Maximize, text: "Your screen will switch to fullscreen for the duration of your attempt. Exiting it is logged as a violation." },
     ...(!integrity
       ? [
@@ -63,20 +75,26 @@ export function ProctoringConsentGate({
   ];
 
   return (
-    <ConsentScreen
-      title={copy.title}
-      subtitle={copy.subtitle}
-      previewVideoRef={previewVideoRef}
-      devicePreviewReady={devicePreviewReady}
-      onEnableDevices={onEnableDevices}
-      onConsent={onConsent}
-      starting={phase === "starting"}
-      blocked={phase === "blocked"}
-      startLabel="Start Proctored Session"
-      consentError={consentError}
-      rules={rules}
-      disclosure={integrity ? <IntegrityDisclosure /> : null}
-      footer={integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}
-    />
+    <ProctoringScreenFrame testId="proctoring-lobby">
+      <InterviewLobby
+        sessionLabel={copy.label}
+        candidateName={candidateName}
+        badge={copy.badge}
+        intro={copy.intro}
+        previewVideoRef={previewVideoRef}
+        cameraStream={cameraStream}
+        devicePreviewReady={devicePreviewReady}
+        onEnableDevices={onEnableDevices}
+        onConsent={onConsent}
+        starting={phase === "starting"}
+        blocked={phase === "blocked"}
+        startLabel="Start Proctored Session"
+        consentError={consentError}
+        rules={rules}
+        disclosure={integrity ? <IntegrityDisclosure /> : null}
+        footer={integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}
+        onLeave={onLeave}
+      />
+    </ProctoringScreenFrame>
   );
 }

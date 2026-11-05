@@ -1,59 +1,47 @@
 import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
 import { Navbar } from "@/components/layout/Navbar";
-import { Hero } from "@/components/hero/Hero";
-import { CapabilityMarquee } from "@/components/sections/CapabilityMarquee";
-import { PlatformRoles } from "@/components/sections/PlatformRoles";
-import { HowItWorks } from "@/components/sections/HowItWorks";
-import { Features } from "@/components/sections/Features";
-import { Stats } from "@/components/sections/Stats";
-import { ProblemExplorer } from "@/components/problems/ProblemExplorer";
-import { TrustPrinciples } from "@/components/sections/TrustPrinciples";
-import { Faq } from "@/components/sections/Faq";
-import { FinalCTA } from "@/components/sections/FinalCTA";
 import { Footer } from "@/components/layout/Footer";
-import { ScrollMotion } from "@/components/layout/ScrollMotion";
+import { Hero } from "@/components/hero/Hero";
+import { ProofBand } from "@/components/landing/ProofBand";
+import { AudienceShowcase } from "@/components/landing/AudienceShowcase";
+import { StudentPayoff } from "@/components/landing/StudentPayoff";
+import { TrustStrip } from "@/components/landing/TrustStrip";
+import { LandingPricing } from "@/components/landing/LandingPricing";
+import { LandingFaq } from "@/components/landing/LandingFaq";
+import { LandingCta } from "@/components/landing/LandingCta";
+import { LandingStructuredData } from "@/components/landing/LandingStructuredData";
 
 export default function Home() {
   return (
-    <div className="flex flex-col min-h-screen bg-background text-primary selection:bg-accent-primary/20 selection:text-accent-primary">
+    <div className="flex min-h-screen flex-col bg-background text-primary selection:bg-accent-primary/20 selection:text-accent-primary">
+      {/* Lets keyboard and screen-reader users jump past the header and the announcement. */}
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-btn focus:bg-accent-primary focus:px-4 focus:py-2.5 focus:text-sm focus:font-bold focus:text-white focus:shadow-glow focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
       <AnnouncementBar />
       <Navbar />
 
-      {/* Every number and every problem in the practice arena is real,
-          fetched from GET /public/stats and /public/problems/sample.
-          Product-preview names and figures are labelled as illustrative. */}
-      <main className="flex-1">
-        {/* 1. Hero — hire on proof; dual CTAs + 3-view product preview */}
+      {/* Eight blocks, in the order a visitor decides: what is it (hero), is there substance (proof), what is in it for me (the two sides),
+          why would a student care (rewards and the Vault), can I trust it, what does it cost, what do I still need to know, and the close.
+          Every number and every date on the page comes from GET /api/public/landing; a block it cannot fill is left out, never faked.
+          Product sketches are labelled as previews, and the voucher brands are the shelf the weekly rewards are picked from. */}
+      <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
         <Hero />
-
-        {/* 2. Capability ticker */}
-        <CapabilityMarquee />
-
-        {/* 2b. Colleges / Students / Recruiters */}
-        <PlatformRoles />
-
-        {/* 3. The hiring loop, told from both sides */}
-        <HowItWorks />
-
-        {/* 4. Platform capabilities (bento) */}
-        <Features />
-
-        {/* 5. Practice arena — real stats + a real sample of the catalog */}
-        <Stats />
-        <ProblemExplorer />
-
-        {/* 6. What makes the scores trustworthy */}
-        <TrustPrinciples />
-
-        {/* 7. FAQ */}
-        <Faq />
-
-        {/* 8. Final CTA */}
-        <FinalCTA />
+        <ProofBand />
+        <AudienceShowcase />
+        <StudentPayoff />
+        <TrustStrip />
+        <LandingPricing />
+        <LandingFaq />
+        <LandingCta />
       </main>
 
       <Footer />
-      <ScrollMotion />
+      <LandingStructuredData />
     </div>
   );
 }

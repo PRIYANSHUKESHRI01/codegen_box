@@ -64,3 +64,57 @@ export interface CoordinatorNote {
   /** Written by the viewer — only an author may delete their note. */
   mine: boolean;
 }
+
+/** GET /coordinator/insights — see CoordinatorInsightsService on the server. */
+export interface TrendPoint {
+  date: string;
+  average: number;
+  active: number;
+  tracked: number;
+}
+
+export interface Mover {
+  student_id: number;
+  name: string;
+  roll_number: string | null;
+  from: number;
+  to: number;
+  change: number;
+}
+
+export type FollowUpStatus = "overdue" | "today" | "upcoming" | "no_date";
+
+export interface FollowUpItem {
+  id: number;
+  student: { id: number; name: string | null; roll_number: string | null };
+  kind: NoteKind;
+  body: string;
+  follow_up_on: string | null;
+  status: FollowUpStatus;
+  author: string | null;
+  created_at: string | null;
+}
+
+export interface SectionEvent {
+  id: number;
+  title: string;
+  slug: string;
+  schedule_state: "unscheduled" | "upcoming" | "open" | "closed";
+  opens_at: string | null;
+  closes_at: string | null;
+  in_section: number;
+  completed: number;
+  in_progress: number;
+  not_started: number;
+  average_score: number | null;
+  not_started_students: { id: number; name: string; roll_number: string | null }[];
+}
+
+export interface CoordinatorInsights {
+  generated_at: string;
+  trend: { points: TrendPoint[]; change_7d: number | null; change_28d: number | null };
+  movers: { improved: Mover[]; slipped: Mover[] };
+  follow_ups: FollowUpItem[];
+  events: SectionEvent[];
+  college: { average: number | null; students: number };
+}

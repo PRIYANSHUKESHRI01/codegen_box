@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Users2,
   UserSearch,
@@ -15,8 +15,16 @@ import {
   Landmark,
   Loader2,
   ArrowRight,
+  Radio,
+  AlertTriangle,
+  CheckCircle2,
+  Info,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { LiveDot } from "./activity/ui";
+import { usePoll } from "./activity/usePoll";
+import type { AttentionItem, Glance } from "@/types/activity";
 import { formatDateTime, formatInr, type ApiAuditLog } from "./types";
 
 interface OverviewResponse {
@@ -65,7 +73,109 @@ function KpiCard({
   );
 }
 
-export function OverviewPanel({ onViewAuditLog }: { onViewAuditLog: () => void }) {
+const SEVERITY = {
+  critical: { icon: AlertTriangle, tone: "border-status-danger/30 bg-status-danger/10 text-status-danger" },
+  warning: { icon: AlertTriangle, tone: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-300" },
+  info: { icon: Info, tone: "border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300" },
+} as const;
+
+/** Who is on AptRun this minute, today and this week — the part of the Overview that moves. Links to Live Activity. */
+function LiveStrip({ onOpen }: { onOpen: () => void }) {
+  const [glance, setGlance] = useState<Glance | null>(null);
+  const load = useCallback(() => {
+    api.get<Glance>("/superadmin/activity/glance").then(setGlance).catch(() => undefined);
+  }, []);
+  useEffect(() => load(), [load]);
+  usePoll(load, 15_000);
+
+  if (!glance) return null;
+
+  const cells: [string, number, string][] = [
+    ["Online now", glance.online, "people on the platform this minute"],
+    ["Today", glance.today, "different people so far"],
+    ["Last 7 days", glance.last_7_days, "weekly active"],
+    ["Sign-ins today", glance.sign_ins_today, "logins and demo logins opened"],
+  ];
+
+  return (
+    <button type="button" onClick={onOpen} className="group flex w-full flex-wrap items-center gap-x-8 gap-y-3 rounded-panel border border-emerald-500/25 bg-gradient-to-r from-emerald-500/[0.07] to-transparent p-4 text-left shadow-subtle transition-colors hover:border-emerald-500/50">
+      <span className="flex items-center gap-2 text-2xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-300">
+        <Radio className="h-4 w-4" aria-hidden /> Live
+        <LiveDot />
+      </span>
+      {cells.map(([label, value, hint]) => (
+        <span key={label} className="min-w-0" title={hint}>
+          <span className="block font-mono text-2xl font-black leading-none text-primary">{value.toLocaleString()}</span>
+          <span className="mt-1 block text-3xs font-semibold uppercase tracking-wider text-text-muted">{label}</span>
+        </span>
+      ))}
+      <span className="ml-auto flex items-center gap-1 text-2xs font-bold text-accent-primary">
+        {glance.tracking ? "Open Live Activity" : "Tracking is switched off"} <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </button>
+  );
+}
+
+/** What needs the superadmin today. An empty list is the good outcome, and says so. */
+function AttentionList({ onOpen }: { onOpen: (tab: string, collegeId?: number) => void }) {
+  const [items, setItems] = useState<AttentionItem[] | null>(null);
+  const load = useCallback(() => {
+    api.get<{ items: AttentionItem[] }>("/superadmin/attention").then((r) => setItems(r.items)).catch(() => setItems([]));
+  }, []);
+  useEffect(() => load(), [load]);
+  usePoll(load, 60_000);
+
+  if (items === null) return null;
+
+  return (
+    <section className="space-y-3 rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle" aria-label="Needs attention">
+      <h2 className="text-sm font-bold text-primary">Needs your attention</h2>
+      {items.length === 0 ? (
+        <p className="flex items-center gap-2 text-xs text-text-muted">
+          <CheckCircle2 className="h-4 w-4 text-status-success" aria-hidden /> Nothing needs you right now: the scheduler is running, tonight&apos;s contest exists, no login is waiting and no payment is stuck.
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {items.map((item) => {
+            const sev = SEVERITY[item.severity];
+            const Icon = sev.icon;
+            return (
+              <li key={item.key} className={cn("rounded-control border p-3.5", sev.tone)}>
+                <div className="flex items-start gap-3">
+                  <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-xs font-bold text-primary">{item.title}</h3>
+                      <span className="rounded-full bg-background/70 px-2 py-0.5 font-mono text-3xs font-bold">{item.count}</span>
+                    </div>
+                    <p className="mt-0.5 text-2xs text-text-secondary">{item.detail}</p>
+                    {item.examples.length > 0 && (
+                      <ul className="mt-2 flex flex-wrap gap-1.5">
+                        {item.examples.map((e) => (
+                          <li key={e.label}>
+                            <button type="button" onClick={() => onOpen("activity", e.id)} className="rounded-full border border-current/25 bg-background/60 px-2 py-0.5 text-3xs font-semibold text-primary hover:bg-background">
+                              {e.label}
+                              {e.note ? <span className="font-normal text-text-muted"> · {e.note}</span> : null}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button type="button" onClick={() => onOpen(item.tab)} className="mt-2 inline-flex items-center gap-1 text-2xs font-bold text-accent-primary hover:underline">
+                      Open <ArrowRight className="h-3 w-3" aria-hidden />
+                    </button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function OverviewPanel({ onViewAuditLog, onOpenTab }: { onViewAuditLog: () => void; onOpenTab?: (tab: string, collegeId?: number) => void }) {
   const [data, setData] = useState<OverviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -98,8 +208,12 @@ export function OverviewPanel({ onViewAuditLog }: { onViewAuditLog: () => void }
 
   const { segments } = data;
 
+  const open = (tab: string, collegeId?: number) => onOpenTab?.(tab, collegeId);
+
   return (
     <div className="space-y-6">
+      <LiveStrip onOpen={() => open("activity")} />
+      <AttentionList onOpen={open} />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         <KpiCard label="Students" value={segments.students.toLocaleString()} icon={GraduationCap} accent="bg-accent-primary/10 text-accent-primary" sub="Enrolled via a college" />
         <KpiCard label="Mellow Direct Leads" value={segments.leads.toLocaleString()} icon={UserSearch} accent="bg-rose-500/10 text-rose-400" sub="Self-registered, no college" />

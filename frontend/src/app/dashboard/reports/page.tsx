@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  Download,
   Trophy,
   Percent,
   Activity,
@@ -47,6 +46,7 @@ import { languageLabel } from "@/lib/judgeLanguages";
 import type { SubmissionHistoryRow, StudentReportInterview } from "@/types/studentReport";
 import type { SoftSkillHistoryEntry } from "@/types/softSkill";
 import { useToast } from "@/lib/toast";
+import { StudentReportPanel } from "@/components/reports/StudentReportPanel";
 
 interface ApiDriveSummary {
   company: { name: string };
@@ -191,36 +191,6 @@ export default function PerformanceReportPage() {
   const strongest = [...attempted].filter((t) => t.solved > 0).sort((a, b) => b.accuracy - a.accuracy)[0];
   const weakest = [...attempted].filter((t) => t.solved < t.total).sort((a, b) => a.accuracy - b.accuracy)[0];
 
-  const handleDownload = async () => {
-    // jsPDF + autoTable (~300kB) only ever loaded when the student actually
-    // clicks Download, not bundled into every visit to this report page.
-    const { generateReportPdf } = await import("@/lib/generateReportPdf");
-    generateReportPdf({
-      studentName: user?.name ?? "Student",
-      college: user?.college?.name,
-      ratingLabel: stats.rating.display_rating,
-      solvedTotal: stats.solved.total_solved,
-      streakCurrent: stats.streak.current,
-      streakMax: stats.streak.max,
-      readinessScore: stats.readiness.score,
-      readinessTier: stats.readiness.tier,
-      acceptanceRate,
-      accepted,
-      totalSubmissions: totalSubs,
-      verdictStats: stats.verdict_stats,
-      languageUsage: stats.language_usage,
-      topicMastery: stats.topic_mastery,
-      recentSubmissions: stats.recent_submissions,
-      driveEligibility: drives.map((d) => ({
-        company: d.company.name,
-        role: d.role_title,
-        ctcRange: d.ctc_range,
-        status: d.student_eligibility.status,
-      })),
-    });
-    triggerToast("Your performance report PDF has downloaded.");
-  };
-
   return (
     <DashboardShell
       role="user"
@@ -230,8 +200,18 @@ export default function PerformanceReportPage() {
           ? "A full breakdown of your real solved history, accuracy, topic mastery, interview performance and submitted code."
           : "A full breakdown of your readiness, interview performance and soft-skills results."
       }
-      actionButton={{ label: "Download PDF", icon: Download, onClick: handleDownload }}
     >
+      {/* The full report as a PDF: made on the server, kept in the history below, so it can be downloaded again exactly as it was. */}
+      <div className="mb-6 flex flex-col gap-3 rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle sm:flex-row sm:items-center sm:justify-between sm:p-5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-bold text-primary">Your full report</h2>
+          <p className="mt-0.5 text-2xs leading-relaxed text-text-muted">
+            A PDF of everything here and more: readiness trend, practice, contests, AI interviews, soft skills and drives. Every report you make is saved, so you can download it again.
+          </p>
+        </div>
+        <StudentReportPanel className="w-full shrink-0 sm:w-72" />
+      </div>
+
       {/* Summary */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {!codes && (

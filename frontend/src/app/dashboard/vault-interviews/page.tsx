@@ -5,6 +5,7 @@ import { ArrowRight, Check, Info, Layers, Mic, ShieldCheck, Target, Trophy } fro
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CuratedSetsExplorer } from "@/components/dashboard/interviews/CuratedSetsExplorer";
 import { VaultAiLockedPanel } from "@/components/dashboard/vaultAi/VaultAiLockedPanel";
+import { VaultAiResultsCard } from "@/components/dashboard/vaultAi/VaultAiResultsCard";
 import { Reveal, ScoreRing } from "@/components/dashboard/vaultAi/vaultKit";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { cn } from "@/lib/utils";
@@ -120,7 +121,11 @@ export default function VaultInterviewsPage() {
   if (access && access.state !== "open") {
     return (
       <DashboardShell role="user" title="Vault AI Interview" subtitle={SUBTITLE}>
-        <VaultAiLockedPanel access={access} />
+        <div className="space-y-6">
+          {/* A student who already has a result (their year changed, an admin's reset) still gets their report; nothing is drawn if they have none. */}
+          <VaultAiResultsCard />
+          <VaultAiLockedPanel access={access} />
+        </div>
       </DashboardShell>
     );
   }
@@ -129,6 +134,8 @@ export default function VaultInterviewsPage() {
     <DashboardShell role="user" title="Vault AI Interview" subtitle={SUBTITLE}>
       <div className="space-y-6">
         <Intro access={access} />
+        {/* The final average of the three sets (best series), the attempts behind it, and the PDF report — once a series has been completed. */}
+        <VaultAiResultsCard />
         <CuratedSetsExplorer />
       </div>
     </DashboardShell>

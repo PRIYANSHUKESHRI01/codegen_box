@@ -10,20 +10,57 @@ import { HpOverlayPortal } from "@/components/portal/cohortKit";
 import { YearPicker } from "@/components/dashboard/tpo/YearPicker";
 import { SELECTABLE_YEARS, yearName } from "@/lib/studyYear";
 import { cn } from "@/lib/utils";
+import { SECTION_MAX_LENGTH, cleanSectionInput, isPrefixOnly, nextSectionName, sectionsWithPrefix } from "@/lib/sectionNaming";
 import type { CohortStudent } from "@/types/cohort";
 
 const errorText = (err: unknown, fallback: string) => (err instanceof ApiError || err instanceof Error ? err.message : fallback);
 
 /** Datalist of the sections already in use, so a TPO picks "B" instead of typing "b " and making a second section. */
-function SectionInput({ id, value, onChange, sections }: { id: string; value: string; onChange: (value: string) => void; sections: string[] }) {
+function SectionInput({
+  id,
+  value,
+  onChange,
+  sections,
+  prefix = null,
+}: {
+  id: string;
+  value: string;
+  onChange: (value: string) => void;
+  sections: string[];
+  /** "CSE_": the box starts with it and the suggestions are this branch's sections first (see lib/sectionNaming). */
+  prefix?: string | null;
+}) {
+  const own = sectionsWithPrefix(sections, prefix);
+  const rest = sections.filter((x) => !own.includes(x));
+  const next = nextSectionName(sections, prefix);
+
   return (
     <>
-      <input id={id} list={`${id}-options`} value={value} onChange={(e) => onChange(e.target.value)} maxLength={20} placeholder="e.g. A" className={cn(hpInput)} />
+      <input
+        id={id}
+        list={`${id}-options`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        maxLength={SECTION_MAX_LENGTH}
+        placeholder={prefix ? `e.g. ${prefix}A` : "e.g. A"}
+        autoComplete="off"
+        className={cn(hpInput)}
+      />
       <datalist id={`${id}-options`}>
-        {sections.map((s) => (
-          <option key={s} value={s} />
+        {[...own, ...rest].map((x) => (
+          <option key={x} value={x} />
         ))}
       </datalist>
+      {prefix && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-2xs text-text-muted">
+          <span>Sections for this branch start with <b className="font-mono text-primary">{prefix}</b>, then the letter.</span>
+          {next && value.trim().toLowerCase() !== next.toLowerCase() && (
+            <button type="button" onClick={() => onChange(next)} className="rounded-full border border-border-strong bg-elevated px-2 py-0.5 font-bold text-text-secondary transition-colors hover:text-primary">
+              Use {next}
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }
@@ -35,22 +72,28 @@ function SectionInput({ id, value, onChange, sections }: { id: string; value: st
 export function EditStudentModal({
   student,
   sections,
+  sectionPrefix = null,
   onClose,
   onSaved,
 }: {
   student: CohortStudent;
   sections: string[];
+  /** The student's branch as a section prefix ("CSE_"), offered while they have no section yet. */
+  sectionPrefix?: string | null;
   onClose: () => void;
   onSaved: (student: CohortStudent) => void;
 }) {
   const currentYear = student.study_year !== null && student.study_year !== undefined && SELECTABLE_YEARS.some((y) => y === student.study_year) ? String(student.study_year) : "";
   const [year, setYear] = useState(currentYear);
-  const [section, setSection] = useState(student.section ?? "");
+  const prefix = student.section ? null : sectionPrefix;
+  const [section, setSection] = useState(student.section ?? (prefix ?? ""));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A box still holding only the prefix is "no section", never a section called "CSE_".
+  const sectionValue = isPrefixOnly(section, prefix) ? "" : cleanSectionInput(section, prefix);
   const yearChanged = year !== currentYear;
-  const sectionChanged = section.trim() !== (student.section ?? "");
+  const sectionChanged = sectionValue !== (student.section ?? "");
   const passedOut = (student.study_year ?? 0) > SELECTABLE_YEARS[SELECTABLE_YEARS.length - 1];
 
   const submit = async (e: React.FormEvent) => {
@@ -61,7 +104,7 @@ export function EditStudentModal({
     try {
       const res = await api.patch<{ student: CohortStudent }>(`/tpo/students/${student.id}`, {
         ...(yearChanged ? { year: year === "" ? null : Number(year) } : {}),
-        ...(sectionChanged ? { section: section.trim() === "" ? null : section.trim() } : {}),
+        ...(sectionChanged ? { section: sectionValue === "" ? null : sectionValue } : {}),
       });
       onSaved(res.student);
     } catch (err) {
@@ -103,7 +146,7 @@ export function EditStudentModal({
             <label htmlFor="edit-student-section" className={hpLabel}>
               Section
             </label>
-            <SectionInput id="edit-student-section" value={section} onChange={setSection} sections={sections} />
+            <SectionInput id="edit-student-section" value={section} onChange={setSection} sections={sections} prefix={prefix} />
             <p className="mt-1 text-2xs text-text-muted">Leave it empty to take them out of their section.</p>
           </div>
 
@@ -123,21 +166,30 @@ export function EditStudentModal({
 export function SetSectionModal({
   count,
   sections,
+  prefix = null,
   onClose,
   onConfirm,
 }: {
   count: number;
   sections: string[];
+  /** "CSE_" when the TPO is looking at one branch (or has selected only that branch): the box starts with it, so a new section is CSE_A. */
+  prefix?: string | null;
   onClose: () => void;
   onConfirm: (section: string | null) => Promise<void>;
 }) {
-  const [section, setSection] = useState("");
+  const [section, setSection] = useState(prefix ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const trimmed = section.trim();
+  // A box still holding only the prefix means "take them out of their section" only when the TPO clears it themselves; the prefix alone is unfinished.
+  const unfinished = isPrefixOnly(section, prefix);
+  const trimmed = unfinished ? "" : cleanSectionInput(section, prefix);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (unfinished) {
+      setError(`Add the section after ${prefix}, for example ${prefix}A. Clear the box if you want to take them out of their section.`);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -163,7 +215,7 @@ export function SetSectionModal({
               Cancel
             </HpButton>
             <HpButton type="submit" form="set-section-form" disabled={saving} isLoading={saving}>
-              {trimmed ? `Move to section ${trimmed}` : "Remove from their section"}
+              {trimmed ? `Move to section ${trimmed}` : unfinished ? `Move to section ${prefix}…` : "Remove from their section"}
             </HpButton>
           </>
         }
@@ -173,7 +225,7 @@ export function SetSectionModal({
             <label htmlFor="set-section-input" className={hpLabel}>
               Which section?
             </label>
-            <SectionInput id="set-section-input" value={section} onChange={setSection} sections={sections} />
+            <SectionInput id="set-section-input" value={section} onChange={setSection} sections={sections} prefix={prefix} />
             <p className="mt-1 text-2xs text-text-muted">Leave it empty to take the selected students out of their section.</p>
           </div>
           {error && <HpFormError>{error}</HpFormError>}

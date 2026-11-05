@@ -11,6 +11,11 @@ export type ProctoringActivity = "contest" | "soft_skill" | "core_test" | "study
 interface ConsentCopy {
   title: string;
   subtitle: string;
+  /** What the lobby calls the attempt: the pill over its heading ("Proctored contest") and its name in the header ("Contest"). */
+  badge: string;
+  label: string;
+  /** The line under the lobby's heading. */
+  intro: string;
   strikes: string;
   /** Only for attempts where the editor's clipboard is restricted (contests); omitted = no line shown. */
   paste?: string;
@@ -28,6 +33,9 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
   contest: {
     title: "This is a proctored contest",
     subtitle: "Required for every contest problem — not for practice.",
+    badge: "Proctored contest",
+    label: "Contest",
+    intro: "Required for every contest problem. A quick look at your camera, microphone and screen — then you can start.",
     strikes:
       "Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike submits your current code and ends your attempt. This is reported to your TPO and section coordinator.",
     paste:
@@ -37,6 +45,9 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
   soft_skill: {
     title: "This is a proctored test",
     subtitle: "Required for every Soft Skills test.",
+    badge: "Proctored test",
+    label: "Soft Skills test",
+    intro: "Required for every Soft Skills test. A quick look at your camera, microphone and screen — then you can start.",
     strikes:
       "Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike submits the answers you've saved so far and ends your attempt. The result is marked as ended by proctoring and can't count as a pass.",
     footer: "By continuing you consent to being recorded and monitored for the duration of this test attempt.",
@@ -44,6 +55,9 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
   core_test: {
     title: "This is a proctored test",
     subtitle: "Required for every Core Prep test.",
+    badge: "Proctored test",
+    label: "Core Prep test",
+    intro: "Required for every Core Prep test. A quick look at your camera, microphone and screen — then you can start.",
     strikes:
       "Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike submits the answers you've saved so far and ends your attempt. The result is marked as ended by proctoring and can't count as a pass.",
     footer: "By continuing you consent to being recorded and monitored for the duration of this test attempt.",
@@ -51,6 +65,9 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
   study: {
     title: "This is a proctored practice sitting",
     subtitle: "Core Prep practice and Skill Drills are taken under proctoring.",
+    badge: "Proctored practice",
+    label: "Practice sitting",
+    intro: "Nothing here counts against you. A quick look at your camera, microphone and screen — then you can start.",
     strikes:
       "Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike closes this sitting, and you can start a new one straight away. Nothing you do here changes your readiness score.",
     footer: "By continuing you consent to being recorded and monitored for the duration of this sitting.",

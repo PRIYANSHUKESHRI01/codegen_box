@@ -11,6 +11,7 @@ use App\Models\VaultProfile;
 use App\Models\VaultStackInterest;
 use App\Services\CuratedInterviewSetService;
 use App\Services\NotificationService;
+use App\Services\Reports\VaultAiReportService;
 use App\Services\ScoreLedger;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +40,8 @@ class VaultInterviewQualificationService
         private readonly CuratedInterviewSetService $curatedService,
         private readonly VaultService $vault,
         private readonly CuratedCatalog $catalog,
+        private readonly VaultAiResultService $results,
+        private readonly VaultAiReportService $reports,
     ) {}
 
     /**
@@ -349,6 +352,7 @@ class VaultInterviewQualificationService
             $qual->qualified_at = Carbon::now();
             $qual->cooldown_until = null;
             $qual->save();
+            $this->refreshLedger($qual);
 
             // The candidate joins the Vault in the same transaction: if that fails, the score is not recorded
             // either, and reconcile() tries again on the next visit.
@@ -385,8 +389,36 @@ class VaultInterviewQualificationService
         }
 
         $qual->save();
+        $this->refreshLedger($qual);
 
         return null;
+    }
+
+    /**
+     * Records what this qualification now holds in the results ledger (the final average of every completed series, and the best of
+     * them) and, if that changed anything, writes a fresh Vault AI report PDF once the surrounding transaction has committed. Called
+     * wherever the qualification's marks change — the live flow and every admin correction. Never lets bookkeeping or a PDF failure touch
+     * the student's result: the qualification is already saved, and the ledger can always be rebuilt (`vault-ai:rebuild-results`).
+     */
+    public function refreshLedger(VaultInterviewQualification $qual): void
+    {
+        try {
+            [$row, $changed] = $this->results->reconcile($qual);
+
+            if ($row === null || ! $changed) {
+                return;
+            }
+
+            DB::afterCommit(function () use ($row) {
+                try {
+                    $this->reports->generate($row->fresh());
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            });
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

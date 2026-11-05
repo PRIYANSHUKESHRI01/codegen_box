@@ -75,6 +75,7 @@ import { HpOverlayPortal } from "@/components/portal/cohortKit";
 import { buildActivityWeeks } from "@/lib/activityGrid";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { StudentReportPanel } from "@/components/reports/StudentReportPanel";
 import { cn, withMinDelay } from "@/lib/utils";
 import { languageLabel } from "@/lib/judgeLanguages";
 import { LanguageBreakdown } from "@/components/dashboard/LanguageBreakdown";
@@ -409,6 +410,7 @@ function StudentReportPageContent() {
                 {report.student.is_blocked ? <ShieldAlert className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
                 {report.student.is_blocked ? "Blocked" : "Active"}
               </span>
+              <StudentReportPanel studentId={report.student.id} studentName={report.student.name} className="w-full sm:w-72" />
             </div>
 
             {/* Stat strip */}
@@ -1038,6 +1040,7 @@ function IdentityHero({ report }: { report: StudentReport }) {
                 Last seen {relativeDays(daysAgo(s.last_seen_at))}
               </HpPill>
             )}
+            <StudentReportPanel studentId={s.id} studentName={s.name} className="mt-1 w-full lg:w-72" />
           </div>
         </div>
 

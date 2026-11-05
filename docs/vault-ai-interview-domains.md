@@ -3,7 +3,7 @@
 The Vault AI Interview is the last step to a Mellow Vault listing: a student picks a **role → stack**, sits **3 sets**
 (one series), and needs a **60 % average**; fail and the next series (up to 3) opens; three fails = 45-day cooldown.
 Until 2026-11-07 only 5 roles / 12 stacks existed. **Every domain on Mellow Vault's "Development & IT" list now has a
-place** — 13 roles, 41 stacks, 369 sets — but only the original 12 stacks have questions. The rest are *coming soon*
+place** — 13 roles, 43 stacks, 387 sets — but only the original 12 stacks have questions. The rest are *coming soon*
 until staff add questions, and then they open **by themselves**.
 
 ## What a student sees

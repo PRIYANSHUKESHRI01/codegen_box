@@ -134,6 +134,7 @@ class ProjectLabPresenter
     {
         return [
             'id' => $submission->id,
+            'enrollment_id' => $submission->project_enrollment_id,
             'attempt' => $submission->attempt,
             'status' => $submission->status,
             'score' => $submission->score,

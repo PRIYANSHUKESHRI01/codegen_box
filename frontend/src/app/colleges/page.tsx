@@ -5,13 +5,13 @@ import { CollegesPageContent } from "@/components/marketing-site/CollegesPage";
 export const metadata: Metadata = {
   title: "AptRun for Colleges — Placement Cell Command Center",
   description:
-    "Run campus drives, onboard a batch from one CSV, prepare every student and report to management — all from one placement sandbox.",
+    "Run campus drives, onboard a batch from one CSV, prepare every student and report to management — all from one platform.",
   alternates: { canonical: "/colleges" },
 };
 
 export default function CollegesPage() {
   return (
-    <MarketingShell>
+    <MarketingShell scrollMotion={false}>
       <CollegesPageContent />
     </MarketingShell>
   );

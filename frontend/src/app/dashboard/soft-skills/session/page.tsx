@@ -342,6 +342,9 @@ export default function SoftSkillSessionPage() {
             previewVideoRef={proctoring.previewVideoRef}
             onEnableDevices={proctoring.enableDevicePreview}
             onConsent={proctoring.grantConsentAndStart}
+            cameraStream={proctoring.cameraStream}
+            candidateName={user?.name ?? ""}
+            onLeave={() => router.push("/dashboard/soft-skills")}
           />
         )}
 

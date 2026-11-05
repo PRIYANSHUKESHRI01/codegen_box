@@ -25,7 +25,7 @@ class StudentBulkNotificationMail extends Mailable
     {
         $subject = $this->user->college
             ? 'An update from your Placement Cell — '.$this->user->college->name
-            : 'An update from the Mellow team';
+            : 'An update from the AptRun team';
 
         return $this->subject($subject)->view('emails.student-bulk-notification');
     }

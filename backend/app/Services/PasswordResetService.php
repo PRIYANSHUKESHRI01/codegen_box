@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Jobs\SendPasswordResetOtpEmail;
+use App\Models\AuthEvent;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
+use App\Services\Activity\AuthEventRecorder;
 use App\Support\SingleMail;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -82,6 +84,8 @@ class PasswordResetService
         }
 
         SingleMail::afterResponse(new SendPasswordResetOtpEmail($user->id, $code));
+
+        app(AuthEventRecorder::class)->record(AuthEvent::OTP_REQUESTED, $user);
     }
 
     /** @return string the raw reset token to hand back to the caller — never stored in plaintext */
@@ -132,6 +136,9 @@ class PasswordResetService
         $user->forceFill(['password' => Hash::make($newPassword), 'must_change_password' => false])->save();
 
         app(IssuedCredentialVault::class)->forget($user);
+
+        // The sign-in log keeps the two stories apart: an owner choosing their first password is the moment a demo login became theirs.
+        app(AuthEventRecorder::class)->record($firstActivation ? AuthEvent::PASSWORD_SET : AuthEvent::PASSWORD_CHANGED, $user, null, null, $firstActivation ? 'activation' : 'reset');
 
         $this->expirePendingResets($user);
 

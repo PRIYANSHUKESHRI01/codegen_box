@@ -41,6 +41,11 @@ class MerchantNavyMockTest extends TestCase
         Queue::fake();
         Mail::fake();
         $this->seed(PlanSeeder::class);
+
+        // The 2026_11_19 migration ships the C# & .NET and ASP.NET Core mock questions (see DotNetStacksTest). These tests are about a bank
+        // that starts empty, so they start from one.
+        \App\Models\MockInterviewQuestion::query()->delete();
+        app(\App\Services\Mock\MockInterviewCatalog::class)->flush();
     }
 
     private function student(): User

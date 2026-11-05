@@ -9,6 +9,7 @@ use App\Models\DriveCollegeMapping;
 use App\Models\Interview;
 use App\Models\InterviewTrack;
 use App\Models\SoftSkillAssessment;
+use App\Services\Interviews\InterviewAudience;
 use App\Services\NotificationService;
 use App\Support\NotificationAudience;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,7 +69,10 @@ class AssessmentNotifier
                 default => null,
             },
             $m instanceof Interview => match ($m->interview_type) {
-                Interview::INTERVIEW_TYPE_TPO_MOCK => $this->forCollege($m, 'AI mock interview', '/dashboard/interviews', null),
+                // A college mock may be aimed at years, sections or named students, and may open later: tell exactly them, and when.
+                Interview::INTERVIEW_TYPE_TPO_MOCK => $m->isTrackRound() || $m->owning_college_id === null
+                    ? $this->forCollege($m, 'AI mock interview', '/dashboard/interviews', null)
+                    : ['AI mock interview', '/dashboard/interviews', fn () => app(InterviewAudience::class)->ids($m), $this->when($m->opens_at)],
                 Interview::INTERVIEW_TYPE_COMPANY => $this->forMappedColleges($m, 'company interview', '/dashboard/interviews', null),
                 default => null,
             },

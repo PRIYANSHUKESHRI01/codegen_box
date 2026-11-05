@@ -7,7 +7,7 @@ no cooldown, and it never lists the student in the Vault by itself. Practise as 
 ## What a student sees
 
 1. The page opens on the domain/stack explorer (`MockInterviewExplorer`). Domains and stacks are **the Vault AI Interview's own**
-   (13 domains, 41 stacks — read from `CuratedCatalog`), so the two sections always list the same things and a new Vault stack
+   (13 domains, 43 stacks — read from `CuratedCatalog`), so the two sections always list the same things and a new Vault stack
    appears here by itself. Search finds a stack by name or by its Mellow Vault domain label ("Laravel Developer").
 2. A stack has **3 practice rounds** (the three themes of its Vault interview, titled "Round N: …"). Each round shows its length, how
    many sittings the student has done and their best score; the button reads *Start practice / Practise again / Start / Resume*.

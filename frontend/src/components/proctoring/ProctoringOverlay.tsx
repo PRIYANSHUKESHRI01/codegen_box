@@ -113,16 +113,19 @@ export function ProctoringOverlay({
 
       {/* Fullscreen-lost — hard blocking prompt, can't be dismissed except by resuming */}
       {phase === "fullscreen_lost" && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-sm">
-          <div className="max-w-sm text-center space-y-4 p-6">
-            <div className="w-14 h-14 mx-auto rounded-full bg-status-danger/15 border border-status-danger/30 flex items-center justify-center text-status-danger">
-              <Maximize className="w-7 h-7" />
+        // The same card the AI interview shows (InterviewSessionHud), so leaving fullscreen reads the same on every proctored surface.
+        <div role="alertdialog" aria-modal="true" aria-label="You left fullscreen" className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-6 backdrop-blur-md">
+          <div className="w-full max-w-sm space-y-5 rounded-[28px] border border-white/10 bg-surface/95 p-7 text-center shadow-2xl">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-status-danger/30 bg-status-danger/15 text-status-danger">
+              <Maximize className="h-7 w-7" aria-hidden />
             </div>
-            <h3 className="text-base font-bold text-primary">You left fullscreen</h3>
-            <p className="text-xs text-text-secondary">
-              This was logged as a strike. Resume fullscreen to continue your attempt — leaving it again will count
-              toward your 3-strike limit.
-            </p>
+            <div className="space-y-2">
+              <h3 className="text-base font-extrabold text-primary">You left fullscreen</h3>
+              <p className="text-xs leading-relaxed text-text-secondary">
+                This was logged as a strike. Resume fullscreen to continue your attempt — leaving it again will count
+                toward your 3-strike limit.
+              </p>
+            </div>
             <Button onClick={onResumeFullscreen} fullWidth>
               Resume Fullscreen
             </Button>

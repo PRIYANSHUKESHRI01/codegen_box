@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\InterviewController;
 use App\Http\Controllers\Api\InterviewSpeechController;
 use App\Http\Controllers\Api\InterviewProctoringController;
 use App\Http\Controllers\Api\InterviewQuestionBankController;
+use App\Http\Controllers\Api\DailyChallengeController;
 use App\Http\Controllers\Api\DrillController;
 use App\Http\Controllers\Api\StudySittingController;
 use App\Http\Controllers\Api\PracticeInterviewController;
@@ -76,6 +77,7 @@ use App\Http\Controllers\Api\AdminProjectLabController;
 use App\Http\Controllers\Api\ProjectLabController;
 use App\Http\Controllers\Api\ProjectWorkspaceController;
 use App\Http\Controllers\Api\PublicController;
+use App\Http\Controllers\Api\PublicLandingController;
 use App\Http\Controllers\Api\AdminCoreImportController;
 use App\Http\Controllers\Api\AdminCoreTestController;
 use App\Http\Controllers\Api\CoreTestProctoringController;
@@ -109,6 +111,12 @@ use App\Http\Controllers\Api\SuperAdminCollegeController;
 use App\Http\Controllers\Api\SuperAdminController;
 use App\Http\Controllers\Api\SuperAdminMarketingTeamController;
 use App\Http\Controllers\Api\SuperAdminPlatformModuleController;
+use App\Http\Controllers\Api\SuperAdminActivityController;
+use App\Http\Controllers\Api\VaultAiResultController;
+use App\Http\Controllers\Api\ProjectSubmitController;
+use App\Http\Controllers\Api\SuperAdminWeeklyRewardController;
+use App\Http\Controllers\Api\ActivityTrackController;
+use App\Http\Controllers\Api\WeeklyRewardController;
 use App\Http\Controllers\Api\SuperAdminCredentialController;
 use App\Http\Controllers\Api\SuperAdminPaymentController;
 use App\Http\Controllers\Api\SuperAdminReadinessController;
@@ -129,6 +137,11 @@ use App\Http\Controllers\Api\TpoSoftSkillController;
 use App\Http\Controllers\Api\TpoStudentController;
 use App\Http\Controllers\Api\TpoStudentNoteController;
 use App\Http\Controllers\Api\TpoStudentReportController;
+use App\Http\Controllers\Api\ReportDocumentController;
+use App\Http\Controllers\Api\SectionInsightsController;
+use App\Http\Controllers\Api\TpoStudentManageController;
+use App\Http\Controllers\Api\TpoInterviewReportController;
+use App\Http\Controllers\Api\StudentInterviewReportController;
 use App\Http\Controllers\Api\VaultIntegrationController;
 use App\Http\Controllers\Api\VocabularyController;
 use App\Http\Controllers\Api\VocabularyProgressController;
@@ -182,6 +195,10 @@ Route::prefix('public')->middleware('throttle:60,1')->group(function () {
 // page polls it every few seconds, and a campus lab shares one IP across a whole class.
 Route::get('/public/plans', [PublicPlanController::class, 'index'])->middleware('throttle:public-plans');
 
+// The landing page's live numbers (tonight's contest, this week's vouchers, platform depth). Same kind of limiter as the price list: one visit is
+// one request, but a campus lab shares an address. See LandingDataService for what is exposed (aggregates only).
+Route::get('/public/landing', [PublicLandingController::class, 'show'])->middleware('throttle:public-landing');
+
 // Razorpay → us: payments, failures and refunds, whether or not the student's browser is still open.
 // Unauthenticated by design; the HMAC signature over the raw body is the credential (see
 // RazorpayWebhookController). Outside the throttled `public` group: a bursty sender must not be
@@ -226,6 +243,8 @@ Route::prefix('password')->group(function () {
 Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    // The browser's "I am here" report (which screen, how long, how far scrolled) for Superadmin → Live Activity.
+    Route::post('/me/activity', [ActivityTrackController::class, 'store'])->middleware('throttle:activity-report');
 
     // Self-service account management — every role's shared Settings page.
     // Scoped entirely to $request->user(), so no role middleware is needed.
@@ -364,6 +383,13 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::get('/students/{student}/report', [AdminStudentReportController::class, 'show']);
                 Route::get('/students/{student}/submissions/{submission}', [AdminStudentReportController::class, 'submission']);
                 Route::get('/students/{student}/contest-submissions/{contestSubmission}', [AdminStudentReportController::class, 'contestSubmission']);
+                Route::post('/students/{student}/reports', [ReportDocumentController::class, 'store'])->middleware('throttle:report-generate');
+                Route::get('/students/{student}/reports', [ReportDocumentController::class, 'indexForStudent']);
+                Route::get('/reports/{report}/download', [ReportDocumentController::class, 'download']);
+                // Vault AI Interview results across every college, and one student's results (the Manage drawer).
+                Route::get('/vault-ai/results', [VaultAiResultController::class, 'adminIndex']);
+                Route::get('/vault-ai/students/{student}/results', [VaultAiResultController::class, 'adminStudent']);
+                Route::post('/vault-ai/results/{result}/report', [VaultAiResultController::class, 'adminGenerate'])->middleware('throttle:report-generate');
             });
 
             Route::middleware('permission:'.User::PERM_PLACEMENTS)->group(function () {
@@ -495,6 +521,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::get('/project-lab/submissions', [AdminProjectLabController::class, 'submissions']);
                 Route::get('/project-lab/submissions/{submission}', [AdminProjectLabController::class, 'showSubmission']);
                 Route::get('/project-lab/submissions/{submission}/snapshot', [AdminProjectLabController::class, 'downloadSnapshot']);
+                // What is inside a submission (file list, one file as text), and the checkpoints the student saved along the way.
+                Route::get('/project-lab/submissions/{submission}/files', [AdminProjectLabController::class, 'files']);
+                Route::get('/project-lab/submissions/{submission}/file', [AdminProjectLabController::class, 'file']);
+                Route::get('/project-lab/saves/{save}/download', [AdminProjectLabController::class, 'downloadSave']);
                 Route::post('/project-lab/submissions/{submission}/review', [AdminProjectLabController::class, 'review']);
             });
 
@@ -722,6 +752,34 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/platform-modules', [SuperAdminPlatformModuleController::class, 'index']);
             Route::put('/platform-modules/{key}', [SuperAdminPlatformModuleController::class, 'update'])
                 ->middleware('throttle:superadmin-sensitive');
+            // The weekly leaderboard's voucher cards: pick the cards for this week or any of the next few (?week=YYYY-MM-DD, a Monday),
+            // copy a week's setup forward, see the board, and work the winners ledger (who was sent which voucher).
+            Route::get('/weekly-rewards', [SuperAdminWeeklyRewardController::class, 'index']);
+            Route::post('/weekly-rewards/copy', [SuperAdminWeeklyRewardController::class, 'copy'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::get('/weekly-rewards/winners', [SuperAdminWeeklyRewardController::class, 'winners']);
+            Route::post('/weekly-rewards/winners/finalize', [SuperAdminWeeklyRewardController::class, 'finalizeWeek'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::patch('/weekly-rewards/winners/{winner}', [SuperAdminWeeklyRewardController::class, 'updateWinner'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::put('/weekly-rewards/{card}', [SuperAdminWeeklyRewardController::class, 'update'])
+                ->middleware('throttle:superadmin-sensitive');
+
+            // Live Activity: who is on right now, who came today / this week, which colleges opened the logins they were given and
+            // what they did after. Read-only. The poll (/activity/pulse) is every ~10 s per open tab, so its limiter is generous.
+            Route::middleware('throttle:superadmin-activity')->prefix('activity')->group(function () {
+                Route::get('/live', [SuperAdminActivityController::class, 'live']);
+                Route::get('/pulse', [SuperAdminActivityController::class, 'pulse']);
+                Route::get('/patterns', [SuperAdminActivityController::class, 'patterns']);
+                Route::get('/glance', [SuperAdminActivityController::class, 'glance']);
+                Route::get('/colleges', [SuperAdminActivityController::class, 'colleges']);
+                Route::get('/colleges/{college}', [SuperAdminActivityController::class, 'college']);
+                Route::get('/colleges/{college}/people', [SuperAdminActivityController::class, 'people']);
+                Route::get('/users/{user}', [SuperAdminActivityController::class, 'person']);
+                Route::get('/sign-ins', [SuperAdminActivityController::class, 'signIns']);
+            });
+            // What needs the superadmin today (logins nobody opened, plans ending, stuck payments, a scheduler that stopped…).
+            Route::get('/attention', [SuperAdminActivityController::class, 'attention'])->middleware('throttle:superadmin-activity');
             Route::get('/feature-flags', [SuperAdminController::class, 'featureFlags']);
             Route::post('/feature-flags/{flag}/toggle', [SuperAdminController::class, 'toggleFeatureFlag']);
 
@@ -824,6 +882,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 // the same "manage leads" capability, a second lead type).
                 Route::get('/contact-requests', [MarketingContactRequestController::class, 'index']);
                 Route::get('/contact-requests/{contactRequest}', [MarketingContactRequestController::class, 'show']);
+                Route::post('/contact-requests/{contactRequest}/claim', [MarketingContactRequestController::class, 'claim']);
                 Route::post('/contact-requests/{contactRequest}/status', [MarketingContactRequestController::class, 'updateStatus']);
                 Route::post('/contact-requests/{contactRequest}/notes', [MarketingContactRequestController::class, 'storeNote']);
             });
@@ -902,6 +961,16 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/students/section', [TpoStudentController::class, 'setSection']);
             Route::patch('/students/{student}', [TpoStudentController::class, 'update'])->whereNumber('student');
 
+            // Running one student's account (see TpoStudentManageController for what is, and is not, allowed): the account at a glance,
+            // corrected details, block / unblock, a new e-mailed login, sign-out everywhere, and removing an account never used.
+            Route::get('/students/{student}/manage', [TpoStudentManageController::class, 'show'])->whereNumber('student');
+            Route::patch('/students/{student}/profile', [TpoStudentManageController::class, 'updateProfile'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+            Route::post('/students/{student}/block', [TpoStudentManageController::class, 'block'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+            Route::post('/students/{student}/unblock', [TpoStudentManageController::class, 'unblock'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+            Route::post('/students/{student}/send-login', [TpoStudentManageController::class, 'sendLogin'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+            Route::post('/students/{student}/revoke-sessions', [TpoStudentManageController::class, 'revokeSessions'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+            Route::delete('/students/{student}', [TpoStudentManageController::class, 'destroy'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
+
             // The Cohort table's "View Report" drill-down: one student's
             // full contest/interview/drive history, activity calendar, and
             // (new) the actual code behind any of their submissions.
@@ -909,6 +978,18 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/students/{student}/report', [TpoStudentReportController::class, 'show']);
             Route::get('/students/{student}/submissions/{submission}', [TpoStudentReportController::class, 'submission']);
             Route::get('/students/{student}/contest-submissions/{contestSubmission}', [TpoStudentReportController::class, 'contestSubmission']);
+
+            // The PDF behind that report: generated, stored in the college's report archive, and re-downloadable exactly as it was.
+            Route::post('/students/{student}/reports', [ReportDocumentController::class, 'store'])->middleware('throttle:report-generate');
+            Route::get('/students/{student}/reports', [ReportDocumentController::class, 'indexForStudent']);
+            // Every student of the college who has taken the Vault AI Interview: the final average of the three sets, attempts, and the stored PDF.
+            Route::get('/vault-ai/results', [VaultAiResultController::class, 'tpoIndex']);
+            Route::post('/vault-ai/results/{result}/report', [VaultAiResultController::class, 'tpoGenerate'])->middleware('throttle:report-generate');
+            Route::get('/reports/archive', [ReportDocumentController::class, 'archive']);
+            Route::post('/reports/section', [SectionInsightsController::class, 'storeForTpo'])->middleware('throttle:report-generate');
+            Route::post('/reports/bundle', [ReportDocumentController::class, 'bundle'])->middleware('throttle:report-generate');
+            Route::get('/reports/{report}/download', [ReportDocumentController::class, 'download']);
+            Route::delete('/reports/{report}', [ReportDocumentController::class, 'destroy']);
 
             // Section Coordinators: TPO-provisioned accounts, each scoped to
             // exactly one section of this college, that can view/lightly
@@ -980,6 +1061,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // Mock Contests above (see TpoInterviewController's docblock).
             Route::get('/interviews', [TpoInterviewController::class, 'index']);
             Route::post('/interviews', [TpoInterviewController::class, 'store']);
+            // Scheduling, audience and the question library (static paths declared BEFORE the {interview} slug routes below).
+            Route::post('/interviews/audience-preview', [TpoInterviewReportController::class, 'audiencePreview']);
+            Route::get('/interviews/library', [TpoInterviewReportController::class, 'library']);
             Route::post('/interviews/{interview}', [TpoInterviewController::class, 'update']);
             Route::delete('/interviews/{interview}', [TpoInterviewController::class, 'destroy']);
             Route::get('/interviews/{interview}/questions', [TpoInterviewController::class, 'questions']);
@@ -991,6 +1075,15 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/sessions/{interviewSession}/reinstate', [TpoInterviewController::class, 'reinstateProctoring']);
             Route::post('/interviews/{interview}/responses/{interviewResponse}/score', [TpoInterviewController::class, 'scoreResponse']);
             Route::post('/interviews/{interview}/sessions/{interviewSession}/finalize', [TpoInterviewController::class, 'finalizeSession']);
+
+            // Telling students again, copying an interview, drawing questions from the AptRun library, and the results with their PDF reports.
+            Route::post('/interviews/{interview}/announce', [TpoInterviewReportController::class, 'announce'])->middleware('throttle:report-generate');
+            Route::post('/interviews/{interview}/duplicate', [TpoInterviewReportController::class, 'duplicate']);
+            Route::post('/interviews/{interview}/library-questions', [TpoInterviewReportController::class, 'addLibraryQuestions']);
+            Route::get('/interviews/{interview}/results', [TpoInterviewReportController::class, 'results']);
+            Route::get('/interviews/{interview}/reports', [TpoInterviewReportController::class, 'reportHistory']);
+            Route::post('/interviews/{interview}/report', [TpoInterviewReportController::class, 'storeReport'])->middleware('throttle:report-generate');
+            Route::post('/interviews/{interview}/sessions/{interviewSession}/report', [TpoInterviewReportController::class, 'storeSessionReport'])->middleware('throttle:report-generate');
 
             // Role templates + the "Final Interview" 3-round pipeline
             // container for the TPO's own tpo_mock tracks — see
@@ -1178,6 +1271,11 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/integrity/{uuid}', [IntegrityReviewController::class, 'show']);
             Route::get('/integrity/{uuid}/evidence/{evidence}', [IntegrityReviewController::class, 'evidence'])->whereNumber('evidence');
             Route::get('/students', [CoordinatorStudentController::class, 'index']);
+            // The dashboard's numbers beyond the roster (trend, movers, scheduled interviews, follow-ups, the college comparison), and the
+            // section report as a stored PDF.
+            Route::get('/insights', [SectionInsightsController::class, 'insights']);
+            Route::get('/reports/section', [SectionInsightsController::class, 'historyForCoordinator']);
+            Route::post('/reports/section', [SectionInsightsController::class, 'storeForCoordinator'])->middleware('throttle:report-generate');
             Route::post('/students/{user}/toggle-block', [CoordinatorStudentController::class, 'toggleBlock']);
             Route::post('/students/bulk-notify', [CoordinatorStudentController::class, 'bulkNotify'])->middleware('throttle:coordinator-notify');
 
@@ -1195,6 +1293,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/students/{student}/report', [CoordinatorStudentReportController::class, 'show']);
             Route::get('/students/{student}/submissions/{submission}', [CoordinatorStudentReportController::class, 'submission']);
             Route::get('/students/{student}/contest-submissions/{contestSubmission}', [CoordinatorStudentReportController::class, 'contestSubmission']);
+            Route::post('/students/{student}/reports', [ReportDocumentController::class, 'store'])->middleware('throttle:report-generate');
+            Route::get('/students/{student}/reports', [ReportDocumentController::class, 'indexForStudent']);
+            Route::get('/reports/{report}/download', [ReportDocumentController::class, 'download']);
 
             // Same proctoring review as the TPO's, but scoped to exactly
             // this coordinator's own section — see CoordinatorProctoringController.
@@ -1289,6 +1390,15 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // TpoStudentReportController/CoordinatorStudentReportController/
             // AdminStudentReportController, which expose the exact same thing
             // about someone ELSE'S submissions.
+            // The student's own full report as a PDF (written for them: no internal follow-up notes), kept in their history.
+            Route::post('/me/report', [ReportDocumentController::class, 'storeMine'])->middleware('throttle:report-generate');
+            Route::get('/me/reports', [ReportDocumentController::class, 'indexMine']);
+            Route::get('/me/reports/{report}/download', [ReportDocumentController::class, 'download']);
+
+            // The Vault AI Interview report: the final average of the three sets (best series kept), the attempts behind it, and its PDF.
+            Route::get('/me/vault-ai/results', [VaultAiResultController::class, 'mine']);
+            Route::post('/me/vault-ai/results/{stackKey}/report', [VaultAiResultController::class, 'generateMine'])->middleware('throttle:report-generate');
+
             Route::get('/submissions', [MySubmissionsController::class, 'index'])->middleware('capability:coding_practice');
             Route::get('/submissions/{submission}', [MySubmissionsController::class, 'show'])->middleware('capability:coding_practice');
             Route::get('/contest-submissions/{contestSubmission}', [MySubmissionsController::class, 'contestSubmission'])->middleware('capability:contests');
@@ -1333,9 +1443,16 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/me/sittings/{sitting}/proctoring/violations', [StudySittingController::class, 'reportViolation'])->middleware('throttle:120,1');
             Route::post('/me/sittings/{sitting}/complete', [StudySittingController::class, 'complete']);
 
-            // Global leaderboard, ranked by real solved-score (or real
-            // contest rating once a student has one — see User::displayRating()).
-            Route::get('/leaderboard', [LeaderboardController::class, 'index'])->middleware('capability:coding_practice');
+            // Global leaderboard — contest scores only: this week's (resets every Monday) and all-time.
+            Route::get('/leaderboard', [LeaderboardController::class, 'index'])->middleware('capability:coding_practice,contests');
+            // What the top of this week's leaderboard wins (vouchers the superadmin has put live) and where the student stands.
+            Route::get('/weekly-rewards', [WeeklyRewardController::class, 'show'])->middleware('capability:coding_practice,contests');
+            Route::get('/weekly-rewards/mine', [WeeklyRewardController::class, 'mine'])->middleware('capability:coding_practice,contests');
+
+            // The AptRun Daily Challenge (8 PM IST every day): the Contests-page hero, and the leaderboard tab with the
+            // edition's top students and the rating ladder. The board lives on the leaderboard page, so either module opens it.
+            Route::get('/daily-challenge', [DailyChallengeController::class, 'show'])->middleware('capability:contests');
+            Route::get('/daily-challenge/leaderboard', [DailyChallengeController::class, 'leaderboard'])->middleware('capability:coding_practice,contests');
 
             Route::get('/contests', [ContestController::class, 'index'])->middleware('capability:contests');
             Route::get('/contests/{contest}', [ContestController::class, 'show'])->middleware('capability:contests');
@@ -1355,6 +1472,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
             Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
+            Route::post('/me/interviews/{interview}/report', [StudentInterviewReportController::class, 'store'])->middleware('capability:ai_interviews')->middleware('throttle:report-generate');
 
             // The student's own study history (Merchant Navy): the score of every set they have sat, and a full report of any sitting to download.
             Route::get('/study-attempts', [\App\Http\Controllers\Api\StudyAttemptController::class, 'index'])->middleware('capability:ai_interviews');
@@ -1486,7 +1604,12 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/project-lab/enrollments/{enrollment}/workspace/heartbeat', [ProjectWorkspaceController::class, 'heartbeat'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-heartbeat');
             Route::post('/project-lab/enrollments/{enrollment}/workspace/integrity', [ProjectWorkspaceController::class, 'integrity'])->middleware('capability:project_lab')->middleware('throttle:lab-integrity');
             Route::post('/project-lab/enrollments/{enrollment}/workspace/stop', [ProjectWorkspaceController::class, 'stop'])->middleware('capability:project_lab')->middleware('throttle:lab-workspace-stop');
-            Route::post('/project-lab/enrollments/{enrollment}/submit', [ProjectWorkspaceController::class, 'submit'])->middleware('capability:project_lab')->middleware('throttle:lab-submit');
+            // Hand-in and "Save progress": AptRun packs the code out of the open editor itself — no route here accepts a file (ProjectSubmitController).
+            Route::post('/project-lab/enrollments/{enrollment}/submit', [ProjectSubmitController::class, 'submit'])->middleware('capability:project_lab')->middleware('throttle:lab-submit');
+            Route::get('/project-lab/enrollments/{enrollment}/saves', [ProjectSubmitController::class, 'saves'])->middleware('capability:project_lab');
+            Route::post('/project-lab/enrollments/{enrollment}/saves', [ProjectSubmitController::class, 'save'])->middleware('capability:project_lab')->middleware('throttle:lab-save');
+            Route::get('/project-lab/enrollments/{enrollment}/saves/{save}/download', [ProjectSubmitController::class, 'downloadSave'])->middleware('capability:project_lab')->middleware('throttle:lab-sow');
+            Route::get('/project-lab/enrollments/{enrollment}/submissions/{submission}/download', [ProjectSubmitController::class, 'downloadSubmission'])->middleware('capability:project_lab')->middleware('throttle:lab-sow');
 
             // Proctoring — contest problem-solving only, never practice (see
             // ContestProctoringController's docblock). start() is idempotent

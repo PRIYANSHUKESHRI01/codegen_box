@@ -22,6 +22,11 @@ export const PROJECT_LAB_ERROR = {
   disabled: "workspaces_disabled",
   priceChanged: "price_changed",
   snapshotTooLarge: "snapshot_too_large",
+  /** Most of the project was copied in from outside AptRun (its files are older than the workspace). */
+  importedFiles: "imported_files",
+  /** A file was sent to a save / hand-in: Project Lab never accepts one. */
+  uploadsNotAccepted: "uploads_not_accepted",
+  saveNotAllowed: "save_not_allowed",
 } as const;
 
 export interface ProjectLabSummary {
@@ -92,8 +97,22 @@ export interface WorkspaceState {
   disk_mb: number | null;
 }
 
+/** A checkpoint of the editor saved with "Save progress" (see ProjectSave on the server). */
+export interface SaveData {
+  id: number;
+  saved_at: string;
+  size_bytes: number;
+  files: number;
+  milestones_done: number;
+  milestones_total: number;
+  /** Files older than the workspace (copied in from outside), for the reviewer's eyes. */
+  imported_files: number;
+  archives: number;
+}
+
 export interface SubmissionData {
   id: number;
+  enrollment_id: number;
   attempt: number;
   status: SubmissionStatus;
   score: number | null;
@@ -317,6 +336,8 @@ export interface AdminSubmissionDetail extends AdminSubmissionRow {
   rubric: { criterion: string; score: number; max: number }[];
   feedback: string | null;
   warnings: string[];
+  /** How the project grew: the checkpoints the student saved from the editor, newest first. */
+  saves: SaveData[];
   reviewer: string | null;
   milestones: { id: number; title: string; acceptance_criteria: string[]; done: boolean }[];
   previous_attempts: { id: number; attempt: number; status: SubmissionStatus; score: number | null; submitted_at: string }[];

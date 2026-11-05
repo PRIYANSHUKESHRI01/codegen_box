@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "AptRun",
     short_name: "AptRun",
-    description: "The placement sandbox for colleges: campus drives, student learning centres and a hiring-partner network.",
+    description: "The placement sandbox for colleges: campus drives, a learning centre for every student, weekly contest rewards and a path to employers on Mellow Vault.",
     start_url: "/",
     display: "standalone",
     background_color: "#F4F6FB",

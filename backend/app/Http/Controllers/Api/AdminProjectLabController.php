@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\ProjectEnrollment;
+use App\Models\ProjectSave;
 use App\Models\ProjectSubmission;
 use App\Models\ProjectTopic;
+use App\Services\ProjectLab\SnapshotArchive;
 use App\Services\ProjectLab\SowPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -159,6 +161,8 @@ class AdminProjectLabController extends Controller
                     'acceptance_criteria' => $m->acceptance_criteria ?? [],
                     'done' => $done->has($m->id),
                 ])->values(),
+                // How the project grew: the checkpoints the student saved from the editor, newest first.
+                'saves' => $enrollment->saves()->latest('id')->get()->map->present()->values(),
                 'previous_attempts' => $enrollment->submissions()
                     ->where('id', '!=', $submission->id)
                     ->get(['id', 'attempt', 'status', 'score', 'submitted_at']),
@@ -207,9 +211,68 @@ class AdminProjectLabController extends Controller
             'student_id' => $submission->user_id,
         ]);
 
-        $name = 'project-'.$submission->project_enrollment_id.'-attempt-'.$submission->attempt.'.tgz';
+        $base = 'project-'.$submission->project_enrollment_id.'-attempt-'.$submission->attempt;
 
-        return $disk->download($submission->snapshot_path, $name, ['Content-Type' => 'application/gzip']);
+        // The original archive (.tgz, byte for byte as it was taken) unless ?format=zip asks for a .zip a reviewer can open anywhere.
+        if ($request->query('format') === 'zip') {
+            try {
+                return app(SnapshotArchive::class)->zipResponse($submission->snapshot_path, $base.'.zip');
+            } catch (\RuntimeException $e) {
+                abort(422, $e->getMessage());
+            }
+        }
+
+        return $disk->download($submission->snapshot_path, $base.'.tgz', ['Content-Type' => 'application/gzip']);
+    }
+
+    /** What is inside the submitted snapshot: every file with its size and time, so a reviewer can see the project without downloading it. */
+    public function files(ProjectSubmission $submission)
+    {
+        abort_unless($submission->hasSnapshot(), 404);
+
+        try {
+            return response()->json(app(SnapshotArchive::class)->listing($submission->snapshot_path));
+        } catch (\RuntimeException $e) {
+            return response()->json(['files' => [], 'total_files' => 0, 'total_bytes' => 0, 'truncated' => false, 'unreadable' => true, 'message' => $e->getMessage()]);
+        }
+    }
+
+    /** One file of the submission as text (binary files and anything over the preview size are not shown). */
+    public function file(Request $request, ProjectSubmission $submission)
+    {
+        abort_unless($submission->hasSnapshot(), 404);
+        $path = (string) $request->validate(['path' => ['required', 'string', 'max:500']])['path'];
+
+        try {
+            $file = app(SnapshotArchive::class)->preview($submission->snapshot_path, $path);
+        } catch (\RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
+
+        abort_if($file === null, 404);
+
+        return response()->json($file);
+    }
+
+    /** A checkpoint the student saved (the progress timeline on the review screen). */
+    public function downloadSave(Request $request, ProjectSave $save)
+    {
+        ActivityLog::record($request->user(), 'Downloaded a saved project checkpoint', 'Project', $save->enrollment->topic->title, [
+            'save_id' => $save->id,
+            'student_id' => $save->user_id,
+        ]);
+
+        $base = 'project-'.$save->project_enrollment_id.'-save-'.$save->id;
+
+        if ($request->query('format') === 'tgz') {
+            return Storage::disk((string) config('workspaces.snapshot.disk'))->download($save->snapshot_path, $base.'.tgz', ['Content-Type' => 'application/gzip']);
+        }
+
+        try {
+            return app(SnapshotArchive::class)->zipResponse($save->snapshot_path, $base.'.zip');
+        } catch (\RuntimeException $e) {
+            abort(422, $e->getMessage());
+        }
     }
 
     public function review(Request $request, ProjectSubmission $submission)

@@ -11,6 +11,7 @@ import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { ContestProblemRow, contestProblemHref } from "@/components/contests/ContestProblemRow";
+import { DailyChallengeLogo } from "@/components/contests/DailyChallenge";
 import { prefetchContestProblem } from "@/lib/contestProblemPrefetch";
 import { warmUpEditor } from "@/lib/editorWarmup";
 import type { ContestDetail, ContestLeaderboard } from "@/types/liveContest";
@@ -138,11 +139,20 @@ function ContestDetailPageContent() {
       {/* Header card */}
       <div className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-panel bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
-            <Swords className="w-6 h-6" />
-          </div>
+          {contest.contest_type === "daily" ? (
+            <DailyChallengeLogo size="md" className="ring-border-subtle" />
+          ) : (
+            <div className="w-12 h-12 rounded-panel bg-accent-primary/10 border border-accent-primary/25 flex items-center justify-center text-accent-primary shrink-0">
+              <Swords className="w-6 h-6" />
+            </div>
+          )}
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
+              {contest.contest_type === "daily" && (
+                <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-300 border border-sky-500/25">
+                  Daily
+                </span>
+              )}
               {contest.is_rated && (
                 <span className="px-2 py-0.5 text-3xs font-bold uppercase rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/25">
                   Rated
@@ -222,7 +232,16 @@ function ContestDetailPageContent() {
               )
             )
           ) : (
-            !contest.has_ended && (
+            !contest.has_ended && contest.registration && contest.registration.state !== "open" ? (
+              // The Daily Challenge is a scheduled event: its sign-up window opens 15 h before the start and closes 1 min before it.
+              <span className="inline-flex items-center gap-1.5 rounded-btn border border-border-strong bg-elevated px-4 py-2.5 text-xs font-bold text-text-secondary">
+                <Lock className="h-3.5 w-3.5" aria-hidden />
+                {contest.registration.state === "not_open"
+                  ? `Registration opens ${new Date(contest.registration.opens_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" })} IST`
+                  : "Registration closed"}
+              </span>
+            ) : (
+              !contest.has_ended && (
               // Registration stays open through the whole live window
               // (backend allows it any time before end_at), not just
               // before start.
@@ -233,6 +252,7 @@ function ContestDetailPageContent() {
               >
                 {registering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Register</span>}
               </button>
+              )
             )
           )}
         </div>

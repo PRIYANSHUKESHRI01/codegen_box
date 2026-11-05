@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, Trash2, Mic, Search, Sparkles, Library } from "lucide-react";
+import { Loader2, Trash2, Mic, Search, Sparkles, Library, BookOpenCheck } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 import { GenerateQuestionsPanel } from "./GenerateQuestionsPanel";
+import { LibraryQuestionsPanel } from "./LibraryQuestionsPanel";
 import {
   CATEGORY_COLORS,
   CATEGORY_LABELS,
@@ -27,6 +28,8 @@ interface ManageInterviewQuestionsModalProps {
   companyId?: number;
   /** Pre-fills the AI panel's role field, e.g. the linked drive's role/job title. */
   defaultRole?: string;
+  /** Offer the AptRun question library (a college TPO's mock interview): random, non-repeating questions by domain and stack. */
+  enableLibrary?: boolean;
   onClose: () => void;
   onToast: ToastTrigger;
 }
@@ -45,13 +48,14 @@ export function ManageInterviewQuestionsModal({
   restrictedToCompanyNote,
   companyId,
   defaultRole,
+  enableLibrary = false,
   onClose,
   onToast,
 }: ManageInterviewQuestionsModalProps) {
   const [attached, setAttached] = useState<AttachedInterviewQuestion[]>([]);
   const [bank, setBank] = useState<BankQuestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<"ai" | "bank">("ai");
+  const [source, setSource] = useState<"ai" | "bank" | "library">(enableLibrary ? "library" : "ai");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<QuestionCategory | "">("");
   const [addingBankId, setAddingBankId] = useState<number | null>(null);
@@ -174,7 +178,20 @@ export function ManageInterviewQuestionsModal({
             </div>
 
             <div className="pt-3 border-t border-border-subtle space-y-3">
-              <div className="flex gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
+              <div className="flex flex-wrap gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit">
+                {enableLibrary && (
+                  <button
+                    type="button"
+                    onClick={() => setSource("library")}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-control text-2xs font-bold transition-all",
+                      source === "library" ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
+                    )}
+                  >
+                    <BookOpenCheck className="w-3.5 h-3.5" />
+                    AptRun Library
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setSource("ai")}
@@ -199,7 +216,9 @@ export function ManageInterviewQuestionsModal({
                 </button>
               </div>
 
-              {source === "ai" ? (
+              {source === "library" ? (
+                <LibraryQuestionsPanel basePath={basePath} interviewSlug={interviewSlug} attachedCount={attached.length} onAdded={load} onToast={onToast} />
+              ) : source === "ai" ? (
                 <GenerateQuestionsPanel defaultRole={defaultRole} companyId={companyId} onAddNow={handleAddGenerated} />
               ) : (
                 <div className="space-y-2">

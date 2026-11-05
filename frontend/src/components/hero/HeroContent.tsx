@@ -2,94 +2,74 @@
 
 import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, GraduationCap } from "lucide-react";
+import { ArrowRight, Check, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ButtonLink } from "@/components/ui/ButtonLink";
 import { TalkToTeamModal } from "@/components/marketing-site/TalkToTeamModal";
 
+const TRUST_POINTS = ["Free for students", "Set up by our team", "Proctored and fair"];
+
+/**
+ * The first thing a visitor reads: who this is for, in one line, and the two ways in. The buyer is the placement cell (Book a demo);
+ * students get their own door beside it. Four moves, in order — eyebrow, headline, one sentence, buttons — and nothing else, so the
+ * product shown underneath does the persuading.
+ */
 export function HeroContent() {
-  const prefersReducedMotion = useReducedMotion();
-  const [contact, setContact] = useState<"institution" | "company" | null>(null);
+  const reduce = useReducedMotion();
+  const [demoOpen, setDemoOpen] = useState(false);
 
-  const scrollToSection = (id: string) => {
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const container = {
-    hidden: {},
-    show: { transition: { staggerChildren: prefersReducedMotion ? 0 : 0.09 } },
-  };
-
+  const container = { hidden: {}, show: { transition: { staggerChildren: reduce ? 0 : 0.09 } } };
   const item = {
-    hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 14 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
+    hidden: { opacity: 0, y: reduce ? 0 : 14 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
   };
 
   return (
     <>
-      <motion.div
-        variants={container}
-        initial="hidden"
-        animate="show"
-        className="flex flex-col items-center text-center max-w-5xl mx-auto pt-6 pb-10 sm:pt-12 sm:pb-12 px-4"
-      >
-        {/* Eyebrow badge with live pulse */}
-        <motion.button
-          type="button"
+      <motion.div variants={container} initial="hidden" animate="show" className="mx-auto flex max-w-4xl flex-col items-center px-4 pb-10 pt-8 text-center sm:pb-14 sm:pt-14">
+        <motion.a
           variants={item}
-          onClick={() => scrollToSection("how-it-works")}
-          className="group inline-flex max-w-full items-center gap-2 px-3 py-1 rounded-full bg-surface border border-border-strong text-xs font-medium text-text-secondary shadow-subtle mb-6 hover:border-accent-primary/50 transition-colors"
+          href="#platform"
+          className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface px-3 py-1 text-xs font-medium text-text-secondary shadow-subtle transition-colors hover:border-accent-primary/50"
         >
-          <span className="relative flex h-1.5 w-1.5 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+          <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
           </span>
-          <span className="font-semibold text-primary text-2xs sm:text-xs truncate">
-            <span className="sm:hidden">The placement sandbox</span>
-            <span className="hidden sm:inline">The placement sandbox for colleges</span>
+          <span className="truncate text-2xs font-semibold text-primary sm:text-xs">
+            <span className="sm:hidden">Placements, end to end</span>
+            <span className="hidden sm:inline">The placement platform for colleges and students</span>
           </span>
-          <span className="text-border-strong shrink-0">&bull;</span>
-          <span className="text-accent-primary font-semibold text-2xs sm:text-xs flex items-center gap-1 shrink-0 group-hover:underline underline-offset-4">
-            See how <ArrowRight className="w-3 h-3" />
+          <span className="shrink-0 text-border-strong" aria-hidden="true">
+            &bull;
           </span>
-        </motion.button>
+          <span className="flex shrink-0 items-center gap-1 text-2xs font-semibold text-accent-primary underline-offset-4 group-hover:underline sm:text-xs">
+            See how <ArrowRight className="h-3 w-3" aria-hidden="true" />
+          </span>
+        </motion.a>
 
-        {/* Headline — one clause, ~7 words, bold rather than black. Large
-            product sites (Stripe, Linear, Vercel, Ramp) all sit at 5–8 words
-            and 56–64px on desktop; 72px/900 read as shouting at laptop widths. */}
+        {/* Two short parallel lines, bold rather than black: Stripe, Linear and Vercel all sit at 56–64px on desktop. */}
         <motion.h1
           variants={item}
-          className="text-[2.5rem] sm:text-5xl lg:text-[3.5rem] 2xl:text-[4rem] font-bold tracking-[-0.035em] text-primary leading-[1.06] mb-5 text-balance"
+          className="mb-5 text-balance text-[clamp(2rem,9.4vw,2.6rem)] font-bold leading-[1.05] tracking-[-0.035em] text-primary sm:text-5xl lg:text-[3.6rem] 2xl:text-[4.1rem]"
         >
-          Run every placement drive{" "}
-          <br className="hidden lg:block" />
-          <span className="inline-block whitespace-nowrap lp-gradient-text">
-            from one platform.
-          </span>
+          Every student placement-ready.
+          <br className="hidden sm:block" />{" "}
+          <span className="lp-gradient-text sm:inline-block sm:whitespace-nowrap">Every drive, one platform.</span>
         </motion.h1>
 
-        {/* Supporting copy — a single sentence. The detail (recruiters,
-            the Vault, reports) is carried by the sections below. */}
-        <motion.p
-          variants={item}
-          className="text-base sm:text-lg text-text-secondary max-w-2xl leading-relaxed mb-8 font-medium text-balance"
-        >
-          Onboard your batch, map recruiters and track every campus drive,{" "}
-          <br className="hidden sm:block" />
-          while each student prepares in a personal learning centre.
+        <motion.p variants={item} className="mb-8 max-w-2xl text-balance text-base font-medium leading-relaxed text-text-secondary sm:text-lg">
+          One platform for your placement cell and every student: proctored drives, AI interviews, readiness analytics, weekly rewards and a
+          direct path to employers.
         </motion.p>
 
-        {/* CTAs — the buyer is the college; students and recruiters get their own doors */}
-        <motion.div
-          variants={item}
-          className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-sm sm:max-w-none mx-auto justify-center mb-5"
-        >
+        <motion.div variants={item} className="mx-auto mb-6 flex w-full max-w-sm flex-col items-center justify-center gap-3 sm:max-w-none sm:flex-row">
           <Button
             variant="primary"
             size="lg"
-            rightIcon={<ArrowRight className="w-4 h-4" />}
-            onClick={() => setContact("institution")}
-            className="w-full sm:w-auto min-h-[46px] justify-center shadow-glow hover:shadow-glow-cyan transition-all font-semibold hp-btn-sheen"
+            rightIcon={<ArrowRight className="h-4 w-4" />}
+            onClick={() => setDemoOpen(true)}
+            className="hp-btn-sheen min-h-[48px] w-full justify-center font-semibold shadow-glow transition-all hover:shadow-glow-cyan sm:w-auto"
           >
             Book a demo
           </Button>
@@ -97,30 +77,24 @@ export function HeroContent() {
             href="/signup"
             variant="secondary"
             size="lg"
-            leftIcon={<GraduationCap className="w-4 h-4 text-accent-primary" />}
-            className="w-full sm:w-auto min-h-[46px] justify-center font-semibold"
+            leftIcon={<GraduationCap className="h-4 w-4 text-accent-primary" />}
+            className="min-h-[48px] w-full justify-center font-semibold sm:w-auto"
           >
             I&apos;m a student
           </ButtonLink>
         </motion.div>
-        <motion.p variants={item} className="text-13 font-medium text-text-secondary">
-          Recruiting for your company?{" "}
-          <button
-            type="button"
-            onClick={() => setContact("company")}
-            className="inline-flex items-center gap-1 font-semibold text-accent-primary hover:underline underline-offset-4"
-          >
-            Hire from partner campuses
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </motion.p>
+
+        <motion.ul variants={item} aria-label="Why teams choose AptRun" className="flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-13 font-medium text-text-secondary">
+          {TRUST_POINTS.map((point) => (
+            <li key={point} className="inline-flex items-center gap-1.5">
+              <Check className="h-3.5 w-3.5 text-status-success" strokeWidth={3} aria-hidden="true" />
+              {point}
+            </li>
+          ))}
+        </motion.ul>
       </motion.div>
-      <TalkToTeamModal
-        key={contact ?? "closed"}
-        open={contact !== null}
-        onClose={() => setContact(null)}
-        defaultAudience={contact ?? "institution"}
-      />
+
+      <TalkToTeamModal key={demoOpen ? "open" : "closed"} open={demoOpen} onClose={() => setDemoOpen(false)} defaultAudience="institution" />
     </>
   );
 }

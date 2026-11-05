@@ -103,6 +103,12 @@ class Interview extends Model
         'qualifying_score_percent',
         'discipline',
         'practice_config',
+        'opens_at',
+        'closes_at',
+        'audience_filter',
+        'announced_at',
+        'open_reminder_sent_at',
+        'close_reminder_sent_at',
     ];
 
     protected function casts(): array
@@ -113,7 +119,50 @@ class Interview extends Model
             'round_number' => 'integer',
             'category_weights' => 'array',
             'qualifying_score_percent' => 'decimal:2',
+            'opens_at' => 'datetime',
+            'closes_at' => 'datetime',
+            'audience_filter' => 'array',
+            'announced_at' => 'datetime',
+            'open_reminder_sent_at' => 'datetime',
+            'close_reminder_sent_at' => 'datetime',
         ];
+    }
+
+    public const SCHEDULE_UNSCHEDULED = 'unscheduled';
+
+    public const SCHEDULE_UPCOMING = 'upcoming';
+
+    public const SCHEDULE_OPEN = 'open';
+
+    public const SCHEDULE_CLOSED = 'closed';
+
+    /**
+     * Where a college mock interview is in its window: `unscheduled` (no window — open as long as it is published), `upcoming`
+     * (opens later), `open`, or `closed`. A window only ever narrows WHEN a student may start; it never hides the interview.
+     */
+    public function scheduleState(?\Carbon\CarbonInterface $at = null): string
+    {
+        $at ??= now();
+
+        if ($this->opens_at === null && $this->closes_at === null) {
+            return self::SCHEDULE_UNSCHEDULED;
+        }
+
+        if ($this->opens_at !== null && $at->lt($this->opens_at)) {
+            return self::SCHEDULE_UPCOMING;
+        }
+
+        if ($this->closes_at !== null && $at->gte($this->closes_at)) {
+            return self::SCHEDULE_CLOSED;
+        }
+
+        return self::SCHEDULE_OPEN;
+    }
+
+    /** Whether a student who has not started yet may start it right now. */
+    public function acceptsNewSittings(?\Carbon\CarbonInterface $at = null): bool
+    {
+        return in_array($this->scheduleState($at), [self::SCHEDULE_UNSCHEDULED, self::SCHEDULE_OPEN], true);
     }
 
     /**
@@ -357,7 +406,13 @@ class Interview extends Model
         // takes its audience from the track, which is where it is set.
         $audienceOwner = $this->isTrackRound() ? $this->track : $this;
 
-        if ($audienceOwner !== null && ! $audienceOwner->audienceIncludes($user)) {
+        // A college's own mock interview may also be aimed at years, sections or named students (InterviewAudience);
+        // for everything else the branch rule is the whole audience, exactly as before.
+        if ($this->isTpoMock() && ! $this->isTrackRound()) {
+            if (! app(\App\Services\Interviews\InterviewAudience::class)->includes($this, $user)) {
+                return false;
+            }
+        } elseif ($audienceOwner !== null && ! $audienceOwner->audienceIncludes($user)) {
             return false;
         }
 

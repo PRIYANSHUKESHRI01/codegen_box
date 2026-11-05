@@ -5,10 +5,11 @@ import { api } from "./api";
 
 /**
  * The only two unauthenticated reads in the whole app — real numbers/real
- * problems for the public marketing landing page (Stats, Problem Explorer,
- * the navbar's ⌘K search). See backend PublicController for exactly what's
- * safe to expose. Shared here so all three consumers can never drift out of
- * sync with each other the way the old hardcoded per-section fake data did.
+ * problems for the public marketing pages (the Students page and the
+ * sign-in / sign-up showcases). The landing page itself shows no problems and
+ * makes neither call. See backend PublicController for exactly what's safe to
+ * expose. Shared here so the consumers can never drift out of sync with each
+ * other the way the old hardcoded per-section fake data did.
  */
 export interface PublicStats {
   problems_total: number;

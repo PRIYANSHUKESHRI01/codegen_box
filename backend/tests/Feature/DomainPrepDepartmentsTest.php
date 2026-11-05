@@ -106,7 +106,7 @@ class DomainPrepDepartmentsTest extends TestCase
         }
 
         $this->assertGreaterThanOrEqual(78, $checked, 'every migration-seeded branch is covered (73 + the 5 other engineering branches)');
-        $this->assertNotContains('cse', \App\Services\Core\CoreAccess::families(), 'CSE keeps the coding problem bank, as before');
+        $this->assertContains('cse', \App\Services\Core\CoreAccess::families(), 'CSE has the CS core as Domain Prep, besides the coding problem bank');
     }
 
     public function test_the_other_engineering_branches_each_get_their_own_specialisation_and_the_shared_core(): void
@@ -130,7 +130,7 @@ class DomainPrepDepartmentsTest extends TestCase
         $disciplines = array_keys(require database_path('data/domain_taxonomy.php'));   // every shipped family, offered or not
         $questions = CoreQuestion::query()->whereIn('discipline_code', $disciplines)->get();
 
-        $this->assertGreaterThanOrEqual(99, $questions->count(), '85 for Management, Commerce and Arts, 14 for the other engineering branches');
+        $this->assertGreaterThanOrEqual(259, $questions->count(), '85 for Management, Commerce and Arts, 14 for the other engineering branches, 160 for the CSE / IT core');
 
         foreach ($questions as $q) {
             $this->assertNotNull($q->subject_id, "question {$q->external_id} has a subject");

@@ -103,10 +103,10 @@ return [
     /*
     | The original engineering disciplines (rows already exist; only the department and the per-family
     | capabilities are written). Domain Prep and Skill Drills were hard-wired to ECE / EEE / Mech / Civil
-    | before; that is now this data. CSE and "other" have neither, exactly as before.
+    | before; that is now this data. CSE has Domain Prep (the CS core: DBMS, OS, networks ...) but no Skill Drills; "other" has Domain Prep only.
     */
     'engineering_disciplines' => [
-        'cse' => ['capabilities' => []],
+        'cse' => ['capabilities' => ['domain_prep' => true]],
         'ece' => ['capabilities' => ['domain_prep' => true, 'skill_drills' => true]],
         'eee' => ['capabilities' => ['domain_prep' => true, 'skill_drills' => true]],
         'mech' => ['capabilities' => ['domain_prep' => true, 'skill_drills' => true]],

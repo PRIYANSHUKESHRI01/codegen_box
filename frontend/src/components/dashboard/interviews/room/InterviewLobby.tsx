@@ -42,6 +42,10 @@ export interface InterviewLobbyProps {
   footer: string;
   /** Leaves the interview without starting it. */
   onLeave?: () => void;
+  /** The pill above the heading. Defaults to the interview's; the other proctored surfaces say what they are ("Proctored contest" …). */
+  badge?: string;
+  /** The line under the heading. */
+  intro?: string;
 }
 
 const PRIMARY =
@@ -76,6 +80,8 @@ export function InterviewLobby(props: InterviewLobbyProps) {
     disclosure,
     footer,
     onLeave,
+    badge = "Proctored interview",
+    intro = "A quick look at your camera, microphone and screen — then we begin.",
   } = props;
 
   const ui = useIntegrityUi();
@@ -86,7 +92,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   const integrity = ui.policy !== null;
   const ready = !integrity || checksPass(ui.checks);
   const missing = ui.checks.filter((c) => c.required && c.status !== "ok" && c.status !== "skipped").map((c) => c.label);
-  const firstName = useMemo(() => candidateName.trim().split(/\s+/)[0] || "there", [candidateName]);
+  const firstName = useMemo(() => candidateName.trim().split(/\s+/)[0] || "", [candidateName]);
 
   const status = !devicePreviewReady
     ? { tone: "idle" as const, text: "First, allow your camera and microphone so we can check your setup." }
@@ -128,12 +134,12 @@ export function InterviewLobby(props: InterviewLobbyProps) {
               <AptRunOrb mode={heard ? "listening" : "idle"} signal={signal} className="w-24 shrink-0 sm:w-28" />
               <div className="min-w-0">
                 <span className="mb-1.5 inline-flex items-center gap-1.5 rounded-full border border-accent-primary/25 bg-accent-primary/10 px-2.5 py-0.5 text-[0.625rem] font-bold uppercase tracking-wider text-accent-primary">
-                  <ShieldCheck className="h-3 w-3" aria-hidden /> Proctored interview
+                  <ShieldCheck className="h-3 w-3" aria-hidden /> {badge}
                 </span>
                 <h1 id="lobby-title" className="text-2xl font-extrabold tracking-tight text-primary sm:text-3xl">
-                  Let&apos;s get you set up, {firstName}.
+                  {firstName ? <>Let&apos;s get you set up, {firstName}.</> : <>Let&apos;s get you set up.</>}
                 </h1>
-                <p className="mt-1 text-sm text-text-secondary">A quick look at your camera, microphone and screen — then we begin.</p>
+                <p className="mt-1 text-sm text-text-secondary">{intro}</p>
               </div>
             </motion.div>
 

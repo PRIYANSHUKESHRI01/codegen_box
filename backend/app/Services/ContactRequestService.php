@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SendContactRequestConfirmation;
 use App\Jobs\SendContactRequestNotification;
+use App\Jobs\SendContactRequestTeamCopy;
 use App\Models\ActivityLog;
 use App\Models\ContactRequest;
 use App\Models\ContactRequestNote;
@@ -39,6 +40,11 @@ class ContactRequestService
 
         if ($contactRequest->assigned_marketing_id !== null) {
             SingleMail::afterResponse(new SendContactRequestNotification($contactRequest->id));
+        }
+
+        // The team inbox hears of every enquiry, assigned or not.
+        if (trim((string) config('brand.enquiry_email')) !== '') {
+            SingleMail::afterResponse(new SendContactRequestTeamCopy($contactRequest->id));
         }
 
         SingleMail::afterResponse(new SendContactRequestConfirmation($contactRequest->id));

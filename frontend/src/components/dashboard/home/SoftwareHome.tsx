@@ -6,6 +6,7 @@ import { Briefcase, CheckCircle2, Flame, Gauge, Mic, Trophy, Zap } from "lucide-
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HackArenaBanner } from "@/components/arena/HackArenaBanner";
+import { WeeklyRewardsBanner } from "@/components/leaderboard/WeeklyRewardsBanner";
 import { MellowVaultInterviewBanner } from "@/components/dashboard/home/MellowVaultInterviewBanner";
 import { PracticeShelf } from "@/components/dashboard/home/PracticeShelf";
 import { UpNextCard } from "@/components/dashboard/home/UpNextCard";
@@ -131,13 +132,17 @@ export function SoftwareHome({ layout = "software", coreHome = null }: { layout?
         <UpNextCard contest={upNextIsContest ? nextContest : null} drive={upNextIsContest ? null : nextDrive} />
       )}
 
-      {/* 2. How am I doing - a handful of numbers, each leading to the page that owns it. */}
-      <OverviewStats stats={statTiles} />
-
-      {/* 3. The Vault AI Interview: the thing to do first on the way to being hired. */}
+      {/* 2. The Vault AI Interview: the thing to do first on the way to being hired, so it is the second card a student meets, straight after
+          the one urgent thing. */}
       {caps.ai_interviews && (
         <MellowVaultInterviewBanner />
       )}
+
+      {/* 3. How am I doing - a handful of numbers, each leading to the page that owns it. */}
+      <OverviewStats stats={statTiles} />
+
+      {/* 3b. This week's leaderboard vouchers - drawn only while the superadmin has one live. */}
+      {caps.contests && <WeeklyRewardsBanner variant="compact" />}
 
       {/* 4. What to do now, and how ready I am. */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

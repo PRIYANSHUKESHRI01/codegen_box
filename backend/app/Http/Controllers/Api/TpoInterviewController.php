@@ -9,6 +9,9 @@ use App\Models\InterviewResponse;
 use App\Models\InterviewSession;
 use App\Services\InterviewProctoringService;
 use App\Services\InterviewTrackAdvancementService;
+use App\Services\Interviews\CollegeInterviewForm;
+use App\Services\Interviews\MockInterviewScheduler;
+use Illuminate\Support\Facades\DB;
 use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -27,10 +30,23 @@ use Illuminate\Validation\Rule;
  */
 class TpoInterviewController extends Controller
 {
+    public function __construct(
+        private readonly CollegeInterviewForm $form,
+        private readonly MockInterviewScheduler $scheduler,
+    ) {}
+
     public function index(Request $request)
     {
+        $interviews = $this->ownedInterviews($request)->whereNull('interview_track_id')->withCount('sessions')->latest('created_at')->get();
+
+        $stats = DB::table('interview_sessions')
+            ->whereIn('interview_id', $interviews->pluck('id'))
+            ->groupBy('interview_id')
+            ->selectRaw("interview_id, sum(case when status = 'completed' then 1 else 0 end) as completed, sum(case when status = 'in_progress' then 1 else 0 end) as in_progress, avg(composite_score_percent) as average")
+            ->get()->keyBy('interview_id');
+
         return response()->json([
-            'interviews' => $this->ownedInterviews($request)->whereNull('interview_track_id')->withCount('sessions')->latest('created_at')->get(),
+            'interviews' => $interviews->map(fn (Interview $i) => $this->form->present($i, $stats[$i->id] ?? null))->values(),
         ]);
     }
 
@@ -44,8 +60,9 @@ class TpoInterviewController extends Controller
 
         $validated = $request->validate([
             ...BranchAudience::rules(),
+            ...CollegeInterviewForm::rules(),
             'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $interview = Interview::create([
@@ -57,9 +74,9 @@ class TpoInterviewController extends Controller
             'owning_college_id' => $collegeId,
             'created_by' => $request->user()->id,
             'branch_audience' => BranchAudience::normalize($validated['branch_audience'] ?? null),
-        ]);
+        ] + $this->form->attributes($validated, $collegeId));
 
-        return response()->json(['interview' => $interview], 201);
+        return response()->json(['interview' => $this->form->present($interview->loadCount('sessions'))], 201);
     }
 
     public function update(Request $request, Interview $interview)
@@ -68,18 +85,48 @@ class TpoInterviewController extends Controller
 
         $validated = $request->validate([
             ...BranchAudience::rules(),
+            ...CollegeInterviewForm::rules(),
             'title' => ['sometimes', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['sometimes', Rule::in(Interview::STATUSES)],
+            'announce' => ['sometimes', 'boolean'],
         ]);
 
         if (array_key_exists('branch_audience', $validated)) {
             $validated['branch_audience'] = BranchAudience::normalize($validated['branch_audience']);
         }
 
-        $interview->update($validated);
+        $schedule = $this->form->attributes($validated, $request->user()->college_id, $interview);
 
-        return response()->json(['interview' => $interview->fresh()]);
+        $wasPublished = $interview->isPublished();
+        $becomesPublished = ($validated['status'] ?? $interview->status) === Interview::STATUS_PUBLISHED;
+
+        if ($becomesPublished && ! $wasPublished && ! $interview->interviewQuestions()->exists()) {
+            return response()->json(['message' => 'Add at least one question before publishing: students would open an empty interview.'], 422);
+        }
+
+        $changedSchedule = collect(['opens_at', 'closes_at', 'audience_filter'])->contains(
+            fn ($k) => array_key_exists($k, $schedule) && json_encode($schedule[$k]) !== json_encode($interview->{$k})
+        ) || (array_key_exists('branch_audience', $validated) && json_encode($validated['branch_audience']) !== json_encode($interview->branch_audience));
+
+        $payload = collect($validated)->except(['announce', 'opens_at', 'closes_at', 'audience_filter', 'qualifying_score_percent'])->all() + $schedule;
+
+        // New times are reminded about afresh (announce() clears them too, but a TPO who did not announce still expects the reminders).
+        if (array_key_exists('opens_at', $schedule) || array_key_exists('closes_at', $schedule)) {
+            $payload['open_reminder_sent_at'] = null;
+            $payload['close_reminder_sent_at'] = null;
+        }
+
+        $interview->update($payload);
+        $interview->refresh();
+
+        if ($becomesPublished && ! $wasPublished) {
+            $this->scheduler->announce($interview, false);
+        } elseif ($wasPublished && $becomesPublished && $changedSchedule && ($validated['announce'] ?? false)) {
+            $this->scheduler->announce($interview, true);
+        }
+
+        return response()->json(['interview' => $this->form->present($interview->loadCount('sessions'))]);
     }
 
     /** Same "no candidate history, no delete" rule as destroyQuestion() — a taken/invited mock interview must be cancelled, not erased. */

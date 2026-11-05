@@ -91,9 +91,7 @@ export function buildStudentNav({
   const placements: NavItem[] = [
     // Its own page now (the list of the college's drives); a single drive, /dashboard/drives?driveId=…, keeps this item lit.
     { label: "Upcoming Drives", href: "/dashboard/drives", icon: Briefcase, matchPrefix: true },
-    ...(caps.company_prep ? [{ label: "Company PYQs", href: "/dashboard/company-prep", icon: Building2, matchPrefix: true, badge: "New", badgeTone: "new" as const }] : []),
-    ...(caps.ai_interviews ? [{ label: "Mock AI Interview", href: "/dashboard/interviews", icon: Mic }] : []),
-    // The final qualification interview. A college student who has not earned it yet sees it locked (with the days left); a year that
+    // The final qualification interview - second, straight under the drives: it is the first thing to do, not the fourth. A college student who has not earned it yet sees it locked (with the days left); a year that
     // is not offered it does not see it at all. Everyone else - direct users, unlocked students - sees it open.
     ...(caps.ai_interviews && vaultAi?.state !== "unavailable"
       ? [
@@ -111,6 +109,8 @@ export function buildStudentNav({
           },
         ]
       : []),
+    ...(caps.company_prep ? [{ label: "Company PYQs", href: "/dashboard/company-prep", icon: Building2, matchPrefix: true, badge: "New", badgeTone: "new" as const }] : []),
+    ...(caps.ai_interviews ? [{ label: "Mock AI Interview", href: "/dashboard/interviews", icon: Mic }] : []),
     // Direct hiring through Mellow Vault is part of Expert. Everyone can open the page (their readiness score, how the Vault helps
     // and how far they are from the 60% line are there), so the item wears a lock rather than hiding — see StudentVaultPage.
     // Named for what it is and what it is for: "Mellow Vault", with "Get Hired" as its badge.

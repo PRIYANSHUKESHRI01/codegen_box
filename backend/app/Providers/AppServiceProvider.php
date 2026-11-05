@@ -197,6 +197,24 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(30)->by('proctoring-event:'.$request->user()?->id);
         });
 
+        // A TPO running their own students' accounts (block, new login e-mails, sign-outs, removals): per TPO, because each of these
+        // either e-mails a real person or ends someone's session. Generous for a morning of cleaning up a roster, but not for a loop.
+        RateLimiter::for('tpo-student-actions', function (Request $request) {
+            return [
+                Limit::perMinute(40)->by('tpo-student-actions:'.$request->user()?->id),
+                Limit::perHour(400)->by('tpo-student-actions-hour:'.$request->user()?->id),
+            ];
+        });
+
+        // PDF reports are rendered on request and stored: per USER, so one eager click-through of a roster cannot starve the server
+        // (a report is roughly a second of CPU), while a TPO building a section's worth in one sitting still gets through.
+        RateLimiter::for('report-generate', function (Request $request) {
+            return [
+                Limit::perMinute(45)->by('report-generate:'.$request->user()?->id),
+                Limit::perHour(600)->by('report-generate-hour:'.$request->user()?->id),
+            ];
+        });
+
         // Exam integrity (see App\Services\Integrity). Per USER, never per address: a campus lab puts a whole class behind
         // one. A telemetry batch goes out every ~10 s plus an immediate one per serious event, so 120/min is a wide margin
         // that still stops a broken or hostile client from flooding the hash-chained log.
@@ -250,6 +268,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(300)->by('public-plans:'.$request->ip());
         });
 
+        // The landing page's live numbers (GET /public/landing): one request per visit, generous for the same reason.
+        RateLimiter::for('public-landing', function (Request $request) {
+            return Limit::perMinute(300)->by('public-landing:'.$request->ip());
+        });
+
         // Superadmin actions that re-ask for the caller's own password (reset-and-reveal
         // an account's password, permanently delete a university). Per USER: a wrong
         // password is a guess at the superadmin's password, and a stolen session token
@@ -291,6 +314,16 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(90)->by('notifications:'.($request->user()?->id ?? $request->ip()));
         });
 
+        // Activity reports: one a minute per open tab while someone is really on a page, plus one when a page is left; 30 leaves room for
+        // several tabs, a laptop waking up and a burst of quick navigation. Per user, never per IP (a campus lab shares one address).
+        RateLimiter::for('activity-report', function (Request $request) {
+            return Limit::perMinute(30)->by('activity-report:'.($request->user()?->id ?? $request->ip()));
+        });
+        // The superadmin's Live Activity screen polls every ~10 s per open tab.
+        RateLimiter::for('superadmin-activity', function (Request $request) {
+            return Limit::perMinute(180)->by('superadmin-activity:'.($request->user()?->id ?? $request->ip()));
+        });
+
         RateLimiter::for('plan-signal', function (Request $request) {
             return Limit::perMinute(90)->by('plan-signal:'.($request->user()?->id ?? $request->ip()));
         });
@@ -310,6 +343,8 @@ class AppServiceProvider extends ServiceProvider
             'lab-integrity' => 30,
             'lab-workspace-stop' => 20,
             'lab-submit' => 5,
+            // "Save progress" packs the whole project out of the container, so it is limited like a hand-in (a little looser).
+            'lab-save' => 8,
             'lab-purchase' => 20,
             // Paying for a plan. Per user, never per IP (a campus lab shares one address). Opening a checkout
             // creates a real gateway order, so it is the tightest; the verify callback and the status poll

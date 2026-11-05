@@ -37,6 +37,8 @@ return [
     'domains' => [
         'laravel' => ['Laravel Developer'],
         'php' => ['PHP Developer'],
+        'csharp_dotnet' => ['C# Developer', 'C#', '.NET Developer', 'DotNet'],
+        'aspnet_core' => ['ASP.NET', 'ASP.NET Core', 'ASP.NET Developer'],
         'cms' => ['CMS Developer', 'WordPress'],
         'api_design' => ['API', 'REST API'],
         'python' => ['Python Developer'],
@@ -90,6 +92,28 @@ return [
                         ['Language Core & OOP', 'Types and juggling, references, OOP, namespaces, autoloading and how a PHP request lives and dies.'],
                         ['Data, Sessions & Real Features', 'PDO and prepared statements, sessions and cookies, file handling, forms, Composer and error handling.'],
                         ['Security, Performance & Production', 'Injection and XSS defence, password hashing, OPcache, caching and debugging a failing production script.'],
+                    ],
+                ],
+                'csharp_dotnet' => [
+                    'name' => 'C# & .NET',
+                    'blurb' => 'The C# language and the .NET runtime: types and OOP, LINQ, async/await, collections, memory and the garbage collector, concurrency and production diagnostics.',
+                    'icon' => 'Code2',
+                    'tags' => ['csharp', 'dotnet', 'linq', 'async', 'clr'],
+                    'sets' => [
+                        ['C# Language Core & OOP', 'Value and reference types, strings, interfaces and abstract classes, equality, nullable reference types and modern C# features.'],
+                        ['LINQ, Async & Collections', 'Collections and their costs, deferred execution, IEnumerable versus IQueryable, async/await, delegates and events.'],
+                        ['Runtime, Memory & Production .NET', 'The CLR and JIT, the garbage collector, IDisposable, exceptions, thread safety and finding leaks and hangs in a running service.'],
+                    ],
+                ],
+                'aspnet_core' => [
+                    'name' => 'ASP.NET Core',
+                    'blurb' => 'Building web APIs and apps on ASP.NET Core: the middleware pipeline, dependency injection, Entity Framework Core, authentication, performance and deployment.',
+                    'icon' => 'Server',
+                    'tags' => ['aspnet', 'dotnet', 'webapi', 'efcore', 'middleware'],
+                    'sets' => [
+                        ['Middleware, Routing & Dependency Injection', 'The request pipeline, service lifetimes, minimal APIs versus controllers, routing and model binding, configuration and environments.'],
+                        ['Web APIs, EF Core & Data Access', 'REST design and validation, DTOs, DbContext and change tracking, loading related data, async actions and data access performance.'],
+                        ['Security, Performance & Production', 'JWT and cookie authentication, authorisation policies, CSRF and CORS, error handling and logging, caching, hosting and deployment.'],
                     ],
                 ],
                 'cms' => [

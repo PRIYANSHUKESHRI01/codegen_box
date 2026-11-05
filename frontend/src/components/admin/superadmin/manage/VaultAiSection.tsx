@@ -8,6 +8,7 @@ import { type ToastTrigger } from "@/lib/toast";
 import type { VaultAiQualificationRow, VaultAiStudentResponse } from "@/types/superadminVaultAi";
 import { VaultAiActionModal, type VaultAiAction } from "../VaultAiActionModal";
 import { VaultAiStatusBadge } from "../vaultAiUi";
+import { VaultAiResultsBlock } from "./VaultAiResultsBlock";
 
 const fmt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
 const SELECT = "rounded-control border border-border-subtle bg-elevated px-2.5 py-2 text-xs text-primary outline-none focus:border-accent-primary";
@@ -246,6 +247,8 @@ export function VaultAiSection({ userId, reload, triggerToast }: { userId: numbe
               </div>
             </div>
           </div>
+
+          <VaultAiResultsBlock studentId={userId} refreshKey={data} triggerToast={triggerToast} />
 
           {rows.length === 0 && !extra && <p className="rounded-control border border-dashed border-border-subtle p-4 text-center text-xs text-text-muted">This student has not started any Vault AI Interview yet.</p>}
 

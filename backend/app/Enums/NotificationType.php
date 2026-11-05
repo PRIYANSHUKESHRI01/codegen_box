@@ -15,6 +15,8 @@ namespace App\Enums;
  *   drive.*                      DriveNotifier (TpoDriveController, DrivePipelineService, DriveCollegeProposalService)
  *   hackathon.*                  HackathonNotifier (Admin/CompanyHackathonController)
  *   assessment.scheduled         AssessmentNotifier (the TPO / Mellow / company contest, interview, soft-skill and core-test controllers)
+ *   daily.scheduled              DailyChallengeService::announce (the next AptRun Daily Challenge, created when the last one closes)
+ *   reward.won, reward.sent      WeeklyRewardService (the weekly leaderboard closes with a prize / the superadmin marks the voucher sent)
  *   plan.changed, payment.*      PlanNotifier (SubscriptionService, CheckoutService, the payment webhooks)
  *   account.password_changed     LifecycleMailService::passwordChanged
  *   college.profile_changed      SuperAdminCollegeController::update (name / code / TPO details edited by the superadmin)
@@ -38,6 +40,9 @@ enum NotificationType: string
     case HackathonCancelled = 'hackathon.cancelled';
 
     case AssessmentScheduled = 'assessment.scheduled';
+    case DailyChallengeScheduled = 'daily.scheduled';
+    case RewardWon = 'reward.won';
+    case RewardSent = 'reward.sent';
 
     case AnnouncementMessage = 'announcement.message';
 
@@ -62,7 +67,7 @@ enum NotificationType: string
         return match ($this) {
             self::DriveLive, self::DriveRegistered, self::DriveStage, self::DriveUnmapped, self::DriveProposal, self::DriveProposalResponse => NotificationCategory::Drives,
             self::HackathonPublished, self::HackathonAnnouncement, self::HackathonCancelled => NotificationCategory::Hackathons,
-            self::AssessmentScheduled => NotificationCategory::Assessments,
+            self::AssessmentScheduled, self::DailyChallengeScheduled, self::RewardWon, self::RewardSent => NotificationCategory::Assessments,
             self::AnnouncementMessage => NotificationCategory::Announcements,
             self::VaultActivity => NotificationCategory::Vault,
             self::ReadinessSlip => NotificationCategory::Progress,
@@ -76,7 +81,7 @@ enum NotificationType: string
     public function severity(): string
     {
         return match ($this) {
-            self::DriveLive, self::PaymentSucceeded, self::PaymentReceived, self::ImportCompleted => 'success',
+            self::DriveLive, self::PaymentSucceeded, self::PaymentReceived, self::ImportCompleted, self::RewardWon, self::RewardSent => 'success',
             self::DriveUnmapped, self::HackathonCancelled, self::PaymentFailed, self::PasswordChanged => 'warning',
             default => 'info',
         };

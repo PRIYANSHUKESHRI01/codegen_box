@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\User;
 use App\Services\Vault\VaultSyncService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -79,6 +80,10 @@ class UserPurgeService
 
             DB::table('personal_access_tokens')->where('tokenable_type', User::class)->where('tokenable_id', $user->id)->delete();
             DB::table('subscriptions')->where('subscriber_type', User::class)->where('subscriber_id', $user->id)->delete();
+            // The sign-in log keeps the e-mail address; visits, page views and day roll-ups cascade with the account.
+            if (Schema::hasTable('auth_events')) {
+                DB::table('auth_events')->where('user_id', $user->id)->delete();
+            }
             User::whereKey($user->id)->delete();
         });
 
@@ -109,6 +114,11 @@ class UserPurgeService
                     ->whereNotNull('audio_path')
                     ->pluck('audio_path')
                     ->all(),
+                // The PDF reports about this person (they follow the student; the rows cascade away with the account).
+                \App\Services\Reports\ReportArchive::pathsForUsers($chunk),
+                // The code AptRun packed out of their Project Lab editor: what they saved and what they handed in.
+                Schema::hasTable('project_saves') ? DB::table('project_saves')->whereIn('user_id', $chunk)->pluck('snapshot_path')->all() : [],
+                DB::table('project_submissions')->whereIn('user_id', $chunk)->whereNotNull('snapshot_path')->pluck('snapshot_path')->all(),
             );
         }
 

@@ -66,6 +66,8 @@ class VaultQualificationAdminService
         });
 
         $this->audit($admin, $user, $qual, 'reset', $reason);
+        // The qualification forgets the series that qualified the student; the results ledger keeps it (flagged as reset).
+        $this->qualifications->refreshLedger($qual);
 
         $this->tell(
             $user,
@@ -120,6 +122,7 @@ class VaultQualificationAdminService
         });
 
         $this->audit($admin, $user, $qual, 'scores', $reason, ['scores' => $scores, 'result' => $outcome]);
+        $this->qualifications->refreshLedger($qual);
 
         if ($outcome === 'qualified') {
             $this->tellQualified($user, $qual, $profile);
@@ -170,6 +173,7 @@ class VaultQualificationAdminService
         });
 
         $this->audit($admin, $user, $qual, 'qualified', $reason, ['average' => $average]);
+        $this->qualifications->refreshLedger($qual);
         $this->tellQualified($user, $qual, $profile);
 
         return $qual->refresh();

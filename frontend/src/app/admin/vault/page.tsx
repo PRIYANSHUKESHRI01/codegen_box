@@ -21,6 +21,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AccessDeniedNotice } from "@/components/admin/AccessDeniedNotice";
 import { Modal } from "@/components/ui/Modal";
 import { VaultAiQuestionsTab } from "@/components/admin/vault/VaultAiQuestionsTab";
+import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList";
 import type { VaultAiCoverage } from "@/types/vaultAiAdmin";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -61,7 +62,7 @@ const EVENT_BADGE: Record<AdminVaultSyncEvent["status"], string> = {
 const fmt = (iso: string | null) =>
   iso ? new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "—";
 
-type Tab = "overview" | "students" | "ai_qualifiers" | "ai_questions" | "sync";
+type Tab = "overview" | "students" | "ai_qualifiers" | "ai_results" | "ai_questions" | "sync";
 
 /**
  * Mellow staff's oversight of the Vault — see AdminVaultController. Nothing is
@@ -95,6 +96,7 @@ export default function AdminVaultPage() {
                 ["overview", "Overview"],
                 ["students", "Students"],
                 ["ai_qualifiers", "AI Interview Qualifiers"],
+                ["ai_results", "AI Interview results"],
                 ["ai_questions", "Vault AI questions"],
                 ["sync", "Mellow Vault sync"],
               ] as const
@@ -116,6 +118,8 @@ export default function AdminVaultPage() {
             <StudentsTab onToast={showToast} />
           ) : tab === "ai_qualifiers" ? (
             <AiInterviewQualifiersTab onToast={showToast} />
+          ) : tab === "ai_results" ? (
+            <VaultAiResultsList scope="platform" triggerToast={showToast} />
           ) : tab === "ai_questions" ? (
             <VaultAiQuestionsTab onToast={showToast} />
           ) : (

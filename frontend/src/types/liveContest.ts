@@ -21,6 +21,8 @@ export interface ContestSummary {
   problem_count: number;
   total_points: number;
   contest_type: "general" | "daily" | "company" | "tpo_mock";
+  /** Daily Challenge editions only: when sign-up opens (15 h before) and closes (1 min before); null for every other contest. */
+  registration: { state: "not_open" | "open" | "closed"; opens_at: string; closes_at: string } | null;
   company: { id: number; name: string; logo: string | null } | null;
 }
 

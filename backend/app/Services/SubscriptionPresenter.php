@@ -120,6 +120,7 @@ class SubscriptionPresenter
                 'code' => $plan->code,
                 'name' => $plan->name,
                 'audience' => $plan->audience,
+                'project_lab_access' => (bool) $plan->project_lab_access,
             ] : null,
         ];
     }

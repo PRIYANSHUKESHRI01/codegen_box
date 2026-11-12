@@ -22,6 +22,7 @@ export interface CoveragePlan {
   code: string;
   name: string;
   audience: "individual" | "institution";
+  project_lab_access?: boolean;
 }
 
 export interface SubscriptionCoverage {

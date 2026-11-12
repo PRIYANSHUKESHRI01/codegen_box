@@ -10,7 +10,7 @@ import { CollegeTable } from "@/components/admin/mellow/CollegeTable";
 import { ListPagination, PAGE_SIZES } from "@/components/admin/mellow/ListPagination";
 import { EditCollegeModal } from "@/components/admin/mellow/EditCollegeModal";
 import { OnboardCollegeModal } from "@/components/admin/mellow/OnboardCollegeModal";
-import { AdjustSeatsModal, ChangePlanModal } from "@/components/admin/mellow/CollegePlanModals";
+import { AdjustSeatsModal, ChangePlanModal, EndCollegePlanModal } from "@/components/admin/mellow/CollegePlanModals";
 import {
   DEFAULT_DIR,
   SORT_LABEL,
@@ -140,6 +140,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false, 
   const [deleteTarget, setDeleteTarget] = useState<{ id: number; name: string } | null>(null);
   const [planCollege, setPlanCollege] = useState<College | null>(null);
   const [seatsCollege, setSeatsCollege] = useState<College | null>(null);
+  const [endPlanCollege, setEndPlanCollege] = useState<{ id: number; name: string } | null>(null);
 
   const loadColleges = useCallback(() => {
     setCollegesLoading(true);
@@ -227,6 +228,7 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false, 
     onSetTpoPassword: canManageDetails ? () => setPasswordTarget(col) : undefined,
     onChangePlan: () => setPlanCollege(col),
     onAdjustSeats: () => setSeatsCollege(col),
+    onEndPlan: col.subscriptionStatus === "active" || col.subscriptionDaysRemaining !== null ? () => setEndPlanCollege({ id: Number(col.id), name: col.name }) : undefined,
     onImportStudents: () => setImportCollege({ id: Number(col.id), name: col.name }),
     onDepartments: () => setDepartmentsCollege({ id: Number(col.id), name: col.name }),
     onCoordinators: () => setCoordinatorsCollege({ id: Number(col.id), name: col.name }),
@@ -471,11 +473,29 @@ export function PartnerCollegesPanel({ triggerToast, canDeleteColleges = false, 
 
       {planCollege && (
         <ChangePlanModal
-          college={{ id: Number(planCollege.id), name: planCollege.name, tier: planCollege.tier }}
+          college={{
+            id: Number(planCollege.id),
+            name: planCollege.name,
+            tier: planCollege.tier,
+            hasActivePlan: planCollege.subscriptionDaysRemaining !== null,
+            projectLabAccess: planCollege.projectLabAccess,
+          }}
           onClose={() => setPlanCollege(null)}
           onDone={(message) => {
             loadColleges();
             setPlanCollege(null);
+            triggerToast(message);
+          }}
+        />
+      )}
+
+      {endPlanCollege && (
+        <EndCollegePlanModal
+          college={endPlanCollege}
+          onClose={() => setEndPlanCollege(null)}
+          onDone={(message) => {
+            loadColleges();
+            setEndPlanCollege(null);
             triggerToast(message);
           }}
         />

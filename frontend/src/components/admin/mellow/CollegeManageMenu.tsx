@@ -1,6 +1,6 @@
 "use client";
 
-import { CreditCard, Layers, Pencil, KeyRound, ShieldCheck, ShieldOff, Trash2, Upload, UserCog, Users, Settings2 } from "lucide-react";
+import { Ban, CreditCard, Layers, Pencil, KeyRound, ShieldCheck, ShieldOff, Trash2, Upload, UserCog, Users, Settings2 } from "lucide-react";
 import { ActionMenu } from "@/components/ui/ActionMenu";
 import type { College } from "./partnerColleges";
 
@@ -9,6 +9,7 @@ export interface CollegeCardActions {
   onSetTpoPassword?: () => void;
   onChangePlan: () => void;
   onAdjustSeats: () => void;
+  onEndPlan?: () => void;
   onImportStudents: () => void;
   onDepartments: () => void;
   onCoordinators: () => void;
@@ -37,6 +38,7 @@ export function CollegeManageMenu({ college, actions, className }: { college: Co
         [
           { key: "plan", label: "Renew / Change Plan", icon: CreditCard, onSelect: actions.onChangePlan },
           { key: "seats", label: "Adjust Seats", icon: Users, onSelect: actions.onAdjustSeats },
+          actions.onEndPlan && { key: "end-plan", label: "End Plan", icon: Ban, tone: "danger", onSelect: actions.onEndPlan },
         ],
         [
           { key: "import", label: "Import Students", icon: Upload, onSelect: actions.onImportStudents },

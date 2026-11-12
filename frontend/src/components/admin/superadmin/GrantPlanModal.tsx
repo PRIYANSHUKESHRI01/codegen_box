@@ -255,7 +255,7 @@ export function GrantPlanModal({ student: preselected = null, onClose, onGranted
 
             {heldNow && heldNow.plan_source === "institution" && (
               <Notice tone="warning">
-                {heldNow.name} is covered by {heldNow.college}&apos;s {heldNow.plan_name} plan. A personal plan is kept on file but only applies once that plan ends.
+                {heldNow.name} is currently covered by {heldNow.college}&apos;s {heldNow.plan_name} plan. Giving a personal plan (Expert / Grandmaster) takes effect immediately and includes full Project Lab access.
               </Notice>
             )}
             {heldNow && heldNow.is_blocked && <Notice tone="warning">This account is blocked, so they can&apos;t use the plan until it is unblocked.</Notice>}

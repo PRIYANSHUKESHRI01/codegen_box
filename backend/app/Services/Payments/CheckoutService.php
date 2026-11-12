@@ -147,15 +147,26 @@ class CheckoutService
      */
     public function assertAllowedToHold(User $user, array $quote): void
     {
-        // A college that pays for its students already covers them: charging one of them
-        // personally would be taking money for something they already have.
+        // A college that pays for its students covers them, unless they are redeeming a free offer
+        // or acquiring Project Lab which their college plan does not include.
         $coverage = $user->subscriptionCoverage();
         if ($coverage['source'] === 'institution' && ($coverage['days_remaining'] ?? 0) > 0) {
-            throw new PaymentException(
-                'Your college already includes full access for you, so there is no need to pay individually.',
-                PaymentException::ALREADY_COVERED,
-                409,
-            );
+            $collegePlan = $coverage['plan'];
+            $isOffer = ($quote['total'] ?? 0) === 0;
+            $quoteHasProjectLab = collect($quote['lines'] ?? [])->contains(function ($line) {
+                $p = Plan::where('code', $line['code'])->first();
+
+                return $p && $p->project_lab_access;
+            });
+            $collegeLacksProjectLab = ! ($collegePlan?->project_lab_access);
+
+            if (! ($isOffer || ($quoteHasProjectLab && $collegeLacksProjectLab))) {
+                throw new PaymentException(
+                    'Your college already includes full access for you, so there is no need to pay individually.',
+                    PaymentException::ALREADY_COVERED,
+                    409,
+                );
+            }
         }
 
         // Buying a lower plan while a higher one still has paid time left would quietly

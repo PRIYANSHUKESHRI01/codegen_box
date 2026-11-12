@@ -166,7 +166,7 @@ class SuperAdminPlanController extends Controller
      */
     public function updateEntitlements(Request $request, Plan $plan): JsonResponse
     {
-        if ($plan->audience !== Plan::AUDIENCE_INDIVIDUAL || $plan->kind !== Plan::KIND_BASE) {
+        if (! in_array($plan->audience, [Plan::AUDIENCE_INDIVIDUAL, Plan::AUDIENCE_INSTITUTION], true) || $plan->kind !== Plan::KIND_BASE) {
             throw ValidationException::withMessages(['plan' => ["What the {$plan->name} plan includes can't be changed here."]]);
         }
 

@@ -351,6 +351,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 // whole sandbox" through a sales conversation) rather than
                 // self-serve — see SubscriptionService::assignInstitutionPlan.
                 Route::post('/colleges/{college}/subscription', [AdminController::class, 'assignCollegeSubscription']);
+                Route::post('/colleges/{college}/subscription/cancel', [AdminController::class, 'cancelCollegeSubscription']);
 
                 // Real-time seat-count tweak, distinct from the full
                 // subscription (re)assignment above — see

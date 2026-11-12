@@ -1094,6 +1094,14 @@ class User extends Authenticatable
      */
     public function effectiveSubscription(): ?Subscription
     {
+        $personal = $this->activeSubscription();
+
+        // If the student holds an active paid or admin-granted personal plan (not the free default Coder plan),
+        // it takes precedence so superadmin grants and student purchases take effect immediately.
+        if ($personal !== null && $personal->isActive() && ! $personal->plan?->isFree()) {
+            return $personal;
+        }
+
         if ($this->college_id !== null) {
             $collegeSubscription = $this->college?->activeSubscription();
 
@@ -1102,7 +1110,7 @@ class User extends Authenticatable
             }
         }
 
-        return $this->activeSubscription();
+        return $personal;
     }
 
     /**
@@ -1233,6 +1241,40 @@ class User extends Authenticatable
                 'max_workspace_hours_per_month' => $effective->plan->max_workspace_hours_per_month,
                 'max_active_projects' => $effective->plan->max_active_projects,
             ];
+        }
+
+        // Also check if user's personal active subscription has project lab access
+        $personal = $this->activeSubscription();
+        if ($personal !== null && $personal->isActive() && $personal->plan?->project_lab_access) {
+            return [
+                'access' => true,
+                'source' => 'plan',
+                'plan' => $personal->plan,
+                'subscription' => $personal,
+                'period_started_at' => now()->startOfMonth(),
+                'period_ends_at' => $personal->current_period_end,
+                'days_remaining' => $personal->daysRemaining(),
+                'max_workspace_hours_per_month' => $personal->plan->max_workspace_hours_per_month,
+                'max_active_projects' => $personal->plan->max_active_projects,
+            ];
+        }
+
+        // Also check if college plan grants project lab access
+        if ($this->college_id !== null) {
+            $collegeSub = $this->college?->activeSubscription();
+            if ($collegeSub !== null && $collegeSub->isActive() && $collegeSub->plan?->project_lab_access) {
+                return [
+                    'access' => true,
+                    'source' => 'institution',
+                    'plan' => $collegeSub->plan,
+                    'subscription' => $collegeSub,
+                    'period_started_at' => now()->startOfMonth(),
+                    'period_ends_at' => $collegeSub->current_period_end,
+                    'days_remaining' => $collegeSub->daysRemaining(),
+                    'max_workspace_hours_per_month' => $collegeSub->plan->max_workspace_hours_per_month,
+                    'max_active_projects' => $collegeSub->plan->max_active_projects,
+                ];
+            }
         }
 
         return $none;

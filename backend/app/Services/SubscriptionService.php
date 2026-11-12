@@ -500,8 +500,10 @@ class SubscriptionService
      *
      * See assignInstitutionPlan() for what $trialDays does.
      */
-    public function assignCustomInstitutionPlan(College $college, int $maxStudents, ?int $annualPrice, User $actor, ?int $trialDays = null): Subscription
+    public function assignCustomInstitutionPlan(College $college, int $maxStudents, ?int $annualPrice, User $actor, ?int $trialDays = null, ?bool $projectLabAccess = null): Subscription
     {
+        $lab = $projectLabAccess ?? true;
+
         $plan = Plan::updateOrCreate(
             ['code' => "custom-college-{$college->id}"],
             [
@@ -512,6 +514,9 @@ class SubscriptionService
                 'is_active' => true,
                 'max_students' => $maxStudents,
                 'drive_access' => true,
+                'project_lab_access' => $lab,
+                'max_workspace_hours_per_month' => $lab ? 80 : null,
+                'max_active_projects' => $lab ? 3 : null,
             ]
         );
 

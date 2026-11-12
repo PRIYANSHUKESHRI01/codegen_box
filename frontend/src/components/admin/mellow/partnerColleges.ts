@@ -14,9 +14,11 @@ export interface ApiCollege {
   active_students_count?: number;
   created_at: string;
   users?: { id: number; name: string; email: string; is_blocked: boolean }[];
+  subscription_id?: number | null;
   subscription_days_remaining?: number | null;
   subscription_status?: string | null;
   subscription_is_trial?: boolean;
+  project_lab_access?: boolean;
   /** Null = unlimited (Academic Enterprise, or a custom plan negotiated as unlimited). */
   plan_max_students?: number | null;
   /** The departments the college runs (Engineering, Management, Commerce, Arts …). */
@@ -42,9 +44,11 @@ export interface College {
   createdAt: number;
   tpoUserId?: number;
   tpoBlocked?: boolean;
+  subscriptionId?: number | null;
   subscriptionDaysRemaining: number | null;
   subscriptionStatus: string | null;
   subscriptionIsTrial: boolean;
+  projectLabAccess: boolean;
   planMaxStudents: number | null;
   departments: string[];
 }
@@ -67,9 +71,11 @@ export function mapCollegeFromApi(college: ApiCollege): College {
     createdAt: new Date(college.created_at).getTime() || 0,
     tpoUserId: tpo?.id,
     tpoBlocked: tpo?.is_blocked ?? false,
+    subscriptionId: college.subscription_id ?? null,
     subscriptionDaysRemaining: college.subscription_days_remaining ?? null,
     subscriptionStatus: college.subscription_status ?? null,
     subscriptionIsTrial: college.subscription_is_trial ?? false,
+    projectLabAccess: college.project_lab_access ?? false,
     planMaxStudents: college.plan_max_students ?? null,
     departments: college.departments && college.departments.length > 0 ? college.departments : ["engineering"],
   };

@@ -319,18 +319,22 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
               );
             }
 
-            // Only a signed-in, not-institution-covered student pays here; everyone else keeps the original
-            // link-based CTA (signup for individuals, mailto for institutions). The free plan is never "bought".
-            const useSelfServeAction =
-              isSignedInStudent && coverageKnown && !coveredByInstitution && !isCurrentIndividualPlan && !isLowerThanCurrent && planIndexOf(plan.id) > 0;
-            const isSubscribingThis = subscribingCode === plan.id;
-
             // The live plan behind an individual card: its price and its real limits.
             const livePlan = live.plans?.find((p) => p.code === plan.id);
 
             // A plan discounted to ₹0 is redeemed, not bought: it never needs the payment gateway, so a gateway that
             // is not set up yet does not lock its button.
             const redeemable = livePlan !== undefined && isRedeemable(livePlan);
+
+            // When covered by a college, students cannot buy individual plans with money, but can redeem free offers.
+            const isCoveredByCollegeForPlan = coveredByInstitution && !redeemable;
+
+            // Only a signed-in, not-institution-covered student (or a student claiming an offer / Project Lab) pays here;
+            // everyone else keeps the original link-based CTA. The free plan is never "bought".
+            const useSelfServeAction =
+              isSignedInStudent && coverageKnown && !isCoveredByCollegeForPlan && !isCurrentIndividualPlan && !isLowerThanCurrent && planIndexOf(plan.id) > 0;
+            const isSubscribingThis = subscribingCode === plan.id;
+
             const paymentsOff = checkout?.available === false && !redeemable;
             const buyLabel = redeemable ? (lapsedThisPlan ? `Renew ${plan.name} free` : "Redeem offer") : lapsedThisPlan ? `Renew ${plan.name}` : plan.ctaLabel;
             const lines = featureLines(plan, livePlan);
@@ -465,7 +469,7 @@ export function PricingPlans({ coverage, onSubscribed, checkout }: PricingPlansP
                   </ul>
 
                   {/* CTA */}
-                  {coveredByInstitution || isCurrentIndividualPlan ? (
+                  {isCoveredByCollegeForPlan || isCurrentIndividualPlan ? (
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-center gap-2 w-full py-3 rounded-btn text-sm font-bold bg-elevated text-text-muted border border-border-subtle cursor-default">
                         <BadgeCheck className="w-4 h-4" />

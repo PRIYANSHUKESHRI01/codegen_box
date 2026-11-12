@@ -98,6 +98,7 @@ class AdminController extends Controller
         // follow-up request — not a stored column, so this can't drift.
         $colleges->each(function (College $college) {
             $subscription = $college->activeSubscription();
+            $college->subscription_id = $subscription?->id;
             $college->subscription_days_remaining = $subscription?->isActive() ? $subscription->daysRemaining() : null;
             $college->subscription_status = $subscription?->status;
             $college->subscription_is_trial = $subscription?->isActive() ? (bool) $subscription->is_trial : false;
@@ -107,6 +108,7 @@ class AdminController extends Controller
             // Null = unlimited (Academic Enterprise) — same convention as
             // College::studentLimit(), which every enforcement point reads.
             $college->plan_max_students = $subscription?->plan?->max_students;
+            $college->project_lab_access = (bool) $subscription?->plan?->project_lab_access;
         });
 
         return response()->json(['colleges' => $colleges]);
@@ -270,7 +272,10 @@ class AdminController extends Controller
             // a companion to it. See SubscriptionService::assignCustomInstitutionPlan().
             'max_students' => ['nullable', 'integer', 'min:1', 'required_without:plan_code'],
             'annual_price' => ['nullable', 'integer', 'min:0'],
+            'project_lab_access' => ['nullable', 'boolean'],
         ]);
+
+        $projectLabAccess = isset($validated['project_lab_access']) ? (bool) $validated['project_lab_access'] : null;
 
         if (! empty($validated['plan_code'])) {
             $plan = Plan::where('code', $validated['plan_code'])->first();
@@ -279,13 +284,35 @@ class AdminController extends Controller
                 return response()->json(['message' => 'That plan is not an institution plan.'], 422);
             }
 
-            $subscription = $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+            if ($projectLabAccess !== null && (bool) $plan->project_lab_access !== $projectLabAccess) {
+                $customPlan = Plan::updateOrCreate(
+                    ['code' => "custom-college-{$college->id}"],
+                    [
+                        'name' => $plan->name,
+                        'audience' => Plan::AUDIENCE_INSTITUTION,
+                        'annual_price' => $plan->annual_price,
+                        'duration_days' => $plan->duration_days ?? 365,
+                        'is_active' => true,
+                        'max_students' => $plan->max_students,
+                        'drive_access' => $plan->drive_access,
+                        'hackathon_access' => $plan->hackathon_access,
+                        'vault_access' => $plan->vault_access,
+                        'project_lab_access' => $projectLabAccess,
+                        'max_workspace_hours_per_month' => $projectLabAccess ? 80 : null,
+                        'max_active_projects' => $projectLabAccess ? 3 : null,
+                    ]
+                );
+                $subscription = $subscriptionService->assignInstitutionPlan($college, $customPlan, $request->user());
+            } else {
+                $subscription = $subscriptionService->assignInstitutionPlan($college, $plan, $request->user());
+            }
         } else {
             $subscription = $subscriptionService->assignCustomInstitutionPlan(
                 $college,
                 (int) $validated['max_students'],
                 $validated['annual_price'] ?? null,
-                $request->user()
+                $request->user(),
+                projectLabAccess: $projectLabAccess ?? true
             );
         }
 
@@ -294,11 +321,40 @@ class AdminController extends Controller
         return response()->json([
             'college' => $college->fresh(),
             'subscription' => [
-                'plan' => ['code' => $plan->code, 'name' => $plan->name, 'max_students' => $plan->max_students],
+                'id' => $subscription->id,
+                'plan' => [
+                    'code' => $plan->code,
+                    'name' => $plan->name,
+                    'max_students' => $plan->max_students,
+                    'project_lab_access' => (bool) $plan->project_lab_access,
+                ],
                 'days_remaining' => $subscription->daysRemaining(),
                 'started_at' => $subscription->started_at,
                 'current_period_end' => $subscription->current_period_end,
             ],
+        ]);
+    }
+
+    /**
+     * End a college's subscription immediately.
+     */
+    public function cancelCollegeSubscription(Request $request, College $college, SubscriptionService $subscriptionService)
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:300'],
+        ]);
+
+        $subscription = $college->activeSubscription();
+
+        if ($subscription === null || ! $subscription->isActive()) {
+            return response()->json(['message' => "{$college->name} has no active plan to end."], 422);
+        }
+
+        $subscriptionService->cancel($subscription, $request->user(), $validated['reason']);
+
+        return response()->json([
+            'college' => $college->fresh(),
+            'message' => "{$college->name}'s plan has been ended.",
         ]);
     }
 

@@ -23,6 +23,7 @@ export function PlanChips({ college }: { college: College }) {
   return (
     <>
       {college.subscriptionIsTrial && days !== null && <span className="rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-3xs font-bold text-violet-500">Demo</span>}
+      {college.projectLabAccess && days !== null && <span className="rounded-full border border-indigo-500/25 bg-indigo-500/10 px-2 py-0.5 text-3xs font-bold text-indigo-400">Project Lab</span>}
       {days === null ? (
         <span className="rounded-full border border-status-warning/25 bg-status-warning/10 px-2 py-0.5 text-3xs font-bold text-status-warning">No active plan</span>
       ) : (

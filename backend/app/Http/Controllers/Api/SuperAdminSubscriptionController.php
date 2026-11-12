@@ -295,12 +295,6 @@ class SuperAdminSubscriptionController extends Controller
 
         if ($student !== null && $student->role === User::ROLE_USER) {
             $payload['coverage'] = app(SubscriptionPresenter::class)->formatCoverage($student->subscriptionCoverage());
-
-            // A plan of their own does nothing while their college's plan covers them — say so, don't let it look broken.
-            $coverage = $student->subscriptionCoverage();
-            if ($coverage['source'] === 'institution') {
-                $payload['warning'] = "{$student->name} is covered by {$student->college?->name}'s {$coverage['plan']?->name} plan, which takes precedence. A personal plan applies only when that plan ends.";
-            }
         }
 
         return $payload;

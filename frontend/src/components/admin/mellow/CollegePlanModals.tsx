@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CreditCard, Users } from "lucide-react";
+import { Ban, CreditCard, Users } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -10,14 +10,33 @@ import { PLAN_CODE_BY_TIER, type CollegeTier } from "./partnerColleges";
 const INPUT = "w-full px-3 py-2 rounded-control bg-elevated border border-border-subtle text-primary outline-none focus:border-accent-primary";
 const CANCEL = "rounded-control border border-border-subtle px-4 py-2 text-text-muted transition-colors hover:text-primary";
 const PRIMARY = "rounded-control bg-accent-primary px-4 py-2 font-bold text-white shadow-subtle transition-colors hover:bg-accent-primary-hover hover:shadow-glow disabled:cursor-not-allowed disabled:opacity-60";
+const DANGER = "rounded-control bg-status-danger px-4 py-2 font-bold text-white shadow-subtle transition-colors hover:bg-status-danger/90 disabled:cursor-not-allowed disabled:opacity-60";
 
 /** "Renew / Change Plan": always starts a fresh billing period today. */
-export function ChangePlanModal({ college, onClose, onDone }: { college: { id: number; name: string; tier: CollegeTier }; onClose: () => void; onDone: (message: string) => void }) {
+export function ChangePlanModal({
+  college,
+  onClose,
+  onDone,
+}: {
+  college: { id: number; name: string; tier: CollegeTier; hasActivePlan?: boolean; projectLabAccess?: boolean };
+  onClose: () => void;
+  onDone: (message: string) => void;
+}) {
   const [tier, setTier] = useState<CollegeTier>(college.tier);
   const [maxStudents, setMaxStudents] = useState("");
   const [annualPrice, setAnnualPrice] = useState("");
+  const [projectLabAccess, setProjectLabAccess] = useState(
+    college.projectLabAccess ?? (college.tier === "Pro Campus" || college.tier === "Academic Enterprise" || college.tier === "Custom")
+  );
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleTierChange = (newTier: CollegeTier) => {
+    setTier(newTier);
+    if (newTier === "Pro Campus" || newTier === "Academic Enterprise") {
+      setProjectLabAccess(true);
+    }
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +46,16 @@ export function ChangePlanModal({ college, onClose, onDone }: { college: { id: n
     try {
       await api.post(
         `/admin/colleges/${college.id}/subscription`,
-        tier === "Custom" ? { max_students: Number(maxStudents), annual_price: annualPrice ? Number(annualPrice) : undefined } : { plan_code: PLAN_CODE_BY_TIER[tier] }
+        tier === "Custom"
+          ? {
+              max_students: Number(maxStudents),
+              annual_price: annualPrice ? Number(annualPrice) : undefined,
+              project_lab_access: projectLabAccess,
+            }
+          : {
+              plan_code: PLAN_CODE_BY_TIER[tier],
+              project_lab_access: projectLabAccess,
+            }
       );
       onDone(`${college.name} is now on the ${tier} plan.`);
     } catch (err) {
@@ -40,7 +68,7 @@ export function ChangePlanModal({ college, onClose, onDone }: { college: { id: n
   return (
     <Modal
       onClose={onClose}
-      title="Renew / Change Plan"
+      title={college.hasActivePlan ? "Renew / Change Plan" : "Assign Plan"}
       subtitle={college.name}
       icon={CreditCard}
       size="md"
@@ -63,10 +91,10 @@ export function ChangePlanModal({ college, onClose, onDone }: { college: { id: n
 
         <div>
           <label className="mb-1 block font-semibold text-text-secondary">Institution Plan</label>
-          <select value={tier} onChange={(e) => setTier(e.target.value as CollegeTier)} className={INPUT}>
+          <select value={tier} onChange={(e) => handleTierChange(e.target.value as CollegeTier)} className={INPUT}>
             <option value="Standard">Standard</option>
-            <option value="Pro Campus">Pro Campus</option>
-            <option value="Academic Enterprise">Academic Enterprise</option>
+            <option value="Pro Campus">Pro Campus (includes Project Lab)</option>
+            <option value="Academic Enterprise">Academic Enterprise (includes Project Lab)</option>
             <option value="Custom">Custom — negotiated seat count</option>
           </select>
         </div>
@@ -83,6 +111,23 @@ export function ChangePlanModal({ college, onClose, onDone }: { college: { id: n
             </div>
           </div>
         )}
+
+        <div className="rounded-control border border-border-subtle bg-elevated p-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={projectLabAccess}
+              onChange={(e) => setProjectLabAccess(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-border-strong text-accent-primary focus:ring-accent-primary"
+            />
+            <div>
+              <span className="block text-xs font-bold text-primary">Include Project Lab Access</span>
+              <span className="block text-2xs text-text-muted">
+                Unlocks cloud VS Code workspaces, guided projects, 80 workspace-hours/month, and up to 3 concurrent projects for every student.
+              </span>
+            </div>
+          </label>
+        </div>
 
         {error && (
           <div role="alert" className="rounded-control border border-status-danger/30 bg-status-danger/10 p-3 font-semibold text-status-danger">
@@ -154,6 +199,81 @@ export function AdjustSeatsModal({
         </div>
 
         <p className="text-2xs text-text-muted">This marks the plan &quot;Custom&quot; and doesn&apos;t change the renewal date.</p>
+
+        {error && (
+          <div role="alert" className="rounded-control border border-status-danger/30 bg-status-danger/10 p-3 font-semibold text-status-danger">
+            {error}
+          </div>
+        )}
+      </form>
+    </Modal>
+  );
+}
+
+/** "End College Plan": ends an active college plan immediately. */
+export function EndCollegePlanModal({
+  college,
+  onClose,
+  onDone,
+}: {
+  college: { id: number; name: string };
+  onClose: () => void;
+  onDone: (message: string) => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [working, setWorking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reason.trim()) return;
+    setWorking(true);
+    setError(null);
+    try {
+      await api.post(`/admin/colleges/${college.id}/subscription/cancel`, { reason: reason.trim() });
+      onDone(`${college.name}'s plan has been ended.`);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to end college plan.");
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <Modal
+      onClose={onClose}
+      title="End College Plan"
+      subtitle={college.name}
+      icon={Ban}
+      size="sm"
+      closeOnBackdrop={false}
+      footer={
+        <>
+          <button type="button" onClick={onClose} className={CANCEL}>
+            Cancel
+          </button>
+          <button type="submit" form="end-college-plan-form" disabled={working || reason.trim().length < 3} className={DANGER}>
+            {working ? "Ending..." : "End Plan Now"}
+          </button>
+        </>
+      }
+    >
+      <form id="end-college-plan-form" onSubmit={submit} className="space-y-4">
+        <p className="text-text-muted">
+          Ending the plan for <strong className="text-primary">{college.name}</strong> immediately ends coverage for every student at this college.
+        </p>
+
+        <div>
+          <label className="mb-1 block font-semibold text-text-secondary">Reason *</label>
+          <input
+            required
+            type="text"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="e.g. Contract ended, subscription replaced"
+            className={INPUT}
+          />
+        </div>
 
         {error && (
           <div role="alert" className="rounded-control border border-status-danger/30 bg-status-danger/10 p-3 font-semibold text-status-danger">

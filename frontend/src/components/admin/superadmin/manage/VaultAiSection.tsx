@@ -15,12 +15,13 @@ const SELECT = "rounded-control border border-border-subtle bg-elevated px-2.5 p
 
 const ACTION_WORDS: Record<string, string> = { reset: "Reset", grant_attempt: "Attempt re-opened", scores: "Marks changed", qualified: "Marked qualified" };
 
-function Marks({ scores }: { scores: Record<string, number> }) {
+function Marks({ scores }: { scores?: Record<string, number> | null }) {
+  const safeScores = scores && typeof scores === "object" ? scores : {};
   return (
     <span className="inline-flex items-center gap-1">
       {["1", "2", "3"].map((set) => (
         <span key={set} className="rounded-lg bg-elevated px-2 py-1 font-mono text-2xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
-          S{set} <span className="text-primary">{scores[set] !== undefined ? `${scores[set]}%` : "—"}</span>
+          S{set} <span className="text-primary">{safeScores[set] !== undefined ? `${safeScores[set]}%` : "—"}</span>
         </span>
       ))}
     </span>
@@ -42,7 +43,7 @@ function StackCard({
 }) {
   const history = row?.attempt_history ?? [];
   // The server refuses only a stack the student has not touched at all (Series 1, no marks, no history).
-  const canReset = row !== null && (row.status !== "in_progress" || row.current_attempt > 1 || Object.keys(row.series_scores).length > 0 || history.length > 0);
+  const canReset = row !== null && (row.status !== "in_progress" || row.current_attempt > 1 || Object.keys(row.series_scores ?? {}).length > 0 || history.length > 0);
   const cycle = history.filter((a) => a.this_cycle);
   const older = history.filter((a) => !a.this_cycle);
 
@@ -79,7 +80,7 @@ function StackCard({
               )}
             </p>
           )}
-          {(row.status === "in_progress" || row.status === "qualified") && Object.keys(row.series_scores).length > 0 && (
+          {(row.status === "in_progress" || row.status === "qualified") && Object.keys(row.series_scores ?? {}).length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-3xs font-bold uppercase tracking-wide text-text-muted">{row.status === "qualified" ? "Qualifying series" : "This series"}</span>
               <Marks scores={row.series_scores} />

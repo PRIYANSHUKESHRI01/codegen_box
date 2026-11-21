@@ -193,7 +193,18 @@ class VaultInterviewQualificationService
                 'all_sets_completed' => $completedCount >= 3,
                 'series_average' => $qual->series_average,
             ],
-            'past_attempts' => array_values(array_slice($qual->attempt_history ?? [], (int) $qual->cycle_start)),
+            'past_attempts' => array_values(array_map(function ($item) use ($qual) {
+                $item = (array) $item;
+                $scores = (array) ($item['scores'] ?? []);
+                return [
+                    'attempt' => (int) ($item['attempt'] ?? 1),
+                    'series_number' => (int) ($item['series_number'] ?? $item['attempt'] ?? 1),
+                    'scores' => empty($scores) ? (object) [] : (object) $scores,
+                    'average' => isset($item['average']) ? round((float) $item['average'], 2) : 0.0,
+                    'evaluated_at' => (string) ($item['evaluated_at'] ?? $qual->updated_at?->toIso8601String() ?? now()->toIso8601String()),
+                    'passed' => (bool) ($item['passed'] ?? false),
+                ];
+            }, array_slice($qual->attempt_history ?? [], (int) $qual->cycle_start))),
         ];
     }
 

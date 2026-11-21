@@ -423,8 +423,8 @@ function SeriesRail({ sets, average }: { sets: QualificationSetDetail[]; average
   );
 }
 
-function PastAttempts({ attempts }: { attempts: VaultQualificationStatusResponse["past_attempts"] }) {
-  if (attempts.length === 0) return null;
+function PastAttempts({ attempts }: { attempts?: VaultQualificationStatusResponse["past_attempts"] | null }) {
+  if (!attempts || attempts.length === 0) return null;
   return (
     <Rise i={3}>
       <section aria-label="Previous attempts" className="rounded-2xl border border-border-subtle bg-surface p-4 shadow-subtle sm:p-5">
@@ -432,26 +432,37 @@ function PastAttempts({ attempts }: { attempts: VaultQualificationStatusResponse
           <History className="h-3.5 w-3.5" aria-hidden /> Previous attempts
         </h5>
         <ul className="mt-3 divide-y divide-border-subtle">
-          {attempts.map((a) => (
-            <li key={`${a.attempt}-${a.evaluated_at}`} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
-              <div className="min-w-0">
-                <p className="text-13 font-bold text-primary">Attempt {a.attempt}</p>
-                <p className="text-2xs text-text-muted">{new Date(a.evaluated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p>
-              </div>
-              <div className="flex items-center gap-1.5">
-                {Object.entries(a.scores)
-                  .sort(([x], [y]) => Number(x) - Number(y))
-                  .map(([set, score]) => (
-                    <span key={set} className="tabular rounded-lg bg-elevated px-2 py-1 text-2xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle" title={`Set ${set}`}>
-                      S{set} <span className="text-primary">{score}%</span>
-                    </span>
-                  ))}
-              </div>
-              <span className={cn("tabular rounded-full px-2.5 py-1 text-2xs font-extrabold ring-1 ring-inset", a.passed ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 ring-rose-500/25 dark:text-rose-300")}>
-                {Math.round(a.average)}% average
-              </span>
-            </li>
-          ))}
+          {attempts.map((a, index) => {
+            const hasValidDate = a.evaluated_at && !isNaN(new Date(a.evaluated_at).getTime());
+            const dateStr = hasValidDate
+              ? new Date(a.evaluated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+              : null;
+            const scoreEntries = a.scores && typeof a.scores === "object" ? Object.entries(a.scores) : [];
+            const avg = typeof a.average === "number" && !isNaN(a.average) ? Math.round(a.average) : 0;
+
+            return (
+              <li key={`${a.attempt}-${a.evaluated_at || index}`} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                <div className="min-w-0">
+                  <p className="text-13 font-bold text-primary">Attempt {a.attempt}</p>
+                  {dateStr && <p className="text-2xs text-text-muted">{dateStr}</p>}
+                </div>
+                {scoreEntries.length > 0 && (
+                  <div className="flex items-center gap-1.5">
+                    {scoreEntries
+                      .sort(([x], [y]) => Number(x) - Number(y))
+                      .map(([set, score]) => (
+                        <span key={set} className="tabular rounded-lg bg-elevated px-2 py-1 text-2xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle" title={`Set ${set}`}>
+                          S{set} <span className="text-primary">{score}%</span>
+                        </span>
+                      ))}
+                  </div>
+                )}
+                <span className={cn("tabular rounded-full px-2.5 py-1 text-2xs font-extrabold ring-1 ring-inset", a.passed ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-300" : "bg-rose-500/10 text-rose-700 ring-rose-500/25 dark:text-rose-300")}>
+                  {avg}% average
+                </span>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </Rise>
@@ -972,7 +983,7 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
 
               {qualification && (
                 <div className="inline-flex shrink-0 items-center gap-3 self-start rounded-2xl border border-border-subtle bg-surface px-3.5 py-2 text-xs shadow-subtle sm:self-auto">
-                  <AttemptMarkers current={qualification.current_attempt} max={qualification.max_attempts} failed={qualification.past_attempts.filter((a) => !a.passed).map((a) => a.attempt)} />
+                  <AttemptMarkers current={qualification.current_attempt} max={qualification.max_attempts} failed={(qualification.past_attempts ?? []).filter((a) => !a.passed).map((a) => a.attempt)} />
                   <span
                     className={cn(
                       "rounded-full px-2.5 py-1 text-3xs font-black uppercase tracking-wide ring-1 ring-inset",

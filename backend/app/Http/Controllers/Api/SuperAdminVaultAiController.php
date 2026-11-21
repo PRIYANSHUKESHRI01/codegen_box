@@ -178,7 +178,20 @@ class SuperAdminVaultAiController extends Controller
         ];
 
         if ($detail) {
-            $row['attempt_history'] = collect($history)->map(fn (array $a, int $i) => $a + ['index' => $i, 'this_cycle' => $i >= $cycleStart])->values();
+            $row['attempt_history'] = collect($history)->map(function (array $a, int $i) use ($cycleStart, $q) {
+                $scores = (array) ($a['scores'] ?? []);
+                return [
+                    'attempt' => (int) ($a['attempt'] ?? ($i + 1)),
+                    'series_number' => (int) ($a['series_number'] ?? $a['attempt'] ?? ($i + 1)),
+                    'scores' => empty($scores) ? (object) [] : (object) $scores,
+                    'average' => isset($a['average']) ? round((float) $a['average'], 2) : 0.0,
+                    'evaluated_at' => (string) ($a['evaluated_at'] ?? $q->updated_at?->toIso8601String() ?? now()->toIso8601String()),
+                    'passed' => (bool) ($a['passed'] ?? false),
+                    'edited_by_admin' => (bool) ($a['edited_by_admin'] ?? false),
+                    'index' => $i,
+                    'this_cycle' => $i >= $cycleStart,
+                ];
+            })->values();
             $row['admin_log'] = array_reverse($q->admin_log ?? []);
         }
 

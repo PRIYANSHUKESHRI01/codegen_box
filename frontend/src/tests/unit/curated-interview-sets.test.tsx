@@ -438,6 +438,21 @@ describe("CuratedSetsExplorer — Qualification Circuit", () => {
       expect(screen.getByText(/New Series Unlocked for Attempt 2 of 3/)).toBeTruthy();
     });
 
+    it("safely handles past attempts when scores or evaluated_at is missing without crashing", async () => {
+      await open(
+        withSets([["not_started", null], ["not_started", null], ["not_started", null]], {
+          current_attempt: 2,
+          past_attempts: [
+            { attempt: 1, series_number: 1, average: 50, passed: false } as any,
+          ],
+        })
+      );
+
+      const region = await screen.findByRole("region", { name: "Previous attempts" });
+      expect(region.textContent).toContain("Attempt 1");
+      expect(region.textContent).toContain("50% average");
+    });
+
     it("has no previous-attempts section on a first attempt", async () => {
       await open(mockQualStatusInProgress);
 

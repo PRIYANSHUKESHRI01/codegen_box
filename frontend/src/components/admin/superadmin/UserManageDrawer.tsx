@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { Loader2, RefreshCw, X } from "lucide-react";
+import { Activity, Download, Loader2, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { downloadApiFile } from "@/lib/download";
 import type { ManagedUserResponse } from "@/types/adminSubscriptions";
 import { roleInfo } from "./accountRoles";
+import { PersonDrawer } from "./activity/PersonDrawer";
 import { ActivitySection } from "./manage/ActivitySection";
 import { OverviewSection, type StudentDetail } from "./manage/OverviewSection";
 import { PlanSection } from "./manage/PlanSection";
@@ -49,7 +51,21 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
   const [detail, setDetail] = useState<StudentDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [exporting, setExporting] = useState(false);
+  const [showLiveActivity, setShowLiveActivity] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleExportReport = async () => {
+    setExporting(true);
+    try {
+      await downloadApiFile(`/superadmin/users/${userId}/export-report`, `aptrun-user-${userId}-report.csv`);
+      triggerToast("User report downloaded successfully.");
+    } catch {
+      triggerToast("Failed to download report.", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setError(null);
@@ -144,7 +160,27 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
                 </div>
               )}
             </div>
-            <div className="flex shrink-0 items-center gap-1">
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setShowLiveActivity(true)}
+                disabled={!user}
+                title="View full live activity, screen history, and mock interview practice (even when offline)"
+                className="inline-flex items-center gap-1 rounded-control border border-border-subtle bg-elevated px-2 py-1 text-3xs font-bold text-primary shadow-subtle hover:bg-surface-hover hover:border-border-strong disabled:opacity-50"
+              >
+                <Activity className="h-3 w-3 text-emerald-500" />
+                <span className="hidden sm:inline">Live Activity</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportReport}
+                disabled={exporting || !user}
+                title="Download user report (CSV)"
+                className="inline-flex items-center gap-1 rounded-control border border-border-subtle bg-elevated px-2 py-1 text-3xs font-bold text-primary shadow-subtle hover:bg-surface-hover hover:border-border-strong disabled:opacity-50"
+              >
+                <Download className="h-3 w-3 text-accent-primary" />
+                <span className="hidden sm:inline">{exporting ? "..." : "Export"}</span>
+              </button>
               <button
                 type="button"
                 onClick={() => void load()}
@@ -194,7 +230,15 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
             </div>
           ) : (
             <>
-              {tab === "overview" && <OverviewSection data={data} reload={reload} triggerToast={triggerToast} detail={detail} />}
+              {tab === "overview" && (
+                <OverviewSection
+                  data={data}
+                  reload={reload}
+                  triggerToast={triggerToast}
+                  detail={detail}
+                  onOpenLiveActivity={() => setShowLiveActivity(true)}
+                />
+              )}
               {tab === "plan" && <PlanSection data={data} reload={reload} triggerToast={triggerToast} />}
               {tab === "vault_ai" && data.user.role === "user" && <VaultAiSection userId={userId} reload={reload} triggerToast={triggerToast} />}
               {tab === "security" && (
@@ -208,11 +252,13 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
                   }}
                 />
               )}
-              {tab === "activity" && <ActivitySection data={data} />}
+              {tab === "activity" && <ActivitySection data={data} onOpenLiveActivity={() => setShowLiveActivity(true)} />}
             </>
           )}
         </div>
       </motion.div>
+
+      {showLiveActivity && <PersonDrawer userId={userId} onClose={() => setShowLiveActivity(false)} />}
     </div>
   );
 }

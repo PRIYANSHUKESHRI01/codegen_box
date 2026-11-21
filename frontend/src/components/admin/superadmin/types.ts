@@ -4,7 +4,7 @@
  * types.ts's role in that page's own tab split.
  */
 
-export type PlatformRole = "superadmin" | "admin_internal" | "admin_tpo" | "admin_marketing" | "user";
+export type PlatformRole = "superadmin" | "admin_internal" | "admin_tpo" | "admin_marketing" | "user" | "section_coordinator" | "admin_company";
 
 /** A user of ANY role, as returned by the superadmin-only /superadmin/users cross-role directory. */
 export interface ApiPlatformUser {
@@ -12,6 +12,9 @@ export interface ApiPlatformUser {
   name: string;
   email: string;
   handle: string | null;
+  phone?: string | null;
+  roll_number?: string | null;
+  last_seen_at?: string | null;
   role: PlatformRole;
   is_blocked: boolean;
   created_at: string;
@@ -33,6 +36,7 @@ export interface ApiPlatformUser {
   } | null;
   /** Only present for role=user rows. */
   readiness_tier?: "Placement Ready" | "In Progress" | "Needs Training";
+  readiness_score?: number | null;
   /** Granular section access — only ever non-null for admin_internal/admin_marketing rows. See User::hasPermission on the backend. */
   permissions: string[] | null;
   /** True while the account still has the temporary password it was issued (it must pick its own at next login). */
@@ -109,6 +113,8 @@ export const ROLE_LABEL: Record<PlatformRole, string> = {
   admin_internal: "Mellow Staff (Ops)",
   admin_marketing: "Mellow Staff (Marketing)",
   admin_tpo: "College TPO",
+  section_coordinator: "Section Coordinator",
+  admin_company: "Hiring Company",
   user: "Student / Coder",
 };
 
@@ -117,6 +123,8 @@ export const ROLE_BADGE_CLASS: Record<PlatformRole, string> = {
   admin_internal: "bg-indigo-500/10 text-indigo-400 border-indigo-500/25",
   admin_marketing: "bg-rose-500/10 text-rose-400 border-rose-500/25",
   admin_tpo: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25",
+  section_coordinator: "bg-sky-500/10 text-sky-400 border-sky-500/25",
+  admin_company: "bg-violet-500/10 text-violet-400 border-violet-500/25",
   user: "bg-emerald-500/10 text-emerald-400 border-emerald-500/25",
 };
 

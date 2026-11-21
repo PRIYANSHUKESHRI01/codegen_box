@@ -186,7 +186,7 @@ class HackathonArenaController extends Controller
     public function register(Request $request, Hackathon $hackathon)
     {
         $this->visibleOrFail($request, $hackathon);
-        $this->planGate->requireHackathonAccess($request->user());
+        $this->planGate->requireHackathonAccess($request->user(), $hackathon);
 
         $data = $request->validate([
             'mode' => ['required', Rule::in(HackathonRegistrationService::MODES)],
@@ -221,7 +221,7 @@ class HackathonArenaController extends Controller
     public function saveSubmission(Request $request, Hackathon $hackathon)
     {
         $this->visibleOrFail($request, $hackathon);
-        $this->planGate->requireHackathonAccess($request->user());
+        $this->planGate->requireHackathonAccess($request->user(), $hackathon);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'min:3', 'max:120'],

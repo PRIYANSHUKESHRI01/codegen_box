@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\NotificationType;
 use App\Http\Controllers\Api\Concerns\ConfirmsSuperadminPassword;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
@@ -9,6 +10,7 @@ use App\Models\ContactRequest;
 use App\Models\User;
 use App\Services\IssuedCredentialVault;
 use App\Services\MarketingTeamService;
+use App\Services\NotificationService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -72,6 +74,169 @@ class SuperAdminMarketingTeamController extends Controller
                 'unassigned_leads' => User::mellowDirectLeads()->whereNull('assigned_marketing_id')->count(),
                 'unassigned_enquiries' => ContactRequest::whereNull('assigned_marketing_id')->count(),
             ],
+        ]);
+    }
+
+    /**
+     * Active marketing staff for assignment dropdowns.
+     */
+    public function activeEmployees(): JsonResponse
+    {
+        $employees = User::where('role', User::ROLE_ADMIN_MARKETING)
+            ->where('is_blocked', false)
+            ->withCount(['assignedLeads as open_leads_count' => fn ($q) => $q->where(fn ($w) => $w->whereIn('lead_status', MarketingTeamService::OPEN_STATUSES)->orWhereNull('lead_status'))])
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return response()->json([
+            'employees' => $employees,
+        ]);
+    }
+
+    /**
+     * Assign one, multiple, or all unassigned leads/users to a chosen marketing employee or auto-distribute.
+     */
+    public function assignLeads(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'user_ids' => ['nullable', 'array', 'max:1000'],
+            'user_ids.*' => ['integer', 'exists:users,id'],
+            'all_unassigned' => ['nullable', 'boolean'],
+            'marketing_id' => ['nullable', 'integer', 'exists:users,id'],
+            'mode' => ['nullable', 'string', 'in:single,auto_distribute'],
+        ]);
+
+        $caller = $request->user();
+        $allUnassigned = $request->boolean('all_unassigned');
+        $mode = $validated['mode'] ?? ($request->filled('marketing_id') ? 'single' : 'auto_distribute');
+
+        if ($allUnassigned) {
+            $targets = User::mellowDirectLeads()
+                ->whereNull('assigned_marketing_id')
+                ->get();
+        } else {
+            $userIds = $validated['user_ids'] ?? [];
+            if (empty($userIds)) {
+                return response()->json(['message' => 'Please select at least one user or choose all unassigned.'], 422);
+            }
+            $targets = User::whereIn('id', $userIds)->get();
+        }
+
+        if ($targets->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'count' => 0,
+                'message' => 'No matching users found to assign.',
+            ]);
+        }
+
+        if ($mode === 'single') {
+            $marketingId = $validated['marketing_id'] ?? null;
+            if (! $marketingId) {
+                return response()->json(['message' => 'Please select a marketing employee.'], 422);
+            }
+
+            $employee = User::where('id', $marketingId)
+                ->where('role', User::ROLE_ADMIN_MARKETING)
+                ->where('is_blocked', false)
+                ->first();
+
+            if (! $employee) {
+                return response()->json(['message' => 'Selected marketing employee is inactive or not found.'], 422);
+            }
+
+            $count = 0;
+            DB::transaction(function () use ($targets, $employee, &$count) {
+                foreach ($targets as $user) {
+                    $user->assigned_marketing_id = $employee->id;
+                    $user->save();
+                    $count++;
+                }
+            });
+
+            app(NotificationService::class)->notify(
+                $employee,
+                NotificationType::LeadNew,
+                'New lead(s) assigned to you',
+                "SuperAdmin assigned {$count} user(s) to you.",
+                [
+                    'url' => '/marketing',
+                    'group_key' => 'marketing.assigned:'.now()->format('YmdHis'),
+                    'actor' => $caller,
+                ]
+            );
+
+            ActivityLog::record(
+                $caller,
+                "Assigned {$count} user(s) to marketing employee {$employee->name}",
+                'User',
+                $employee->name,
+                ['count' => $count, 'marketing_id' => $employee->id]
+            );
+
+            return response()->json([
+                'success' => true,
+                'count' => $count,
+                'employee' => ['id' => $employee->id, 'name' => $employee->name],
+                'message' => "Successfully assigned {$count} user(s) to {$employee->name}.",
+            ]);
+        }
+
+        // Auto-distribute mode across active marketing employees
+        $employees = User::where('role', User::ROLE_ADMIN_MARKETING)
+            ->where('is_blocked', false)
+            ->withCount('assignedLeads')
+            ->orderBy('assigned_leads_count')
+            ->orderBy('id')
+            ->get();
+
+        if ($employees->isEmpty()) {
+            return response()->json(['message' => 'No active marketing employees available to receive leads.'], 422);
+        }
+
+        $load = $employees->mapWithKeys(fn (User $e) => [$e->id => (int) $e->assigned_leads_count])->all();
+        $placed = [];
+
+        DB::transaction(function () use ($targets, &$load, &$placed) {
+            foreach ($targets as $user) {
+                $targetId = array_search(min($load), $load, true);
+                $user->assigned_marketing_id = $targetId;
+                $user->save();
+                $load[$targetId]++;
+                $placed[$targetId][] = $user->id;
+            }
+        });
+
+        foreach ($placed as $employeeId => $assignedIds) {
+            $emp = $employees->firstWhere('id', $employeeId);
+            if (! $emp) continue;
+            $c = count($assignedIds);
+            app(NotificationService::class)->notify(
+                $emp,
+                NotificationType::LeadNew,
+                'New lead(s) assigned to you',
+                "SuperAdmin distributed {$c} user(s) to you.",
+                [
+                    'url' => '/marketing',
+                    'group_key' => 'marketing.distributed:'.now()->format('YmdHis'),
+                    'actor' => $caller,
+                ]
+            );
+        }
+
+        $totalCount = $targets->count();
+        ActivityLog::record(
+            $caller,
+            "Auto-distributed {$totalCount} unassigned user(s) across marketing team",
+            'User',
+            'Marketing Team',
+            ['total_count' => $totalCount, 'placed' => array_map('count', $placed)]
+        );
+
+        return response()->json([
+            'success' => true,
+            'count' => $totalCount,
+            'message' => "Successfully auto-distributed {$totalCount} user(s) evenly across the marketing team.",
         ]);
     }
 

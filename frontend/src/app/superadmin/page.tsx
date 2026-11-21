@@ -3,11 +3,12 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog, Gift, Activity } from "lucide-react";
+import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog, Gift, Activity, Users, Rocket, Sparkles, BarChart3, ShieldCheck, Briefcase } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { cn } from "@/lib/utils";
 import { OverviewPanel } from "@/components/admin/superadmin/OverviewPanel";
+import { AptRunUsersPanel } from "@/components/admin/superadmin/AptRunUsersPanel";
 import { StudentsPanel } from "@/components/admin/superadmin/StudentsPanel";
 import { LeadsPanel } from "@/components/admin/superadmin/LeadsPanel";
 import { MarketingPerformancePanel } from "@/components/admin/superadmin/MarketingPerformancePanel";
@@ -38,13 +39,25 @@ import { MarketingTeamPanel } from "@/components/admin/superadmin/marketingTeam/
 import { MerchantNavyPanel } from "@/components/admin/superadmin/MerchantNavyPanel";
 import { WeeklyRewardsPanel } from "@/components/admin/superadmin/WeeklyRewardsPanel";
 import { ActivityPanel } from "@/components/admin/superadmin/activity/ActivityPanel";
+import { SuperAdminHackathonsPanel } from "@/components/admin/superadmin/SuperAdminHackathonsPanel";
+import { GeminiKeysPanel } from "@/components/admin/superadmin/GeminiKeysPanel";
+import { PlatformUsageAnalytics } from "@/components/admin/superadmin/PlatformUsageAnalytics";
+import { TrafficPulseBar } from "@/components/admin/superadmin/TrafficPulseBar";
+import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList";
+import { SuperAdminDrivesPanel } from "@/components/admin/superadmin/SuperAdminDrivesPanel";
 import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "activity" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "platform_usage", label: "Platform Usage", icon: BarChart3 },
   { id: "activity", label: "Live Activity", icon: Activity },
+  { id: "gemini_keys", label: "Gemini Keys", icon: Sparkles },
+  { id: "drives", label: "Placement Drives", icon: Briefcase },
+  { id: "hackathons", label: "Hackathons", icon: Rocket },
+  { id: "vault_ai", label: "Vault AI Results", icon: ShieldCheck },
+  { id: "users", label: "AptRun Users", icon: Users },
   { id: "students", label: "Students", icon: GraduationCap },
   { id: "leads", label: "Leads", icon: UserSearch },
   { id: "marketing", label: "Marketing Performance", icon: Megaphone },
@@ -123,6 +136,8 @@ function SuperAdminPageContent() {
       title="Superadmin Master Control"
       subtitle="Complete bird's-eye management of users, partner universities, infrastructure, and security."
     >
+      <TrafficPulseBar />
+
       <div className="flex items-center gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit flex-wrap">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -143,7 +158,23 @@ function SuperAdminPageContent() {
       </div>
 
       {activeTab === "overview" && <OverviewPanel onViewAuditLog={() => goToTab("audit")} onOpenTab={(tab, collegeId) => isTab(tab) && goToTab(tab, collegeId)} />}
+      {activeTab === "platform_usage" && <PlatformUsageAnalytics />}
       {activeTab === "activity" && <ActivityPanel key={collegeParam ?? "all"} initialCollegeId={collegeParam} />}
+      {activeTab === "gemini_keys" && <GeminiKeysPanel triggerToast={triggerToast} />}
+      {activeTab === "drives" && <SuperAdminDrivesPanel />}
+      {activeTab === "hackathons" && <SuperAdminHackathonsPanel triggerToast={triggerToast} />}
+      {activeTab === "vault_ai" && (
+        <div className="space-y-4">
+          <div className="rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
+            <h2 className="text-base font-extrabold text-primary">Platform-wide Vault AI Results &amp; Reports</h2>
+            <p className="mt-0.5 text-xs text-text-muted">
+              Every student across all partner colleges who has sat a Vault AI Interview series — final averages across the three sets, attempts taken, and downloadable PDF reports.
+            </p>
+          </div>
+          <VaultAiResultsList scope="platform" triggerToast={triggerToast} />
+        </div>
+      )}
+      {activeTab === "users" && <AptRunUsersPanel triggerToast={triggerToast} />}
       {activeTab === "students" && <StudentsPanel triggerToast={triggerToast} />}
       {activeTab === "leads" && <LeadsPanel triggerToast={triggerToast} />}
       {activeTab === "marketing" && <MarketingPerformancePanel />}

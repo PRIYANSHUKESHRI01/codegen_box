@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Search, Ban, CheckCircle2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Search, Ban, CheckCircle2, RefreshCw, AlertTriangle, Download, UserX, KeyRound, FileSpreadsheet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { downloadApiFile } from "@/lib/download";
 import { UserManageDrawer } from "./UserManageDrawer";
+import { ReadinessReportModal } from "./ReadinessReportModal";
 import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
 import { UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
 import { departmentShort, useBranchCatalog } from "@/lib/branches";
@@ -38,10 +40,18 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
   const [searchDebounced, setSearchDebounced] = useState("");
   const [activeStudentId, setActiveStudentId] = useState<number | null>(null);
 
+  // Bulk operations across multiple students (for campus placement drives and high-concurrency scale)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
+  const [affiliation, setAffiliation] = useState<"all" | "college" | "independent">("all");
+  const [downloading, setDownloading] = useState(false);
   const [collegeId, setCollegeId] = useState("");
   // Superadmin sees every department; narrowing to one is a filter, never a restriction.
   const catalog = useBranchCatalog();
   const [department, setDepartment] = useState("");
+  const [readinessFilter, setReadinessFilter] = useState<string>("");
+  const [showReadinessModal, setShowReadinessModal] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setSearchDebounced(search), 350);
@@ -50,15 +60,41 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
 
   // The numbers beside each filter, worked out under every OTHER filter: a university's count is its students of the
   // chosen department, a department's count is its students at the chosen university — exactly what picking it shows.
-  const facets = useDirectoryFacets({ role: "user", collegeId, department, hasCollege: true, search: searchDebounced });
+  const facets = useDirectoryFacets({
+    role: "user",
+    collegeId,
+    department,
+    hasCollege: affiliation === "all" ? undefined : affiliation === "college",
+    search: searchDebounced,
+  });
 
   const buildParams = useCallback((extra: Record<string, string> = {}) => {
-    const params = new URLSearchParams({ role: "user", has_college: "1", ...extra });
+    const params = new URLSearchParams({ role: "user", ...extra });
+    if (affiliation === "college") params.set("has_college", "1");
+    else if (affiliation === "independent") params.set("has_college", "0");
     if (searchDebounced) params.set("search", searchDebounced);
     if (collegeId) params.set("college_id", collegeId);
     if (department) params.set("department", department);
+    if (readinessFilter === "above_50") params.set("min_readiness", "50");
+    else if (readinessFilter === "placement_ready") params.set("readiness_tier", "Placement Ready");
+    else if (readinessFilter === "in_progress") params.set("readiness_tier", "In Progress");
+    else if (readinessFilter === "needs_training") params.set("readiness_tier", "Needs Training");
     return params;
-  }, [searchDebounced, collegeId, department]);
+  }, [affiliation, searchDebounced, collegeId, department, readinessFilter]);
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      const params = buildParams();
+      const filename = affiliation === "independent" ? "aptrun-independent-students.csv" : "aptrun-students-report.csv";
+      await downloadApiFile(`/superadmin/users/export?${params.toString()}`, filename);
+      triggerToast("Students report downloaded successfully.");
+    } catch {
+      triggerToast("Failed to download students report.", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Only the newest request may write to the screen: with several filters changed in quick succession, a slow answer to an
   // old filter must never land on top of the answer to the current one.
@@ -66,7 +102,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
 
   const load = useCallback(() => {
     const ticket = ++latest.current;
-    const askedFiltered = Boolean(searchDebounced || collegeId || department);
+    const askedFiltered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter);
     setFetching(true);
     setError(null);
 
@@ -122,15 +158,67 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
       .finally(() => setLoadingMore(false));
   };
 
-  const filtered = Boolean(searchDebounced || collegeId || department);
+  const filtered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter);
   const clearFilters = () => {
     setSearch("");
     setSearchDebounced("");
     setCollegeId("");
     setDepartment("");
+    setAffiliation("all");
+    setReadinessFilter("");
   };
 
   const departmentCount = (code: string): number | null => (facets?.departments ? facets.departments[code] ?? 0 : null);
+
+  const isAllOnPageSelected = students.length > 0 && students.every((s) => selectedIds.has(s.id));
+
+  const toggleSelectAllOnPage = () => {
+    const next = new Set(selectedIds);
+    if (isAllOnPageSelected) {
+      students.forEach((s) => next.delete(s.id));
+    } else {
+      students.forEach((s) => next.add(s.id));
+    }
+    setSelectedIds(next);
+  };
+
+  const toggleSelectUser = (id: number) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleBulkAction = async (action: "revoke_sessions" | "toggle_block" | "send_credentials") => {
+    if (selectedIds.size === 0) return;
+    const count = selectedIds.size;
+    const confirmText =
+      action === "revoke_sessions"
+        ? `Are you sure you want to revoke all active sessions for ${count} selected student(s)? They will be immediately signed out across all devices.`
+        : action === "toggle_block"
+        ? `Are you sure you want to toggle the block status for ${count} selected student(s)?`
+        : `Are you sure you want to regenerate and dispatch new credentials to ${count} selected student(s) via email?`;
+
+    if (!window.confirm(confirmText)) return;
+
+    setBulkProcessing(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string }>("/superadmin/users/bulk-action", {
+        user_ids: Array.from(selectedIds),
+        action,
+      });
+      triggerToast(res.message);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Bulk action failed.", "error");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -142,11 +230,36 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
               ? error
                 ? "Couldn't load the list."
                 : "Loading students…"
-              : `${total.toLocaleString()} student(s) ${answeredFiltered ? "match this filter" : "enrolled via a partner college"}.`}
+              : `${total.toLocaleString()} student(s) ${answeredFiltered ? "match this filter" : affiliation === "independent" ? "registered independently" : "enrolled via a partner college"}.`}
             {loaded && fetching && <span className="ml-2 inline-flex items-center gap-1 text-accent-primary"><RefreshCw className="h-3 w-3 animate-spin" aria-hidden />Updating…</span>}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Affiliation filter */}
+          <div className="inline-flex items-center rounded-control border border-border-subtle bg-surface p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setAffiliation("all")}
+              className={cn("rounded px-2.5 py-1 text-2xs transition-colors", affiliation === "all" ? "bg-accent-primary text-white" : "text-text-secondary hover:text-primary")}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setAffiliation("college")}
+              className={cn("rounded px-2.5 py-1 text-2xs transition-colors", affiliation === "college" ? "bg-accent-primary text-white" : "text-text-secondary hover:text-primary")}
+            >
+              College
+            </button>
+            <button
+              type="button"
+              onClick={() => setAffiliation("independent")}
+              className={cn("rounded px-2.5 py-1 text-2xs transition-colors", affiliation === "independent" ? "bg-accent-primary text-white" : "text-text-secondary hover:text-primary")}
+            >
+              Independent
+            </button>
+          </div>
+
           <UniversityPicker value={collegeId} onChange={setCollegeId} facets={facets} allowNone={false} />
           <select
             aria-label="Filter by department"
@@ -164,6 +277,18 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
               );
             })}
           </select>
+          <select
+            aria-label="Filter by readiness score"
+            value={readinessFilter}
+            onChange={(e) => setReadinessFilter(e.target.value)}
+            className="rounded-control border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-primary outline-none focus:border-accent-primary"
+          >
+            <option value="">All readiness</option>
+            <option value="above_50">≥ 50% Readiness</option>
+            <option value="placement_ready">Placement Ready (≥75%)</option>
+            <option value="in_progress">In Progress (45–74%)</option>
+            <option value="needs_training">Needs Training (&lt;45%)</option>
+          </select>
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
@@ -175,6 +300,27 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
               className="pl-8 pr-3 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary placeholder-text-muted outline-none focus:border-accent-primary"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={() => setShowReadinessModal(true)}
+            title="Download student readiness scores report (CSV) with score threshold filtering"
+            className="inline-flex items-center gap-1.5 rounded-control border border-emerald-500/40 bg-emerald-500/10 px-3 py-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 shadow-subtle hover:bg-emerald-500/20 hover:border-emerald-500/60 transition-colors"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span>Readiness Report</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownloadReport}
+            disabled={downloading || total === 0}
+            title="Download students report (CSV)"
+            className="inline-flex items-center gap-1.5 rounded-control border border-border-subtle bg-surface px-3 py-1.5 text-xs font-bold text-primary shadow-subtle hover:bg-surface-hover hover:border-border-strong disabled:opacity-50"
+          >
+            <Download className={cn("h-3.5 w-3.5 text-accent-primary", downloading && "animate-bounce")} />
+            <span>{downloading ? "Exporting..." : "Download Report"}</span>
+          </button>
         </div>
       </div>
 
@@ -218,6 +364,15 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
             <table className="w-full text-left text-xs">
               <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={isAllOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      className="rounded border-border-subtle text-accent-primary focus:ring-accent-primary cursor-pointer"
+                      aria-label="Select all students on current page"
+                    />
+                  </th>
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3">College</th>
                   <th className="px-4 py-3">Department · Branch</th>
@@ -232,13 +387,31 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
                   <tr
                     key={s.id}
                     onClick={() => setActiveStudentId(s.id)}
-                    className="hover:bg-surface-hover/60 transition-colors cursor-pointer"
+                    className={cn(
+                      "hover:bg-surface-hover/60 transition-colors cursor-pointer",
+                      selectedIds.has(s.id) && "bg-accent-primary/5"
+                    )}
                   >
+                    <td className="px-3 py-3 w-8" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(s.id)}
+                        onChange={() => toggleSelectUser(s.id)}
+                        className="rounded border-border-subtle text-accent-primary focus:ring-accent-primary cursor-pointer"
+                        aria-label={`Select ${s.name}`}
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="font-bold text-primary">{s.name}</div>
                       <div className="text-3xs font-mono text-text-muted">{s.email}</div>
                     </td>
-                    <td className="px-4 py-3 text-text-secondary font-medium">{s.college?.name ?? "—"}</td>
+                    <td className="px-4 py-3 text-text-secondary font-medium">
+                      {s.college?.name ?? (
+                        <span className="inline-flex items-center rounded-full border border-violet-500/25 bg-violet-500/10 px-2 py-0.5 text-3xs font-bold text-violet-600 dark:text-violet-400">
+                          Direct / Independent
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-text-secondary">
                       <div>{s.branch ?? "—"}</div>
                       <div className="text-3xs text-text-muted">{departmentShort(catalog, s.department ?? "engineering")}</div>
@@ -256,13 +429,33 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {s.readiness_tier ? (
-                        <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", TIER_BADGE_CLASS[s.readiness_tier])}>
-                          {s.readiness_tier}
-                        </span>
-                      ) : (
-                        "—"
-                      )}
+                      <div className="flex flex-col gap-1 items-start">
+                        {s.readiness_tier ? (
+                          <div className="flex items-center gap-1.5">
+                            {s.readiness_score !== undefined && s.readiness_score !== null && (
+                              <span
+                                className={cn(
+                                  "font-mono font-extrabold text-xs",
+                                  s.readiness_score >= 75
+                                    ? "text-status-success"
+                                    : s.readiness_score >= 50
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : s.readiness_score >= 45
+                                    ? "text-accent-secondary"
+                                    : "text-status-warning"
+                                )}
+                              >
+                                {s.readiness_score}%
+                              </span>
+                            )}
+                            <span className={cn("px-2 py-0.5 text-3xs font-bold rounded-full border", TIER_BADGE_CLASS[s.readiness_tier])}>
+                              {s.readiness_tier}
+                            </span>
+                          </div>
+                        ) : (
+                          "—"
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-text-muted">{formatDateTime(s.created_at)}</td>
                     <td className="px-4 py-3">
@@ -296,11 +489,85 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
         </div>
       )}
 
+      {/* Floating Bulk Operations Toolbar for 2k-3k scale operations */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-panel bg-elevated/95 backdrop-blur-md border border-accent-primary/50 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-primary text-3xs font-black text-white">
+              {selectedIds.size}
+            </span>
+            <span className="text-xs font-bold text-primary">
+              selected
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-border-subtle" />
+
+          {/* Credentials Dispatch */}
+          <button
+            type="button"
+            onClick={() => handleBulkAction("send_credentials")}
+            disabled={bulkProcessing}
+            title="Reset and email new login credentials to selected students"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-bold bg-accent-primary hover:bg-accent-primary/90 text-white shadow-subtle disabled:opacity-50 transition-all"
+          >
+            <KeyRound className="w-3.5 h-3.5" />
+            <span>{bulkProcessing ? "Processing..." : "Dispatch Credentials"}</span>
+          </button>
+
+          {/* Revoke Sessions */}
+          <button
+            type="button"
+            onClick={() => handleBulkAction("revoke_sessions")}
+            disabled={bulkProcessing}
+            title="Immediately revoke tokens and sign out selected students across all devices"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-bold bg-amber-500/15 hover:bg-amber-500/25 text-amber-500 border border-amber-500/30 disabled:opacity-50 transition-all"
+          >
+            <RefreshCw className={cn("w-3.5 h-3.5", bulkProcessing && "animate-spin")} />
+            <span>Revoke Sessions</span>
+          </button>
+
+          {/* Block / Unblock */}
+          <button
+            type="button"
+            onClick={() => handleBulkAction("toggle_block")}
+            disabled={bulkProcessing}
+            title="Toggle blocked status for selected students"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-bold bg-status-danger/15 hover:bg-status-danger/25 text-status-danger border border-status-danger/30 disabled:opacity-50 transition-all"
+          >
+            <Ban className="w-3.5 h-3.5" />
+            <span>Toggle Block</span>
+          </button>
+
+          <div className="h-4 w-px bg-border-subtle" />
+
+          {/* Deselect */}
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={bulkProcessing}
+            className="px-2.5 py-1.5 rounded-control text-xs font-medium text-text-muted hover:text-primary transition-colors disabled:opacity-50"
+          >
+            Deselect
+          </button>
+        </div>
+      )}
+
       {activeStudentId && (
         <UserManageDrawer
           userId={activeStudentId}
           onClose={() => setActiveStudentId(null)}
           onChanged={load}
+          triggerToast={triggerToast}
+        />
+      )}
+
+      {showReadinessModal && (
+        <ReadinessReportModal
+          collegeId={collegeId}
+          department={department}
+          affiliation={affiliation}
+          onClose={() => setShowReadinessModal(false)}
           triggerToast={triggerToast}
         />
       )}

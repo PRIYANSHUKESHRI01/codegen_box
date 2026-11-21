@@ -175,7 +175,17 @@ class CuratedCatalog
                     foreach ($series['sets'] as &$set) {
                         $builtin = array_map(fn (array $q) => $q + ['source' => 'builtin'], $set['questions'] ?? []);
                         $set['builtin_count'] = count($builtin);
-                        $set['questions'] = array_merge($builtin, $custom[$set['id']] ?? []);
+                        
+                        $seenTexts = [];
+                        $merged = [];
+                        foreach (array_merge($builtin, $custom[$set['id']] ?? []) as $q) {
+                            $textKey = trim($q['text'] ?? '');
+                            if ($textKey !== '' && ! isset($seenTexts[$textKey])) {
+                                $seenTexts[$textKey] = true;
+                                $merged[] = $q;
+                            }
+                        }
+                        $set['questions'] = $merged;
                     }
                     unset($set);
                 }

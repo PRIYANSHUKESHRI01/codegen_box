@@ -63,6 +63,9 @@ class AppServiceProvider extends ServiceProvider
         // Which whole sections are switched on (Superadmin -> Merchant Navy): read once per request, so a switch is live on the very next one.
         $this->app->scoped(\App\Services\PlatformModules::class);
 
+        // Gemini API key rotation and multi-key fallback pool
+        $this->app->singleton(\App\Services\GeminiKeyRotationService::class);
+
         // One catalog per request, so the explorer, the qualification service and the admin screen all see the same tree.
         $this->app->singleton(\App\Services\Vault\CuratedCatalog::class);
         // Same reason: one Mock AI Interview catalog per request, so a write that flushes it flushes the one every reader holds.
@@ -145,6 +148,35 @@ class AppServiceProvider extends ServiceProvider
             return [
                 Limit::perMinute(5)->by('login-email:'.Str::lower((string) $request->input('email'))),
                 Limit::perMinute(150)->by('login-ip:'.$request->ip()),
+            ];
+        });
+
+        // Public registration: stops bot account flooding, mass bcrypt hashing,
+        // welcome email storms, and external API sync hammering.
+        RateLimiter::for('register', function (Request $request) {
+            return [
+                Limit::perMinute(5)->by('register-ip:'.$request->ip()),
+                Limit::perHour(30)->by('register-ip-hour:'.$request->ip()),
+            ];
+        });
+
+        // SSO single-sign-on login redirects
+        RateLimiter::for('sso-login', function (Request $request) {
+            return Limit::perMinute(20)->by('sso-login-ip:'.$request->ip());
+        });
+
+        // Audio & spoken answer submissions (Mock & Vault AI interviews)
+        // Per-user to prevent multipart upload flooding and disk/memory exhaustion.
+        RateLimiter::for('interview-answer', function (Request $request) {
+            return Limit::perMinute(30)->by('interview-answer:'.($request->user()?->id ?? $request->ip()));
+        });
+
+        // AI interview lifecycle actions (start, complete, reattempt, retry-scoring)
+        // Protects Gemini AI quota pool, billing, and queue saturation.
+        RateLimiter::for('interview-action', function (Request $request) {
+            return [
+                Limit::perMinute(15)->by('interview-action:'.($request->user()?->id ?? $request->ip())),
+                Limit::perHour(120)->by('interview-action-hour:'.($request->user()?->id ?? $request->ip())),
             ];
         });
 
@@ -393,6 +425,13 @@ class AppServiceProvider extends ServiceProvider
         User::created(function (User $user) {
             if ($user->role === User::ROLE_USER) {
                 app(SubscriptionService::class)->ensureDefaultIndividualPlan($user);
+
+                // Auto-sync learner / student to Mellow Vault developer_details_tb
+                try {
+                    app(\App\Services\Vault\MellowVaultUserSyncService::class)->syncUser($user);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
             }
 
             // A "Mellow Direct" lead (role=user, no college) gets a

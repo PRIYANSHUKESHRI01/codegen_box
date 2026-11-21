@@ -49,7 +49,8 @@ class GeminiSpeakingPassageService
      */
     public function generate(string $topic, string $difficulty, string $purpose): array
     {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI passage generation is not configured yet.');
@@ -65,24 +66,26 @@ class GeminiSpeakingPassageService
         [$minWords, $maxWords, $style] = self::LEVELS[$difficulty];
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(25)
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $purpose, $difficulty, $minWords, $maxWords, $style)]]]],
-                        'generationConfig' => [
-                            'temperature' => 0.8,
-                            'maxOutputTokens' => 1024,
-                            'responseMimeType' => 'application/json',
-                            'responseSchema' => [
-                                'type' => 'OBJECT',
-                                'properties' => ['title' => ['type' => 'STRING'], 'passage_text' => ['type' => 'STRING']],
-                                'required' => ['title', 'passage_text'],
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($topic, $purpose, $difficulty, $minWords, $maxWords, $style) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(25)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $purpose, $difficulty, $minWords, $maxWords, $style)]]]],
+                            'generationConfig' => [
+                                'temperature' => 0.8,
+                                'maxOutputTokens' => 1024,
+                                'responseMimeType' => 'application/json',
+                                'responseSchema' => [
+                                    'type' => 'OBJECT',
+                                    'properties' => ['title' => ['type' => 'STRING'], 'passage_text' => ['type' => 'STRING']],
+                                    'required' => ['title', 'passage_text'],
+                                ],
                             ],
-                        ],
-                    ]
-                );
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] speaking passage request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI passage generation is temporarily unavailable. Please try again.');

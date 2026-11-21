@@ -42,6 +42,8 @@ export function hostApi(scope: HostScope) {
     publish: (id: number) => api.post<Wrapped>(`${one(id)}/publish`),
     unpublish: (id: number) => api.post<Wrapped>(`${one(id)}/unpublish`),
     cancel: (id: number, reason: string) => api.post<Wrapped>(`${one(id)}/cancel`, { reason }),
+    extendDeadline: (id: number, minutes: number, notify = true) =>
+      api.post<{ message: string; hackathon: HostHackathonDetail }>(`${one(id)}/extend-deadline`, { minutes, notify }),
 
     registrations: (id: number, q = "") =>
       api.get<{ registrations: HostRegistration[]; totals: { participants: number; teams: number } }>(
@@ -92,6 +94,8 @@ export interface FormState {
   title: string;
   tagline: string;
   description: string;
+  problem_statement: string;
+  reading_time_minutes: string;
   accent: HackathonFormPayload["accent"];
   themes: string[];
   mode: HackathonFormPayload["mode"];
@@ -131,6 +135,8 @@ export function emptyForm(): FormState {
     title: "",
     tagline: "",
     description: "",
+    problem_statement: "",
+    reading_time_minutes: "15",
     accent: "violet",
     themes: [],
     mode: "online",
@@ -163,6 +169,8 @@ export function formFromHackathon(h: HostHackathonDetail): FormState {
     title: h.title,
     tagline: h.tagline,
     description: h.description,
+    problem_statement: h.problem_statement ?? "",
+    reading_time_minutes: String(h.reading_time_minutes ?? 15),
     accent: h.accent,
     themes: h.themes ?? [],
     mode: h.mode,
@@ -199,6 +207,8 @@ export function payloadFromForm(f: FormState, canFeature: boolean): HackathonFor
     title: trim(f.title),
     tagline: trim(f.tagline),
     description: trim(f.description),
+    problem_statement: optional(f.problem_statement),
+    reading_time_minutes: Math.max(0, Number(f.reading_time_minutes || 15)),
     accent: f.accent,
     themes: f.themes,
     mode: f.mode,

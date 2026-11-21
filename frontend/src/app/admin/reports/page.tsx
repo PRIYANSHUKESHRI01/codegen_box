@@ -6,7 +6,7 @@ import { BranchScopeBar } from "@/components/branches/BranchScopeBar";
 import { inBranchScope, SCOPE_ALL } from "@/lib/branches";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ShieldCheck,
   Users2,
@@ -19,10 +19,7 @@ import {
   FileText,
   CheckCircle2,
   X,
-  Mail,
-  Phone,
   Trophy,
-  UserX,
   ArrowRight,
   BarChart3,
   CalendarDays,
@@ -39,15 +36,22 @@ import {
   type LucideIcon,
   Code2,
   CircuitBoard,
+  Target,
+  TrendingDown,
+  TrendingUp,
+  Clock,
+  Hourglass,
+  UserPlus,
+  Search,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { BarChart } from "@/components/dashboard/tpo/BarChart";
 import { cn } from "@/lib/utils";
 import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import type { TpoReportsData, ReportPreview } from "@/lib/generateTpoReports";
-import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
 import { Modal } from "@/components/ui/Modal";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import {
@@ -56,14 +60,17 @@ import {
   HpButton,
   HpCard,
   HpCompanyLogo,
+  HpFunnel,
   HpIconTile,
   HpItem,
   HpPill,
   HpProgress,
+  HpSearch,
   HpSectionHeader,
   HpSkeleton,
   HpSkeletonCards,
   HpStagger,
+  HpStatCard,
   HpTabs,
   hpBtn,
   hpEase,
@@ -75,12 +82,17 @@ import { rollupLanguages } from "@/lib/cohortInsights";
 import { languageLabel } from "@/lib/judgeLanguages";
 import { useToast } from "@/lib/toast";
 
-// jsPDF + jspdf-autotable + ExcelJS (~500kB combined) live behind this one
-// dynamic import instead of a top-level one — every REPORTS entry below
-// calls through it on demand (view/download click, or the one-time PDF
-// pre-generation effect), so the module is fetched as its own chunk after
-// the page has already rendered and become interactive, never as part of
-// this route's initial JS.
+const SERIES_PACKAGES = "#0284C7";
+
+const ACTION_ICON: Record<string, LucideIcon> = {
+  stale_applications: Clock,
+  pending_offers: Hourglass,
+  unregistered_eligible: UserPlus,
+};
+
+const pctOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
+const fmtNum = (v: number) => String(Math.round(v * 10) / 10);
+
 function loadReportLib() {
   return import("@/lib/generateTpoReports");
 }
@@ -88,9 +100,6 @@ function loadReportLib() {
 type ReportFormat = "PDF" | "Excel" | "CSV";
 type ReportCategory = "Compliance" | "Operations" | "Analytics";
 
-/** Real, derived-on-load cohort figures — the same numbers every report
- * below is built from, surfaced once here so both the page's snapshot strip
- * and each report card's live stat read from one source of truth. */
 interface CohortSummary {
   totalStudents: number;
   branchCount: number;
@@ -99,22 +108,12 @@ interface CohortSummary {
   avgReadiness: number;
   mappedDrives: number;
   nonCompliantTotal: number;
-  /** Students who have submitted at least one solution, and who practised in the last 7 days. */
   codingStudents: number;
   activeStudents: number;
-  /** The language the most students have submitted in, if anyone has. */
   topLanguage: string | null;
-  /** Students of a branch whose Core Prep is live. */
   coreStudents: number;
 }
 
-/**
- * `sectionFilter` narrows only the student-derived figures (total/branch/
- * section counts, avg CGPA/readiness) — `mappedDrives`/`nonCompliantTotal`
- * stay college-wide always, since a drive isn't a per-section concept (its
- * funnel is server-precomputed across the whole cohort, same reasoning as
- * complianceAuditRows in generateTpoReports.ts).
- */
 function computeSummary(data: TpoReportsData, sectionFilter: string | null): CohortSummary {
   const { drives } = data;
   const students = sectionFilter ? data.students.filter((s) => (s.section ?? "Unassigned") === sectionFilter) : data.students;
@@ -152,12 +151,8 @@ interface ReportDef {
     sectionFilter: string | null
   ) => Promise<{ blob: Blob; filename: string }> | { blob: Blob; filename: string };
   preview?: (data: TpoReportsData, sectionFilter: string | null) => Promise<ReportPreview>;
-  /** Whether this report is meaningfully scoped by section — Directory/Funnel/Deck operate on drives, not per-student data, so the section filter never changes their output. */
   sectionAware?: boolean;
-  /** Hides the report from colleges it means nothing to (no core-branch student with Core Prep live). */
   available?: (data: TpoReportsData) => boolean;
-  /** A real, computed-on-the-spot figure shown on the card itself — so a TPO
-   * knows roughly what a report contains before spending a click on it. */
   liveStat: (summary: CohortSummary) => LiveStat;
 }
 
@@ -251,8 +246,8 @@ const REPORTS: ReportDef[] = [
   },
   {
     id: "deck",
-    name: "Management Readiness Deck",
-    description: "Board-ready summary — headline stats, readiness tier mix, and your top mapped companies.",
+    name: "Management Readiness & Placement Deck",
+    description: "Board-ready summary — headline stats, readiness tier mix, placement rate and top recruiting companies.",
     format: "PDF",
     category: "Analytics",
     icon: Presentation,
@@ -263,7 +258,6 @@ const REPORTS: ReportDef[] = [
 
 const CATEGORY_FILTERS = ["All", "Compliance", "Operations", "Analytics"] as const;
 
-/** Category → identity tone for the card's icon tile (amber/rose stay reserved for risk). */
 const CATEGORY_TONE: Record<ReportCategory, HpTone> = {
   Compliance: "violet",
   Operations: "sky",
@@ -275,11 +269,6 @@ const FORMAT_ICON: Record<ReportFormat, LucideIcon> = {
   Excel: FileSpreadsheet,
   CSV: Sheet,
 };
-
-/** Readiness meter tone — same thresholds the section list has always used. */
-function readinessTone(score: number): HpTone {
-  return score >= 75 ? "emerald" : score >= 45 ? "sky" : "amber";
-}
 
 function scopeLabel(section: string): string {
   return section === "Unassigned" ? "No Section" : `Section ${section}`;
@@ -296,26 +285,35 @@ function downloadBlob(blob: Blob, filename: string) {
 
 export default function PlacementReportsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
-  // Every report is the department the TPO is looking at (the switcher under the page title), or the whole college.
   const { scope: deptScope } = useDepartmentScope();
   const [categoryFilter, setCategoryFilter] = useState<(typeof CATEGORY_FILTERS)[number]>("All");
   const [sectionFilter, setSectionFilter] = useState<string | null>(null);
   const [rawData, setData] = useState<TpoReportsData | null>(null);
   const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
-  // The branch switcher narrows the STUDENT side of every report (rosters, readiness, who fails a drive).
-  // Drive definitions and their college-wide funnel counts stay as they are — a drive is not a branch.
+
   const data = useMemo<TpoReportsData | null>(() => {
     if (!rawData || branchScope === SCOPE_ALL) return rawData;
     const students = rawData.students.filter((s) => inBranchScope(s, branchScope));
     const ids = new Set(students.map((s) => s.id));
-    return { ...rawData, students, drives: rawData.drives.map((d) => ({ ...d, non_compliant: d.non_compliant.filter((n) => ids.has(n.id)) })) };
+    return {
+      ...rawData,
+      students,
+      drives: rawData.drives.map((d) => ({
+        ...d,
+        non_compliant: d.non_compliant.filter((n) => ids.has(n.id)),
+      })),
+    };
   }, [rawData, branchScope]);
-  const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewReport, setPreviewReport] = useState<{ name: string; preview: ReportPreview } | null>(null);
   const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
+
+  // Search & filter for placed students table
+  const [placementSearch, setPlacementSearch] = useState("");
+  const [placementBranchFilter, setPlacementBranchFilter] = useState("ALL");
 
   const triggerToast = useToast();
 
@@ -323,13 +321,11 @@ export default function PlacementReportsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [reportsRes, coordinatorsRes] = await Promise.all([
-        api.get<TpoReportsData>(deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`),
-        api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
-      ]);
+      const reportsRes = await api.get<TpoReportsData>(
+        deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`
+      );
       setData(reportsRes);
       setBranchScope(SCOPE_ALL);
-      setCoordinators(coordinatorsRes.coordinators);
     } catch (err) {
       setLoadError(err instanceof ApiError ? err.message : "Failed to load report data.");
     } finally {
@@ -341,21 +337,6 @@ export default function PlacementReportsPage() {
     if (status === "ready") loadData();
   }, [status, loadData]);
 
-  // "View" for the 3 PDF reports (no in-app preview table makes sense for a
-  // PDF) is a real <a href target="_blank">, not a JS-triggered
-  // window.open() — a real anchor's native click handling is the only
-  // approach that reliably opened a blob: URL in a new tab in testing;
-  // window.open() (even called synchronously from the onClick, even via a
-  // synthetic anchor.click()) silently produced a blank tab when triggered
-  // through React's event dispatch, and that restriction gets even stricter
-  // once generation is itself async (a dynamic import + jsPDF work) — by the
-  // time it resolves, it's no longer inside the original click's gesture, so
-  // window.open() would get popup-blocked. Pre-building each PDF's blob URL
-  // here — once per data load (and whenever the section filter changes, for
-  // section-aware reports) — sidesteps that entirely: the report lib chunk
-  // loads once in the background while the rest of the page is already
-  // interactive, and by the time anyone clicks View, the anchor's href is
-  // just a plain blob: URL.
   useEffect(() => {
     if (!data) return;
     let cancelled = false;
@@ -377,15 +358,12 @@ export default function PlacementReportsPage() {
   }, [data, sectionFilter]);
 
   if (status !== "ready") {
-    return (
-      <SessionLoader />
-    );
+    return <SessionLoader />;
   }
 
   const reports = data ? REPORTS.filter((r) => !r.available || r.available(data)) : REPORTS;
   const filtered = reports.filter((r) => categoryFilter === "All" || r.category === categoryFilter);
   const summary = data ? computeSummary(data, sectionFilter) : null;
-  const sectionStats = data ? computeSectionStats(data.students, coordinators) : [];
 
   const handleViewPreview = async (report: ReportDef) => {
     if (!data || !report.preview) return;
@@ -420,212 +398,494 @@ export default function PlacementReportsPage() {
     count: f === "All" ? reports.length : reports.filter((r) => r.category === f).length,
   }));
 
+  // Placement outcomes calculations
+  const placements = data?.placements;
+  const f = placements?.funnel ?? { batch_enrolled: 0, registered: 0, shortlisted: 0, interviewed: 0, offered: 0, accepted: 0 };
+  const target = placements?.target ?? { target_percent: null, target_deadline: null, current_percent: 0 };
+  const currentPct = target.current_percent;
+  const targetPct = target.target_percent ? Number(target.target_percent) : null;
+  const gapToTarget = targetPct !== null ? Math.max(0, targetPct - currentPct) : null;
+
+  // Max and Avg CTC calculated from recruiter data
+  const companySummary = placements?.company_summary ?? [];
+  const allMaxCtcs = companySummary.map((c) => c.max_ctc).filter((v): v is number => v !== null && v > 0);
+  const recentCtcs = (placements?.recent_placements ?? [])
+    .map((p) => parseFloat(p.ctc_offered))
+    .filter((n) => !isNaN(n) && n > 0);
+
+  const highestCtc = allMaxCtcs.length > 0 ? Math.max(...allMaxCtcs) : recentCtcs.length > 0 ? Math.max(...recentCtcs) : null;
+  const totalOffersAccepted = companySummary.reduce((s, c) => s + c.offers_accepted, 0);
+  const weightedCtcSum = companySummary.reduce((s, c) => s + (c.avg_ctc ?? 0) * c.offers_accepted, 0);
+  const avgCtc =
+    totalOffersAccepted > 0 && weightedCtcSum > 0
+      ? (weightedCtcSum / totalOffersAccepted).toFixed(1)
+      : recentCtcs.length > 0
+      ? (recentCtcs.reduce((a, b) => a + b, 0) / recentCtcs.length).toFixed(1)
+      : null;
+
+  // Funnel steps
+  const funnelSteps: [string, number][] = [
+    ["Enrolled", f.batch_enrolled],
+    ["Registered", f.registered],
+    ["Shortlisted", f.shortlisted],
+    ["Interviewed", f.interviewed],
+    ["Offered", f.offered],
+    ["Accepted", f.accepted],
+  ];
+
+  const dropOff = funnelSteps.slice(1).reduce<{ from: string; to: string; rate: number } | null>((worst, [label, value], i) => {
+    const [prevLabel, prev] = funnelSteps[i];
+    if (prev <= 0) return worst;
+    const rate = pctOf(value, prev);
+    return worst === null || rate < worst.rate ? { from: prevLabel, to: label, rate } : worst;
+  }, null);
+
+  const trendApplications = (placements?.branch_trend ?? []).reduce((s, r) => s + r.applications, 0);
+  const trendAccepted = (placements?.branch_trend ?? []).reduce((s, r) => s + r.offers_accepted, 0);
+
+  const totalOffers = (placements?.package_distribution ?? []).reduce((s, b) => s + b.count, 0);
+  const peakBracket = (placements?.package_distribution ?? []).reduce<{ bracket: string; count: number } | null>(
+    (best, b) => (b.count > 0 && (best === null || b.count > best.count) ? b : best),
+    null
+  );
+
+  // Placed students filtering
+  const allRecentPlacements = placements?.recent_placements ?? [];
+  const placementBranches = Array.from(new Set(allRecentPlacements.map((p) => p.branch).filter((b): b is string => !!b)));
+  const filteredPlacements = allRecentPlacements.filter((p) => {
+    if (placementBranchFilter !== "ALL" && p.branch !== placementBranchFilter) return false;
+    if (!placementSearch.trim()) return true;
+    const q = placementSearch.toLowerCase();
+    return (
+      p.student_name.toLowerCase().includes(q) ||
+      (p.roll_number ?? "").toLowerCase().includes(q) ||
+      p.company.toLowerCase().includes(q) ||
+      p.role_title.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <DashboardShell
       role="admin_tpo"
       currentTpoView="tpo"
       title="Placement Reports"
-      subtitle="Real, live reports generated from your current student cohort and mapped drives — view or download any time."
+      subtitle="Comprehensive placement outcomes, drive conversion funnels, recruiter hiring records, package distributions, and downloadable official reports."
     >
       {loadError && <HpErrorCard message={loadError} onRetry={loadData} />}
 
       {loading ? (
         <ReportsSkeleton />
-      ) : (
+      ) : data && placements ? (
         <HpStagger className="space-y-6">
-          {/* Report context + active scope */}
-          {data && (
-            <HpItem>
-              <HpCard spotlight={false} className="relative overflow-hidden p-4 sm:p-5">
-                <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_160%_at_0%_0%,rgb(var(--hp-id)/0.10),transparent_60%),radial-gradient(50%_160%_at_100%_0%,rgba(99,102,241,0.10),transparent_60%)]" />
-                <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex min-w-0 items-center gap-3.5">
-                    <HpCompanyLogo name={data.college.name} size="md" />
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-15 font-bold tracking-tight text-primary">{data.college.name}</span>
-                        {data.college.tier && (
-                          <HpPill tone="slate" size="sm">
-                            {data.college.tier}
-                          </HpPill>
-                        )}
-                      </div>
-                      <div className="tabular mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-text-muted">
-                        <HpPill tone="sky" size="sm" dot>
-                          Generated on demand
+          {/* Context Card & Scope Selector */}
+          <HpItem>
+            <HpCard spotlight={false} className="relative overflow-hidden p-4 sm:p-5">
+              <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_160%_at_0%_0%,rgb(var(--hp-id)/0.10),transparent_60%),radial-gradient(50%_160%_at_100%_0%,rgba(99,102,241,0.10),transparent_60%)]" />
+              <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-3.5">
+                  <HpCompanyLogo name={data.college.name} size="md" />
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-15 font-bold tracking-tight text-primary">{data.college.name}</span>
+                      {data.college.tier && (
+                        <HpPill tone="slate" size="sm">
+                          {data.college.tier}
                         </HpPill>
-                        <span>{reports.length} reports · PDF, Excel &amp; CSV</span>
-                      </div>
+                      )}
+                    </div>
+                    <div className="tabular mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-text-muted">
+                      <HpPill tone="emerald" size="sm" dot>
+                        Placement Season Records
+                      </HpPill>
+                      <span>
+                        {f.accepted} placed students · {data.drives.length} drives · {companySummary.length} recruiters
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {rawData && <BranchScopeBar students={rawData.students} value={branchScope} onChange={setBranchScope} className="mr-2" />}
-                    <span className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Scope</span>
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      <motion.span
-                        key={sectionFilter ?? "all"}
-                        initial={{ opacity: 0, scale: 0.92 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.92 }}
-                        transition={{ duration: 0.2, ease: hpEase }}
-                      >
-                        <HpPill tone={sectionFilter ? "indigo" : "slate"} icon={sectionFilter ? Filter : LayoutGrid}>
-                          {sectionFilter ? scopeLabel(sectionFilter) : "All sections"}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {rawData && <BranchScopeBar students={rawData.students} value={branchScope} onChange={setBranchScope} />}
+                  <Link href="/admin/analytics" className={hpBtn("secondary", "sm", "h-9 shrink-0")}>
+                    <Gauge className="h-4 w-4" />
+                    Readiness Analytics
+                  </Link>
+                </div>
+              </div>
+            </HpCard>
+          </HpItem>
+
+          {/* Headline Placement KPIs */}
+          <HpItem>
+            <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <HpStatCard
+                label="Placement Rate"
+                value={currentPct}
+                suffix="%"
+                decimals={Number.isInteger(currentPct) ? 0 : 1}
+                icon={Target}
+                tone="violet"
+                hint={
+                  targetPct !== null
+                    ? gapToTarget && gapToTarget > 0
+                      ? `Target ${fmtNum(targetPct)}% · ${fmtNum(gapToTarget)} pts to go`
+                      : `Target ${fmtNum(targetPct)}% · reached`
+                    : "No target set"
+                }
+              />
+              <HpStatCard
+                label="Offers Accepted"
+                value={f.accepted}
+                icon={Trophy}
+                tone="emerald"
+                hint={`of ${f.offered} ${f.offered === 1 ? "offer" : "offers"} extended`}
+              />
+              <HpStatCard
+                label="Highest Package"
+                value={highestCtc !== null ? highestCtc : 0}
+                suffix=" LPA"
+                icon={IndianRupee}
+                tone="indigo"
+                hint={highestCtc !== null ? "Top offer secured" : "No offers yet"}
+              />
+              <HpStatCard
+                label="Average Package"
+                value={avgCtc !== null ? Number(avgCtc) : 0}
+                suffix=" LPA"
+                decimals={1}
+                icon={BarChart3}
+                tone="sky"
+                hint="Across accepted offers"
+              />
+              <HpStatCard
+                label="Hiring Partners"
+                value={companySummary.length}
+                icon={Building2}
+                tone="teal"
+                hint="with accepted offers"
+              />
+            </div>
+          </HpItem>
+
+          {/* Placement Funnel + Action Attention */}
+          <HpItem>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+              <HpCard className="p-5 sm:p-6 xl:col-span-2">
+                <HpSectionHeader
+                  title="Season Placement Pipeline Funnel"
+                  subtitle="Stage-by-stage candidate progression from cohort enrollment down to accepted offers"
+                  icon={Filter}
+                  tone="indigo"
+                  action={
+                    f.batch_enrolled > 0 ? (
+                      <HpPill tone="emerald" size="sm" className="hidden sm:inline-flex">
+                        <span className="tabular">{fmtNum((f.accepted / f.batch_enrolled) * 100)}% enrolled → placed</span>
+                      </HpPill>
+                    ) : undefined
+                  }
+                />
+                {f.batch_enrolled === 0 ? (
+                  <InlineEmpty icon={Filter} title="No students enrolled yet" description="The funnel fills in as students register and proceed through campus drives." />
+                ) : (
+                  <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_14rem]">
+                    <HpFunnel stages={funnelSteps.map(([label, value]) => ({ label, value, tone: "indigo" as const }))} />
+                    <div className="grid grid-cols-1 gap-3 border-t border-border-subtle pt-5 sm:grid-cols-2 sm:items-center xl:flex xl:flex-col xl:items-stretch xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
+                      <div className="flex items-center gap-4 xl:flex-col xl:items-start">
+                        <TargetRing value={currentPct} target={targetPct} />
+                        <div>
+                          <div className="text-xs font-bold text-primary">Placement vs Target</div>
+                          <p className="tabular mt-0.5 text-2xs leading-relaxed text-text-muted">
+                            {targetPct !== null ? (
+                              <>
+                                Target {fmtNum(targetPct)}%
+                                {target.target_deadline &&
+                                  ` by ${new Date(target.target_deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
+                                .
+                              </>
+                            ) : (
+                              "No placement target set for this season."
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      {dropOff && dropOff.rate < 100 && (
+                        <div className="rounded-2xl bg-elevated/60 p-3 ring-1 ring-inset ring-border-subtle">
+                          <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                            <TrendingDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" aria-hidden />
+                            Biggest stage drop-off
+                          </div>
+                          <div className="mt-1 text-xs font-bold text-primary">
+                            {dropOff.from} → {dropOff.to}
+                          </div>
+                          <div className="tabular text-2xs text-text-muted">{dropOff.rate}% carried through</div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </HpCard>
+
+              <AttentionCard items={placements.action_items} />
+            </div>
+          </HpItem>
+
+          {/* Package Distribution & Branch Placement Trend */}
+          <HpItem>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+              {/* Package Distribution */}
+              <HpCard className="flex flex-col p-5 sm:p-6">
+                <HpSectionHeader
+                  title="Salary / CTC Package Distribution"
+                  subtitle="Accepted job offers distributed across salary compensation brackets"
+                  icon={IndianRupee}
+                  tone="sky"
+                  action={
+                    totalOffers > 0 ? (
+                      <span className="tabular text-2xs font-semibold text-text-muted">
+                        {totalOffers} {totalOffers === 1 ? "offer" : "offers"}
+                      </span>
+                    ) : undefined
+                  }
+                />
+                {placements.package_distribution.every((b) => b.count === 0) ? (
+                  <InlineEmpty icon={IndianRupee} title="No accepted offers yet" description="Salary distribution appears once students accept offers." />
+                ) : (
+                  <>
+                    <div className="mt-8">
+                      <BarChart
+                        variant="premium"
+                        ariaLabel="Accepted offers by CTC bracket"
+                        categories={placements.package_distribution.map((b) => b.bracket)}
+                        series={[{ label: "Students Placed", color: SERIES_PACKAGES, values: placements.package_distribution.map((b) => b.count) }]}
+                        suffix=""
+                        height={180}
+                        maxValue={Math.max(4, Math.ceil(Math.max(...placements.package_distribution.map((b) => b.count)) / 2) * 2)}
+                      />
+                    </div>
+                    <div className="mt-auto pt-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4 text-2xs text-text-muted">
+                        <span className="tabular">
+                          <span className="font-bold text-primary">{totalOffers}</span> total accepted {totalOffers === 1 ? "offer" : "offers"}
+                        </span>
+                        {peakBracket && (
+                          <span className="tabular">
+                            Most common: <span className="font-semibold text-text-secondary">{peakBracket.bracket}</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </HpCard>
+
+              {/* Branch Placement Rates */}
+              <HpCard className="flex flex-col p-5 sm:p-6">
+                <HpSectionHeader
+                  title="Branch Placement Rate & Conversions"
+                  subtitle="Accepted offers per application by academic branch"
+                  icon={TrendingUp}
+                  tone="emerald"
+                />
+                {placements.branch_trend.length === 0 ? (
+                  <InlineEmpty
+                    icon={TrendingUp}
+                    tone="emerald"
+                    title="No placement outcomes yet"
+                    description="Outcomes record here as drives complete and offers are extended."
+                  />
+                ) : (
+                  <ul className="mt-6 space-y-4">
+                    {placements.branch_trend.map((row) => (
+                      <li key={`${row.year}-${row.branch}`}>
+                        <div className="mb-1.5 flex items-baseline justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-xs font-semibold text-primary">{row.branch}</span>
+                            <HpPill tone="slate" size="sm">
+                              <span className="tabular">{row.year}</span>
+                            </HpPill>
+                          </span>
+                          <span className="flex shrink-0 items-baseline gap-2">
+                            <span className="tabular text-3xs font-semibold text-text-muted">
+                              {row.offers_accepted} of {row.applications}
+                            </span>
+                            <span className="tabular text-sm font-extrabold text-primary">{row.placement_rate}%</span>
+                          </span>
+                        </div>
+                        <HpProgress value={row.placement_rate} tone="emerald" className="h-2" />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {trendApplications > 0 && (
+                  <div className="mt-auto pt-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4 text-2xs text-text-muted">
+                      <span className="tabular">
+                        <span className="font-bold text-primary">{trendAccepted}</span> of {trendApplications}{" "}
+                        {trendApplications === 1 ? "application" : "applications"} placed
+                      </span>
+                      <span className="tabular">
+                        Overall <span className="font-semibold text-text-secondary">{pctOf(trendAccepted, trendApplications)}%</span>
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </HpCard>
+            </div>
+          </HpItem>
+
+          {/* Company-wise Hiring Summary */}
+          <HpItem>
+            <CompanyTable rows={placements.company_summary} />
+          </HpItem>
+
+          {/* Placed Students Ledger & Offer Registry */}
+          <HpItem>
+            <HpCard spotlight={false} className="overflow-hidden">
+              <div className="p-5 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <HpSectionHeader
+                    title="Placed Students & Offer Registry"
+                    subtitle="Verified record of student placements, recruiters, roles and compensation packages"
+                    icon={Trophy}
+                    tone="emerald"
+                    action={
+                      filteredPlacements.length > 0 ? (
+                        <HpPill tone="emerald" size="sm">
+                          <span className="tabular">{filteredPlacements.length} of {allRecentPlacements.length} placed</span>
                         </HpPill>
-                      </motion.span>
-                    </AnimatePresence>
-                    {sectionFilter && (
-                      <HpButton variant="ghost" size="sm" onClick={() => setSectionFilter(null)} leftIcon={<X className="h-3.5 w-3.5" />}>
-                        Clear filter ({sectionFilter})
-                      </HpButton>
+                      ) : undefined
+                    }
+                  />
+
+                  {/* Search and branch filter */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <div className="relative w-full sm:w-60">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                      <input
+                        type="text"
+                        value={placementSearch}
+                        onChange={(e) => setPlacementSearch(e.target.value)}
+                        placeholder="Search student or recruiter…"
+                        className="h-8.5 w-full rounded-xl border border-border-subtle bg-elevated/40 pl-8.5 pr-3 text-xs text-primary placeholder:text-text-muted focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                      {placementSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setPlacementSearch("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-primary"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {placementBranches.length > 1 && (
+                      <select
+                        value={placementBranchFilter}
+                        onChange={(e) => setPlacementBranchFilter(e.target.value)}
+                        className="h-8.5 rounded-xl border border-border-subtle bg-elevated/40 px-3 text-xs text-primary focus:border-indigo-500 focus:outline-none"
+                      >
+                        <option value="ALL">All Branches</option>
+                        {placementBranches.map((b) => (
+                          <option key={b} value={b}>
+                            {b}
+                          </option>
+                        ))}
+                      </select>
                     )}
                   </div>
                 </div>
-              </HpCard>
-            </HpItem>
-          )}
+              </div>
 
-          {/* Cohort snapshot — real, live context so a TPO knows what these
-              reports actually contain before spending a click on any of them. */}
-          {summary && (
-            <HpItem>
-              <SnapshotStrip summary={summary} sectionFilter={sectionFilter} />
-            </HpItem>
-          )}
-
-          {/* Section Performance — ranked best-average-first, so a TPO can see at
-              a glance which section is doing well and which needs attention,
-              plus who to actually contact about it. Clicking a row (or the
-              Filter button on the reports below) scopes the section-aware
-              reports to just that section. */}
-          {sectionStats.length > 0 && (
-            <HpItem>
-              <HpCard spotlight={false} className="p-5 sm:p-6">
-                <HpSectionHeader
-                  title="Section Performance"
-                  subtitle="Ranked by average readiness · select a section to scope section-aware reports"
-                  icon={Trophy}
-                  tone="sky"
-                  action={
-                    <span className="tabular text-2xs font-semibold text-text-muted">
-                      {sectionStats.length} {sectionStats.length === 1 ? "section" : "sections"}
-                    </span>
-                  }
-                />
-                <div className="mt-5 hidden grid-cols-[minmax(0,1fr)_15rem] gap-4 px-3 pb-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted lg:grid">
-                  <div className="grid grid-cols-[2rem_9rem_minmax(0,1fr)_5.5rem] gap-4">
-                    <span>#</span>
-                    <span>Section</span>
-                    <span>Avg readiness</span>
-                    <span className="text-right">Avg CGPA</span>
-                  </div>
-                  <span>Coordinator</span>
+              {allRecentPlacements.length === 0 ? (
+                <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
+                  <InlineEmpty
+                    icon={Trophy}
+                    tone="emerald"
+                    title="No placements recorded yet"
+                    description="As students accept offers in campus drives, their verified placement records appear here."
+                  />
                 </div>
-                <ul className="mt-3 space-y-2 lg:mt-0">
-                  {sectionStats.map((s, i) => {
-                    const selected = sectionFilter === s.section;
-                    return (
-                      <li
-                        key={s.section}
-                        className={cn(
-                          "flex flex-col gap-3 rounded-2xl border p-3 transition-all duration-200 lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-center lg:gap-4",
-                          selected
-                            ? "border-indigo-500/40 bg-indigo-500/[0.06] shadow-[0_0_0_3px_rgba(99,102,241,0.08)]"
-                            : "border-border-subtle bg-elevated/30 hover:border-indigo-500/25 hover:bg-elevated/60"
-                        )}
-                      >
-                        <button
-                          type="button"
-                          aria-pressed={selected}
-                          onClick={() => setSectionFilter(sectionFilter === s.section ? null : s.section)}
-                          className="group flex w-full min-w-0 cursor-pointer flex-wrap items-center gap-x-4 gap-y-2.5 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[rgb(var(--bg-surface-rgb))] lg:grid lg:grid-cols-[2rem_9rem_minmax(0,1fr)_5.5rem]"
-                        >
-                          <span
-                            className={cn(
-                              "tabular inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-3xs font-extrabold ring-1 ring-inset transition-colors",
-                              selected
-                                ? "bg-gradient-to-b from-indigo-500 to-violet-600 text-white ring-white/20"
-                                : i === 0
-                                ? "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300"
-                                : "bg-elevated text-text-muted ring-border-subtle group-hover:text-primary"
-                            )}
-                          >
-                            {selected ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : `#${i + 1}`}
-                          </span>
-                          <span className="min-w-0 flex-1 lg:flex-none">
-                            <span className="block truncate text-13 font-bold text-primary">{scopeLabel(s.section)}</span>
-                            <span className="tabular block text-2xs text-text-muted">
-                              {s.studentCount} {s.studentCount === 1 ? "student" : "students"}
-                            </span>
-                          </span>
-                          <span className="order-last flex w-full min-w-0 items-center gap-2.5 lg:order-none lg:w-auto">
-                            <HpProgress value={s.avgReadiness} tone={readinessTone(s.avgReadiness)} className="h-2 flex-1" />
-                            <span className="tabular w-14 shrink-0 text-right text-xs font-bold text-primary">
-                              {s.avgReadiness}
-                              <span className="text-3xs font-semibold text-text-muted">/100</span>
-                            </span>
-                          </span>
-                          <span className="tabular shrink-0 text-right text-xs font-semibold text-text-secondary">
-                            {s.avgCgpa !== null ? (
-                              <>
-                                <span className="text-3xs font-semibold text-text-muted lg:hidden">CGPA </span>
-                                {s.avgCgpa.toFixed(2)}
-                              </>
-                            ) : (
-                              "—"
-                            )}
-                          </span>
-                        </button>
-
-                        <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border-subtle pt-3 lg:justify-start lg:border-0 lg:pt-0">
-                          {s.coordinator ? (
-                            <>
-                              <span className="flex min-w-0 items-center gap-2">
-                                <HpAvatar name={s.coordinator.name} size="xs" />
-                                <span className="truncate text-xs font-semibold text-text-secondary">{s.coordinator.name}</span>
-                                {s.coordinators.length > 1 && <span className="shrink-0 text-3xs font-semibold text-text-muted" title={s.coordinators.map((c) => c.name).join(", ")}>+{s.coordinators.length - 1}</span>}
-                              </span>
-                              <span className="flex shrink-0 items-center gap-0.5 lg:ml-auto">
-                                <a
-                                  href={`mailto:${s.coordinator.email}`}
-                                  title={`Email ${s.coordinator.name}`}
-                                  aria-label={`Email ${s.coordinator.name}`}
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-text-muted transition-colors hover:bg-indigo-500/10 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300"
-                                >
-                                  <Mail className="h-3.5 w-3.5" />
-                                </a>
-                                {s.coordinator.phone && (
-                                  <a
-                                    href={`tel:${s.coordinator.phone}`}
-                                    title={`Call ${s.coordinator.name}`}
-                                    aria-label={`Call ${s.coordinator.name}`}
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-text-muted transition-colors hover:bg-indigo-500/10 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 dark:hover:text-indigo-300"
-                                  >
-                                    <Phone className="h-3.5 w-3.5" />
-                                  </a>
-                                )}
-                              </span>
-                            </>
-                          ) : (
-                            <HpPill tone="amber" size="sm" icon={UserX}>
-                              No coordinator
+              ) : filteredPlacements.length === 0 ? (
+                <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
+                  <InlineEmpty
+                    icon={Search}
+                    title="No matching student records"
+                    description="No placed student records matched your current search or branch filter."
+                  />
+                </div>
+              ) : (
+                <div className="max-h-[30rem] overflow-x-auto overflow-y-auto border-t border-border-subtle">
+                  <table className="w-full min-w-[700px] text-left">
+                    <thead>
+                      <tr>
+                        <th scope="col" className={cn(hpTh, STICKY_TH)}>Candidate</th>
+                        <th scope="col" className={cn(hpTh, STICKY_TH)}>Branch</th>
+                        <th scope="col" className={cn(hpTh, STICKY_TH)}>Recruiter &amp; Role</th>
+                        <th scope="col" className={cn(hpTh, STICKY_TH, "text-right")}>Package (CTC)</th>
+                        <th scope="col" className={cn(hpTh, STICKY_TH, "text-right")}>Placed Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                      {filteredPlacements.map((p, i) => (
+                        <tr key={i} className="transition-colors duration-150 hover:bg-indigo-500/[0.04]">
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-3">
+                              <HpAvatar name={p.student_name} size="sm" />
+                              <div className="min-w-0">
+                                <div className="truncate text-xs font-bold text-primary">{p.student_name}</div>
+                                <div className="tabular text-3xs text-text-muted">{p.roll_number ?? "No Roll No"}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-5 py-3">
+                            <HpPill tone="slate" size="sm">
+                              {p.branch ?? "General"}
                             </HpPill>
-                          )}
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </HpCard>
-            </HpItem>
-          )}
+                          </td>
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <CompanyLogo name={p.company} size="sm" />
+                              <div className="min-w-0">
+                                <span className="font-semibold text-primary text-xs">{p.company}</span>
+                                <span className="text-3xs text-text-muted block truncate">{p.role_title}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="tabular px-5 py-3 text-right">
+                            <HpPill tone="emerald" size="sm" icon={IndianRupee}>
+                              <span className="font-bold">{p.ctc_offered} LPA</span>
+                            </HpPill>
+                          </td>
+                          <td className="tabular px-5 py-3 text-right text-2xs text-text-muted">
+                            {new Date(p.placed_at).toLocaleDateString("en-IN", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </HpCard>
+          </HpItem>
 
-          {/* Report library */}
+          {/* Drive Coverage & Directory Snapshot */}
+          <HpItem>
+            <div className="grid grid-cols-1 gap-6">
+              <DriveCoverage drives={data.drives} />
+            </div>
+          </HpItem>
+
+          {/* Official Report Library */}
           <HpItem className="space-y-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <HpSectionHeader
-                title="Report Library"
-                subtitle="Built in your browser from the live data above"
+                title="Official Placement Documents & Exports"
+                subtitle="Generated in your browser on demand for accreditation (NAAC/NIRF), executive briefings, and department archives"
                 icon={Library}
                 tone="indigo"
               />
@@ -698,18 +958,8 @@ export default function PlacementReportsPage() {
               </AnimatePresence>
             </motion.div>
           </HpItem>
-
-          {/* What the drive + placement reports draw on, at a glance */}
-          {data && (
-            <HpItem>
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-                <DriveCoverage drives={data.drives} />
-                <RecentPlacements rows={data.placements.recent_placements} />
-              </div>
-            </HpItem>
-          )}
         </HpStagger>
-      )}
+      ) : null}
 
       {/* Preview modal for tabular (Excel/CSV) reports */}
       {previewReport && (
@@ -762,67 +1012,186 @@ export default function PlacementReportsPage() {
 
 /* ── Sections ───────────────────────────────────────────────────────────── */
 
-function SnapshotStrip({ summary, sectionFilter }: { summary: CohortSummary; sectionFilter: string | null }) {
-  const flagged = summary.nonCompliantTotal > 0;
-  const cells: { label: string; icon: LucideIcon; tone: HpTone; value: ReactNode; foot?: ReactNode }[] = [
-    { label: "Total Students", icon: Users2, tone: "indigo", value: <AnimatedCounter target={summary.totalStudents} /> },
-    { label: "Branches", icon: GitBranch, tone: "sky", value: <AnimatedCounter target={summary.branchCount} /> },
-    { label: "Sections", icon: LayoutGrid, tone: "violet", value: <AnimatedCounter target={summary.sectionCount} /> },
-    {
-      label: "Avg CGPA",
-      icon: GraduationCap,
-      tone: "teal",
-      value: summary.avgCgpa !== null ? <AnimatedCounter target={summary.avgCgpa} decimals={2} /> : "—",
-    },
-    {
-      label: "Avg Readiness",
-      icon: Gauge,
-      tone: "indigo",
-      value: (
+function AttentionCard({ items }: { items: TpoReportsData["placements"]["action_items"] }) {
+  return (
+    <HpCard className="flex flex-col p-5 sm:p-6">
+      <HpSectionHeader
+        title="Needs Your Attention"
+        subtitle="Follow-ups your placement pipeline is waiting on"
+        icon={AlertTriangle}
+        tone="amber"
+        action={
+          <HpPill tone={items.length > 0 ? "amber" : "slate"} size="sm" dot={items.length > 0} pulse={items.length > 0}>
+            <span className="tabular">{items.length}</span>
+          </HpPill>
+        }
+      />
+      {items.length === 0 ? (
+        <div className="mt-5 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle px-4 py-8 text-center">
+          <HpIconTile icon={CheckCircle2} tone="emerald" size="lg" />
+          <p className="mt-3 text-13 font-bold text-primary">All caught up</p>
+          <p className="mt-1 text-2xs text-text-muted">Nothing needs your attention right now.</p>
+        </div>
+      ) : (
         <>
-          <AnimatedCounter target={summary.avgReadiness} />
-          <span className="text-sm font-bold text-text-muted">/100</span>
+          <ul className="mt-5 space-y-2.5">
+            {items.map((item, i) => (
+              <motion.li
+                key={i}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.35, ease: hpEase, delay: 0.2 + i * 0.06 }}
+                className="flex items-start gap-3 rounded-2xl bg-amber-500/[0.06] p-3.5 ring-1 ring-inset ring-amber-500/20 transition-colors duration-200 hover:bg-amber-500/10"
+              >
+                <HpIconTile icon={ACTION_ICON[item.type] ?? AlertTriangle} tone="amber" size="sm" />
+                <p className="pt-1 text-xs leading-relaxed text-text-secondary">{item.message}</p>
+              </motion.li>
+            ))}
+          </ul>
+          <div className="mt-auto pt-4">
+            <Link href="/admin/drives" className={hpBtn("soft", "sm", "w-full")}>
+              Open Campus Drives
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
         </>
-      ),
-      foot: <HpProgress value={summary.avgReadiness} tone={readinessTone(summary.avgReadiness)} className="mt-2.5" />,
-    },
-    {
-      label: "Compliance Flags",
-      icon: flagged ? AlertTriangle : ShieldCheck,
-      tone: flagged ? "rose" : "emerald",
-      value: <AnimatedCounter target={summary.nonCompliantTotal} />,
-      foot: (
-        <HpPill tone={flagged ? "rose" : "emerald"} size="sm" icon={flagged ? AlertTriangle : CheckCircle2} className="mt-2">
-          {flagged ? "Needs review" : "All clear"}
-        </HpPill>
-      ),
-    },
-  ];
+      )}
+    </HpCard>
+  );
+}
 
+function CompanyTable({ rows }: { rows: TpoReportsData["placements"]["company_summary"] }) {
+  const totalAccepted = rows.reduce((s, c) => s + c.offers_accepted, 0);
   return (
     <HpCard spotlight={false} className="overflow-hidden">
-      <div className="flex min-h-[1.5rem] flex-wrap items-center justify-between gap-2 px-5 pt-4 sm:px-6">
-        <span className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Cohort snapshot</span>
-        {sectionFilter && (
-          <HpPill tone="indigo" size="sm" icon={Filter}>
-            Student figures · {scopeLabel(sectionFilter)}
-          </HpPill>
-        )}
+      <div className="px-5 py-4 sm:px-6">
+        <HpSectionHeader
+          title="Company-wise Recruiter Performance"
+          subtitle="Accepted job offers and salary packages by recruiting partner"
+          icon={Building2}
+          tone="sky"
+          action={
+            rows.length > 0 ? (
+              <HpPill tone="sky" size="sm" className="hidden sm:inline-flex">
+                <span className="tabular">
+                  {rows.length} {rows.length === 1 ? "company" : "companies"}
+                </span>
+              </HpPill>
+            ) : undefined
+          }
+        />
       </div>
-      {/* 1px grid gaps over a hairline-coloured backdrop = dividers that stay correct at 2, 3 or 6 columns. */}
-      <dl className="mt-3 grid grid-cols-2 gap-px border-t border-border-subtle bg-border-subtle sm:grid-cols-3 xl:grid-cols-6">
-        {cells.map((c) => (
-          <div key={c.label} className="min-w-0 bg-[rgb(var(--bg-surface-rgb))] px-5 py-4 sm:px-6 xl:px-5">
-            <dt className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.06em] text-text-muted">
-              <c.icon className={cn("h-3.5 w-3.5 shrink-0", HP_TONES[c.tone].text)} aria-hidden />
-              <span className="min-w-0 leading-tight">{c.label}</span>
-            </dt>
-            <dd className="mt-2 text-2xl font-extrabold leading-none tracking-tight text-primary">{c.value}</dd>
-            {c.foot}
-          </div>
-        ))}
-      </dl>
+      {rows.length === 0 ? (
+        <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
+          <InlineEmpty
+            icon={Building2}
+            title="No accepted offers yet"
+            description="Accepted offers will appear by company as placement drives conclude."
+          />
+        </div>
+      ) : (
+        <div className="overflow-x-auto border-t border-border-subtle">
+          <table className="w-full min-w-[600px]">
+            <thead className="bg-elevated/50">
+              <tr>
+                <th scope="col" className={hpTh}>Company</th>
+                <th scope="col" className={cn(hpTh, "w-56")}>Offers accepted</th>
+                <th scope="col" className={cn(hpTh, "text-right")}>Avg CTC</th>
+                <th scope="col" className={cn(hpTh, "text-right")}>Max CTC</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {rows.map((c) => (
+                <tr key={c.company} className="group transition-colors duration-200 hover:bg-indigo-500/[0.035]">
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <CompanyLogo name={c.company} size="sm" />
+                      <span className="max-w-[18rem] truncate text-13 font-bold text-primary">{c.company}</span>
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <span className="tabular w-6 shrink-0 text-13 font-extrabold text-primary">{c.offers_accepted}</span>
+                      <HpProgress value={pctOf(c.offers_accepted, totalAccepted)} tone="sky" className="flex-1" />
+                      <span className="tabular w-9 shrink-0 text-right text-3xs font-semibold text-text-muted">{pctOf(c.offers_accepted, totalAccepted)}%</span>
+                    </div>
+                  </td>
+                  <td className="tabular whitespace-nowrap px-5 py-3.5 text-right text-xs font-bold text-primary">
+                    <Ctc value={c.avg_ctc} />
+                  </td>
+                  <td className="tabular whitespace-nowrap px-5 py-3.5 text-right text-xs font-bold text-primary">
+                    <Ctc value={c.max_ctc} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </HpCard>
+  );
+}
+
+function Ctc({ value }: { value: number | null }) {
+  if (value === null) return <span className="font-medium text-text-muted">—</span>;
+  return (
+    <>
+      {value} <span className="text-3xs font-semibold text-text-muted">LPA</span>
+    </>
+  );
+}
+
+function TargetRing({ value, target, size = 100, stroke = 9 }: { value: number; target: number | null; size?: number; stroke?: number }) {
+  const reduce = useReducedMotion();
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, value));
+  const t = target !== null ? Math.max(0, Math.min(100, target)) : null;
+  const angle = t !== null ? (t / 100) * 2 * Math.PI : 0;
+  const cx = size / 2;
+  const inner = r - stroke / 2 - 2;
+  const outer = r + stroke / 2 + 2;
+
+  return (
+    <div className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
+      <svg
+        width={size}
+        height={size}
+        className="-rotate-90"
+        role="img"
+        aria-label={`${fmtNum(value)}% placed${t !== null ? `, against a ${fmtNum(t)}% target` : ""}`}
+      >
+        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth={stroke} className="stroke-border-subtle" />
+        <motion.circle
+          cx={cx}
+          cy={cx}
+          r={r}
+          fill="none"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          stroke="#10B981"
+          strokeDasharray={c}
+          initial={{ strokeDashoffset: reduce ? c - (c * pct) / 100 : c }}
+          animate={{ strokeDashoffset: c - (c * pct) / 100 }}
+          transition={{ duration: 1.1, ease: hpEase, delay: 0.2 }}
+        />
+        {t !== null && (
+          <line
+            x1={cx + inner * Math.cos(angle)}
+            y1={cx + inner * Math.sin(angle)}
+            x2={cx + outer * Math.cos(angle)}
+            y2={cx + outer * Math.sin(angle)}
+            stroke="#6366F1"
+            strokeWidth={3}
+            strokeLinecap="round"
+          />
+        )}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
+        <span className="text-lg font-extrabold tracking-tight text-primary">{fmtNum(value)}%</span>
+        <span className="mt-1 text-3xs font-semibold uppercase tracking-[0.08em] text-text-muted">placed</span>
+      </div>
+    </div>
   );
 }
 
@@ -897,7 +1266,6 @@ function LiveStatLine({ stat }: { stat: LiveStat }) {
   );
 }
 
-/** Header cell pinned to the top of a scrolling table panel, with a hairline under it. */
 const STICKY_TH = "sticky top-0 z-10 whitespace-nowrap bg-[rgb(var(--bg-surface-rgb))] shadow-[inset_0_-1px_0_var(--border-subtle)]";
 
 const DRIVE_STATUS_TONE: Record<string, HpTone> = {
@@ -909,35 +1277,34 @@ const DRIVE_STATUS_TONE: Record<string, HpTone> = {
 
 function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
   return (
-    <HpCard spotlight={false} className="overflow-hidden xl:col-span-2">
+    <HpCard spotlight={false} className="overflow-hidden">
       <div className="px-5 py-4 sm:px-6">
         <HpSectionHeader
-          title="Drive Eligibility at a Glance"
-          subtitle="What the Directory, Funnel and Compliance reports are built from"
+          title="Campus Drive Catalog &amp; Eligibility Reach"
+          subtitle="All mapped corporate drives, scheduled dates, and batch eligibility breakdown"
           icon={BarChart3}
           tone="indigo"
           action={
             <Link href="/admin/drives" className={hpBtn("ghost", "sm")}>
-              <span className="hidden sm:inline">Campus Drives</span>
+              <span className="hidden sm:inline">Manage Drives</span>
               <ArrowRight className="h-3.5 w-3.5" />
-              <span className="sr-only sm:hidden">Campus Drives</span>
             </Link>
           }
         />
       </div>
       {drives.length === 0 ? (
         <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
-          <InlineEmpty icon={Building2} title="No drives mapped yet" description="Drives appear here once a company maps one to your college." />
+          <InlineEmpty icon={Building2} title="No drives mapped yet" description="Drives appear here once companies map opportunities to your college." />
         </div>
       ) : (
         <div className="max-h-[26rem] overflow-auto border-t border-border-subtle">
           <table className="w-full min-w-[620px]">
             <thead>
               <tr>
-                <th scope="col" className={cn(hpTh, STICKY_TH)}>Drive</th>
-                <th scope="col" className={cn(hpTh, STICKY_TH)}>Date</th>
-                <th scope="col" className={cn(hpTh, STICKY_TH)}>Fully eligible</th>
-                <th scope="col" className={cn(hpTh, STICKY_TH, "text-right")}>Flags</th>
+                <th scope="col" className={cn(hpTh, STICKY_TH)}>Drive &amp; Recruiter</th>
+                <th scope="col" className={cn(hpTh, STICKY_TH)}>Scheduled Date</th>
+                <th scope="col" className={cn(hpTh, STICKY_TH)}>Fully eligible cohort</th>
+                <th scope="col" className={cn(hpTh, STICKY_TH, "text-right")}>Compliance Flags</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border-subtle">
@@ -997,76 +1364,6 @@ function DriveCoverage({ drives }: { drives: TpoReportsData["drives"] }) {
   );
 }
 
-function RecentPlacements({ rows }: { rows: TpoReportsData["placements"]["recent_placements"] }) {
-  return (
-    <HpCard spotlight={false} className="flex flex-col overflow-hidden">
-      <div className="px-5 py-4 sm:px-6">
-        <HpSectionHeader
-          title="Recent Placements"
-          subtitle="Latest accepted offers"
-          icon={Trophy}
-          tone="emerald"
-          action={
-            rows.length > 0 ? (
-              <HpPill tone="emerald" size="sm">
-                <span className="tabular">{rows.length}</span>
-              </HpPill>
-            ) : undefined
-          }
-        />
-      </div>
-      {rows.length === 0 ? (
-        <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
-          <InlineEmpty icon={Trophy} tone="emerald" title="No placements yet" description="Accepted offers land here with the company and package." />
-        </div>
-      ) : (
-        <ul className="max-h-[26rem] flex-1 divide-y divide-border-subtle overflow-y-auto border-t border-border-subtle">
-          {rows.map((p, i) => (
-            <motion.li
-              key={i}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, ease: hpEase, delay: 0.15 + Math.min(i, 8) * 0.03 }}
-              className="flex items-center gap-3 px-5 py-3.5 transition-colors duration-200 hover:bg-indigo-500/[0.035] sm:px-6"
-            >
-              <HpAvatar name={p.student_name} size="md" />
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-13 font-bold text-primary">{p.student_name}</div>
-                <div className="truncate text-2xs text-text-muted">
-                  {p.company} · {p.role_title}
-                </div>
-              </div>
-              <div className="shrink-0 text-right">
-                <HpPill tone="emerald" size="sm" icon={IndianRupee}>
-                  <span className="tabular">{p.ctc_offered} LPA</span>
-                </HpPill>
-                <div className="tabular mt-1 text-3xs text-text-muted">
-                  {new Date(p.placed_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-                </div>
-              </div>
-            </motion.li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-auto border-t border-border-subtle px-5 py-3.5 sm:px-6">
-        <Link href="/admin/analytics" className={hpBtn("soft", "sm", "w-full")}>
-          Open Readiness Analytics
-          <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
-      </div>
-    </HpCard>
-  );
-}
-
-/* ── Small pieces ───────────────────────────────────────────────────────── */
-
-/**
- * DashboardShell lifts the portal's <main> onto its own stacking layer
- * (`relative z-[1]`), so a `fixed` modal rendered inside the page can't rise
- * above the sticky header or the sidebar rail. Re-parenting it onto <body>
- * (inside `.hp-portal` so --hp-id still resolves) fixes that — purely
- * structural, the modal and its handlers are untouched.
- */
 function OverlayPortal({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -1101,7 +1398,7 @@ function InlineEmpty({
 
 function ReportsSkeleton() {
   return (
-    <div className="space-y-6" role="status" aria-label="Loading reports">
+    <div className="space-y-6" role="status" aria-label="Loading placement reports">
       <HpCard spotlight={false} className="flex items-center gap-3.5 p-4 sm:p-5">
         <HpSkeleton className="h-11 w-11 rounded-[14px]" />
         <div className="flex-1 space-y-2">
@@ -1110,14 +1407,13 @@ function ReportsSkeleton() {
         </div>
         <HpSkeleton className="hidden h-7 w-32 rounded-full sm:block" />
       </HpCard>
-      <HpCard spotlight={false} className="grid grid-cols-2 gap-6 p-5 sm:grid-cols-3 sm:p-6 xl:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="space-y-2.5">
-            <HpSkeleton className="h-3 w-20" />
-            <HpSkeleton className="h-6 w-14" />
-          </div>
-        ))}
-      </HpCard>
+      <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <HpStatCard label="Placement Rate" value={0} icon={Target} tone="violet" loading />
+        <HpStatCard label="Offers Accepted" value={0} icon={Trophy} tone="emerald" loading />
+        <HpStatCard label="Highest Package" value={0} icon={IndianRupee} tone="indigo" loading />
+        <HpStatCard label="Average Package" value={0} icon={BarChart3} tone="sky" loading />
+        <HpStatCard label="Hiring Partners" value={0} icon={Building2} tone="teal" loading />
+      </div>
       <HpCard spotlight={false} className="space-y-3 p-5 sm:p-6">
         <HpSkeleton className="h-4 w-44" />
         {Array.from({ length: 3 }).map((_, i) => (

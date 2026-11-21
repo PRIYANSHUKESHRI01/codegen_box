@@ -57,6 +57,27 @@ class ScoreInterviewSessionJob implements ShouldQueue
         $interview = $session->interview;
         $role = $interview->track?->role_title ?? $interview->placementDrive?->role_title ?? $interview->title;
 
+        // Lazy transcription recovery: if any response has an audio recording but an empty or placeholder
+        // transcript (e.g. from browser STT network drops), transcribe it with AI before scoring!
+        $transcriptionService = app(\App\Services\Speech\AudioTranscriptionService::class);
+        foreach ($session->responses as $response) {
+            $transcript = trim((string) ($response->transcript_text ?? ''));
+            if (($transcript === '' || $transcript === '(Audio response submitted)' || $transcript === '(No answer recorded)') && !empty($response->audio_path)) {
+                try {
+                    $recovered = $transcriptionService->transcribeStoragePath($response->audio_path);
+                    if (!empty(trim($recovered))) {
+                        $response->update(['transcript_text' => trim($recovered)]);
+                        $response->refresh();
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('[ScoreInterviewSessionJob] Audio transcription recovery failed', [
+                        'response_id' => $response->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
         $items = $session->responses->map(fn ($response) => [
             'response_id' => $response->id,
             'question_text' => $response->interviewQuestion->questionBank->question_text,

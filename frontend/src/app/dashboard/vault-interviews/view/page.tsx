@@ -18,6 +18,7 @@ import {
   RotateCcw,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Timer,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -62,8 +63,27 @@ function VaultInterviewSetContent() {
   const [playingId, setPlayingId] = useState<number | null>(null);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
   const [reattempting, setReattempting] = useState(false);
+  const [retryingScoring, setRetryingScoring] = useState(false);
   // Pressing Start gives feedback at once; the interview is a full-screen experience and takes a moment to open.
   const [opening, setOpening] = useState(false);
+
+  const handleRetryScoring = async () => {
+    if (retryingScoring) return;
+    setRetryingScoring(true);
+    try {
+      const res = await api.post<InterviewResult>(`/interviews/${encodeURIComponent(slug)}/retry-scoring`, {});
+      setResult(res);
+      if (res.status === "scored") {
+        toast.success("Your Vault AI Interview score is ready!");
+      } else {
+        toast.info("Evaluation is in progress. Your answers are securely saved.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Evaluation service is busy. Your answers are safely saved and will be scored automatically.");
+    } finally {
+      setRetryingScoring(false);
+    }
+  };
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -295,23 +315,59 @@ function VaultInterviewSetContent() {
                         )}
                       </div>
                     ) : (
-                      <div className="space-y-3 rounded-2xl border border-amber-500/25 bg-amber-500/[0.06] p-5 shadow-subtle">
-                        <p className="flex items-start gap-2 text-sm text-text-secondary">
-                          <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-                          <span>
-                            <strong className="font-bold text-primary">Scoring didn&apos;t complete for this set, so it hasn&apos;t counted.</strong>{" "}
-                            {result.reattemptable ? "You can sit it again." : "A reviewer has been notified."}
+                      <div className="rounded-2xl border border-indigo-500/25 bg-indigo-500/[0.04] p-5 space-y-3.5 text-left shadow-subtle">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-500 ring-1 ring-inset ring-indigo-500/25">
+                            <ShieldCheck className="h-5 w-5" aria-hidden />
                           </span>
-                        </p>
-                        {result.reattemptable && (
+                          <div>
+                            <h4 className="text-sm font-extrabold text-primary">All Answers Recorded &amp; Safely Saved</h4>
+                            <p className="mt-0.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
+                              ✓ Audio recordings &amp; spoken transcripts safely stored in your Vault account
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-border-subtle bg-surface p-3.5 text-xs leading-relaxed text-text-secondary space-y-1.5">
+                          <p>
+                            Your interview responses for all questions are <strong className="font-bold text-primary">100% saved</strong>. You do <strong className="font-bold text-primary">not</strong> need to re-attempt or re-record your answers.
+                          </p>
+                          <p className="text-2xs text-text-muted">
+                            Our AI evaluation service is experiencing temporary high traffic. Your answers are safely queued in the background and will count toward your Mellow Vault series once scored. You can check your marks now below, or return anytime to view your updated qualification status.
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5 pt-1">
                           <button
-                            onClick={handleReattempt}
-                            disabled={reattempting}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50"
+                            type="button"
+                            onClick={handleRetryScoring}
+                            disabled={retryingScoring}
+                            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
                           >
-                            <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-                            {reattempting ? "Resetting..." : "Sit this set again"}
+                            {retryingScoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            <span>{retryingScoring ? "Evaluating Answers..." : "View / Check My Score"}</span>
                           </button>
+
+                          <Link
+                            href={HOME}
+                            className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-surface px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-primary transition-all"
+                          >
+                            <span>Back to Qualification Circuit</span>
+                          </Link>
+                        </div>
+
+                        {result.reattemptable && (
+                          <p className="pt-1 text-3xs text-text-muted">
+                            Prefer to discard these saved answers and take a fresh sitting instead?{" "}
+                            <button
+                              type="button"
+                              onClick={handleReattempt}
+                              disabled={reattempting}
+                              className="font-bold text-indigo-600 dark:text-indigo-400 underline hover:text-indigo-500"
+                            >
+                              {reattempting ? "Resetting..." : "Sit this set again"}
+                            </button>
+                          </p>
                         )}
                       </div>
                     )}

@@ -283,6 +283,54 @@ trait ManagesHackathons
         return response()->json(['hackathon' => $presenter->hostDetail($this->withCounts($hackathon->fresh('company')))]);
     }
 
+    public function extendDeadline(Request $request, Hackathon $hackathon, HackathonPresenter $presenter)
+    {
+        $hackathon = $this->resolve($request, $hackathon);
+
+        if ($hackathon->isCancelled()) {
+            throw new HackathonRuleException('A cancelled hackathon cannot be extended.', 'hackathon_cancelled', 409);
+        }
+
+        if ($hackathon->resultsArePublished()) {
+            throw new HackathonRuleException('Results are already published for this hackathon.', 'results_published', 409);
+        }
+
+        $data = $request->validate([
+            'minutes' => ['required', 'integer', 'min:5', 'max:10080'],
+            'notify' => ['nullable', 'boolean'],
+        ]);
+
+        $minutes = (int) $data['minutes'];
+        // If ends_at is in the past, extend from now, otherwise extend from ends_at
+        $base = $hackathon->ends_at->isPast() ? now() : $hackathon->ends_at;
+        $newEndsAt = $base->copy()->addMinutes($minutes);
+
+        $hackathon->update([
+            'ends_at' => $newEndsAt,
+        ]);
+
+        $newEndsAtFormatted = $newEndsAt->timezone('Asia/Kolkata')->format('d M Y, h:i A');
+
+        $notify = $request->boolean('notify', true);
+        if ($notify) {
+            $hackathon->announcements()->create([
+                'title' => "⏰ Submission Deadline Extended (+{$minutes} mins)",
+                'body' => "Attention participants: The submission deadline has been officially extended by {$minutes} minutes. New deadline: {$newEndsAtFormatted} IST. Ensure your GitHub repository and live deployed URL are submitted before the timer expires!",
+                'published_at' => now(),
+            ]);
+        }
+
+        ActivityLog::record($request->user(), 'Extended hackathon deadline', 'Hackathon', $hackathon->title, [
+            'added_minutes' => $minutes,
+            'new_ends_at' => $newEndsAt->toIso8601String(),
+        ]);
+
+        return response()->json([
+            'message' => "Deadline extended by {$minutes} minutes to {$newEndsAtFormatted} IST.",
+            'hackathon' => $presenter->hostDetail($this->withCounts($hackathon->fresh(['company', 'announcements']))),
+        ]);
+    }
+
     // ───────────────────────────── people ─────────────────────────────
 
     public function registrations(Request $request, Hackathon $hackathon, HackathonPresenter $presenter)
@@ -545,6 +593,8 @@ trait ManagesHackathons
             'title' => ['required', 'string', 'min:3', 'max:160'],
             'tagline' => ['required', 'string', 'min:3', 'max:200'],
             'description' => ['required', 'string', 'min:40', 'max:20000'],
+            'problem_statement' => ['nullable', 'string', 'max:50000'],
+            'reading_time_minutes' => ['nullable', 'integer', 'min:0', 'max:180'],
             'accent' => ['required', Rule::in(Hackathon::ACCENTS)],
             'themes' => ['nullable', 'array', 'max:8'],
             'themes.*' => ['string', 'min:1', 'max:30'],
@@ -758,6 +808,8 @@ trait ManagesHackathons
             'title' => trim($data['title']),
             'tagline' => trim($data['tagline']),
             'description' => trim($data['description']),
+            'problem_statement' => isset($data['problem_statement']) && trim($data['problem_statement']) !== '' ? trim($data['problem_statement']) : null,
+            'reading_time_minutes' => isset($data['reading_time_minutes']) ? max(0, (int) $data['reading_time_minutes']) : 15,
             'accent' => $data['accent'],
             'themes' => array_values(array_unique(array_filter(array_map('trim', $data['themes'] ?? [])))),
             'mode' => $data['mode'],

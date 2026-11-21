@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Copy, Gift, Trophy } from "lucide-react";
+import { ArrowRight, Check, Copy, Gift, Sparkles, Trophy } from "lucide-react";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
+import { VoucherRevealModal } from "./VoucherRevealModal";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { MyWin, Prize, RewardBanner } from "@/types/weeklyRewards";
@@ -185,12 +186,38 @@ function NextWeekTeaser({ next, className }: { next: NonNullable<RewardBanner["n
 export function MyRewards({ className }: { className?: string }) {
   const [wins, setWins] = useState<MyWin[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
+  const [activeWin, setActiveWin] = useState<MyWin | null>(null);
+  const [autoReveal, setAutoReveal] = useState(false);
 
   useEffect(() => {
     let alive = true;
     api
       .get<{ wins: MyWin[] }>("/weekly-rewards/mine")
-      .then((res) => alive && setWins(res.wins))
+      .then((res) => {
+        if (!alive) return;
+        setWins(res.wins);
+        if (typeof window !== "undefined") {
+          const params = new URLSearchParams(window.location.search);
+          const rewardParam = params.get("reward");
+          const copiedParam = params.get("copied") === "1";
+          if (rewardParam) {
+            const matched = res.wins.find((w) => w.id === Number(rewardParam));
+            if (matched) {
+              setActiveWin(matched);
+              if (copiedParam) {
+                setAutoReveal(true);
+                if (matched.voucher_code) {
+                  try {
+                    navigator.clipboard.writeText(matched.voucher_code);
+                  } catch {
+                    /* clipboard write failed */
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
       .catch(() => alive && setWins([]));
     return () => {
       alive = false;
@@ -211,36 +238,65 @@ export function MyRewards({ className }: { className?: string }) {
   };
 
   return (
-    <section aria-label="Your rewards" className={cn("rounded-panel border border-amber-400/40 bg-amber-400/[0.07] p-5", className)}>
-      <h2 className="flex items-center gap-2 text-sm font-extrabold text-primary">
-        <Gift className="h-4 w-4 text-amber-500" aria-hidden /> Your rewards
-      </h2>
-      <ul className="mt-3 space-y-2.5">
-        {wins.map((w) => (
-          <li key={w.id} className="flex flex-wrap items-center gap-3 rounded-control border border-border-subtle bg-surface p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static export: next/image's optimiser is unavailable */}
-            <img src={w.logo} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg border border-border-subtle bg-white object-contain p-1" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-primary">
-                {w.brand} ₹{w.amount.toLocaleString("en-IN")} voucher
-              </p>
-              <p className="text-2xs text-text-muted">
-                Week of {new Date(w.week_key).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · finished #{w.rank}
-              </p>
-            </div>
-            {w.status === "sent" && w.voucher_code ? (
-              <button type="button" onClick={() => copy(w)} className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-elevated px-3 py-1.5 font-mono text-xs font-bold text-primary hover:bg-surface-hover" aria-label={`Copy voucher code for ${w.brand}`}>
-                {w.voucher_code}
-                {copied === w.id ? <Check className="h-3.5 w-3.5 text-status-success" aria-hidden /> : <Copy className="h-3.5 w-3.5 text-text-muted" aria-hidden />}
-              </button>
-            ) : w.status === "sent" ? (
-              <span className="rounded-full border border-status-success/30 bg-status-success/10 px-2.5 py-1 text-3xs font-bold text-status-success">Sent to your e-mail</span>
-            ) : (
-              <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-3xs font-bold text-amber-700 dark:text-amber-300">We&apos;re sending it</span>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+    <>
+      <section aria-label="Your rewards" className={cn("rounded-panel border border-amber-400/40 bg-amber-400/[0.07] p-5", className)}>
+        <h2 className="flex items-center gap-2 text-sm font-extrabold text-primary">
+          <Gift className="h-4 w-4 text-amber-500" aria-hidden /> Your rewards
+        </h2>
+        <ul className="mt-3 space-y-2.5">
+          {wins.map((w) => (
+            <li key={w.id} className="flex flex-wrap items-center gap-3 rounded-control border border-border-subtle bg-surface p-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- static export: next/image's optimiser is unavailable */}
+              <img src={w.logo} alt="" width={36} height={36} className="h-9 w-9 shrink-0 rounded-lg border border-border-subtle bg-white object-contain p-1" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-primary">
+                  {w.brand} ₹{w.amount.toLocaleString("en-IN")} voucher
+                </p>
+                <p className="text-2xs text-text-muted">
+                  Week of {new Date(w.week_key).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} · finished #{w.rank}
+                </p>
+              </div>
+              {w.status === "sent" && w.voucher_code ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveWin(w)}
+                    className="inline-flex items-center gap-1.5 rounded-control bg-gradient-to-r from-amber-500 to-amber-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-sm hover:from-amber-600 hover:to-amber-700 transition-all active:scale-95"
+                    aria-label={`Open voucher details for ${w.brand}`}
+                  >
+                    <Gift className="h-3.5 w-3.5" aria-hidden />
+                    Open Voucher
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => copy(w)}
+                    className="inline-flex items-center gap-1.5 rounded-control border border-border-strong bg-elevated px-3 py-1.5 font-mono text-xs font-bold text-primary hover:bg-surface-hover"
+                    aria-label={`Copy voucher code for ${w.brand}`}
+                  >
+                    {w.voucher_code}
+                    {copied === w.id ? <Check className="h-3.5 w-3.5 text-status-success" aria-hidden /> : <Copy className="h-3.5 w-3.5 text-text-muted" aria-hidden />}
+                  </button>
+                </div>
+              ) : w.status === "sent" ? (
+                <span className="rounded-full border border-status-success/30 bg-status-success/10 px-2.5 py-1 text-3xs font-bold text-status-success">Sent to your e-mail</span>
+              ) : (
+                <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-3xs font-bold text-amber-700 dark:text-amber-300">We&apos;re sending it</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {activeWin && (
+        <VoucherRevealModal
+          win={activeWin}
+          autoReveal={autoReveal}
+          onClose={() => {
+            setActiveWin(null);
+            setAutoReveal(false);
+          }}
+        />
+      )}
+    </>
   );
 }

@@ -78,6 +78,23 @@ class ContestController extends Controller
             return response()->json(['message' => 'This contest has already ended.'], 422);
         }
 
+        // Placement Drive Gating: If this contest belongs to a placement drive,
+        // the student must be registered for that drive to participate in this assessment.
+        if ($contest->placement_drive_id !== null) {
+            $isRegistered = \App\Models\DriveApplication::where('placement_drive_id', $contest->placement_drive_id)
+                ->where('user_id', $request->user()->id)
+                ->whereNotIn('stage', [\App\Models\DriveApplication::STAGE_REJECTED, \App\Models\DriveApplication::STAGE_WITHDRAWN])
+                ->exists();
+
+            if (! $isRegistered) {
+                return response()->json([
+                    'message' => 'You must register for this placement drive before participating in this contest assessment.',
+                    'code' => 'drive_registration_required',
+                    'drive_id' => $contest->placement_drive_id,
+                ], 403);
+            }
+        }
+
         // The Daily Challenge is a scheduled event: you sign up in its window (opens 15 h before, closes 1 min before the start).
         if ($refusal = app(DailyChallengeService::class)->registrationRefusal($contest)) {
             return response()->json(['message' => $refusal], 422);

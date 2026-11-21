@@ -317,6 +317,21 @@ class VaultInterviewQualificationService
 
         if ($passed instanceof VaultProfile && $qual) {
             $this->notifyQualified($qual, $passed);
+
+            try {
+                app(\App\Services\Vault\MellowVaultScoreTransferService::class)->transferQualification($qual, (float) $qual->series_average);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[VaultInterviewQualificationService] Series qualification transfer to Mellow Vault failed', ['error' => $e->getMessage()]);
+            }
+        }
+
+        // When candidate scores >= 60% in this specific set, automatically transfer the verified set score
+        if ($scorePercent >= 60) {
+            try {
+                app(\App\Services\Vault\MellowVaultScoreTransferService::class)->transferSetScore($interview, (float) $scorePercent);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[VaultInterviewQualificationService] Set score transfer to Mellow Vault failed', ['error' => $e->getMessage()]);
+            }
         }
 
         return $qual;

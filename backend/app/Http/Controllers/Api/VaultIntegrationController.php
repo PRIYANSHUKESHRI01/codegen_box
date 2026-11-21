@@ -34,6 +34,58 @@ class VaultIntegrationController extends Controller
         return response()->json(['ok' => true, 'service' => 'aptrun-vault', 'version' => 1]);
     }
 
+    /**
+     * GET /api/vault/v1/ai-interviews
+     * Mellow Vault pulling all candidates who scored >= 60% in Vault AI Interviews.
+     */
+    public function aiInterviews(Request $request)
+    {
+        $validated = $request->validate([
+            'stack_key' => ['nullable', 'string'],
+            'after_id' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'between:1,200'],
+        ]);
+
+        $limit = (int) ($validated['limit'] ?? 50);
+
+        $query = \App\Models\VaultInterviewQualification::with(['user:id,name,email,phone,college_id', 'user.college:id,name'])
+            ->where('status', \App\Models\VaultInterviewQualification::STATUS_QUALIFIED)
+            ->where('series_average', '>=', 60.0)
+            ->orderBy('id');
+
+        if (! empty($validated['stack_key'])) {
+            $query->where('stack_key', $validated['stack_key']);
+        }
+
+        if (! empty($validated['after_id'])) {
+            $query->where('id', '>', (int) $validated['after_id']);
+        }
+
+        $records = $query->limit($limit + 1)->get();
+        $hasMore = $records->count() > $limit;
+        $items = $records->take($limit);
+
+        return response()->json([
+            'qualifications' => $items->map(fn ($q) => [
+                'qualification_id' => $q->id,
+                'aptrun_user_id' => $q->user_id,
+                'name' => $q->user?->name,
+                'email' => $q->user?->email,
+                'phone' => $q->user?->phone,
+                'college_name' => $q->user?->college?->name,
+                'stack_key' => $q->stack_key,
+                'role_key' => $q->role_key,
+                'series_average' => (float) $q->series_average,
+                'round_scores' => $q->series_scores,
+                'status' => 'qualified',
+                'message' => "Candidate scored {$q->series_average}% and successfully cleared / qualified for Mellow Vault in {$q->stack_key}.",
+                'qualified_at' => $q->qualified_at?->toIso8601String(),
+            ])->values(),
+            'has_more' => $hasMore,
+            'next_after' => $hasMore ? $items->last()->id : null,
+        ]);
+    }
+
     public function index(Request $request, VaultPayloadBuilder $payloads)
     {
         $validated = $request->validate([

@@ -60,6 +60,7 @@ export function Stat({
   icon: Icon,
   tone = "bg-accent-primary/10 text-accent-primary",
   live = false,
+  onClick,
 }: {
   label: string;
   value: ReactNode;
@@ -67,22 +68,43 @@ export function Stat({
   icon?: ComponentType<{ className?: string }>;
   tone?: string;
   live?: boolean;
+  onClick?: () => void;
 }) {
+  const isClickable = Boolean(onClick);
+
   return (
-    <div className="flex flex-col justify-between rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle">
+    <div
+      role={isClickable ? "button" : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={isClickable ? (e) => (e.key === "Enter" || e.key === " ") && onClick?.() : undefined}
+      className={cn(
+        "flex flex-col justify-between rounded-panel border border-border-subtle bg-surface p-4 shadow-subtle transition-all text-left",
+        isClickable && "cursor-pointer hover:border-accent-primary/60 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0 group focus:outline-none focus:ring-2 focus:ring-accent-primary/40"
+      )}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-2xs font-semibold uppercase tracking-wider text-text-muted">
           {live && <LiveDot />}
           {label}
         </span>
-        {Icon && (
-          <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-control", tone)}>
-            <Icon className="h-3.5 w-3.5" />
-          </span>
-        )}
+        <div className="flex items-center gap-1.5">
+          {Icon && (
+            <span className={cn("flex h-7 w-7 shrink-0 items-center justify-center rounded-control transition-transform", tone, isClickable && "group-hover:scale-105")}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+          )}
+        </div>
       </div>
       <div className="mt-3">
-        <div className="font-mono text-2xl font-black tracking-tight text-primary">{value}</div>
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="font-mono text-2xl font-black tracking-tight text-primary">{value}</div>
+          {isClickable && (
+            <span className="text-3xs font-semibold text-text-muted group-hover:text-accent-primary transition-colors">
+              View list &rarr;
+            </span>
+          )}
+        </div>
         {sub && <div className="mt-1 text-2xs font-medium text-text-muted">{sub}</div>}
       </div>
     </div>

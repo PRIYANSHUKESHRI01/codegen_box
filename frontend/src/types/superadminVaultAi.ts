@@ -20,7 +20,7 @@ export interface VaultAiAdminLogEntry {
   at: string;
   by: string;
   by_id: number;
-  action: "reset" | "scores" | "qualified";
+  action: "reset" | "scores" | "qualified" | "grant_attempt";
   reason: string;
   result?: string;
   average?: number;

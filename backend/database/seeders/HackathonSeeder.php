@@ -65,6 +65,7 @@ class HackathonSeeder extends Seeder
         );
 
         $this->liveSprint();
+        $this->tenHourNationalSprint();
         $this->companyChallenge($nimbus);
         $this->announcedHack();
         $this->judgingHackDay();
@@ -194,6 +195,135 @@ MD,
 
         $h->announcements()->create(['author_id' => $this->host?->id, 'title' => 'Late registration extended', 'body' => 'Registration now stays open until tomorrow, so friends who are still deciding can still join your team. Share your invite code!', 'created_at' => now()->subHours(20)]);
         $h->announcements()->create(['author_id' => $this->host?->id, 'title' => 'Kickoff is live 🚀', 'body' => 'The hackathon has started. Pick your track, open a repository, and remember: a deployed demo beats slides.', 'created_at' => now()->subHours(30)]);
+    }
+
+    // ───────────────────────────── 1b. 10-hour national sprint (active live & 15m reading) ─────────────────────────────
+
+    private function tenHourNationalSprint(): void
+    {
+        $h = $this->upsert('aptrun-10-hr-national-sprint', [
+            'title' => 'AptRun 10-Hour National Build Sprint',
+            'tagline' => '10 Hours. 1 Real-World Problem Statement. Build locally on your laptop & deploy live.',
+            'description' => <<<'MD'
+## 10-Hour National Build Sprint
+
+Welcome to AptRun's premier 10-hour high-intensity national hackathon. Big companies and tech giants test engineering agility by giving engineers a real-world problem and an active delivery window.
+
+### Hackathon Format & Phases:
+1. **15-Minute Problem Reading Phase**: When the hackathon kicks off, the official problem statement is unveiled. Take 15 minutes to review constraints, plan architecture, and set up your development environment.
+2. **Building Phase (Local Laptop)**: You will develop this project on your local machine (no remote project lab is opened). Build your full-stack application and write unit/integration tests.
+3. **Submission**: Push your clean source code to a public GitHub repository and deploy your live build on Vercel, Netlify, Render, Railway, or AWS. Submit your GitHub URL and Live Deployed Link in the portal before the 10-hour deadline.
+
+### Evaluation Criteria:
+- **Technical Architecture & Code Quality** (35%)
+- **Problem Resolution & Functional Completeness** (30%)
+- **Live Deployed Demonstration & UX** (25%)
+- **Documentation & Setup Instructions** (10%)
+MD,
+            'problem_statement' => <<<'MD'
+## Problem Statement: Real-Time Crisis Aid & Volunteer Logistics Dispatcher
+
+### Context & Challenge
+During floods, earthquakes, and civil emergencies, volunteer organizations and district administrations struggle with fragmented communications, delayed dispatch of essential medical/food kits, and mismatched volunteer skills.
+
+### Key Requirements to Build:
+1. **Distress SOS Beacon**: A responsive form or API for victims/coordinators to broadcast SOS requests with GPS coordinates, urgency level (Critical, High, Medium), and required relief items.
+2. **Volunteer & Dispatch Command Map**: A geospatial or card-based dashboard allowing incident commanders to view active distress signals, match inventory kits, and assign nearby verified volunteers.
+3. **Live Status Tracking**: Real-time status pipeline transitions (`Requested` → `Assigned` → `En Route` → `Delivered`) with OTP or signature verification on handoff.
+4. **Offline Resilience**: Local caching mechanism so volunteers can view assigned tasks even when cellular data is intermittent.
+
+### Submission Deliverables:
+- **Local Machine Build**: Developed on your laptop (no online project lab needed).
+- **GitHub Repository URL**: Clean repository with README, architecture diagram, and setup commands.
+- **Deployed Live URL**: Public accessible deployment on Vercel, Netlify, Render, Railway, or AWS.
+MD,
+            'reading_time_minutes' => 15,
+            'accent' => 'indigo',
+            'themes' => ['Fullstack', 'Real-Time', 'Social Good', 'DevOps'],
+            'mode' => Hackathon::MODE_ONLINE,
+            'location' => null,
+            'host_type' => Hackathon::HOST_PLATFORM,
+            'company_id' => null,
+            'registration_opens_at' => now()->subDays(5),
+            'registration_closes_at' => now()->addHours(2),
+            // Kicked off 10 minutes ago — currently inside the 15-minute problem reading window!
+            'starts_at' => now()->subMinutes(10),
+            'ends_at' => now()->subMinutes(10)->addHours(10),
+            'results_expected_at' => now()->addDays(3),
+            'min_team_size' => 1,
+            'max_team_size' => 4,
+            'max_participants' => 1000,
+            'prize_pool_amount' => 200000,
+            'currency' => 'INR',
+            'prizes' => [
+                ['place' => 1, 'title' => 'Grand Champion', 'reward' => '₹1,00,000', 'perks' => ['Fast-track interview with hiring partners', 'AptRun Lifetime Access', 'Winner Badge on AptRun Profile']],
+                ['place' => 2, 'title' => 'First Runner-Up', 'reward' => '₹60,000', 'perks' => ['Direct interview shortlist', 'AptRun Pro for 1 year']],
+                ['place' => 3, 'title' => 'Second Runner-Up', 'reward' => '₹40,000', 'perks' => ['Direct interview shortlist', 'AptRun Pro for 6 months']],
+            ],
+            'tracks' => [
+                ['name' => 'Fullstack Web Application', 'description' => 'Complete web platform with live client and backend API.'],
+                ['name' => 'Mobile & Progressive Web App', 'description' => 'Offline-first, responsive mobile or PWA experience.'],
+            ],
+            'criteria' => [
+                ['name' => 'Architecture & Code Quality', 'weight' => 35, 'description' => 'Clean code, modular structure, error handling.'],
+                ['name' => 'Core Functionality', 'weight' => 30, 'description' => 'SOS beacon, inventory matching, and status pipeline.'],
+                ['name' => 'Live Deployed Experience', 'weight' => 25, 'description' => 'Working live demo accessible over public HTTPS.'],
+                ['name' => 'Documentation & Deliverables', 'weight' => 10, 'description' => 'Clear README, setup instructions, and architecture overview.'],
+            ],
+            'rules' => 'All code must be authored during the hackathon. Plagiarism or pre-built commercial templates will lead to disqualification.',
+            'eligibility' => 'Open to all registered users and college students on AptRun.',
+            'faqs' => [
+                ['question' => 'Do I need to build in an online project lab?', 'answer' => 'No. Big companies and AptRun ask you to develop on your own local laptop machine, push to GitHub, and deploy to a free host like Vercel or Render.'],
+                ['question' => 'What if I submit late?', 'answer' => 'Submissions strictly close at the 10-hour mark. Late submissions cannot be accepted.'],
+                ['question' => 'Can I participate solo or in a team?', 'answer' => 'Both are allowed! You can compete individually or in teams of up to 4 members.'],
+            ],
+            'resources' => [
+                ['label' => 'Next.js + Tailwind Starter', 'url' => 'https://github.com/vercel/next.js'],
+                ['label' => 'Vercel Deployment Guide', 'url' => 'https://vercel.com/docs'],
+            ],
+            'is_featured' => true,
+            'audience' => Hackathon::AUDIENCE_ALL,
+        ]);
+
+        if ($h->participants()->exists()) {
+            return;
+        }
+
+        $teams = [
+            // Demo Team 1 with submitted GitHub repo and live deployment link
+            ['name' => 'Code Vanguard', 'members' => [$this->cohort[0], $this->cohort[1]], 'project' => [
+                'title' => 'CrisisAid Dispatcher',
+                'tagline' => 'Real-time SOS logistics dispatcher with offline-first synchronization.',
+                'description' => 'Built during the 10-hour sprint on our local laptop. Features automated volunteer skill-matching, real-time dispatch map, and cryptographic handoff confirmation.',
+                'track' => 'Fullstack Web Application',
+                'repo_url' => 'https://github.com/code-vanguard/crisisaid-dispatcher',
+                'demo_url' => 'https://crisisaid-dispatcher.vercel.app',
+                'video_url' => 'https://youtu.be/crisisaid-demo',
+                'tech_stack' => ['Next.js 14', 'TypeScript', 'TailwindCSS', 'PostgreSQL', 'Prisma'],
+                'status' => 'submitted',
+            ]],
+            // Demo Team 2 with draft in progress
+            ['name' => 'Agile Hackers', 'members' => [$this->cohort[2]], 'project' => [
+                'title' => 'ReliefPulse Mobile',
+                'tagline' => 'PWA emergency aid kit request and volunteer coordination.',
+                'description' => 'Developing locally on laptop: React Native web with IndexedDB local storage and WebSockets for live status updates.',
+                'track' => 'Mobile & Progressive Web App',
+                'repo_url' => 'https://github.com/agile-hackers/reliefpulse',
+                'demo_url' => null,
+                'video_url' => null,
+                'tech_stack' => ['React', 'Node.js', 'Express', 'MongoDB'],
+                'status' => 'draft',
+            ]],
+        ];
+
+        $this->seedTeams($h, $teams);
+
+        $h->announcements()->create([
+            'author_id' => $this->host?->id,
+            'title' => 'Problem Statement Released — 15m Reading Phase Active',
+            'body' => 'The 10-Hour National Build Sprint has commenced. The problem statement is now live. Please review all requirements, prepare your local laptop development setup, and push to GitHub early!',
+            'created_at' => now()->subMinutes(10),
+        ]);
     }
 
     // ───────────────────────────── 2. company, registration open ─────────────────────────────

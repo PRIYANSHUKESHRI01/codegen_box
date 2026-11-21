@@ -31,7 +31,8 @@ class GeminiInterviewScoringService
      */
     public function score(array $items, string $role, ?string $discipline = null): array
     {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI interview scoring is not configured yet.');
@@ -44,28 +45,27 @@ class GeminiInterviewScoringService
         $prompt = $this->buildPrompt($items, $role, $discipline);
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(30)
-                // One more try for what is usually momentary (a dropped connection, a rate-limit blip, Google's 5xx): a failed scoring
-                // otherwise leaves the student without a score for the set. A bad key or bad request is not retried.
-                ->retry(2, 1500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException
-                    || ($exception instanceof \Illuminate\Http\Client\RequestException && in_array($exception->response->status(), [429, 500, 502, 503, 504], true)))
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [
-                            ['parts' => [['text' => $prompt]]],
-                        ],
-                        'generationConfig' => [
-                            // Lower than question generation's 0.9 — evaluation
-                            // should be consistent for the same answer, not creative.
-                            'temperature' => 0.2,
-                            'maxOutputTokens' => 4096,
-                            'responseMimeType' => 'application/json',
-                            'responseSchema' => $this->responseSchema(),
-                        ],
-                    ]
-                );
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(30)
+                    ->retry(2, 1500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [
+                                ['parts' => [['text' => $prompt]]],
+                            ],
+                            'generationConfig' => [
+                                // Lower than question generation's 0.9 — evaluation
+                                // should be consistent for the same answer, not creative.
+                                'temperature' => 0.2,
+                                'maxOutputTokens' => 4096,
+                                'responseMimeType' => 'application/json',
+                                'responseSchema' => $this->responseSchema(),
+                            ],
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] interview scoring request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI interview scoring is temporarily unavailable.');

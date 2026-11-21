@@ -11,11 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class MockInterviewQuestion extends Model
 {
-    protected $fillable = ['stack_key', 'round_number', 'topic', 'position', 'text', 'category', 'duration_seconds', 'note', 'needs_review', 'origin', 'image', 'created_by'];
+    protected $fillable = ['stack_key', 'parent_set_number', 'round_number', 'topic', 'position', 'text', 'category', 'duration_seconds', 'note', 'needs_review', 'origin', 'image', 'created_by'];
 
     protected function casts(): array
     {
         return [
+            'parent_set_number' => 'integer',
             'round_number' => 'integer',
             'position' => 'integer',
             'duration_seconds' => 'integer',
@@ -33,6 +34,7 @@ class MockInterviewQuestion extends Model
     {
         return [
             'id' => $this->id,
+            'parent_set_number' => (int) ($this->parent_set_number ?? 1),
             'text' => $this->text,
             'category' => $this->category,
             'duration_seconds' => $this->duration_seconds,

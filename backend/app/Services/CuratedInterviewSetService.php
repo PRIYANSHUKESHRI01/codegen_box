@@ -280,11 +280,20 @@ class CuratedInterviewSetService
                     $identity['image'] = null;
                 }
 
+                $setNumber = (int) ($setData['set_number'] ?? 1);
+                $curatedDifficulty = match ($setNumber) {
+                    1 => 'advanced',
+                    2 => 'hard',
+                    3 => 'expert',
+                    default => 'hard',
+                };
+                $expectedDifficulty = $q['difficulty'] ?? $curatedDifficulty;
+
                 $bankQuestion = InterviewQuestionBank::firstOrCreate(
                     $identity,
                     [
                         'category' => $q['category'] ?? InterviewQuestionBank::CATEGORY_TECHNICAL,
-                        'difficulty' => $q['difficulty'] ?? 'standard',
+                        'difficulty' => $expectedDifficulty,
                         'expected_duration_seconds' => $q['duration_seconds'] ?? 180,
                         'tags' => $tags,
                         'notes_for_reviewer' => $q['note'] ?? null,
@@ -303,6 +312,10 @@ class CuratedInterviewSetService
 
                     if (($q['note'] ?? null) !== null && $bankQuestion->notes_for_reviewer !== $q['note']) {
                         $changes['notes_for_reviewer'] = $q['note'];
+                    }
+
+                    if ($bankQuestion->difficulty === 'standard' || empty($bankQuestion->difficulty)) {
+                        $changes['difficulty'] = $expectedDifficulty;
                     }
 
                     if (array_key_exists('needs_review', $q) && (bool) $bankQuestion->reference_unverified !== (bool) $q['needs_review']) {

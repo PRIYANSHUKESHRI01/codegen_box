@@ -96,4 +96,23 @@ return [
     /* Days to keep delivered events before `vault:prune` removes them. */
     'sync_retention_days' => 30,
 
+    /*
+    |--------------------------------------------------------------------------
+    | Mellow Vault Score Transfer (AWS to AWS)
+    |--------------------------------------------------------------------------
+    |
+    | When a candidate scores >= 60% in a Vault AI interview, AptRun transfers
+    | their verified score and qualification status to Mellow Vault using
+    | the existing production sync channels (URL / DB connection).
+    |
+    */
+    'score_transfer' => [
+        'enabled' => true,
+        'url' => env('VAULT_SYNC_URL'),
+        'secret' => env('VAULT_SYNC_SECRET'),
+        'api_key' => env('VAULT_API_KEY'),
+        'threshold' => 60.0,
+        'table' => 'vault_ai_qualifications_tb',
+    ],
+
 ];

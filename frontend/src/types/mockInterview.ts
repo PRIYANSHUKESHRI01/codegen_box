@@ -17,6 +17,7 @@ export interface MockRoundProgress {
 
 export interface MockRound {
   id: string;
+  parent_set_number?: number;
   round_number: number;
   title: string;
   description: string;
@@ -28,6 +29,21 @@ export interface MockRound {
   /** Has enough questions to practise. */
   ready: boolean;
   my: MockRoundProgress;
+}
+
+export interface MockParentSet {
+  id: string;
+  set_number: number;
+  title: string;
+  level: string;
+  description: string;
+  rounds_count: number;
+  total_questions: number;
+  ready: boolean;
+  status: "not_attempted" | "in_progress" | "completed";
+  attempts: number;
+  best_score: number | null;
+  rounds: MockRound[];
 }
 
 export interface MockStack {
@@ -45,6 +61,7 @@ export interface MockStack {
   counts_toward_readiness?: boolean;
   ready_rounds: number;
   total_rounds: number;
+  parent_sets?: MockParentSet[];
   rounds: MockRound[];
 }
 

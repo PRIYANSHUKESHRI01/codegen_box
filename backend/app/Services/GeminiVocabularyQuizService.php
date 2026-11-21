@@ -40,7 +40,8 @@ class GeminiVocabularyQuizService
      */
     public function generate(string $topic, string $difficulty, array $avoid = []): array
     {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI vocabulary quiz generation is not configured yet.');
@@ -54,20 +55,22 @@ class GeminiVocabularyQuizService
         $difficulty = array_key_exists($difficulty, self::LEVEL_STYLE) ? $difficulty : 'intermediate';
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(25)
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $difficulty, $avoid)]]]],
-                        'generationConfig' => [
-                            'temperature' => 0.8,
-                            'maxOutputTokens' => 3072,
-                            'responseMimeType' => 'application/json',
-                            'responseSchema' => $this->responseSchema(),
-                        ],
-                    ]
-                );
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($topic, $difficulty, $avoid) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(25)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $difficulty, $avoid)]]]],
+                            'generationConfig' => [
+                                'temperature' => 0.8,
+                                'maxOutputTokens' => 3072,
+                                'responseMimeType' => 'application/json',
+                                'responseSchema' => $this->responseSchema(),
+                            ],
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] vocabulary quiz request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI vocabulary quiz generation is temporarily unavailable. Please try again.');

@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, useRef } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,6 +17,7 @@ export function AnswerEditor({
   label,
   placeholder,
   audioUrl,
+  isTranscribing = false,
   className,
 }: {
   value: string;
@@ -27,6 +29,8 @@ export function AnswerEditor({
   placeholder?: string;
   /** The recording of the spoken answer, offered for playback while reviewing. */
   audioUrl?: string | null;
+  /** Whether backend AI transcription is currently processing the audio in the background. */
+  isTranscribing?: boolean;
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -41,14 +45,20 @@ export function AnswerEditor({
 
   return (
     <div className={cn("rounded-2xl border border-accent-primary/40 bg-surface px-4 py-3 shadow-sm ring-4 ring-accent-primary/[0.07] transition-shadow focus-within:ring-accent-primary/20", className)}>
+      {isTranscribing && (
+        <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent-primary/10 px-3 py-1.5 text-xs font-semibold text-accent-primary animate-pulse">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+          <span>Transcribing your spoken answer with AI...</span>
+        </div>
+      )}
       <textarea
         ref={ref}
         aria-label={label}
         autoFocus={autoFocus}
         rows={3}
         value={value}
-        disabled={disabled}
-        placeholder={placeholder}
+        disabled={disabled || isTranscribing}
+        placeholder={isTranscribing ? "Generating verbatim transcript..." : placeholder}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (onSubmit && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {

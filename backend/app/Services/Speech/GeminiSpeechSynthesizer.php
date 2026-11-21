@@ -20,18 +20,28 @@ class GeminiSpeechSynthesizer extends HttpSpeechSynthesizer
         return $this->config['model'].':'.$this->config['voice'];
     }
 
+    protected function apiKey(): string
+    {
+        $rotationKey = app(\App\Services\GeminiKeyRotationService::class)->getActiveApiKeyString();
+
+        return ! empty($rotationKey) ? $rotationKey : parent::apiKey();
+    }
+
     public function synthesize(string $text): SynthesizedSpeech
     {
-        $response = $this->send(fn ($http) => $http->withHeaders(['x-goog-api-key' => $this->apiKey()])->post(
-            'https://generativelanguage.googleapis.com/v1beta/models/'.$this->config['model'].':generateContent',
-            [
-                'contents' => [['parts' => [['text' => $text]]]],
-                'generationConfig' => [
-                    'responseModalities' => ['AUDIO'],
-                    'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $this->config['voice']]]],
-                ],
-            ]
-        ));
+        $rotationService = app(\App\Services\GeminiKeyRotationService::class);
+        $response = $rotationService->runWithFallback(function (string $currentKey) use ($text) {
+            return $this->send(fn ($http) => $http->withHeaders(['x-goog-api-key' => $currentKey])->post(
+                'https://generativelanguage.googleapis.com/v1beta/models/'.$this->config['model'].':generateContent',
+                [
+                    'contents' => [['parts' => [['text' => $text]]]],
+                    'generationConfig' => [
+                        'responseModalities' => ['AUDIO'],
+                        'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $this->config['voice']]]],
+                    ],
+                ]
+            ));
+        });
 
         $inline = $response->json('candidates.0.content.parts.0.inlineData') ?? $response->json('candidates.0.content.parts.0.inline_data');
         $audio = is_array($inline) ? base64_decode((string) ($inline['data'] ?? ''), true) : false;

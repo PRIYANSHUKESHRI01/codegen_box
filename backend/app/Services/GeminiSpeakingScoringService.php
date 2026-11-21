@@ -83,7 +83,8 @@ class GeminiSpeakingScoringService
         int $targetWpmMin = 110,
         int $targetWpmMax = 160,
     ): array {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI speech scoring is not configured yet.');
@@ -95,10 +96,12 @@ class GeminiSpeakingScoringService
         // The notes pass doubles the request count per attempt; deployments on a tight Gemini quota can switch it off.
         $wantNotes = (bool) config('services.gemini.speaking_pronunciation_notes', true);
 
-        $responses = Http::pool(fn (Pool $pool) => array_values(array_filter([
-            $pool->as('score')->withHeaders(['x-goog-api-key' => $apiKey])->timeout(45)->post($this->endpoint(), $scoreBody),
-            $wantNotes ? $pool->as('notes')->withHeaders(['x-goog-api-key' => $apiKey])->timeout(30)->post($this->endpoint(), $notesBody) : null,
-        ])));
+        $responses = $rotationService->runWithFallback(function (string $currentKey) use ($scoreBody, $notesBody, $wantNotes) {
+            return Http::pool(fn (Pool $pool) => array_values(array_filter([
+                $pool->as('score')->withHeaders(['x-goog-api-key' => $currentKey])->timeout(45)->post($this->endpoint(), $scoreBody),
+                $wantNotes ? $pool->as('notes')->withHeaders(['x-goog-api-key' => $currentKey])->timeout(30)->post($this->endpoint(), $notesBody) : null,
+            ])));
+        });
 
         $call = $this->parse($responses['score'] ?? null, 'scoring');
 

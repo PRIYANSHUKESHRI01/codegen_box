@@ -26,6 +26,16 @@ export const ROLE_FILTERS: { value: string; label: string }[] = [
   { value: "superadmin", label: "Superadmins" },
 ];
 
+/** Roles for the AptRun Users section (all platform users excluding superadmin). */
+export const APTRUN_USER_ROLES: { value: string; label: string }[] = [
+  { value: "", label: "All AptRun Users" },
+  { value: "user", label: "Students" },
+  { value: "admin_tpo", label: "College TPOs" },
+  { value: "section_coordinator", label: "Coordinators" },
+  { value: "admin_company", label: "Hiring Companies" },
+  { value: "admin_internal,admin_marketing", label: "Mellow Staff" },
+];
+
 /** Plan filter values the user directory understands (see SuperAdminController::users()). */
 export const PLAN_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "Any plan" },

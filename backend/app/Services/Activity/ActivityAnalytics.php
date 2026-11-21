@@ -6,8 +6,14 @@ use App\Models\ActivityPageView;
 use App\Models\ActivityVisit;
 use App\Models\AuthEvent;
 use App\Models\College;
+use App\Models\ContestSubmission;
+use App\Models\CorePracticeAnswer;
+use App\Models\ListeningAttempt;
+use App\Models\SpeakingAttempt;
+use App\Models\Submission;
 use App\Models\User;
 use App\Models\UserActivityDay;
+use App\Models\VocabularyAttempt;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -256,6 +262,238 @@ class ActivityAnalytics
                 'avg_scroll' => (int) round((float) $r->avg_scroll),
                 'last_at' => Carbon::parse($r->last_at),
             ])->all();
+    }
+
+    public const FEATURE_CATALOG = [
+        ['section' => 'Practice Arena', 'category' => 'Coding & Problem Solving', 'color' => '#10b981'],
+        ['section' => 'Core Prep · Practice', 'category' => 'Core Technical Prep', 'color' => '#3b82f6'],
+        ['section' => 'Core Prep · Tests', 'category' => 'Core Technical Prep', 'color' => '#6366f1'],
+        ['section' => 'Mock AI Interview', 'category' => 'AI Mock Interviews', 'color' => '#8b5cf6'],
+        ['section' => 'Vault AI Interview', 'category' => 'AI Mock Interviews', 'color' => '#a855f7'],
+        ['section' => 'Skill Drills', 'category' => 'Core Technical Prep', 'color' => '#06b6d4'],
+        ['section' => 'Contests', 'category' => 'Coding & Contests', 'color' => '#f59e0b'],
+        ['section' => 'Learning Centre · Speaking', 'category' => 'Communication & Voice', 'color' => '#ec4899'],
+        ['section' => 'Learning Centre · Listening', 'category' => 'Communication & Voice', 'color' => '#f43f5e'],
+        ['section' => 'Learning Centre · Vocabulary', 'category' => 'Communication & Voice', 'color' => '#e11d48'],
+        ['section' => 'Soft Skills', 'category' => 'Aptitude & Soft Skills', 'color' => '#14b8a6'],
+        ['section' => 'Project Lab', 'category' => 'Project Engineering', 'color' => '#84cc16'],
+        ['section' => 'Hack Arena', 'category' => 'Hackathons & Projects', 'color' => '#d946ef'],
+        ['section' => 'Company PYQs', 'category' => 'Company Prep & Placement', 'color' => '#f97316'],
+        ['section' => 'Upcoming Drives', 'category' => 'Company Prep & Placement', 'color' => '#fb923c'],
+        ['section' => 'Leaderboard', 'category' => 'Gamification & Rewards', 'color' => '#eab308'],
+        ['section' => 'Student Overview', 'category' => 'Dashboard & Navigation', 'color' => '#64748b'],
+    ];
+
+    /**
+     * Detailed platform feature and module usage: ranks features from most used down to least used,
+     * category distribution, time engagement, and daily practice trends without any schema changes.
+     *
+     * @return array<string, mixed>
+     */
+    public function detailedFeatureUsage(int $days = 30, ?string $role = null, ?int $collegeId = null): array
+    {
+        $days = max(1, min($days, 90));
+        $since = Carbon::now()->subDays($days);
+        $tz = $this->timezone();
+
+        // 1. Query ActivityPageViews by section
+        $viewsQuery = ActivityPageView::query()
+            ->join('activity_visits as v', 'v.id', '=', 'activity_page_views.visit_id')
+            ->where('activity_page_views.entered_at', '>=', $since)
+            ->when($collegeId !== null, fn ($q) => $q->where('activity_page_views.college_id', $collegeId));
+
+        $pageViewsBySection = $this->roleScope($viewsQuery, $role, 'v.role')
+            ->selectRaw('activity_page_views.section as section, COUNT(*) as views, COUNT(DISTINCT activity_page_views.user_id) as users, SUM(activity_page_views.active_seconds) as total_seconds, AVG(activity_page_views.active_seconds) as avg_seconds, AVG(activity_page_views.max_scroll) as avg_scroll, MAX(activity_page_views.entered_at) as last_at')
+            ->groupBy('activity_page_views.section')
+            ->get()
+            ->keyBy('section');
+
+        // 2. Direct Practice counts over period
+        $practiceCounts = [
+            'coding_submissions' => Submission::where('created_at', '>=', $since)->count(),
+            'core_answers' => CorePracticeAnswer::where('created_at', '>=', $since)->count(),
+            'speaking_attempts' => SpeakingAttempt::where('created_at', '>=', $since)->count(),
+            'listening_attempts' => ListeningAttempt::where('created_at', '>=', $since)->count(),
+            'vocabulary_attempts' => VocabularyAttempt::where('created_at', '>=', $since)->count(),
+            'contest_submissions' => ContestSubmission::where('created_at', '>=', $since)->count(),
+        ];
+        $totalPracticeActions = array_sum($practiceCounts);
+
+        // 3. Category Map
+        $categoryMap = [];
+        $colorMap = [];
+        foreach (self::FEATURE_CATALOG as $item) {
+            $categoryMap[$item['section']] = $item['category'];
+            $colorMap[$item['section']] = $item['color'];
+        }
+
+        // 4. Combine all features from catalog and any additional ones in DB
+        $allSections = array_unique(array_merge(
+            array_column(self::FEATURE_CATALOG, 'section'),
+            $pageViewsBySection->keys()->all()
+        ));
+
+        // Skip internal/auth non-feature screens
+        $excludedFromRanking = ['Login', 'Register', 'Forgot Password', 'Reset Password'];
+        $allSections = array_diff($allSections, $excludedFromRanking);
+
+        $featureItems = [];
+        $totalTrackedViews = 0;
+        $totalTrackedSeconds = 0;
+
+        foreach ($allSections as $section) {
+            $row = $pageViewsBySection->get($section);
+            $views = (int) ($row->views ?? 0);
+            $users = (int) ($row->users ?? 0);
+            $seconds = (int) ($row->total_seconds ?? 0);
+            $avgSec = (int) round((float) ($row->avg_seconds ?? 0));
+            $avgScroll = (int) round((float) ($row->avg_scroll ?? 0));
+            $lastAt = $row?->last_at ? Carbon::parse($row->last_at)->toIso8601String() : null;
+
+            $category = $categoryMap[$section] ?? 'Other Platform Modules';
+            $color = $colorMap[$section] ?? '#94a3b8';
+
+            // Connect direct practice count if applicable
+            $directCount = 0;
+            if (str_contains($section, 'Practice Arena')) $directCount = $practiceCounts['coding_submissions'];
+            elseif (str_contains($section, 'Core Prep')) $directCount = $practiceCounts['core_answers'];
+            elseif (str_contains($section, 'Speaking')) $directCount = $practiceCounts['speaking_attempts'];
+            elseif (str_contains($section, 'Listening')) $directCount = $practiceCounts['listening_attempts'];
+            elseif (str_contains($section, 'Vocabulary')) $directCount = $practiceCounts['vocabulary_attempts'];
+            elseif (str_contains($section, 'Contests')) $directCount = $practiceCounts['contest_submissions'];
+
+            // Effective engagement score: views + direct practice actions
+            $engagementScore = $views + ($directCount * 2);
+
+            $totalTrackedViews += $views;
+            $totalTrackedSeconds += $seconds;
+
+            $featureItems[] = [
+                'section' => $section,
+                'category' => $category,
+                'color' => $color,
+                'views' => $views,
+                'users' => $users,
+                'total_seconds' => $seconds,
+                'total_minutes' => round($seconds / 60, 1),
+                'avg_seconds' => $avgSec,
+                'avg_minutes' => round($avgSec / 60, 1),
+                'avg_scroll' => $avgScroll,
+                'direct_attempts' => $directCount,
+                'engagement_score' => $engagementScore,
+                'last_at' => $lastAt,
+            ];
+        }
+
+        // Sort by engagement score descending (most used first)
+        usort($featureItems, fn ($a, $b) => $b['engagement_score'] <=> $a['engagement_score'] ?: $b['views'] <=> $a['views']);
+
+        $totalPlatformActions = max(1, $totalTrackedViews + $totalPracticeActions);
+
+        $rank = 1;
+        $ranked = [];
+
+        foreach ($featureItems as $item) {
+            $totalEngagements = $item['views'] + $item['direct_attempts'];
+            $share = round(($totalEngagements / $totalPlatformActions) * 100, 1);
+            $tier = match (true) {
+                $rank <= 3 => 'most_popular',
+                $rank <= 7 => 'high_engagement',
+                $rank <= 11 => 'moderate',
+                default => 'least_used',
+            };
+
+            $item['rank'] = $rank;
+            $item['total_engagements'] = $totalEngagements;
+            $item['share_percentage'] = $share;
+            $item['usage_tier'] = $tier;
+            $ranked[] = $item;
+            $rank++;
+        }
+
+        // Most used (top 4) and Least used (bottom 4)
+        $mostUsed = array_slice($ranked, 0, 4);
+        $leastUsed = array_reverse(array_slice($ranked, -4));
+
+        // Group by category
+        $categoryGroups = [];
+        foreach ($ranked as $f) {
+            $cat = $f['category'];
+            if (! isset($categoryGroups[$cat])) {
+                $categoryGroups[$cat] = [
+                    'category' => $cat,
+                    'color' => $f['color'],
+                    'views' => 0,
+                    'direct_attempts' => 0,
+                    'engagements' => 0,
+                    'users' => 0,
+                    'minutes' => 0,
+                    'features_count' => 0,
+                ];
+            }
+            $categoryGroups[$cat]['views'] += $f['views'];
+            $categoryGroups[$cat]['direct_attempts'] += $f['direct_attempts'];
+            $categoryGroups[$cat]['engagements'] += $f['total_engagements'];
+            $categoryGroups[$cat]['users'] = max($categoryGroups[$cat]['users'], $f['users']);
+            $categoryGroups[$cat]['minutes'] += $f['total_minutes'];
+            $categoryGroups[$cat]['features_count']++;
+        }
+
+        $categories = array_values($categoryGroups);
+        usort($categories, fn ($a, $b) => $b['engagements'] <=> $a['engagements'] ?: $b['views'] <=> $a['views']);
+        foreach ($categories as &$cat) {
+            $cat['share_percentage'] = round(($cat['engagements'] / $totalPlatformActions) * 100, 1);
+        }
+        unset($cat);
+
+        // Daily trend over period
+        $trendQuery = ActivityPageView::query()
+            ->join('activity_visits as v', 'v.id', '=', 'activity_page_views.visit_id')
+            ->where('activity_page_views.entered_at', '>=', $since)
+            ->when($collegeId !== null, fn ($q) => $q->where('activity_page_views.college_id', $collegeId));
+
+        $dailyStats = $this->roleScope($trendQuery, $role, 'v.role')
+            ->selectRaw('DATE(activity_page_views.entered_at) as day, COUNT(*) as views, COUNT(DISTINCT activity_page_views.user_id) as users, SUM(activity_page_views.active_seconds) as seconds')
+            ->groupBy('day')
+            ->get()
+            ->keyBy('day');
+
+        $dailyTrend = [];
+        $checkDays = min($days, 30);
+        for ($i = $checkDays - 1; $i >= 0; $i--) {
+            $d = Carbon::now($tz)->subDays($i);
+            $dateStr = $d->toDateString();
+            $stat = $dailyStats->get($dateStr);
+            $dailyTrend[] = [
+                'day' => $dateStr,
+                'label' => $d->format('M j'),
+                'views' => (int) ($stat->views ?? 0),
+                'users' => (int) ($stat->users ?? 0),
+                'minutes' => (int) round(((int) ($stat->seconds ?? 0)) / 60),
+            ];
+        }
+
+        $topName = $mostUsed[0]['section'] ?? 'None';
+        $bottomName = $leastUsed[0]['section'] ?? 'None';
+
+        return [
+            'period_days' => $days,
+            'summary' => [
+                'total_views' => $totalTrackedViews,
+                'total_minutes' => round($totalTrackedSeconds / 60, 1),
+                'total_practice_actions' => $totalPracticeActions,
+                'total_features_tracked' => count($ranked),
+                'top_feature' => $topName,
+                'least_feature' => $bottomName,
+                'top_category' => $categories[0]['category'] ?? 'None',
+            ],
+            'ranked_features' => $ranked,
+            'most_used' => $mostUsed,
+            'least_used' => $leastUsed,
+            'categories' => $categories,
+            'daily_trend' => $dailyTrend,
+            'practice_totals' => $practiceCounts,
+        ];
     }
 
     // ------------------------------------------------------------------ online

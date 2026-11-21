@@ -9,6 +9,7 @@ Thumbs.db
 # Dev server output
 *.log
 *.out
+.vite/
 
 # Deploy packages and crash dumps — a package zip can contain a copy of
 # backend/.env, so it must never be committable (see infra/deploy/).

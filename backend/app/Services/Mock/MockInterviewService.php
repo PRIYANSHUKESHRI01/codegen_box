@@ -80,6 +80,61 @@ class MockInterviewService
                     ];
                 }
 
+                $parentSets = [];
+                if (! empty($stack['parent_sets'])) {
+                    foreach ($stack['parent_sets'] as $pset) {
+                        $prounds = [];
+                        $setAttempts = 0;
+                        $setBestScore = null;
+                        $setInProgress = false;
+
+                        foreach ($pset['rounds'] as $pround) {
+                            $pCount = count($pround['questions']);
+                            $pMy = $mine[$pround['id']] ?? self::EMPTY_PROGRESS;
+
+                            if ($pMy['attempts'] > 0) {
+                                $setAttempts += $pMy['attempts'];
+                            }
+                            if ($pMy['best_score'] !== null) {
+                                $setBestScore = max($setBestScore ?? 0, $pMy['best_score']);
+                            }
+                            if ($pMy['open_status'] === 'in_progress') {
+                                $setInProgress = true;
+                            }
+
+                            $prounds[] = [
+                                'id' => $pround['id'],
+                                'parent_set_number' => (int) ($pround['parent_set_number'] ?? $pset['set_number']),
+                                'round_number' => $pround['round_number'],
+                                'title' => $pround['title'],
+                                'description' => $pround['description'],
+                                'duration_minutes' => $pround['duration_minutes'],
+                                'question_count' => $pCount,
+                                'sitting_questions' => min($pCount, $this->sittingLength($stack)),
+                                'ready' => $this->catalog->isRoundReady($pround),
+                                'my' => $pMy,
+                            ];
+                        }
+
+                        $setStatus = $setInProgress ? 'in_progress' : ($setAttempts > 0 ? 'completed' : 'not_attempted');
+
+                        $parentSets[] = [
+                            'id' => $pset['id'],
+                            'set_number' => $pset['set_number'],
+                            'title' => $pset['title'],
+                            'level' => $pset['level'] ?? 'Foundational',
+                            'description' => $pset['description'],
+                            'rounds_count' => count($prounds),
+                            'total_questions' => array_sum(array_column($prounds, 'question_count')),
+                            'ready' => collect($prounds)->every(fn ($r) => $r['ready']),
+                            'status' => $setStatus,
+                            'attempts' => $setAttempts,
+                            'best_score' => $setBestScore,
+                            'rounds' => $prounds,
+                        ];
+                    }
+                }
+
                 $stats['total_stacks']++;
                 $stats['live_stacks'] += $progress['live'] ? 1 : 0;
                 $live += $progress['live'] ? 1 : 0;
@@ -98,6 +153,7 @@ class MockInterviewService
                     'counts_toward_readiness' => ($stack['discipline'] ?? null) !== InterviewDiscipline::MARITIME_KEY,
                     'ready_rounds' => $progress['ready_rounds'],
                     'total_rounds' => $progress['total_rounds'],
+                    'parent_sets' => $parentSets,
                     'rounds' => $rounds,
                 ];
             }
@@ -171,7 +227,7 @@ class MockInterviewService
                 'discipline' => $target['stack']['discipline'] ?? null,
                 'set' => [
                     'id' => $roundId,
-                    'series_number' => 1,
+                    'series_number' => (int) ($round['parent_set_number'] ?? ($target['parent_set']['set_number'] ?? 1)),
                     'set_number' => $round['round_number'],
                     'title' => $round['title'],
                     'description' => $round['description'],

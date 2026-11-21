@@ -23,6 +23,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { CountdownTimer } from "@/components/dashboard/student/CountdownTimer";
 import { DifficultyBadge } from "@/components/problems/DifficultyBadge";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useToast } from "@/lib/toast";
 import { codesAtAll } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -148,6 +149,7 @@ function DrivesRouter() {
 
 function PlacementDrivePreparePageContent({ driveId }: { driveId: string }) {
   const router = useRouter();
+  const triggerToast = useToast();
   const { status: authStatus, user: authUser } = useAuthGuard(["user"]);
   // The recommended problems are coding practice: a programme without it is not pointed at a Practice Arena it does not have.
   const codes = codesAtAll(authUser);
@@ -160,6 +162,71 @@ function PlacementDrivePreparePageContent({ driveId }: { driveId: string }) {
   // Computed once when the drive loads so CountdownTimer is never handed a
   // freshly-recomputed value on an unrelated re-render (which would reset its tick).
   const [minutesFromNow, setMinutesFromNow] = useState(0);
+
+  const [registering, setRegistering] = useState(false);
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  const handleRegister = async () => {
+    if (!detail) return;
+    setRegistering(true);
+    try {
+      const res = await api.post<{ message: string; application: MyDriveApplication }>(
+        `/drives/${detail.drive.id}/register`,
+        {}
+      );
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              drive: {
+                ...prev.drive,
+                myApplication: res.application,
+              },
+            }
+          : null
+      );
+      triggerToast.success(res.message || "You are now registered for this placement drive.", {
+        title: "Registration Confirmed",
+      });
+    } catch (err) {
+      triggerToast.error(err instanceof ApiError ? err.message : "Failed to register for drive.", {
+        title: "Registration Failed",
+      });
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!detail) return;
+    setWithdrawing(true);
+    try {
+      const res = await api.post<{ message: string; application: MyDriveApplication }>(
+        `/drives/${detail.drive.id}/withdraw`,
+        {}
+      );
+      setDetail((prev) =>
+        prev
+          ? {
+              ...prev,
+              drive: {
+                ...prev.drive,
+                myApplication: res.application,
+              },
+            }
+          : null
+      );
+      triggerToast.info(res.message || "You have withdrawn your registration for this drive.", {
+        title: "Registration Withdrawn",
+      });
+    } catch (err) {
+      triggerToast.error(err instanceof ApiError ? err.message : "Failed to withdraw registration.", {
+        title: "Withdrawal Failed",
+      });
+    } finally {
+      setWithdrawing(false);
+    }
+  };
 
   useEffect(() => {
     if (authStatus !== "ready" || !driveId) return;
@@ -324,6 +391,97 @@ function PlacementDrivePreparePageContent({ driveId }: { driveId: string }) {
           </div>
         </div>
       </section>
+
+      {/* Registration Gate & Status Card */}
+      {drive.myApplication &&
+      drive.myApplication.stage !== "withdrawn" &&
+      drive.myApplication.stage !== "rejected" ? (
+        <section className="p-4 sm:p-5 rounded-panel bg-status-success/10 border border-status-success/30 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-status-success shrink-0 mt-0.5" />
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-xs text-status-success">
+                  You are registered for this drive
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-3xs font-semibold uppercase bg-status-success/20 text-status-success">
+                  Stage: {drive.myApplication.stage_label}
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary mt-1">
+                Your registration is active. You are cleared to take all linked online tests, coding contests, and technical interviews.
+              </p>
+            </div>
+          </div>
+          {isOpen && drive.myApplication.stage === "registered" && (
+            <button
+              type="button"
+              onClick={handleWithdraw}
+              disabled={withdrawing}
+              className="text-xs text-text-muted hover:text-status-danger underline self-start sm:self-auto shrink-0 transition-colors disabled:opacity-50"
+            >
+              {withdrawing ? "Withdrawing..." : "Withdraw Registration"}
+            </button>
+          )}
+        </section>
+      ) : drive.studentEligibility.status === "eligible" ? (
+        <section className="p-4 sm:p-5 rounded-panel bg-accent-primary/10 border border-accent-primary/30 shadow-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-accent-primary shrink-0 mt-0.5" />
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-xs text-accent-primary">
+                  Registration Required for this Drive
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-3xs font-semibold uppercase bg-accent-primary/20 text-accent-primary">
+                  Eligible Candidate
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary mt-1 max-w-xl">
+                You meet all academic eligibility requirements for this role. Register now to participate in scheduled tests, coding rounds, and technical interviews.
+              </p>
+            </div>
+          </div>
+          {isOpen ? (
+            <button
+              type="button"
+              onClick={handleRegister}
+              disabled={registering}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-control bg-accent-primary text-text-inverse font-bold text-xs hover:bg-accent-primary-hover shadow-subtle shrink-0 transition-all disabled:opacity-50"
+            >
+              {registering ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Registering...</span>
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Register for Drive</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <span className="text-xs text-text-muted italic">
+              {isPast ? "Registration has closed." : "Registration opens soon."}
+            </span>
+          )}
+        </section>
+      ) : (
+        <section className="p-4 sm:p-5 rounded-panel bg-status-danger/10 border border-status-danger/30 shadow-subtle flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-status-danger shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-xs text-status-danger">
+              Not Eligible to Register for this Drive
+            </span>
+            <p className="text-xs text-text-secondary mt-1">
+              {drive.studentEligibility.reasons.length > 0
+                ? drive.studentEligibility.reasons.join(" · ")
+                : "You do not meet the academic criteria or eligible branches specified for this recruitment drive."}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Overview + Eligibility */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

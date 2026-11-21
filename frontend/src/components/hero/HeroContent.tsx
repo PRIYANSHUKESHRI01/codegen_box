@@ -27,27 +27,6 @@ export function HeroContent() {
   return (
     <>
       <motion.div variants={container} initial="hidden" animate="show" className="mx-auto flex max-w-4xl flex-col items-center px-4 pb-10 pt-8 text-center sm:pb-14 sm:pt-14">
-        <motion.a
-          variants={item}
-          href="#platform"
-          className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-full border border-border-strong bg-surface px-3 py-1 text-xs font-medium text-text-secondary shadow-subtle transition-colors hover:border-accent-primary/50"
-        >
-          <span className="relative flex h-1.5 w-1.5 shrink-0" aria-hidden="true">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
-          </span>
-          <span className="truncate text-2xs font-semibold text-primary sm:text-xs">
-            <span className="sm:hidden">Placements, end to end</span>
-            <span className="hidden sm:inline">The placement platform for colleges and students</span>
-          </span>
-          <span className="shrink-0 text-border-strong" aria-hidden="true">
-            &bull;
-          </span>
-          <span className="flex shrink-0 items-center gap-1 text-2xs font-semibold text-accent-primary underline-offset-4 group-hover:underline sm:text-xs">
-            See how <ArrowRight className="h-3 w-3" aria-hidden="true" />
-          </span>
-        </motion.a>
-
         {/* Two short parallel lines, bold rather than black: Stripe, Linear and Vercel all sit at 56–64px on desktop. */}
         <motion.h1
           variants={item}

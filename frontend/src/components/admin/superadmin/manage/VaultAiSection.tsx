@@ -13,7 +13,7 @@ import { VaultAiResultsBlock } from "./VaultAiResultsBlock";
 const fmt = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—");
 const SELECT = "rounded-control border border-border-subtle bg-elevated px-2.5 py-2 text-xs text-primary outline-none focus:border-accent-primary";
 
-const ACTION_WORDS: Record<string, string> = { reset: "Reset", scores: "Marks changed", qualified: "Marked qualified" };
+const ACTION_WORDS: Record<string, string> = { reset: "Reset", grant_attempt: "Attempt re-opened", scores: "Marks changed", qualified: "Marked qualified" };
 
 function Marks({ scores }: { scores: Record<string, number> }) {
   return (

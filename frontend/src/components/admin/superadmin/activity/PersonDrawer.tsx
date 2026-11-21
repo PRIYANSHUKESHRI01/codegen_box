@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, Clock, KeyRound, LogIn, X } from "lucide-react";
+import { ChevronDown, Clock, Download, KeyRound, Laptop, LogIn, Mic, X } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { downloadApiFile } from "@/lib/download";
 import { cn } from "@/lib/utils";
 import type { PersonDetail, PersonVisit } from "@/types/activity";
 import { EVENT_NAME, EVENT_TONE, REASON_NAME, STATE_META, ago, clock, span, stamp } from "./format";
@@ -13,9 +14,22 @@ import { DeviceIcon, ErrorBox, LiveDot, RoleChip, ScrollMeter, Spinner, StateBad
 export function PersonDrawer({ userId, onClose }: { userId: number; onClose: () => void }) {
   const [data, setData] = useState<PersonDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const panelRef = useRef<HTMLDivElement>(null);
+
+  const handleDownload = async () => {
+    if (!data) return;
+    setDownloading(true);
+    try {
+      await downloadApiFile(`/superadmin/users/${userId}/export-report`, `aptrun-user-${userId}-report.csv`);
+    } catch {
+      // Ignore
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const load = useCallback(() => {
     setError(null);
@@ -51,10 +65,16 @@ export function PersonDrawer({ userId, onClose }: { userId: number; onClose: () 
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="truncate text-base font-extrabold text-primary">{data?.user.name ?? "Loading…"}</h2>
               {data && <RoleChip role={data.user.role} />}
-              {data?.online_now && (
-                <span className="inline-flex items-center gap-1.5 text-3xs font-bold text-emerald-600 dark:text-emerald-300">
-                  <LiveDot /> Online now
-                </span>
+              {data && (
+                data.online_now ? (
+                  <span className="inline-flex items-center gap-1.5 text-3xs font-bold text-emerald-600 dark:text-emerald-300">
+                    <LiveDot /> Online now
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-3xs font-medium text-text-muted">
+                    <span className="h-2 w-2 rounded-full bg-border-strong" /> Offline{data.facts.last_seen_at ? ` · Last active ${ago(data.facts.last_seen_at)}` : ""}
+                  </span>
+                )
               )}
             </div>
             {data && (
@@ -65,9 +85,23 @@ export function PersonDrawer({ userId, onClose }: { userId: number; onClose: () 
               </p>
             )}
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="rounded-control p-1.5 text-text-muted hover:bg-elevated hover:text-primary">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {data && (
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                title="Download user report (CSV)"
+                className="inline-flex items-center gap-1.5 rounded-control border border-border-subtle bg-elevated px-2.5 py-1.5 text-2xs font-semibold text-primary shadow-subtle hover:bg-surface-hover hover:border-border-strong disabled:opacity-50"
+              >
+                <Download className="h-3.5 w-3.5 text-accent-primary" />
+                <span className="hidden sm:inline">{downloading ? "Downloading..." : "Export Report"}</span>
+              </button>
+            )}
+            <button type="button" onClick={onClose} aria-label="Close" className="rounded-control p-1.5 text-text-muted hover:bg-elevated hover:text-primary">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </header>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
@@ -123,6 +157,124 @@ function Body({ data }: { data: PersonDetail }) {
           ))}
         </dl>
       </section>
+
+      {data.interviews && (
+        <section className="rounded-panel border border-border-subtle bg-surface p-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <Mic className="h-4 w-4 text-violet-500" />
+                <h3 className="text-sm font-bold text-primary">Mock AI Interviews Practice</h3>
+              </div>
+              <p className="mt-0.5 text-2xs text-text-muted">Total practice time and spoken mock interview performance.</p>
+            </div>
+            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 font-mono text-3xs font-bold text-violet-600 dark:text-violet-400">
+              {data.interviews.total_sessions} {data.interviews.total_sessions === 1 ? "Session" : "Sessions"}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Total Practice</span>
+              <p className="font-mono text-base font-black text-primary">{span(data.interviews.total_practice_minutes * 60)}</p>
+            </div>
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Completed</span>
+              <p className="font-mono text-base font-black text-primary">{data.interviews.completed_sessions}</p>
+            </div>
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Avg Score</span>
+              <p className="font-mono text-base font-black text-primary">
+                {data.interviews.average_score > 0 ? `${data.interviews.average_score}%` : "—"}
+              </p>
+            </div>
+          </div>
+
+          {data.interviews.sessions.length > 0 && (
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border-subtle text-3xs font-bold uppercase tracking-wider text-text-muted">
+                    <th className="py-1.5 pr-2 text-left">Interview</th>
+                    <th className="py-1.5 pr-2 text-left">Duration</th>
+                    <th className="py-1.5 pr-2 text-left">Score</th>
+                    <th className="py-1.5 pr-2 text-left">Status</th>
+                    <th className="py-1.5 text-right">Date</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle">
+                  {data.interviews.sessions.map((sess) => (
+                    <tr key={sess.id}>
+                      <td className="py-2 pr-2">
+                        <span className="font-semibold text-primary">{sess.title}</span>
+                        {sess.round_name && <span className="block text-3xs text-text-muted">{sess.round_name}</span>}
+                      </td>
+                      <td className="py-2 pr-2 font-mono text-text-secondary">
+                        {sess.duration_minutes ? `${sess.duration_minutes} min` : "—"}
+                      </td>
+                      <td className="py-2 pr-2">
+                        {sess.composite_score_percent !== null ? (
+                          <span className="font-mono font-bold text-emerald-600">{sess.composite_score_percent}%</span>
+                        ) : (
+                          <span className="text-3xs text-text-muted">Awaiting score</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-2">
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-0.5 text-3xs font-bold capitalize",
+                            sess.status === "completed" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+                          )}
+                        >
+                          {sess.status.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="py-2 text-right text-3xs text-text-muted">
+                        {sess.started_at ? ago(sess.started_at) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {data.platforms && (
+        <section className="rounded-panel border border-border-subtle bg-surface p-4">
+          <div className="flex items-center gap-1.5">
+            <Laptop className="h-4 w-4 text-cyan-500" />
+            <h3 className="text-sm font-bold text-primary">Platforms & Devices Used</h3>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Devices</span>
+              <p className="mt-0.5 font-semibold text-primary">
+                {data.platforms.devices.length > 0 ? data.platforms.devices.join(", ") : "Desktop"}
+              </p>
+            </div>
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Browsers</span>
+              <p className="mt-0.5 font-semibold text-primary truncate" title={data.platforms.browsers.join(", ")}>
+                {data.platforms.browsers.length > 0 ? data.platforms.browsers.join(", ") : "Chrome"}
+              </p>
+            </div>
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">OS</span>
+              <p className="mt-0.5 font-semibold text-primary truncate" title={data.platforms.os_list.join(", ")}>
+                {data.platforms.os_list.length > 0 ? data.platforms.os_list.join(", ") : "Windows"}
+              </p>
+            </div>
+            <div className="rounded-control bg-elevated p-2">
+              <span className="text-3xs text-text-muted uppercase font-bold">Last IP</span>
+              <p className="mt-0.5 font-mono text-primary truncate">
+                {data.platforms.last_ip ?? "—"}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-panel border border-border-subtle bg-surface p-4">
         <h3 className="text-sm font-bold text-primary">Sections used</h3>

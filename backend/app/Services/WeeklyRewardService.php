@@ -264,6 +264,20 @@ class WeeklyRewardService
             ? collect()
             : $this->board->standings(ContestLeaderboardService::PERIOD_WEEKLY, null, $week)->take(max($shown, $prizes->count()));
 
+        $users = User::with('college:id,name')->whereIn('id', $standings->pluck('user.id'))->get()->keyBy('id');
+        $winnersThisWeek = $this->ledgerAvailable() ? WeeklyRewardWinner::where('week_key', $week['key'])->get()->keyBy('user_id') : collect();
+
+        $standingsPayload = $standings->map(function (array $row) use ($prizes, $users, $winnersThisWeek) {
+            $user = $users->get($row['user']['id']);
+            $winner = $winnersThisWeek->get($row['user']['id']);
+            return $row + [
+                'email' => $user?->email,
+                'college' => $user?->college?->name,
+                'prize' => $this->prizeForRank($prizes, $row['rank']),
+                'winner' => $winner ? $this->winnerPayload($winner) : null,
+            ];
+        })->values();
+
         $previous = $this->board->previousWeek();
         $lastPrizes = $this->prizes($previous);
 
@@ -272,7 +286,7 @@ class WeeklyRewardService
             'current_week' => $this->board->weekPayload($current),
             'schedule' => $this->schedule($current),
             'cards' => $cards,
-            'standings' => $standings->map(fn (array $row) => $row + ['prize' => $this->prizeForRank($prizes, $row['rank'])])->values(),
+            'standings' => $standingsPayload,
             'last_week' => [
                 'week' => $this->board->weekPayload($previous),
                 'prizes' => $lastPrizes->values(),
@@ -454,12 +468,104 @@ class WeeklyRewardService
     }
 
     /**
+     * Award a coupon directly to a student for the weekly contest leaderboard.
+     * Records the voucher, marks it sent, creates dashboard notification and sends transactional email.
+     */
+    public function awardCoupon(User $actor, array $data): WeeklyRewardWinner
+    {
+        $cardKey = $data['card'];
+        abort_unless($this->exists($cardKey), 422, 'Invalid reward card/company selected.');
+
+        $cardDef = $this->cards()[$cardKey];
+        $user = User::with('college:id,name')->findOrFail($data['user_id']);
+        $week = $this->weekOf($data['week'] ?? null);
+        $rank = (int) ($data['rank'] ?? 1);
+        $score = (int) ($data['contest_score'] ?? 0);
+        $voucherCode = trim((string) $data['voucher_code']);
+
+        $winner = WeeklyRewardWinner::firstOrNew([
+            'week_key' => $week['key'],
+            'user_id' => $user->id,
+        ]);
+
+        $winner->rank = $rank;
+        $winner->user_name = $user->name;
+        $winner->user_handle = $user->handle;
+        $winner->email = $user->email;
+        $winner->college = $user->college?->name;
+        $winner->contest_score = $score > 0 ? $score : ($winner->contest_score ?? 0);
+        $winner->card = $cardKey;
+        $winner->brand = (string) $cardDef['brand'];
+        $winner->amount = (int) $cardDef['amount'];
+        $winner->voucher_code = $voucherCode;
+        $winner->status = WeeklyRewardWinner::SENT;
+        $winner->sent_at = now();
+        $winner->handled_by = $actor->id;
+        if (!empty($data['note'])) {
+            $winner->note = trim((string) $data['note']);
+        }
+        $winner->save();
+
+        // 1. Dashboard In-App Notification
+        app(NotificationService::class)->notify(
+            $winner->user_id,
+            NotificationType::RewardSent,
+            "Congratulations! You won a {$winner->brand} voucher",
+            "You topped the weekly contest! Your ₹{$winner->amount} {$winner->brand} voucher is ready — click to open and reveal your coupon code.",
+            [
+                'url' => '/dashboard/contests?reward='.$winner->id,
+                'data' => [
+                    'kind' => 'reward_sent',
+                    'id' => $winner->id,
+                    'card' => $cardKey,
+                    'brand' => $winner->brand,
+                    'amount' => $winner->amount,
+                ],
+                'group_key' => 'reward.sent:'.$winner->id
+            ]
+        );
+
+        // 2. Transactional Email
+        if (!empty($user->email)) {
+            try {
+                \Illuminate\Support\Facades\Mail::to($user->email)->send(
+                    new \App\Mail\WeeklyContestVoucherMail($user, $winner, $cardDef)
+                );
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[WeeklyRewardService] Failed to send voucher email: '.$e->getMessage());
+            }
+        }
+
+        ActivityLog::record(
+            $actor,
+            "Awarded a {$winner->brand} voucher to {$winner->user_name} for the weekly contest",
+            'Weekly reward',
+            $winner->user_name,
+            [
+                'winner' => $winner->id,
+                'week' => $winner->week_key->toDateString(),
+                'brand' => $winner->brand,
+                'amount' => $winner->amount,
+            ]
+        );
+
+        return $winner;
+    }
+
+    /**
      * The superadmin's hand on the ledger: record the voucher (code and a note) and mark it sent, or cancel it. The first time a row
      * becomes `sent` the student is told, and from then on they can see the code on their Contests page.
      */
     public function updateWinner(WeeklyRewardWinner $winner, array $data, User $actor): WeeklyRewardWinner
     {
         $was = $winner->status;
+
+        if (array_key_exists('card', $data) && $this->exists((string) $data['card'])) {
+            $cardDef = $this->cards()[(string) $data['card']];
+            $winner->card = (string) $data['card'];
+            $winner->brand = (string) $cardDef['brand'];
+            $winner->amount = (int) $cardDef['amount'];
+        }
 
         if (array_key_exists('voucher_code', $data)) {
             $winner->voucher_code = ($data['voucher_code'] === null || trim((string) $data['voucher_code']) === '') ? null : trim((string) $data['voucher_code']);
@@ -483,8 +589,19 @@ class WeeklyRewardService
                 NotificationType::RewardSent,
                 "Your {$winner->brand} voucher is on its way",
                 $winner->voucher_code ? "Your ₹{$winner->amount} {$winner->brand} voucher is ready — open Contests to see your code." : "We have sent your ₹{$winner->amount} {$winner->brand} voucher to {$winner->email}.",
-                ['url' => '/dashboard/contests', 'data' => ['kind' => 'reward_sent', 'id' => $winner->id], 'group_key' => 'reward.sent:'.$winner->id]
+                ['url' => '/dashboard/contests?reward='.$winner->id, 'data' => ['kind' => 'reward_sent', 'id' => $winner->id], 'group_key' => 'reward.sent:'.$winner->id]
             );
+
+            $user = User::find($winner->user_id);
+            if ($user && $user->email && $winner->voucher_code) {
+                try {
+                    \Illuminate\Support\Facades\Mail::to($user->email)->send(
+                        new \App\Mail\WeeklyContestVoucherMail($user, $winner, $this->cards()[$winner->card] ?? [])
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('[WeeklyRewardService] Failed to send voucher email: '.$e->getMessage());
+                }
+            }
         }
 
         ActivityLog::record($actor, "Marked the {$winner->brand} voucher for {$winner->user_name} as {$winner->status}", 'Weekly reward', $winner->user_name, [

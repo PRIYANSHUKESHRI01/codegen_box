@@ -33,22 +33,25 @@ class GeminiCoreQuestionDraftService
      */
     public function draft(string $discipline, string $subject, ?string $topic, string $difficulty, string $type, int $count, array $avoidStems = []): array
     {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI drafting is not configured yet — write the questions by hand or import them.');
         }
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(40)
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [['parts' => [['text' => $this->prompt($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems)]]]],
-                        'generationConfig' => ['temperature' => 0.6, 'maxOutputTokens' => 8192, 'responseMimeType' => 'application/json', 'responseSchema' => $this->schema()],
-                    ]
-                );
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(40)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [['parts' => [['text' => $this->prompt($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems)]]]],
+                            'generationConfig' => ['temperature' => 0.6, 'maxOutputTokens' => 8192, 'responseMimeType' => 'application/json', 'responseSchema' => $this->schema()],
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] core draft request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI drafting is temporarily unavailable. Try again, or write the questions by hand.');

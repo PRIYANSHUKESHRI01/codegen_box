@@ -12,6 +12,7 @@ import {
   LayoutDashboard,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import type { DashboardRole } from "@/components/dashboard/DashboardSidebar";
 import { CompanyCommandCenter } from "@/components/dashboard/company/CompanyCommandCenter";
 import { TpoCommandCenter } from "@/components/dashboard/tpo/TpoCommandCenter";
 import { OpsOverviewPanel } from "@/components/admin/mellow/OpsOverviewPanel";
@@ -56,8 +57,14 @@ function AdminPageContent() {
   // college_tpo session can never flip this to admin_internal from the
   // client, unlike the old localStorage-based persona switch.
   const { user, status } = useAuthGuard(["admin_internal", "admin_tpo", "superadmin", "admin_company"]);
-  const userRole: "admin_internal" | "admin_tpo" | "admin_company" =
-    user?.role === "admin_tpo" ? "admin_tpo" : user?.role === "admin_company" ? "admin_company" : "admin_internal";
+  const userRole: DashboardRole =
+    user?.role === "superadmin"
+      ? "superadmin"
+      : user?.role === "admin_tpo"
+      ? "admin_tpo"
+      : user?.role === "admin_company"
+      ? "admin_company"
+      : "admin_internal";
 
   // Mellow staff only ever see the Platform Ops view now — there is no
   // "supervise a TPO's dashboard" mode to switch into. The view is simply
@@ -65,11 +72,14 @@ function AdminPageContent() {
   // and no query param can override it.
   const activeTab: "mellow" | "tpo" = userRole === "admin_tpo" ? "tpo" : "mellow";
 
-  // Mellow Ops' own sub-navigation — a real tab-shell (mirrors
-  // superadmin/page.tsx's ?tab= convention exactly) so every sidebar item
-  // is a real, bookmarkable destination instead of a same-page #anchor.
+  // Sub-navigation — a real tab-shell (mirrors superadmin/page.tsx's ?tab= convention).
+  // For superadmin, browsing /admin (Problem Bank) defaults directly to "problems".
   const mellowTabParam = searchParams?.get("tab") ?? null;
-  const [mellowTab, setMellowTab] = useState<MellowTab>(isMellowTab(mellowTabParam) ? mellowTabParam : "overview");
+  const initialMellowTab: MellowTab =
+    userRole === "superadmin"
+      ? (isMellowTab(mellowTabParam) ? mellowTabParam : "problems")
+      : (isMellowTab(mellowTabParam) ? mellowTabParam : "overview");
+  const [mellowTab, setMellowTab] = useState<MellowTab>(initialMellowTab);
 
   const goToMellowTab = (tab: MellowTab) => {
     setMellowTab(tab);
@@ -152,6 +162,10 @@ function AdminPageContent() {
           ? `${greeting()}, ${user?.name ?? "there"}`
           : userRole === "admin_tpo" || activeTab === "tpo"
           ? `${greeting()}, ${user?.name ?? "there"}`
+          : userRole === "superadmin"
+          ? mellowTab === "problems"
+            ? "Problem Bank"
+            : "Platform Operations"
           : "Mellow Internal Operations"
       }
       subtitle={
@@ -159,6 +173,8 @@ function AdminPageContent() {
           ? `${user?.company?.name ?? "Your company"} — Job openings, candidate pipeline & hiring assessments.`
           : userRole === "admin_tpo" || activeTab === "tpo"
           ? `${user?.college?.name ?? "Your institution"} — Campus placement readiness & recruitment drives.`
+          : userRole === "superadmin"
+          ? "Browse, manage, and curate coding problems and test suites across AptRun."
           : "Platform curation, partner college governance, and platform-user management."
       }
       actionButton={
@@ -209,12 +225,9 @@ function AdminPageContent() {
       )}
 
       {/* ========================================================================= */}
-      {/* VIEW 1: MELLOW INTERNAL EMPLOYEE — real tab-shell (mirrors              */}
-      {/* superadmin/page.tsx exactly): every tab is a real, database-backed      */}
-      {/* panel and a real ?tab= destination, not a same-page #anchor into a      */}
-      {/* mix of real sections and hardcoded mock data.                           */}
+      {/* VIEW 1: PLATFORM OPS & CURATION (superadmin / admin_internal)            */}
       {/* ========================================================================= */}
-      {userRole === "admin_internal" && activeTab === "mellow" && (
+      {(userRole === "admin_internal" || userRole === "superadmin") && activeTab === "mellow" && (
         <motion.div
           key="mellow-view"
           initial={{ opacity: 0, y: 10 }}
@@ -222,26 +235,28 @@ function AdminPageContent() {
           exit={{ opacity: 0, y: -10 }}
           className="space-y-6"
         >
-          <div className="flex items-center gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit flex-wrap">
-            {allowedMellowTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => goToMellowTab(tab.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
-                    mellowTab === tab.id ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
-                  )}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
+          {userRole !== "superadmin" && (
+            <div className="flex items-center gap-1.5 p-1 rounded-control bg-elevated border border-border-subtle w-fit flex-wrap">
+              {allowedMellowTabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => goToMellowTab(tab.id)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3.5 py-1.5 rounded-control text-2xs font-bold transition-all whitespace-nowrap",
+                      mellowTab === tab.id ? "bg-accent-primary text-white shadow-subtle" : "text-text-secondary hover:text-primary"
+                    )}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
-          {allowedMellowTabs.length === 1 && (
+          {userRole !== "superadmin" && allowedMellowTabs.length === 1 && (
             <div className="p-4 rounded-panel bg-status-warning/10 border border-status-warning/25 text-xs text-status-warning">
               You haven&apos;t been granted access to any Mellow Ops section yet — ask your superadmin to grant access from the Mellow Staff tab.
             </div>
@@ -250,7 +265,7 @@ function AdminPageContent() {
           {mellowTab === "overview" && <OpsOverviewPanel />}
           {mellowTab === "colleges" && allowedMellowTabs.some((t) => t.id === "colleges") && <PartnerCollegesPanel triggerToast={triggerToast} />}
           {mellowTab === "users" && allowedMellowTabs.some((t) => t.id === "users") && <PlatformUsersPanel triggerToast={triggerToast} />}
-          {mellowTab === "problems" && allowedMellowTabs.some((t) => t.id === "problems") && <ProblemBankPanel triggerToast={triggerToast} />}
+          {mellowTab === "problems" && <ProblemBankPanel triggerToast={triggerToast} />}
         </motion.div>
       )}
 

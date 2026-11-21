@@ -41,6 +41,25 @@ class HackathonNotifier
                 'data' => ['hackathon_id' => $h->id, 'slug' => $h->slug],
                 'group_key' => "hackathon.published:{$h->id}",
             ]);
+
+            // Dispatch announcement emails to all eligible students
+            try {
+                $studentsQuery = $h->audience === Hackathon::AUDIENCE_COLLEGES
+                    ? \App\Models\User::where('role', \App\Models\User::ROLE_USER)->whereIn('college_id', $h->colleges()->pluck('colleges.id')->all())
+                    : \App\Models\User::where('role', \App\Models\User::ROLE_USER);
+
+                $studentsQuery->whereNotNull('email')->chunk(100, function ($students) use ($h) {
+                    foreach ($students as $student) {
+                        try {
+                            \Illuminate\Support\Facades\Mail::to($student->email)->queue(new \App\Mail\HackathonPublishedMail($student, $h));
+                        } catch (\Throwable $e) {
+                            report($e);
+                        }
+                    }
+                });
+            } catch (\Throwable $e) {
+                report($e);
+            }
         });
     }
 

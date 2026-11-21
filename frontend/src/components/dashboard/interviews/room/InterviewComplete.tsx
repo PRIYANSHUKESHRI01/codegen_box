@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, Loader2, Mail, RefreshCw, RotateCcw, Sparkles, ThumbsDown, ThumbsUp, UserCheck } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, Mail, RefreshCw, RotateCcw, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, UserCheck } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { ScoreRing } from "@/components/dashboard/vaultAi/vaultKit";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
@@ -80,6 +81,7 @@ export function InterviewComplete({
   elapsedSeconds,
   reattempting,
   onReattempt,
+  onRetryScoring,
   onBack,
 }: {
   vault: boolean;
@@ -93,16 +95,20 @@ export function InterviewComplete({
   elapsedSeconds: number | null;
   reattempting: boolean;
   onReattempt: () => void;
+  onRetryScoring?: () => Promise<void> | void;
   onBack: () => void;
 }) {
   const signal = useRoomSignal();
   const reduce = useReducedMotion() ?? false;
+  const [retryingScoring, setRetryingScoring] = useState(false);
   const scoring = !result || result.status === "scoring";
   const done = result?.status === "scored" ? result : null;
   const percent = Math.round(done?.composite_score_percent ?? 0);
   const belowBar = done !== null && !vault && percent < 60 && done.reattemptable !== false;
-  // A study set can always be practised again; any other interview only when it scored below the bar (or could not be scored).
-  const canReattempt = study ? done !== null && done.reattemptable !== false : belowBar || (result?.status === "needs_human_review" && result.reattemptable === true);
+  const needsReview = result?.status === "needs_human_review";
+  // A study set can always be practised again; any other interview only when it scored below the bar.
+  // For pending review/eval, answers are saved so reattempt is an optional alternative, not the main CTA.
+  const canReattempt = study ? done !== null && done.reattemptable !== false : belowBar;
 
   const rise = (delay: number) => (reduce ? {} : { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay } });
 
@@ -118,8 +124,8 @@ export function InterviewComplete({
                 <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                 {study ? "Preparing your summary..." : "Scoring your interview with AI..."}
               </p>
-            ) : result?.status === "needs_human_review" ? (
-              <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">Your answers have been saved. A real person will review your responses.</p>
+            ) : needsReview ? (
+              <p className="mx-auto mt-2 max-w-md text-sm text-text-muted">All answers safely captured and saved to your profile.</p>
             ) : (
               <p className="mx-auto mt-2 max-w-sm text-sm text-text-muted">
                 {study ? "Here is how much of each model answer you covered. Go through them below, then practise the set again." : "Here's how you did — a human reviewer can still adjust this afterward."}
@@ -201,6 +207,69 @@ export function InterviewComplete({
 
             <p className="text-center text-3xs text-text-muted">Scored by AI — a human reviewer can still adjust this.</p>
           </div>
+        ) : needsReview ? (
+          <motion.div {...rise(0.16)} className="w-full max-w-lg space-y-4 text-left">
+            <div className="rounded-2xl border border-accent-primary/25 bg-accent-primary/[0.05] p-5 shadow-subtle space-y-3.5">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent-primary/10 text-accent-primary ring-1 ring-inset ring-accent-primary/25">
+                  <ShieldCheck className="h-5 w-5" aria-hidden />
+                </span>
+                <div>
+                  <h4 className="text-sm font-extrabold text-primary">All Answers Saved &amp; Secure</h4>
+                  <p className="mt-0.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
+                    ✓ All {Math.max(answeredCount, totalQuestions)} responses &amp; audio clips safely stored
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border-subtle bg-surface/80 p-3.5 text-xs leading-relaxed text-text-secondary space-y-1.5">
+                <p>
+                  Your interview is <strong className="font-bold text-primary">100% completed</strong>. You do <strong className="font-bold text-primary">not</strong> need to re-attempt or speak your answers again.
+                </p>
+                <p className="text-2xs text-text-muted">
+                  {vault
+                    ? "Our AI scoring engine is experiencing temporary peak load. Your responses are safely queued in the background and will count toward your Mellow Vault qualification once processed. You can check your score now, or return anytime to view your qualification marks."
+                    : "Our AI evaluation engine is processing high traffic. Your responses are safely queued in the background. You can check your score right now below, or return anytime from your dashboard to view your marks."}
+                </p>
+              </div>
+
+              {onRetryScoring && (
+                <div className="pt-1 flex flex-wrap items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (retryingScoring) return;
+                      setRetryingScoring(true);
+                      try {
+                        await onRetryScoring();
+                      } finally {
+                        setRetryingScoring(false);
+                      }
+                    }}
+                    disabled={retryingScoring}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-accent-primary px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-accent-primary/25 transition-colors hover:bg-accent-primary-hover disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    {retryingScoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <Sparkles className="h-3.5 w-3.5" aria-hidden />}
+                    <span>{retryingScoring ? "Evaluating Answers..." : "View / Check My Score"}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {result?.reattemptable && (
+              <p className="text-center text-3xs text-text-muted">
+                Want to discard these answers and take a fresh sitting instead?{" "}
+                <button
+                  type="button"
+                  onClick={onReattempt}
+                  disabled={reattempting}
+                  className="font-bold text-accent-primary underline hover:text-accent-primary-hover"
+                >
+                  {reattempting ? "Resetting..." : "Re-attempt Interview"}
+                </button>
+              </p>
+            )}
+          </motion.div>
         ) : (
           <motion.div {...rise(0.16)} className="w-full max-w-xs space-y-3 text-left">
             <p className="text-3xs font-bold uppercase tracking-[0.16em] text-text-muted">What happens next</p>
@@ -208,9 +277,7 @@ export function InterviewComplete({
               <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-accent-primary/25 bg-accent-primary/10">
                 <UserCheck className="h-3.5 w-3.5 text-accent-primary" aria-hidden />
               </span>
-              <p className="text-xs leading-relaxed text-text-secondary">
-                {result?.status === "needs_human_review" ? "A reviewer reads your transcripts and listens to your recordings." : "Your interview is being scored by AI right now."}
-              </p>
+              <p className="text-xs leading-relaxed text-text-secondary">Your interview is being scored by AI right now.</p>
             </div>
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-elevated">

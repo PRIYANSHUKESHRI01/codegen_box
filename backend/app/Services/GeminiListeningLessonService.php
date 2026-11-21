@@ -63,7 +63,8 @@ class GeminiListeningLessonService
      */
     public function generate(string $topic, string $difficulty, string $kind): array
     {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI lesson generation is not configured yet.');
@@ -79,20 +80,22 @@ class GeminiListeningLessonService
         [$minWords, $maxWords, $style] = self::LEVELS[$difficulty];
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(40)
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $kind, $difficulty, $minWords, $maxWords, $style)]]]],
-                        'generationConfig' => [
-                            'temperature' => 0.8,
-                            'maxOutputTokens' => 4096,
-                            'responseMimeType' => 'application/json',
-                            'responseSchema' => $this->responseSchema(),
-                        ],
-                    ]
-                );
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($topic, $kind, $difficulty, $minWords, $maxWords, $style) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(40)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $kind, $difficulty, $minWords, $maxWords, $style)]]]],
+                            'generationConfig' => [
+                                'temperature' => 0.8,
+                                'maxOutputTokens' => 4096,
+                                'responseMimeType' => 'application/json',
+                                'responseSchema' => $this->responseSchema(),
+                            ],
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] listening lesson request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI lesson generation is temporarily unavailable. Please try again.');

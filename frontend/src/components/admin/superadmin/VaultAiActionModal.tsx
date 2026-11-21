@@ -38,6 +38,8 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
   const [reason, setReason] = useState("");
   const [working, setWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resetMode, setResetMode] = useState<"full_reset" | "retry_attempt">("full_reset");
+  const [targetAttempt, setTargetAttempt] = useState<number>(() => (action.kind === "reset" ? Math.max(1, Math.min(3, action.row.current_attempt || 3)) : 3));
 
   // Marks start from what is on record: the attempt being corrected, or the series being sat.
   const initialMarks = useMemo(() => {
@@ -69,8 +71,19 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
 
     try {
       if (action.kind === "reset") {
-        const res = await api.post<VaultAiStudentResponse>(`${base}/stacks/${action.stackKey}/reset`, { reason: reason.trim() });
-        onDone(res, action.row.status === "qualified" ? `${studentName}'s ${action.stackName} qualification has been taken back.` : `${studentName} has all 3 ${action.stackName} attempts again.`);
+        const body: { reason: string; mode?: string; attempt?: number } = { reason: reason.trim() };
+        if (resetMode === "retry_attempt") {
+          body.mode = "retry_attempt";
+          body.attempt = targetAttempt;
+        }
+        const res = await api.post<VaultAiStudentResponse>(`${base}/stacks/${action.stackKey}/reset`, body);
+        const msg =
+          action.row.status === "qualified"
+            ? `${studentName}'s ${action.stackName} qualification has been taken back.`
+            : resetMode === "retry_attempt"
+            ? `${studentName} has been granted access to re-attempt Series ${targetAttempt} in ${action.stackName}.`
+            : `${studentName} has all 3 ${action.stackName} attempts again.`;
+        onDone(res, msg);
       } else if (action.kind === "scores") {
         const scores: Record<string, number> = {};
         parsed.forEach((m, i) => {
@@ -160,23 +173,81 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
     >
       <form id="vault-ai-action-form" onSubmit={submit} className="space-y-4">
         {action.kind === "reset" && (
-          <div className="space-y-2 text-xs leading-relaxed text-text-secondary">
+          <div className="space-y-3 text-xs leading-relaxed text-text-secondary">
             {action.row.status === "qualified" ? (
               <p>
                 <strong className="text-primary">{studentName}</strong> stops being qualified in {action.stackName}. They go back to Series 1 with all 3 attempts, and the Vault follows: unless they are qualified in another stack or their
                 readiness score earns the place, they leave it and Mellow Vault is told to withdraw them.
               </p>
-            ) : action.row.is_blocked ? (
-              <p>
-                <strong className="text-primary">{studentName}</strong> is blocked for another {action.row.cooldown_days_remaining} day{action.row.cooldown_days_remaining === 1 ? "" : "s"}. This ends the block now and gives them Series 1 with
-                all 3 attempts, and they can start straight away.
-              </p>
             ) : (
-              <p>
-                <strong className="text-primary">{studentName}</strong> goes back to Series 1 with all 3 attempts. Marks in the series they are on are cleared; an interview they had started is not carried over.
-              </p>
+              <>
+                <p className="text-text-muted">
+                  Choose how to restore access for <strong className="text-primary">{studentName}</strong> in {action.stackName}: unblock or re-open a specific series (such as Attempt {targetAttempt}) or perform a full reset back to Series 1.
+                </p>
+                <div className="space-y-2">
+                  <label
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-control border p-3 transition-colors",
+                      resetMode === "full_reset" ? "border-accent-primary bg-accent-primary/5" : "border-border-subtle bg-elevated/40 hover:bg-elevated/70"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="reset-mode"
+                      value="full_reset"
+                      checked={resetMode === "full_reset"}
+                      onChange={() => setResetMode("full_reset")}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div>
+                      <div className="font-semibold text-primary">Full Reset — 3 fresh attempts from Series 1</div>
+                      <div className="text-2xs text-text-muted">
+                        Resets the student back to Series 1 with all 3 fresh attempts. Marks in the active series are cleared.
+                      </div>
+                    </div>
+                  </label>
+
+                  <label
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-control border p-3 transition-colors",
+                      resetMode === "retry_attempt" ? "border-accent-primary bg-accent-primary/5" : "border-border-subtle bg-elevated/40 hover:bg-elevated/70"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="reset-mode"
+                      value="retry_attempt"
+                      checked={resetMode === "retry_attempt"}
+                      onChange={() => setResetMode("retry_attempt")}
+                      className="mt-0.5 accent-accent-primary"
+                    />
+                    <div className="flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-primary">Re-open Series (Keep earlier attempt history)</span>
+                        {resetMode === "retry_attempt" && (
+                          <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-3xs font-bold uppercase tracking-wide text-text-muted">Series:</span>
+                            <select
+                              value={targetAttempt}
+                              onChange={(e) => setTargetAttempt(Number(e.target.value))}
+                              className="rounded border border-border-subtle bg-surface px-2 py-0.5 text-xs font-bold text-primary"
+                            >
+                              <option value={3}>Series 3 (Attempt 3)</option>
+                              <option value={2}>Series 2 (Attempt 2)</option>
+                              <option value={1}>Series 1 (Attempt 1)</option>
+                            </select>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-2xs text-text-muted">
+                        Immediately clears any block/cooldown and re-opens Series {targetAttempt}. Prior attempts remain intact in history.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </>
             )}
-            <p className="text-text-muted">The failed attempts stay on record here, but the student no longer sees them. They are told by notification.</p>
+            <p className="text-text-muted">The student is notified automatically of the restored access.</p>
           </div>
         )}
 

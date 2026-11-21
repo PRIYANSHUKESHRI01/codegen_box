@@ -25,7 +25,11 @@ class ScorePendingInterviews extends Command
             ->where('status', InterviewSession::STATUS_COMPLETED)
             ->whereNull('ai_scored_at')
             ->whereNull('reviewed_at')
-            ->whereNull('scoring_failed_at')
+            ->where(function ($q) {
+                // Retry unattempted sessions, or transiently failed sessions older than 3 minutes
+                $q->whereNull('scoring_failed_at')
+                  ->orWhere('scoring_failed_at', '<=', now()->subMinutes(3));
+            })
             ->where('completed_at', '<=', now()->subSeconds((int) $this->option('older-than')))
             // Nothing older than a day: a session that old with no score is a human's call, not a retry's.
             ->where('completed_at', '>=', now()->subDay())

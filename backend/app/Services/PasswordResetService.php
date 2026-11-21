@@ -142,6 +142,13 @@ class PasswordResetService
 
         $this->expirePendingResets($user);
 
+        // Keep credentials in sync on Mellow Vault so user can log into Mellow Vault with the new password
+        try {
+            app(\App\Services\Vault\MellowVaultUserSyncService::class)->updateCredentials($user, $newPassword);
+        } catch (\Throwable $e) {
+            // Fail soft
+        }
+
         // A password reset should invalidate any session an attacker might
         // already hold — same tokens() relation AuthController::sessions()/
         // revokeSession() already use for the equivalent manual action.

@@ -269,8 +269,45 @@ export function HackathonForm({ scope, hackathonId }: { scope: HostScope; hackat
               error={errors.description}
               hint="Markdown is supported: ## headings, **bold**, - bullet lists, [links](https://…). Explain the challenge, the format and why it's worth entering."
             >
-              <textarea id="h-desc" value={form.description} onChange={(e) => set("description", e.target.value)} rows={10} maxLength={20000} className={cn(hpInput, "resize-y font-mono text-xs leading-relaxed")} />
+              <textarea id="h-desc" value={form.description} onChange={(e) => set("description", e.target.value)} rows={6} maxLength={20000} className={cn(hpInput, "resize-y font-mono text-xs leading-relaxed")} />
             </Field>
+
+            <Field
+              label="Problem Statement"
+              htmlFor="h-problem"
+              error={errors.problem_statement}
+              hint="The core challenge statement, specifications, features to build, and technical constraints. Unveiled prominently during the hackathon."
+            >
+              <textarea
+                id="h-problem"
+                value={form.problem_statement}
+                onChange={(e) => set("problem_statement", e.target.value)}
+                rows={8}
+                maxLength={50000}
+                placeholder="## Problem Statement&#10;&#10;Describe the real-world problem, target personas, required deliverables (local codebase + deployed live link), and technical expectations..."
+                className={cn(hpInput, "resize-y font-mono text-xs leading-relaxed")}
+              />
+            </Field>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Problem Reading Time (minutes)"
+                htmlFor="h-reading-time"
+                error={errors.reading_time_minutes}
+                hint="Minutes given at kickoff for participants to read the problem statement, review criteria, and setup local laptops (default: 15 min)."
+              >
+                <input
+                  id="h-reading-time"
+                  type="number"
+                  min={0}
+                  max={180}
+                  value={form.reading_time_minutes}
+                  onChange={(e) => set("reading_time_minutes", e.target.value)}
+                  className={hpInput}
+                  placeholder="15"
+                />
+              </Field>
+            </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
               <div>
@@ -522,11 +559,11 @@ export function HackathonForm({ scope, hackathonId }: { scope: HostScope; hackat
           )}
         </fieldset>
 
-        {/* Sticky action bar */}
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border-subtle bg-[rgb(var(--bg-surface-rgb))]/92 px-4 py-3 backdrop-blur-xl md:pl-[calc(theme(spacing.rail)+1rem)]">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-3">
+        {/* Floating sticky action bar */}
+        <div className="sticky bottom-4 z-20 mt-8 rounded-panel border border-border-subtle bg-surface/95 px-5 py-3.5 shadow-2xl backdrop-blur-md">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-xs text-text-muted" aria-live="polite">
-              {saved ? <span className="font-bold text-emerald-600 dark:text-emerald-300">{saved}</span> : isDraft ? "Drafts are only visible to you." : "Changes go live as soon as you save."}
+              {saved ? <span className="font-bold text-status-success">{saved}</span> : isDraft ? "Drafts are only visible to you." : "Changes go live as soon as you save."}
             </p>
             <div className="flex items-center gap-2.5">
               <Link href={existing ? paths.manage(existing.id) : paths.list} className={hpBtn("ghost", "md")}>

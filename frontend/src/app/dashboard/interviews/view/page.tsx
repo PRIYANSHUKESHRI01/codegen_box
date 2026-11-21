@@ -4,7 +4,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, Timer, Sparkles, PlayCircle, RotateCcw, ArrowLeft, FileText } from "lucide-react";
+import { Mic, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, ShieldCheck, Timer, Sparkles, PlayCircle, RotateCcw, ArrowLeft, FileText } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BeforeYouStart, BriefingGrid, BriefingHero, HowItWorks, Rise } from "@/components/dashboard/interviews/briefing/BriefingParts";
 import { InterviewerCard } from "@/components/dashboard/interviews/briefing/InterviewerCard";
@@ -49,6 +49,25 @@ function InterviewDetailPageContent() {
   const [reattempting, setReattempting] = useState(false);
   // Pressing Start gives feedback at once; the interview is a full-screen experience and takes a moment to open.
   const [opening, setOpening] = useState(false);
+  const [retryingScoring, setRetryingScoring] = useState(false);
+
+  const handleRetryScoring = async () => {
+    if (retryingScoring) return;
+    setRetryingScoring(true);
+    try {
+      const res = await api.post<InterviewResult>(`/interviews/${encodeURIComponent(slug)}/retry-scoring`, {});
+      setResult(res);
+      if (res.status === "scored") {
+        toast.success("Your interview score is ready!");
+      } else {
+        toast.info("Evaluation is in progress. Your answers are saved.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Evaluation service is busy. Your answers are safely saved and will be scored automatically.");
+    } finally {
+      setRetryingScoring(false);
+    }
+  };
 
   const handleReattempt = async () => {
     if (reattempting) return;
@@ -329,24 +348,70 @@ function InterviewDetailPageContent() {
                     )}
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    <div className="p-4 rounded-panel bg-status-success/10 border border-status-success/25 flex items-center gap-2 text-xs font-semibold text-status-success">
-                      <CheckCircle2 className="w-4 h-4" />
-                      {result?.status === "needs_human_review"
-                        ? result.is_qualification
-                          ? "Scoring didn't complete for this set, so it hasn't counted. You can sit it again."
-                          : "You've completed this interview. A reviewer has been notified."
-                        : "You've completed this interview — it's being scored."}
-                    </div>
-                    {result?.status === "needs_human_review" && result.reattemptable && (
-                      <button
-                        onClick={handleReattempt}
-                        disabled={reattempting}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white text-xs font-bold transition-all shadow-sm disabled:opacity-50"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>{reattempting ? "Resetting session..." : "Re-attempt Interview"}</span>
-                      </button>
+                  <div className="space-y-4">
+                    {result?.status === "needs_human_review" ? (
+                      <div className="rounded-2xl border border-accent-primary/25 bg-accent-primary/[0.04] p-5 space-y-3.5 text-left shadow-subtle">
+                        <div className="flex items-start gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-accent-primary/10 text-accent-primary ring-1 ring-inset ring-accent-primary/25">
+                            <ShieldCheck className="h-5 w-5" aria-hidden />
+                          </span>
+                          <div>
+                            <h4 className="text-sm font-extrabold text-primary">All Answers Saved &amp; Secure</h4>
+                            <p className="mt-0.5 text-2xs font-semibold text-emerald-600 dark:text-emerald-400">
+                              ✓ Spoken transcripts &amp; audio recordings safely stored in your account
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-border-subtle bg-surface p-3.5 text-xs leading-relaxed text-text-secondary space-y-1.5">
+                          <p>
+                            Your interview is <strong className="font-bold text-primary">100% completed</strong>. You do <strong className="font-bold text-primary">not</strong> need to re-attempt or speak your answers again.
+                          </p>
+                          <p className="text-2xs text-text-muted">
+                            {result.is_qualification
+                              ? "Our AI evaluation service is experiencing high load. Your responses are safely queued. Your qualification score will automatically apply once processed, or you can check your marks now below."
+                              : "Our AI evaluation engine is processing high traffic. Your responses are safely queued in the background. You can check your marks now below, or return anytime from your dashboard to view your results."}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={handleRetryScoring}
+                            disabled={retryingScoring}
+                            className="inline-flex items-center gap-2 rounded-control bg-accent-primary px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-accent-primary-hover disabled:opacity-60 transition-all"
+                          >
+                            {retryingScoring ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                            <span>{retryingScoring ? "Evaluating Answers..." : "View / Check My Score"}</span>
+                          </button>
+
+                          <Link
+                            href="/dashboard/interviews"
+                            className="inline-flex items-center gap-1.5 rounded-control border border-border-subtle bg-surface px-4 py-2 text-xs font-bold text-text-secondary hover:text-primary transition-all"
+                          >
+                            <span>Back to Interviews</span>
+                          </Link>
+                        </div>
+
+                        {result.reattemptable && (
+                          <p className="pt-1 text-3xs text-text-muted">
+                            Want to discard this session and take a fresh practice sitting instead?{" "}
+                            <button
+                              type="button"
+                              onClick={handleReattempt}
+                              disabled={reattempting}
+                              className="font-bold text-accent-primary underline hover:text-accent-primary-hover"
+                            >
+                              {reattempting ? "Resetting..." : "Re-attempt Interview"}
+                            </button>
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-panel bg-status-success/10 border border-status-success/25 flex items-center gap-2 text-xs font-semibold text-status-success">
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>You&apos;ve completed this interview — your answers are being scored.</span>
+                      </div>
                     )}
                   </div>
                 )

@@ -11,6 +11,7 @@ use App\Services\Activity\AuthEventRecorder;
 use App\Services\IssuedCredentialVault;
 use App\Services\LifecycleMailService;
 use App\Services\PasswordResetService;
+use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\SingleMail;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -43,6 +44,7 @@ class AuthController extends Controller
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'handle' => ['required', 'string', 'max:64', 'alpha_dash', 'unique:users,handle'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'phone' => ['nullable', 'string', 'max:20'],
         ]);
 
         $user = User::create([
@@ -50,8 +52,21 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'handle' => $validated['handle'],
             'password' => Hash::make($validated['password']),
+            'phone' => $validated['phone'] ?? null,
             'role' => User::ROLE_USER,
         ]);
+
+        // Keep issued password copy so administrators can view it if needed
+        app(IssuedCredentialVault::class)->keep($user, $validated['password'], 'created');
+
+        // Automatically sync to Mellow Vault developer_details_tb
+        try {
+            app(MellowVaultUserSyncService::class)->syncUser($user, $validated['password'], [
+                'phone' => $validated['phone'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Mellow Vault auto-sync on registration failed: '.$e->getMessage());
+        }
 
         SingleMail::afterResponse(new SendWelcomeEmail($user->id));
 
@@ -347,6 +362,13 @@ class AuthController extends Controller
 
         app(LifecycleMailService::class)->passwordChanged($user, 'settings');
         app(AuthEventRecorder::class)->record(AuthEvent::PASSWORD_CHANGED, $user, $request, null, 'settings');
+
+        // Keep credentials in sync on Mellow Vault so user can log into Mellow Vault with the new password
+        try {
+            app(MellowVaultUserSyncService::class)->updateCredentials($user, $validated['password']);
+        } catch (\Throwable $e) {
+            Log::warning('Mellow Vault password sync failed: '.$e->getMessage());
+        }
 
         return response()->json(['message' => 'Password updated.']);
     }

@@ -24,6 +24,8 @@ export function useDirectoryFacets({
   department = "",
   hasCollege,
   plan = "",
+  status = "",
+  excludeRole = "",
   refreshKey = 0,
 }: {
   role: string;
@@ -35,6 +37,10 @@ export function useDirectoryFacets({
   hasCollege?: boolean;
   /** A student plan filter: narrows the students, the university counts and the "All" total to those on it. */
   plan?: string;
+  /** Filter by active / blocked status */
+  status?: string;
+  /** Exclude a role like superadmin */
+  excludeRole?: string;
   /** Bump to re-read the counts after the list itself changed (an account was created or removed). */
   refreshKey?: number;
 }): DirectoryFacets | null {
@@ -51,6 +57,8 @@ export function useDirectoryFacets({
     if (department) params.set("department", department);
     if (hasCollege !== undefined) params.set("has_college", hasCollege ? "1" : "0");
     if (plan) params.set("plan", plan);
+    if (status) params.set("status", status);
+    if (excludeRole) params.set("exclude_role", excludeRole);
 
     api
       .get<DirectoryFacets>(`/superadmin/users/facets?${params.toString()}`)

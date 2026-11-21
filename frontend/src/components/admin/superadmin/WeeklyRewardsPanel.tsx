@@ -10,6 +10,7 @@ import type { ToastTrigger } from "@/lib/toast";
 import type { AdminRewardCard, AdminRewards, AdminStanding, Prize, ScheduleWeek, WeekInfo } from "@/types/weeklyRewards";
 import { DailyStatusCard } from "./rewards/DailyStatusCard";
 import { WinnersLedger } from "./rewards/WinnersLedger";
+import { AwardCouponModal } from "./rewards/AwardCouponModal";
 
 const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 
@@ -38,6 +39,7 @@ export function WeeklyRewardsPanel({ triggerToast }: { triggerToast: ToastTrigge
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
+  const [targetStudent, setTargetStudent] = useState<AdminStanding | null>(null);
 
   const load = useCallback(
     (weekKey: string | null = week) => {
@@ -269,15 +271,49 @@ export function WeeklyRewardsPanel({ triggerToast }: { triggerToast: ToastTrigge
 
       <div className="space-y-6">
         <section className="min-w-0 rounded-panel border border-border-subtle bg-surface p-5 shadow-subtle">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-primary">
-            <Trophy className="h-4 w-4 text-amber-500" aria-hidden /> {data.week.is_future ? "Leaderboard" : current ? "This week's board" : "That week's board"}
-          </h3>
-          <p className="mt-0.5 text-2xs text-text-muted">{data.week.is_future ? "The board starts from zero on Monday." : "Contest points since Monday — the prize each rank would win right now."}</p>
-          <StandingsTable rows={data.standings} empty={data.week.is_future ? "This week has not started." : "Nobody has scored in a contest this week yet."} />
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-primary">
+                <Trophy className="h-4 w-4 text-amber-500" aria-hidden /> {data.week.is_future ? "Leaderboard" : current ? "This week's board" : "That week's board"}
+              </h3>
+              <p className="mt-0.5 text-2xs text-text-muted">{data.week.is_future ? "The board starts from zero on Monday." : "Contest points since Monday — top performers with their email and options to award coupons directly."}</p>
+            </div>
+            {data.standings.length > 0 && (
+              <span className="text-3xs font-semibold text-text-muted">
+                Showing top {data.standings.length} performers
+              </span>
+            )}
+          </div>
+          <StandingsTable
+            rows={data.standings}
+            empty={data.week.is_future ? "This week has not started." : "Nobody has scored in a contest this week yet."}
+            onAward={(s) => setTargetStudent(s)}
+          />
         </section>
 
         <WinnersLedger triggerToast={triggerToast} closeOutNeeded={closeOutNeeded} onClosedOut={() => load()} />
       </div>
+
+      {targetStudent && (
+        <AwardCouponModal
+          student={{
+            id: targetStudent.user.id,
+            name: targetStudent.user.name,
+            handle: targetStudent.user.handle,
+            email: targetStudent.email,
+            college: targetStudent.college,
+            rank: targetStudent.rank,
+            contest_score: targetStudent.contest_score,
+            initialCard: targetStudent.winner?.prize?.key ?? targetStudent.prize?.key ?? "dominos",
+            initialCode: targetStudent.winner?.voucher_code ?? undefined,
+            initialNote: targetStudent.winner?.note ?? undefined,
+          }}
+          weekKey={data.week.key}
+          onClose={() => setTargetStudent(null)}
+          onSuccess={() => load()}
+          triggerToast={triggerToast}
+        />
+      )}
     </div>
   );
 }
@@ -295,7 +331,7 @@ function PrizeChip({ prize }: { prize: AdminStanding["prize"] }) {
   );
 }
 
-function StandingsTable({ rows, empty }: { rows: AdminStanding[]; empty: string }) {
+function StandingsTable({ rows, empty, onAward }: { rows: AdminStanding[]; empty: string; onAward: (s: AdminStanding) => void }) {
   if (rows.length === 0) return <p className="mt-4 text-xs text-text-muted">{empty}</p>;
   return (
     <div className="mt-3 overflow-x-auto">
@@ -303,23 +339,46 @@ function StandingsTable({ rows, empty }: { rows: AdminStanding[]; empty: string 
         <thead>
           <tr className="border-b border-border-subtle">
             <th className={TH}>Rank</th>
-            <th className={TH}>Student</th>
-            <th className={TH}>Prize</th>
-            <th className={cn(TH, "pr-0 text-right")}>Score</th>
+            <th className={TH}>Student &amp; Email</th>
+            <th className={TH}>Scheduled Prize</th>
+            <th className={TH}>Status</th>
+            <th className={TH}>Score</th>
+            <th className={cn(TH, "pr-0 text-right")}>Action</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.user.id} className="border-b border-border-subtle last:border-0">
+            <tr key={r.user.id} className="border-b border-border-subtle align-middle last:border-0 hover:bg-elevated/30">
               <td className="py-2.5 pr-3 font-mono font-bold">{MEDAL[r.rank] ?? `#${r.rank}`}</td>
               <td className="py-2.5 pr-3">
                 <div className="font-bold text-primary">{r.user.name}</div>
-                <div className="font-mono text-2xs text-text-muted">@{r.user.handle}</div>
+                <div className="text-2xs font-medium text-accent-primary">{r.email ?? "No email"}</div>
+                {r.college && <div className="text-3xs text-text-muted">{r.college}</div>}
               </td>
               <td className="py-2.5 pr-3">
                 <PrizeChip prize={r.prize} />
               </td>
-              <td className="py-2.5 text-right font-mono font-bold text-primary">{r.contest_score}</td>
+              <td className="py-2.5 pr-3">
+                {r.winner ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-status-success/30 bg-status-success/10 px-2 py-0.5 text-3xs font-bold text-status-success">
+                    <CheckCircle2 className="h-2.5 w-2.5" />
+                    {r.winner.prize?.brand ?? "Voucher"} Sent
+                  </span>
+                ) : (
+                  <span className="text-3xs font-medium text-text-muted">Pending voucher</span>
+                )}
+              </td>
+              <td className="py-2.5 pr-3 font-mono font-bold text-primary">{r.contest_score}</td>
+              <td className="py-2.5 text-right">
+                <button
+                  type="button"
+                  onClick={() => onAward(r)}
+                  className="inline-flex items-center gap-1.5 rounded-btn bg-accent-primary px-3 py-1.5 text-2xs font-bold text-white shadow-subtle transition-all hover:bg-accent-primary-hover hover:shadow-md"
+                >
+                  <Gift className="h-3 w-3" />
+                  {r.winner ? "Edit / Re-send" : "Give Coupon"}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

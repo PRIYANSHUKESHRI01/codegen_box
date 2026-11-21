@@ -6,11 +6,15 @@ use App\Http\Controllers\Api\Concerns\ConfirmsSuperadminPassword;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\ActivityLog;
+use App\Models\ActivityPageView;
+use App\Models\ActivityVisit;
+use App\Models\AuthEvent;
 use App\Models\College;
 use App\Models\Company;
 use App\Models\ContactRequest;
-use App\Models\NewsletterSubscriber;
 use App\Models\FeatureFlag;
+use App\Models\InterviewSession;
+use App\Models\NewsletterSubscriber;
 use App\Models\Plan;
 use App\Models\Submission;
 use App\Models\Subscription;
@@ -20,11 +24,16 @@ use App\Services\IssuedCredentialVault;
 use App\Services\Judge\JudgeStatusService;
 use App\Services\LeadAssignmentService;
 use App\Services\ReadinessScoreService;
+use App\Services\ScoreLedger;
 use App\Services\StudentStatsService;
+use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\SingleMail;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -71,6 +80,16 @@ class SuperAdminController extends Controller
                 : $query->whereNull('college_id');
         }
 
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $query->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $query->where('is_blocked', false);
+            }
+        } elseif ($request->has('is_blocked')) {
+            $query->where('is_blocked', $request->boolean('is_blocked'));
+        }
+
         // Narrow to one university's roster (every role that belongs to one: students, TPOs, coordinators), or `none` for the
         // accounts that belong to no university (Mellow staff, hiring companies, individual coders).
         $this->applyCollege($query, $request);
@@ -85,6 +104,24 @@ class SuperAdminController extends Controller
         // "who is on what" question needs — a college-covered student's own plan is what lapses
         // if the college does.
         $this->applyPlan($query, $request->query('plan'));
+
+        // Readiness score filtering
+        if ($request->filled('min_readiness')) {
+            $min = (int) $request->query('min_readiness');
+            $query->where('users.readiness_score', '>=', $min);
+        }
+
+        if ($request->filled('readiness_tier')) {
+            $tier = $request->query('readiness_tier');
+            if ($tier === 'Placement Ready') {
+                $query->where('users.readiness_score', '>=', (int) config('readiness.tiers.placement_ready', 75));
+            } elseif ($tier === 'In Progress') {
+                $query->where('users.readiness_score', '>=', (int) config('readiness.tiers.in_progress', 45))
+                      ->where('users.readiness_score', '<', (int) config('readiness.tiers.placement_ready', 75));
+            } elseif ($tier === 'Needs Training') {
+                $query->where(fn ($q) => $q->whereNull('users.readiness_score')->orWhere('users.readiness_score', '<', (int) config('readiness.tiers.in_progress', 45)));
+            }
+        }
 
         $page = $query->latest()->paginate(50);
 
@@ -116,6 +153,8 @@ class SuperAdminController extends Controller
             ] : null;
             if ($user->role === User::ROLE_USER) {
                 $user->readiness_tier = $user->readinessTier();
+                $user->readiness_score = $user->readinessScore();
+                app(ScoreLedger::class)->readiness($user->id, $user->readiness_score);
             }
 
             return $user;
@@ -130,7 +169,9 @@ class SuperAdminController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
-                    ->orWhere('handle', 'like', "%{$search}%");
+                    ->orWhere('handle', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('roll_number', 'like', "%{$search}%");
             });
         }
     }
@@ -138,6 +179,13 @@ class SuperAdminController extends Controller
     /** `roles` (comma-separated) wins over the single `role`; unknown values are dropped rather than rejected. */
     private function applyRoles(Builder $query, Request $request): void
     {
+        if ($excludeRole = $request->query('exclude_role')) {
+            $query->where('role', '!=', $excludeRole);
+        }
+        if ($excludeRoles = $request->query('exclude_roles')) {
+            $query->whereNotIn('role', explode(',', (string) $excludeRoles));
+        }
+
         if ($roles = $request->query('roles')) {
             $validRoles = array_intersect(explode(',', (string) $roles), User::ROLES);
             if ($validRoles !== []) {
@@ -179,6 +227,19 @@ class SuperAdminController extends Controller
         $plan = is_string($plan) && $plan !== '' ? $plan : null;
 
         $byRole = User::query();
+        if ($excludeRole = $request->query('exclude_role')) {
+            $byRole->where('role', '!=', $excludeRole);
+        }
+        if ($excludeRoles = $request->query('exclude_roles')) {
+            $byRole->whereNotIn('role', explode(',', (string) $excludeRoles));
+        }
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $byRole->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $byRole->where('is_blocked', false);
+            }
+        }
         $this->applySearch($byRole, $request);
         $this->applyCollege($byRole, $request);
         $roles = $byRole->selectRaw('role, COUNT(*) as accounts')->groupBy('role')->pluck('accounts', 'role');
@@ -187,6 +248,16 @@ class SuperAdminController extends Controller
         $total = (int) $roles->sum();
         if ($plan !== null) {
             $students = User::query()->where('role', User::ROLE_USER);
+            if ($excludeRole = $request->query('exclude_role')) {
+                $students->where('role', '!=', $excludeRole);
+            }
+            if ($status = $request->query('status')) {
+                if ($status === 'blocked') {
+                    $students->where('is_blocked', true);
+                } elseif ($status === 'active') {
+                    $students->where('is_blocked', false);
+                }
+            }
             $this->applySearch($students, $request);
             $this->applyCollege($students, $request);
             $this->applyPlan($students, $plan);
@@ -199,6 +270,13 @@ class SuperAdminController extends Controller
         $this->applyRoles($byCollege, $request);
         $this->applyDepartment($byCollege, $department);
         $this->applyPlanToStudents($byCollege, $plan);
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $byCollege->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $byCollege->where('is_blocked', false);
+            }
+        }
         $perCollege = $byCollege->selectRaw('college_id, COUNT(*) as accounts')->groupBy('college_id')->pluck('accounts', 'college_id');
 
         $noCollege = User::query()->whereNull('college_id');
@@ -206,6 +284,13 @@ class SuperAdminController extends Controller
         $this->applyRoles($noCollege, $request);
         $this->applyDepartment($noCollege, $department);
         $this->applyPlanToStudents($noCollege, $plan);
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $noCollege->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $noCollege->where('is_blocked', false);
+            }
+        }
 
         // Students per department under the chosen university (and search). A student never classified counts under the
         // fallback department, exactly as User::scopeInDepartment() treats them, so these add up to the student total.
@@ -297,7 +382,10 @@ class SuperAdminController extends Controller
     public function showUser(User $user, StudentStatsService $stats)
     {
         if ($user->role !== User::ROLE_USER) {
-            return response()->json(['user' => $this->staffOrTenantPayload($user)]);
+            return response()->json([
+                'user' => $this->staffOrTenantPayload($user),
+                'platform_activity' => $this->buildPlatformActivity($user),
+            ]);
         }
 
         $coverage = $user->subscriptionCoverage();
@@ -310,6 +398,7 @@ class SuperAdminController extends Controller
                 'handle' => $user->handle,
                 'phone' => $user->phone,
                 'college' => $user->college ? ['id' => $user->college->id, 'name' => $user->college->name] : null,
+                'is_independent' => $user->college_id === null,
                 'roll_number' => $user->roll_number,
                 'branch' => $user->branch,
                 'cgpa' => $user->cgpa,
@@ -334,6 +423,608 @@ class SuperAdminController extends Controller
                 'activity' => $stats->activityHeatmap($user),
                 'recent_submissions' => $stats->recentSubmissions($user, 10),
             ],
+            'interview_stats' => $this->buildInterviewStats($user),
+            'platform_activity' => $this->buildPlatformActivity($user),
+        ]);
+    }
+
+    private function buildInterviewStats(User $user): array
+    {
+        $sessions = InterviewSession::where('user_id', $user->id)
+            ->with([
+                'interview:id,title,slug,interview_type,round_name,company_id',
+                'interview.company:id,name',
+            ])
+            ->withCount('responses')
+            ->orderByDesc('id')
+            ->get();
+
+        $totalSeconds = 0;
+        foreach ($sessions as $s) {
+            if ($s->started_at && $s->completed_at) {
+                $totalSeconds += max(0, $s->started_at->diffInSeconds($s->completed_at));
+            } else {
+                $totalSeconds += (int) $s->responses()->sum('audio_duration_seconds');
+            }
+        }
+        $totalMinutes = (int) round($totalSeconds / 60);
+
+        $completedCount = $sessions->where('status', InterviewSession::STATUS_COMPLETED)->count();
+        $scored = $sessions->whereNotNull('composite_score_percent');
+        $avgScore = $scored->count() > 0 ? round((float) $scored->avg('composite_score_percent'), 1) : null;
+
+        return [
+            'total_sessions' => $sessions->count(),
+            'completed_sessions' => $completedCount,
+            'total_practice_minutes' => $totalMinutes,
+            'average_score_percent' => $avgScore,
+            'sessions' => $sessions->map(fn ($s) => [
+                'id' => $s->id,
+                'title' => $s->interview?->title ?? 'AI Mock Interview',
+                'round_name' => $s->interview?->round_name,
+                'company_name' => $s->interview?->company?->name,
+                'interview_type' => $s->interview?->interview_type,
+                'status' => $s->status,
+                'composite_score_percent' => $s->composite_score_percent !== null ? (float) $s->composite_score_percent : null,
+                'has_score' => $s->hasScoreAvailable(),
+                'started_at' => $s->started_at,
+                'completed_at' => $s->completed_at,
+                'duration_minutes' => $s->started_at && $s->completed_at ? (int) round(max(0, $s->started_at->diffInSeconds($s->completed_at)) / 60) : (int) round(((int) $s->responses()->sum('audio_duration_seconds')) / 60),
+                'responses_count' => $s->responses_count,
+            ])->values()->all(),
+        ];
+    }
+
+    private function buildPlatformActivity(User $user): array
+    {
+        $visits = ActivityVisit::where('user_id', $user->id)->latest('last_seen_at')->limit(50)->get();
+        $authEvents = AuthEvent::where('user_id', $user->id)->latest('id')->limit(20)->get();
+
+        $devices = $visits->pluck('device')->merge($authEvents->pluck('device'))->filter()->unique()->values()->all();
+        $browsers = $visits->pluck('browser')->merge($authEvents->pluck('browser'))->filter()->unique()->values()->all();
+        $osList = $visits->pluck('os')->merge($authEvents->pluck('os'))->filter()->unique()->values()->all();
+        $lastIp = $visits->first()?->ip ?? $authEvents->first()?->ip;
+
+        $totalSeconds = (int) ActivityVisit::where('user_id', $user->id)->sum('active_seconds');
+        $totalMinutes = (int) round($totalSeconds / 60);
+
+        $topSections = ActivityPageView::where('user_id', $user->id)
+            ->selectRaw('section, COUNT(*) as views, SUM(active_seconds) as seconds, MAX(entered_at) as last_at')
+            ->groupBy('section')
+            ->orderByDesc('seconds')
+            ->limit(10)
+            ->get()
+            ->map(fn ($r) => [
+                'section' => $r->section ?: 'General',
+                'views' => (int) $r->views,
+                'minutes' => (int) round($r->seconds / 60),
+                'seconds' => (int) $r->seconds,
+                'last_at' => $r->last_at,
+            ])->all();
+
+        return [
+            'devices' => $devices,
+            'browsers' => $browsers,
+            'os_list' => $osList,
+            'primary_device' => $devices[0] ?? null,
+            'last_ip' => $lastIp,
+            'total_active_minutes' => $totalMinutes,
+            'total_visits' => $visits->count(),
+            'top_sections' => $topSections,
+        ];
+    }
+
+    public function exportUsers(Request $request): Response
+    {
+        $query = User::query()->with('college:id,name');
+
+        $this->applySearch($query, $request);
+        $this->applyRoles($query, $request);
+
+        if ($request->has('has_college')) {
+            $request->boolean('has_college')
+                ? $query->whereNotNull('college_id')
+                : $query->whereNull('college_id');
+        }
+
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $query->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $query->where('is_blocked', false);
+            }
+        } elseif ($request->has('is_blocked')) {
+            $query->where('is_blocked', $request->boolean('is_blocked'));
+        }
+
+        $this->applyCollege($query, $request);
+
+        if (($department = $request->query('department')) && is_string($department)) {
+            $this->applyDepartment($query, $department);
+        }
+
+        $this->applyPlan($query, $request->query('plan'));
+
+        $users = $query->latest()->limit(5000)->get();
+
+        $students = $users->filter(fn (User $u) => $u->role === User::ROLE_USER);
+        if ($students->isNotEmpty()) {
+            app(ReadinessScoreService::class)->prime($students);
+        }
+
+        $userIds = $users->pluck('id')->all();
+
+        $interviewAggregates = InterviewSession::whereIn('user_id', $userIds)
+            ->selectRaw('
+                user_id,
+                COUNT(id) as total_interviews,
+                SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_interviews,
+                AVG(composite_score_percent) as avg_score,
+                SUM(CASE 
+                    WHEN started_at IS NOT NULL AND completed_at IS NOT NULL 
+                    THEN TIMESTAMPDIFF(SECOND, started_at, completed_at) 
+                    ELSE 0 END
+                ) as interview_seconds
+            ')
+            ->groupBy('user_id')
+            ->get()
+            ->keyBy('user_id');
+
+        $activityAggregates = ActivityVisit::whereIn('user_id', $userIds)
+            ->selectRaw('
+                user_id,
+                SUM(active_seconds) as total_seconds,
+                COUNT(id) as total_visits,
+                MAX(device) as device,
+                MAX(browser) as browser,
+                MAX(os) as os,
+                MAX(ip) as ip,
+                MAX(last_seen_at) as last_seen
+            ')
+            ->groupBy('user_id')
+            ->get()
+            ->keyBy('user_id');
+
+        $problemCounts = Submission::whereIn('user_id', $userIds)
+            ->where('status', Submission::STATUS_ACCEPTED)
+            ->selectRaw('user_id, COUNT(DISTINCT problem_id) as solved_count')
+            ->groupBy('user_id')
+            ->pluck('solved_count', 'user_id');
+
+        $csv = [];
+        $csv[] = [
+            'User ID',
+            'Name',
+            'Email',
+            'Phone',
+            'Role',
+            'Affiliation',
+            'College Name',
+            'Department',
+            'Branch',
+            'Section',
+            'Roll Number',
+            'CGPA',
+            'Backlogs',
+            'Status',
+            'Readiness Score',
+            'Readiness Tier',
+            'Subscription Plan',
+            'Subscription Source',
+            'Coding Problems Solved',
+            'Mock AI Interviews Count',
+            'AI Interview Practice Time (Mins)',
+            'Avg Interview Score %',
+            'Total Platform Active Time (Mins)',
+            'Platform Device',
+            'Browser & OS',
+            'Last IP',
+            'Last Active At',
+            'Account Created At',
+        ];
+
+        foreach ($users as $user) {
+            $coverage = $user->subscriptionCoverage();
+            $intAgg = $interviewAggregates->get($user->id);
+            $actAgg = $activityAggregates->get($user->id);
+
+            $intMins = $intAgg ? (int) round($intAgg->interview_seconds / 60) : 0;
+            $actMins = $actAgg ? (int) round($actAgg->total_seconds / 60) : 0;
+            $affiliation = $user->college_id ? 'College Affiliated' : ($user->role === User::ROLE_USER ? 'Direct / Independent' : 'Staff / Other');
+
+            $csv[] = [
+                $user->id,
+                $user->name,
+                $user->email,
+                $user->phone ?? '',
+                $user->role,
+                $affiliation,
+                $user->college?->name ?? 'None (Independent)',
+                $user->department ?? '',
+                $user->branch ?? '',
+                $user->section ?? '',
+                $user->roll_number ?? '',
+                $user->cgpa ?? '',
+                $user->backlogs ?? '0',
+                $user->is_blocked ? 'Blocked' : 'Active',
+                $user->role === User::ROLE_USER ? $user->readinessScore() : 'N/A',
+                $user->role === User::ROLE_USER ? $user->readinessTier() : 'N/A',
+                $coverage['plan']?->name ?? 'Free / None',
+                $coverage['source'] ?? 'N/A',
+                (int) ($problemCounts[$user->id] ?? 0),
+                (int) ($intAgg?->total_interviews ?? 0),
+                $intMins,
+                $intAgg && $intAgg->avg_score !== null ? round((float) $intAgg->avg_score, 1).'%' : 'N/A',
+                $actMins,
+                $actAgg?->device ?? 'N/A',
+                ($actAgg?->browser ?? '').($actAgg?->os ? ' on '.$actAgg->os : ''),
+                $actAgg?->ip ?? '',
+                $user->last_seen_at?->toIso8601String() ?? ($actAgg?->last_seen ?? ''),
+                $user->created_at?->toIso8601String() ?? '',
+            ];
+        }
+
+        $output = fopen('php://temp', 'r+');
+        foreach ($csv as $row) {
+            fputcsv($output, $row);
+        }
+        rewind($output);
+        $content = stream_get_contents($output);
+        fclose($output);
+
+        $isIndependent = $request->query('has_college') === '0' || $request->query('college_id') === 'none';
+        $filename = 'aptrun-'.($isIndependent ? 'independent-students' : 'students-report').'-'.Carbon::now()->toDateString().'.csv';
+
+        return response($content, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    /**
+     * Dedicated export for Student Placement Readiness Reports.
+     * Supports filtering by minimum readiness score (e.g. min_score=50 for users above 50% readiness),
+     * maximum score, readiness tier (Placement Ready, In Progress, Needs Training),
+     * college, department, affiliation, and search query.
+     */
+    public function exportReadinessReport(Request $request): Response
+    {
+        $query = User::query()
+            ->where('role', User::ROLE_USER)
+            ->with(['college:id,name']);
+
+        $this->applySearch($query, $request);
+        $this->applyCollege($query, $request);
+
+        if (($department = $request->query('department')) && is_string($department)) {
+            $this->applyDepartment($query, $department);
+        }
+
+        if ($request->has('has_college')) {
+            $request->boolean('has_college')
+                ? $query->whereNotNull('college_id')
+                : $query->whereNull('college_id');
+        }
+
+        if ($status = $request->query('status')) {
+            if ($status === 'blocked') {
+                $query->where('is_blocked', true);
+            } elseif ($status === 'active') {
+                $query->where('is_blocked', false);
+            }
+        } elseif ($request->has('is_blocked')) {
+            $query->where('is_blocked', $request->boolean('is_blocked'));
+        }
+
+        $students = $query->latest()->limit(10000)->get();
+
+        if ($students->isNotEmpty()) {
+            app(ReadinessScoreService::class)->prime($students);
+        }
+
+        $minScore = $request->filled('min_score') ? (int) $request->query('min_score') : null;
+        $maxScore = $request->filled('max_score') ? (int) $request->query('max_score') : null;
+        $tier = $request->query('tier');
+
+        $filtered = $students->filter(function (User $user) use ($minScore, $maxScore, $tier) {
+            $score = $user->readinessScore();
+            $userTier = $user->readinessTier();
+
+            if ($minScore !== null && $score < $minScore) {
+                return false;
+            }
+            if ($maxScore !== null && $score > $maxScore) {
+                return false;
+            }
+            if (!empty($tier) && $tier !== 'all' && strtolower($userTier) !== strtolower($tier)) {
+                return false;
+            }
+
+            return true;
+        })->sortByDesc(fn (User $u) => $u->readinessScore())->values();
+
+        $csv = [];
+        $csv[] = [
+            'Rank',
+            'Student ID',
+            'Student Name',
+            'Email',
+            'Phone',
+            'College / University',
+            'Affiliation',
+            'Department',
+            'Branch',
+            'Section',
+            'Roll Number',
+            'CGPA',
+            'Backlogs',
+            'Readiness Score (%)',
+            'Readiness Tier',
+            'AI Mock Interview Score (%)',
+            'Core Technical Score (%)',
+            'Coding Practice Score (%)',
+            'Learning Centre Score (%)',
+            'Soft Skills Score (%)',
+            'Contests Score (%)',
+            'Consistency Score (%)',
+            'Readiness Overridden',
+            'Vault Qualified',
+            'Account Status',
+            'Joined At',
+        ];
+
+        $rank = 1;
+        foreach ($filtered as $user) {
+            $breakdown = $user->readinessBreakdown();
+            $comps = collect($breakdown['components'] ?? [])->keyBy('key');
+
+            $aiInterview = $comps->get('ai_interview')['score'] ?? 0;
+            $coreTech = $comps->get('core_technical')['score'] ?? 0;
+            $coding = $comps->get('coding_practice')['score'] ?? 0;
+            $learning = $comps->get('learning_centre')['score'] ?? 0;
+            $softSkills = $comps->get('soft_skills')['score'] ?? 0;
+            $contests = $comps->get('contests')['score'] ?? 0;
+            $consistency = $comps->get('consistency')['score'] ?? 0;
+
+            $affiliation = $user->college_id ? 'College Affiliated' : 'Direct / Independent';
+            $overridden = isset($breakdown['override']) ? 'Yes (Manual Set)' : 'No (Calculated)';
+            $vaultQual = !empty($breakdown['vault']['qualifies']) ? 'Qualified' : 'Pending';
+
+            $csv[] = [
+                $rank++,
+                $user->id,
+                $user->name,
+                $user->email,
+                $user->phone ?? '',
+                $user->college?->name ?? 'Independent / Direct',
+                $affiliation,
+                $user->department ?? '',
+                $user->branch ?? '',
+                $user->section ?? '',
+                $user->roll_number ?? '',
+                $user->cgpa ?? '',
+                $user->backlogs ?? '0',
+                $user->readinessScore(),
+                $user->readinessTier(),
+                $aiInterview,
+                $coreTech,
+                $coding,
+                $learning,
+                $softSkills,
+                $contests,
+                $consistency,
+                $overridden,
+                $vaultQual,
+                $user->is_blocked ? 'Blocked' : 'Active',
+                $user->created_at?->toIso8601String() ?? '',
+            ];
+        }
+
+        $output = fopen('php://temp', 'r+');
+        foreach ($csv as $row) {
+            fputcsv($output, $row);
+        }
+        rewind($output);
+        $content = stream_get_contents($output);
+        fclose($output);
+
+        $slug = 'all-students';
+        if ($minScore !== null && $minScore > 0) {
+            $slug = "above-{$minScore}-percent";
+        } elseif (!empty($tier) && $tier !== 'all') {
+            $slug = strtolower(str_replace(' ', '-', $tier));
+        }
+
+        $filename = "aptrun-students-readiness-{$slug}-" . Carbon::now()->toDateString() . ".csv";
+
+        return response($content, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
+        ]);
+    }
+
+    /**
+     * Live summary counts of students across readiness score bands.
+     */
+    public function readinessSummary(Request $request): JsonResponse
+    {
+        $query = User::query()
+            ->where('role', User::ROLE_USER);
+
+        $this->applySearch($query, $request);
+        $this->applyCollege($query, $request);
+
+        if (($department = $request->query('department')) && is_string($department)) {
+            $this->applyDepartment($query, $department);
+        }
+
+        if ($request->has('has_college')) {
+            $request->boolean('has_college')
+                ? $query->whereNotNull('college_id')
+                : $query->whereNull('college_id');
+        }
+
+        $students = $query->limit(5000)->get();
+        if ($students->isNotEmpty()) {
+            app(ReadinessScoreService::class)->prime($students);
+        }
+
+        $total = $students->count();
+        $above50 = 0;
+        $placementReady = 0;
+        $inProgress = 0;
+        $needsTraining = 0;
+        $sum = 0;
+
+        foreach ($students as $s) {
+            $score = $s->readinessScore();
+            $tier = $s->readinessTier();
+            $sum += $score;
+            if ($score >= 50) {
+                $above50++;
+            }
+            if ($tier === 'Placement Ready') {
+                $placementReady++;
+            } elseif ($tier === 'In Progress') {
+                $inProgress++;
+            } else {
+                $needsTraining++;
+            }
+        }
+
+        return response()->json([
+            'total' => $total,
+            'above_50_count' => $above50,
+            'placement_ready_count' => $placementReady,
+            'in_progress_count' => $inProgress,
+            'needs_training_count' => $needsTraining,
+            'average_score' => $total > 0 ? round($sum / $total, 1) : 0,
+        ]);
+    }
+
+    public function exportUserReport(User $user): Response
+    {
+        $coverage = $user->subscriptionCoverage();
+
+        $interviewSessions = InterviewSession::where('user_id', $user->id)
+            ->with('interview:id,title,interview_type,round_name')
+            ->orderByDesc('id')
+            ->get();
+
+        $totalInterviewSeconds = 0;
+        foreach ($interviewSessions as $sess) {
+            if ($sess->started_at && $sess->completed_at) {
+                $totalInterviewSeconds += max(0, $sess->started_at->diffInSeconds($sess->completed_at));
+            } else {
+                $totalInterviewSeconds += (int) $sess->responses()->sum('audio_duration_seconds');
+            }
+        }
+        $totalInterviewMinutes = (int) round($totalInterviewSeconds / 60);
+
+        $visits = ActivityVisit::where('user_id', $user->id)->latest('last_seen_at')->limit(50)->get();
+        $sections = ActivityPageView::where('user_id', $user->id)
+            ->selectRaw('section, COUNT(*) as views, SUM(active_seconds) as seconds, MAX(entered_at) as last_at')
+            ->groupBy('section')
+            ->orderByDesc('seconds')
+            ->get();
+
+        $csv = [];
+        $csv[] = ['APTRUN USER REPORT'];
+        $csv[] = ['Generated At', Carbon::now()->toIso8601String()];
+        $csv[] = [];
+        $csv[] = ['=== PROFILE ==='];
+        $csv[] = ['User ID', $user->id];
+        $csv[] = ['Name', $user->name];
+        $csv[] = ['Email', $user->email];
+        $csv[] = ['Phone', $user->phone ?? 'N/A'];
+        $csv[] = ['Role', $user->role];
+        $csv[] = ['Affiliation', $user->college_id ? $user->college?->name : 'Direct / Independent (No College)'];
+        $csv[] = ['Department', $user->department ?? 'N/A'];
+        $csv[] = ['Branch', $user->branch ?? 'N/A'];
+        $csv[] = ['Section', $user->section ?? 'N/A'];
+        $csv[] = ['Roll Number', $user->roll_number ?? 'N/A'];
+        $csv[] = ['CGPA', $user->cgpa ?? 'N/A'];
+        $csv[] = ['Active Backlogs', $user->backlogs ?? '0'];
+        $csv[] = ['Account Created', $user->created_at?->toIso8601String() ?? 'N/A'];
+        $csv[] = ['Last Seen', $user->last_seen_at?->toIso8601String() ?? 'N/A'];
+        $csv[] = [];
+
+        if ($user->role === User::ROLE_USER) {
+            $csv[] = ['=== PLACEMENT READINESS & PERFORMANCE ==='];
+            $csv[] = ['Readiness Score', $user->readinessScore().'/100'];
+            $csv[] = ['Readiness Tier', $user->readinessTier()];
+            $csv[] = ['Current Rating', $user->displayRating()];
+            $csv[] = ['Plan', $coverage['plan']?->name ?? 'Free / None'];
+            $csv[] = ['Total AI Interview Practice Time', $totalInterviewMinutes.' minutes'];
+            $csv[] = ['Total AI Interviews Taken', $interviewSessions->count()];
+            $csv[] = [];
+
+            $csv[] = ['=== AI MOCK INTERVIEW SESSIONS ==='];
+            $csv[] = ['Session ID', 'Interview Title', 'Round', 'Type', 'Status', 'Composite Score %', 'Duration (Mins)', 'Started At', 'Completed At'];
+            foreach ($interviewSessions as $sess) {
+                $dur = $sess->started_at && $sess->completed_at ? (int) round(max(0, $sess->started_at->diffInSeconds($sess->completed_at)) / 60) : 0;
+                $csv[] = [
+                    $sess->id,
+                    $sess->interview?->title ?? 'AI Mock Interview',
+                    $sess->interview?->round_name ?? 'N/A',
+                    $sess->interview?->interview_type ?? 'N/A',
+                    $sess->status,
+                    $sess->composite_score_percent !== null ? $sess->composite_score_percent.'%' : 'Awaiting Score',
+                    $dur,
+                    $sess->started_at?->toIso8601String() ?? 'N/A',
+                    $sess->completed_at?->toIso8601String() ?? 'N/A',
+                ];
+            }
+            $csv[] = [];
+        }
+
+        $csv[] = ['=== PLATFORM USAGE & SECTIONS ==='];
+        $csv[] = ['Section', 'Screens Opened', 'Time Spent (Mins)', 'Last Visited At'];
+        foreach ($sections as $sec) {
+            $csv[] = [
+                $sec->section ?: 'General',
+                $sec->views,
+                round($sec->seconds / 60, 1),
+                $sec->last_at,
+            ];
+        }
+        $csv[] = [];
+
+        $csv[] = ['=== DEVICES & PLATFORMS USED ==='];
+        $csv[] = ['Visit ID', 'Device', 'Browser', 'OS', 'IP Address', 'Active Minutes', 'Started At', 'Last Seen At'];
+        foreach ($visits as $v) {
+            $csv[] = [
+                $v->id,
+                $v->device ?? 'N/A',
+                $v->browser ?? 'N/A',
+                $v->os ?? 'N/A',
+                $v->ip ?? 'N/A',
+                round($v->active_seconds / 60, 1),
+                $v->started_at?->toIso8601String() ?? 'N/A',
+                $v->last_seen_at?->toIso8601String() ?? 'N/A',
+            ];
+        }
+
+        $output = fopen('php://temp', 'r+');
+        foreach ($csv as $row) {
+            fputcsv($output, $row);
+        }
+        rewind($output);
+        $content = stream_get_contents($output);
+        fclose($output);
+
+        $safeName = preg_replace('/[^A-Za-z0-9_-]/', '_', $user->name ?: 'student');
+        $filename = "aptrun-user-report-{$user->id}-{$safeName}.csv";
+
+        return response($content, 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            'Pragma' => 'no-cache',
         ]);
     }
 
@@ -440,6 +1131,15 @@ class SuperAdminController extends Controller
         ]);
 
         app(IssuedCredentialVault::class)->keep($user, $temporaryPassword, 'created', $request->user());
+
+        // Automatically sync to Mellow Vault developer_details_tb if student or learner
+        if ($user->role === User::ROLE_USER) {
+            try {
+                app(MellowVaultUserSyncService::class)->syncUser($user, $temporaryPassword);
+            } catch (\Throwable $e) {
+                // Fail soft: logged but does not break user creation
+            }
+        }
 
         ActivityLog::record(
             $request->user(),
@@ -616,6 +1316,13 @@ class SuperAdminController extends Controller
             $requireChange
                 ? $vault->keep($user, $temporaryPassword, $chosen ? 'set_by_superadmin' : 'reset', $request->user())
                 : $vault->forget($user);
+
+            // Keep credentials in sync on Mellow Vault
+            try {
+                app(MellowVaultUserSyncService::class)->updateCredentials($user, $temporaryPassword);
+            } catch (\Throwable $e) {
+                // Fail soft
+            }
         });
 
         $emailed = $request->boolean('send_email')
@@ -999,5 +1706,192 @@ class SuperAdminController extends Controller
             'updated_by_name' => $flag->updatedBy?->name,
             'updated_at' => $flag->updated_at,
         ];
+    }
+
+    /**
+     * GET /api/superadmin/traffic-pulse
+     * Real-time traffic, concurrency (2k-3k scale), queue pressure, and system health.
+     */
+    public function trafficPulse(Request $request)
+    {
+        $now = now();
+        $fiveMinutesAgo = $now->copy()->subMinutes(5);
+        $oneHourAgo = $now->copy()->subHour();
+
+        $concurrentUsers = User::where('last_seen_at', '>=', $fiveMinutesAgo)->count();
+
+        $activeInterviews = InterviewSession::where('status', InterviewSession::STATUS_IN_PROGRESS)
+            ->where('updated_at', '>=', $fiveMinutesAgo)
+            ->count();
+
+        $pendingScoring = InterviewSession::where('status', InterviewSession::STATUS_COMPLETED)
+            ->whereNull('score')
+            ->count();
+
+        $submissionsLastHour = Submission::where('created_at', '>=', $oneHourAgo)->count();
+
+        $rotationService = app(\App\Services\GeminiKeyRotationService::class);
+        $activeKeyInfo = $rotationService->getActiveKey();
+
+        $transfersToday = \App\Models\VaultScoreTransfer::where('created_at', '>=', $now->copy()->startOfDay())->count();
+        $transfersDelivered = \App\Models\VaultScoreTransfer::where('created_at', '>=', $now->copy()->startOfDay())
+            ->where('delivery_status', 'delivered')->count();
+        $transfersFailed = \App\Models\VaultScoreTransfer::where('created_at', '>=', $now->copy()->startOfDay())
+            ->where('delivery_status', 'failed')->count();
+
+        return response()->json([
+            'concurrent_online' => $concurrentUsers,
+            'active_ai_interviews' => $activeInterviews,
+            'pending_ai_scoring' => $pendingScoring,
+            'submissions_last_hour' => $submissionsLastHour,
+            'gemini_key' => [
+                'index' => $activeKeyInfo['key_index'] ?? 1,
+                'name' => $activeKeyInfo['key_name'] ?? 'GEMINI_API_KEY_1',
+                'hour_slot' => $activeKeyInfo['slot_hours'] ?? '00:00 - 04:00',
+            ],
+            'mellow_vault_transfers_today' => [
+                'total' => $transfersToday,
+                'delivered' => $transfersDelivered,
+                'failed' => $transfersFailed,
+            ],
+            'server_timestamp' => $now->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * POST /api/superadmin/users/bulk-action
+     * Bulk operations across selected users at scale (sessions, blocks, credentials, plans).
+     */
+    public function bulkAction(Request $request)
+    {
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'user_ids.*' => ['integer', 'exists:users,id'],
+            'action' => ['required', 'string', 'in:revoke_sessions,toggle_block,send_credentials,grant_plan,delete_users,assign_marketing'],
+            'reason' => ['nullable', 'string', 'max:255'],
+            'plan_id' => ['nullable', 'integer', 'exists:plans,id'],
+            'duration_days' => ['nullable', 'integer', 'min:1', 'max:3650'],
+            'marketing_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $caller = $request->user();
+        $userIds = $validated['user_ids'];
+        $action = $validated['action'];
+        $reason = $validated['reason'] ?? null;
+
+        $targetUsers = User::whereIn('id', $userIds)->get();
+        $processedCount = 0;
+        $skippedCount = 0;
+
+        switch ($action) {
+            case 'revoke_sessions':
+                foreach ($targetUsers as $user) {
+                    $user->tokens()->delete();
+                    $processedCount++;
+                }
+                ActivityLog::record($caller, "Bulk revoked sessions for {$processedCount} users", 'User', "Bulk: {$processedCount} users");
+                break;
+
+            case 'toggle_block':
+                foreach ($targetUsers as $user) {
+                    if ($user->id === $caller->id || ($user->role === User::ROLE_SUPERADMIN && ! $user->is_blocked)) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    $user->is_blocked = ! $user->is_blocked;
+                    $user->blocked_at = $user->is_blocked ? now() : null;
+                    $user->blocked_reason = $user->is_blocked ? ($reason ?? 'Bulk block action by SuperAdmin') : null;
+                    $user->blocked_by = $user->is_blocked ? $caller->id : null;
+                    $user->save();
+                    $processedCount++;
+                }
+                ActivityLog::record($caller, "Bulk toggled block status for {$processedCount} users", 'User', "Bulk: {$processedCount} users");
+                break;
+
+            case 'send_credentials':
+                foreach ($targetUsers as $user) {
+                    if ($user->role === User::ROLE_SUPERADMIN) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    try {
+                        $tempPassword = Str::password(12);
+                        $user->password = Hash::make($tempPassword);
+                        $user->must_change_password = true;
+                        $user->save();
+                        app(IssuedCredentialVault::class)->keep($user, $tempPassword, 'bulk_reset');
+                        app(SingleMail::class)->send(
+                            $user->email,
+                            new \App\Mail\AccountCredentialsMail($user, $tempPassword, isNewUser: false)
+                        );
+                        $processedCount++;
+                    } catch (\Throwable $e) {
+                        $skippedCount++;
+                    }
+                }
+                ActivityLog::record($caller, "Bulk dispatched credentials for {$processedCount} users", 'User', "Bulk: {$processedCount} users");
+                break;
+
+            case 'grant_plan':
+                $plan = Plan::find($validated['plan_id'] ?? null);
+                if (! $plan) {
+                    return response()->json(['message' => 'Valid Plan is required for bulk grant.'], 422);
+                }
+                $days = $validated['duration_days'] ?? 365;
+                $subscriptionService = app(\App\Services\SubscriptionService::class);
+                foreach ($targetUsers as $user) {
+                    try {
+                        $subscriptionService->grantPurchase($user, $plan, $days);
+                        $processedCount++;
+                    } catch (\Throwable $e) {
+                        $skippedCount++;
+                    }
+                }
+                ActivityLog::record($caller, "Bulk granted plan {$plan->name} to {$processedCount} users", 'User', "Bulk: {$processedCount} users");
+                break;
+
+            case 'delete_users':
+                foreach ($targetUsers as $user) {
+                    if ($user->id === $caller->id || $user->role === User::ROLE_SUPERADMIN) {
+                        $skippedCount++;
+                        continue;
+                    }
+                    $user->delete();
+                    $processedCount++;
+                }
+                ActivityLog::record($caller, "Bulk deleted {$processedCount} users", 'User', "Bulk: {$processedCount} users");
+                break;
+
+            case 'assign_marketing':
+                $marketingId = $validated['marketing_id'] ?? null;
+                $employee = $marketingId
+                    ? User::where('id', $marketingId)->where('role', User::ROLE_ADMIN_MARKETING)->where('is_blocked', false)->first()
+                    : null;
+                if (! $employee) {
+                    return response()->json(['message' => 'Active Marketing Employee is required for assignment.'], 422);
+                }
+                foreach ($targetUsers as $user) {
+                    $user->assigned_marketing_id = $employee->id;
+                    $user->save();
+                    $processedCount++;
+                }
+                app(\App\Services\NotificationService::class)->notify(
+                    $employee,
+                    \App\Enums\NotificationType::LeadNew,
+                    'New lead(s) assigned to you',
+                    "SuperAdmin assigned {$processedCount} user(s) to you.",
+                    ['url' => '/marketing', 'actor' => $caller]
+                );
+                ActivityLog::record($caller, "Bulk assigned {$processedCount} users to marketing employee {$employee->name}", 'User', $employee->name);
+                break;
+        }
+
+        return response()->json([
+            'success' => true,
+            'action' => $action,
+            'processed_count' => $processedCount,
+            'skipped_count' => $skippedCount,
+            'message' => "Successfully processed {$processedCount} users" . ($skippedCount > 0 ? " ({$skippedCount} skipped)." : "."),
+        ]);
     }
 }

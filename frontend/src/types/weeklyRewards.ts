@@ -81,6 +81,9 @@ export interface AdminRewardCard extends RewardCard {
 
 export interface AdminStanding extends Omit<ContestBoardRow, "prize"> {
   prize: Prize | null;
+  email?: string | null;
+  college?: string | null;
+  winner?: LedgerWinner | null;
 }
 
 export interface WeekFlags extends WeekInfo {

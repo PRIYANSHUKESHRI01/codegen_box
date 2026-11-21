@@ -5,6 +5,7 @@ namespace App\Services\Activity;
 use App\Models\ActivityPageView;
 use App\Models\AuthEvent;
 use App\Models\College;
+use App\Models\InterviewSession;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\UserActivityDay;
@@ -226,10 +227,56 @@ class CollegeAdoption
 
         $user->loadMissing('college:id,name');
 
+        $interviewSummary = null;
+        if ($user->role === User::ROLE_USER) {
+            $sessions = InterviewSession::where('user_id', $user->id)
+                ->with('interview:id,title,round_name,interview_type')
+                ->orderByDesc('id')
+                ->limit(25)
+                ->get();
+
+            $totalSeconds = 0;
+            foreach ($sessions as $s) {
+                if ($s->started_at && $s->completed_at) {
+                    $totalSeconds += max(0, $s->started_at->diffInSeconds($s->completed_at));
+                } else {
+                    $totalSeconds += (int) $s->responses()->sum('audio_duration_seconds');
+                }
+            }
+
+            $interviewSummary = [
+                'total_sessions' => $sessions->count(),
+                'completed_sessions' => $sessions->where('status', InterviewSession::STATUS_COMPLETED)->count(),
+                'total_practice_minutes' => (int) round($totalSeconds / 60),
+                'average_score' => round((float) ($sessions->whereNotNull('composite_score_percent')->avg('composite_score_percent') ?? 0), 1),
+                'sessions' => $sessions->map(fn ($s) => [
+                    'id' => $s->id,
+                    'title' => $s->interview?->title ?? 'AI Mock Interview',
+                    'round_name' => $s->interview?->round_name,
+                    'type' => $s->interview?->interview_type,
+                    'status' => $s->status,
+                    'composite_score_percent' => $s->composite_score_percent !== null ? (float) $s->composite_score_percent : null,
+                    'started_at' => $s->started_at,
+                    'completed_at' => $s->completed_at,
+                    'duration_minutes' => $s->started_at && $s->completed_at ? (int) round(max(0, $s->started_at->diffInSeconds($s->completed_at)) / 60) : null,
+                ])->all(),
+            ];
+        }
+
+        $platformSummary = [
+            'devices' => collect($visits)->pluck('device')->filter()->unique()->values()->all(),
+            'browsers' => collect($visits)->pluck('browser')->filter()->unique()->values()->all(),
+            'os_list' => collect($visits)->pluck('os')->filter()->unique()->values()->all(),
+            'primary_device' => collect($visits)->pluck('device')->filter()->first(),
+            'last_ip' => $visits[0]['ip'] ?? ($events[0]['ip'] ?? null),
+        ];
+
         return [
-            'user' => $this->userRow($user) + ['college' => $user->college?->name, 'is_blocked' => (bool) $user->is_blocked],
+            'user' => $this->userRow($user) + ['college' => $user->college?->name, 'is_blocked' => (bool) $user->is_blocked, 'is_independent' => $user->role === User::ROLE_USER && $user->college_id === null],
             'facts' => $facts,
             'online_now' => $this->analytics->isOnline($user),
+            'interviews' => $interviewSummary,
+            'platforms' => $platformSummary,
             'events' => $events,
             'visits' => $visits,
             'sections' => $sections,

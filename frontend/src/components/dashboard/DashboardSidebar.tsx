@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Building2,
   Users2,
+  Users,
   Activity,
   Gift,
   ShieldCheck,
@@ -135,13 +136,14 @@ interface DashboardSidebarProps {
 
 export function DashboardSidebar({
   currentRole,
-  currentTpoView = "mellow",
+  currentTpoView: rawTpoView,
   onSwitchTpoView,
   mobileOpen = false,
   onCloseMobile,
   collapsed: controlledCollapsed,
   onToggleCollapse,
 }: DashboardSidebarProps) {
+  const currentTpoView = rawTpoView ?? (currentRole === "admin_tpo" ? "tpo" : "mellow");
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const collapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
@@ -485,18 +487,22 @@ export function DashboardSidebar({
       // (different components — admin/mellow/{OpsOverviewPanel,
       // PartnerCollegesPanel} vs admin/superadmin/{OverviewPanel,
       // CollegesPanel} — but the same ground from a nav's perspective).
-      // Including both made the sidebar read as two dashboards stapled
-      // together, which is exactly what was reported as a bug. What's left
-      // (Problem Bank, Placement Drives, Contests, AI Interviews, Articles,
-      // Vault, Platform Users, Customer Success) has no superadmin-
-      // console equivalent at all, so it stays reachable, clearly labeled
-      // as a distinct toolset rather than folded into Executive/Governance.
-      const mellowOpsExtrasForSuperadmin = mellowOpsSections.map((section) =>
+      // Below that, superadmin gets the platform operations & content toolset
+      // (Problem Bank, Placement Drives, Contests, AI Interviews, Soft Skills,
+      // Domain Prep, Project Lab, Articles, Vault) labeled clearly as "Platform Operations".
+      // Duplicates already present in Executive or Governance ("Overview",
+      // "Partner Colleges & TPOs", "Platform Users", "Hackathons") are removed.
+      const platformOpsForSuperadmin = mellowOpsSections.map((section) =>
         section.title === "Mellow Ops"
           ? {
               ...section,
+              title: "Platform Operations",
               items: section.items.filter(
-                (item) => item.label !== "Overview" && item.label !== "Partner Colleges & TPOs"
+                (item) =>
+                  item.label !== "Overview" &&
+                  item.label !== "Partner Colleges & TPOs" &&
+                  item.label !== "Platform Users" &&
+                  item.label !== "Hackathons"
               ),
             }
           : section
@@ -507,7 +513,9 @@ export function DashboardSidebar({
           title: "Executive",
           items: [
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
+            { label: "Platform Usage", href: "/superadmin?tab=platform_usage", icon: BarChart3, badge: "Live", badgeTone: "live" },
             { label: "Live Activity", href: "/superadmin?tab=activity", icon: Activity, badge: "Live", badgeTone: "live" },
+            { label: "Hackathons", href: "/superadmin?tab=hackathons", icon: Rocket, badge: "Live", badgeTone: "live" },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
             { label: "Contest Rewards", href: "/superadmin?tab=weekly_rewards", icon: Gift },
             { label: "Departments", href: "/superadmin?tab=departments", icon: Layers },
@@ -520,7 +528,9 @@ export function DashboardSidebar({
         {
           title: "Governance",
           items: [
+            { label: "AptRun Users", href: "/superadmin?tab=users", icon: Users },
             { label: "Students", href: "/superadmin?tab=students", icon: GraduationCap },
+            { label: "Vault AI Results", href: "/superadmin?tab=vault_ai", icon: ShieldCheck },
             { label: "Leads", href: "/superadmin?tab=leads", icon: UserSearch },
             { label: "Marketing Performance", href: "/superadmin?tab=marketing", icon: Megaphone },
             { label: "Marketing Team", href: "/superadmin?tab=marketing_team", icon: UserCog },
@@ -540,15 +550,22 @@ export function DashboardSidebar({
               badge: "99.99%",
               badgeTone: "ok",
             },
+            {
+              label: "Gemini AI Keys",
+              href: "/superadmin?tab=gemini_keys",
+              icon: Sparkles,
+              badge: "6 Keys",
+              badgeTone: "ok",
+            },
           ],
         },
-        ...mellowOpsExtrasForSuperadmin,
+        ...platformOpsForSuperadmin,
       ];
     }
 
     if (
       currentRole === "admin_internal" ||
-      (currentRole === "admin_tpo" && currentTpoView === "mellow")
+      (currentRole === "admin_tpo" && currentTpoView === "mellow" && storedUser?.role !== "admin_tpo")
     ) {
       return mellowOpsSections;
     }
@@ -580,7 +597,7 @@ export function DashboardSidebar({
               icon: Swords,
             },
             {
-              label: "Mock Interviews",
+              label: "Mock AI Interview",
               href: "/admin/mock-interviews",
               icon: Mic,
             },
@@ -815,7 +832,7 @@ export function DashboardSidebar({
   const currentRoleInfo =
     storedUser?.role === "superadmin"
       ? roleMeta.superadmin
-      : currentRole === "admin_internal" || (currentRole === "admin_tpo" && currentTpoView === "mellow")
+      : currentRole === "admin_internal" || (currentRole === "admin_tpo" && currentTpoView === "mellow" && storedUser?.role !== "admin_tpo")
       ? roleMeta.admin_internal
       : currentRole === "admin_tpo"
       ? roleMeta.admin_tpo

@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, Check, CheckCircle2, Circle, Clock, ExternalLink, Github, Link2, Loader2, Lock, Medal, Quote, Save, Send, Video, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, BookOpen, Check, CheckCircle2, ChevronDown, ChevronUp, Circle, Clock, Code2, ExternalLink, Github, Laptop, Link2, Loader2, Lock, Medal, Quote, Save, Send, Timer, Video, X, type LucideIcon } from "lucide-react";
 import { useArenaDirty } from "@/components/arena/ArenaShell";
 import { formatScore } from "@/components/arena/detail/Podium";
 import { CountUp, EASE, Reveal } from "@/components/arena/motion";
-import { Countdown, PageNotice } from "@/components/arena/primitives";
+import { ArenaMarkdown, Countdown, PageNotice } from "@/components/arena/primitives";
 import { arenaApi, errorMessage, formatDateTime, isHttpUrl, ordinal, relativeTime } from "@/lib/hackathon";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -56,6 +56,13 @@ export function ProjectPanel({ hackathon, onChange }: { hackathon: HackathonDeta
   const [notice, setNotice] = useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [busy, setBusy] = useState<"draft" | "submit" | null>(null);
   const [tagDraft, setTagDraft] = useState("");
+  const [showProblem, setShowProblem] = useState(true);
+  const [nowTime, setNowTime] = useState(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Pick up a refreshed project (a teammate saved, or we just did) without clobbering unsaved typing.
   const serverKey = project ? `${project.id}:${project.updated_at}:${project.status}` : "none";
@@ -160,6 +167,12 @@ export function ProjectPanel({ hackathon, onChange }: { hackathon: HackathonDeta
   const readOnly = !access.allowed;
   const teamTooSmall = team && team.members.length < team.min_size;
 
+  const readingMin = hackathon.reading_time_minutes ?? 15;
+  const startTime = new Date(hackathon.starts_at).getTime();
+  const readingEndTime = startTime + readingMin * 60 * 1000;
+  const deadlineTime = new Date(hackathon.ends_at).getTime();
+  const isReading = nowTime >= startTime && nowTime < readingEndTime && nowTime < deadlineTime;
+
   // What "Submit" will insist on — shown up front as a checklist so it never comes as a surprise.
   const checklist = [
     { label: "Title", done: form.title.trim().length >= 3 },
@@ -192,6 +205,99 @@ export function ProjectPanel({ hackathon, onChange }: { hackathon: HackathonDeta
         <PageNotice tone="info">
           {submitted ? "Your project was submitted before the deadline. Judging is under way — results will appear here." : "The deadline has passed, so the project can no longer be edited."}
         </PageNotice>
+      )}
+
+      {/* Live Hackathon Status, Real-Time Countdown & Local Build Instructions */}
+      {access.allowed && (
+        <div className="rounded-2xl border border-indigo-500/30 bg-gradient-to-br from-[#0c0d1c] via-[#10132b] to-[#151433] p-5 shadow-lg sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider text-rose-300 ring-1 ring-rose-500/40">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-rose-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-rose-500" />
+                  </span>
+                  Hackathon Active
+                </span>
+
+                {isReading ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/20 px-2.5 py-0.5 text-xs font-bold text-amber-200 ring-1 ring-amber-400/30">
+                    <BookOpen className="h-3.5 w-3.5" /> {readingMin}m Problem Reading Phase
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-400/20 px-2.5 py-0.5 text-xs font-bold text-emerald-200 ring-1 ring-emerald-400/30">
+                    <Code2 className="h-3.5 w-3.5" /> Building & Submission Active
+                  </span>
+                )}
+              </div>
+
+              <p className="text-sm font-semibold text-white">
+                {isReading
+                  ? "Read the problem statement thoroughly, plan system architecture, and prepare your local repo."
+                  : "Build on your local laptop · Submit your GitHub Repo URL & Live Deployed Link before the deadline."}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-white/70">
+                <span className="inline-flex items-center gap-1 text-indigo-200">
+                  <Laptop className="h-3.5 w-3.5" /> Local Laptop Build (No Project Lab Needed)
+                </span>
+                <span className="inline-flex items-center gap-1 text-violet-200">
+                  <Github className="h-3.5 w-3.5" /> GitHub Repo URL Required
+                </span>
+                <span className="inline-flex items-center gap-1 text-sky-200">
+                  <Link2 className="h-3.5 w-3.5" /> Deployed Live Link Required
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/40 p-3 sm:text-right">
+              <p className="mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-indigo-300 sm:justify-end">
+                <Timer className="h-3.5 w-3.5" />
+                {isReading ? "Reading Phase Left" : "Submission Window Left"}
+              </p>
+              <Countdown target={isReading ? (hackathon.reading_ends_at ?? new Date(readingEndTime).toISOString()) : hackathon.ends_at} size="sm" className="sm:justify-end" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Prominent Problem Statement Viewer */}
+      {hackathon.problem_statement && (
+        <div className="rounded-2xl border border-indigo-500/25 bg-[#0f1124] p-5 shadow-md">
+          <div className="flex items-center justify-between border-b border-white/[0.08] pb-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
+                <BookOpen className="h-4 w-4" />
+              </span>
+              <div>
+                <h3 className="text-sm font-bold text-white">Official Problem Statement</h3>
+                <p className="text-2xs text-[color:var(--ar-text-3)]">Read the specifications and deliverables for this hackathon</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowProblem((s) => !s)}
+              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-2.5 py-1 text-xs font-semibold text-white/80 hover:bg-white/5"
+            >
+              {showProblem ? (
+                <>
+                  Collapse <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  View Problem <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </button>
+          </div>
+
+          {showProblem && (
+            <div className="dt-prose mt-4 max-h-96 overflow-y-auto pr-2">
+              <ArenaMarkdown>{hackathon.problem_statement}</ArenaMarkdown>
+            </div>
+          )}
+        </div>
       )}
 
       <Reveal y={12}>
@@ -278,17 +384,17 @@ export function ProjectPanel({ hackathon, onChange }: { hackathon: HackathonDeta
                   </Group>
                 )}
 
-                <Group n={hasTracks ? 3 : 2} title="Links" hint="Where judges can see it working.">
+                <Group n={hasTracks ? 3 : 2} title="Project Deliverables & Links" hint="Where judges and recruiters can inspect code and test the live build.">
                   <div className="grid gap-5 md:grid-cols-2">
-                    <Field label="Repository" htmlFor="p-repo" error={errors.repo_url} hint="Required to submit. Make sure it's public.">
-                      <LinkInput icon={Github} id="p-repo" value={form.repo_url} onChange={(v) => set("repo_url", v)} placeholder="https://github.com/you/project" invalid={!!errors.repo_url} />
+                    <Field label="GitHub Repository URL" htmlFor="p-repo" required error={errors.repo_url} hint="Required. Provide your public GitHub repo link where your local code was pushed.">
+                      <LinkInput icon={Github} id="p-repo" value={form.repo_url} onChange={(v) => set("repo_url", v)} placeholder="https://github.com/your-username/hackathon-project" invalid={!!errors.repo_url} />
                     </Field>
-                    <Field label="Live demo" htmlFor="p-demo" error={errors.demo_url} hint="A deployed demo beats slides.">
-                      <LinkInput icon={Link2} id="p-demo" value={form.demo_url} onChange={(v) => set("demo_url", v)} placeholder="https://your-demo.example.com" invalid={!!errors.demo_url} />
+                    <Field label="Live Deployed Link" htmlFor="p-demo" error={errors.demo_url} hint="Your live deployment URL (Vercel, Netlify, Render, Railway, AWS, Cloudflare, etc.).">
+                      <LinkInput icon={Link2} id="p-demo" value={form.demo_url} onChange={(v) => set("demo_url", v)} placeholder="https://your-app.vercel.app" invalid={!!errors.demo_url} />
                     </Field>
                   </div>
 
-                  <Field label="Demo video" htmlFor="p-video" error={errors.video_url} hint="A short walkthrough (up to 3 minutes) on YouTube, Loom, Drive…">
+                  <Field label="Demo Video (optional)" htmlFor="p-video" error={errors.video_url} hint="A short walkthrough or demo (YouTube, Loom, Google Drive…)">
                     <LinkInput icon={Video} id="p-video" value={form.video_url} onChange={(v) => set("video_url", v)} placeholder="https://youtu.be/…" invalid={!!errors.video_url} />
                   </Field>
                 </Group>

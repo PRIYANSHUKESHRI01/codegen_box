@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Ban, CheckCircle2, Clock, Eye, KeyRound, LogOut, ShieldAlert, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Ban, CheckCircle2, Clock, Database, Eye, KeyRound, LogOut, RefreshCw, ShieldAlert, ShieldCheck, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { formatDateTime } from "../types";
@@ -29,6 +29,53 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
   const [blockReason, setBlockReason] = useState("");
   const [askBlock, setAskBlock] = useState(false);
   const [busy, setBusy] = useState<"signout" | "block" | null>(null);
+
+  const [vaultSync, setVaultSync] = useState<{
+    found: boolean;
+    dev_id?: number;
+    phone?: string;
+    clg_name?: string;
+    login_status?: number;
+    developer_status?: number;
+    is_aptrun_synced?: number;
+    has_password?: boolean;
+    aptrun_synced_at?: string;
+  } | null>(null);
+  const [syncingVault, setSyncingVault] = useState(false);
+
+  const loadVaultStatus = async () => {
+    try {
+      const res = await api.get<{ mellow_vault: any }>(`/superadmin/users/${user.id}/mellow-vault-status`);
+      setVaultSync(res.mellow_vault);
+    } catch {
+      setVaultSync(null);
+    }
+  };
+
+  useEffect(() => {
+    if (user.role === "user") {
+      void loadVaultStatus();
+    }
+  }, [user.id, user.role]);
+
+  const handleManualVaultSync = async () => {
+    setSyncingVault(true);
+    try {
+      const res = await api.post<{ success: boolean; dev_id?: number; action?: string; error?: string }>(
+        `/superadmin/users/${user.id}/sync-mellow-vault`
+      );
+      if (res.success) {
+        triggerToast(`Synced to Mellow Vault (dev_id: #${res.dev_id}, action: ${res.action}).`);
+        await loadVaultStatus();
+      } else {
+        triggerToast(res.error || "Failed to sync to Mellow Vault.", "error");
+      }
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Sync failed.", "error");
+    } finally {
+      setSyncingVault(false);
+    }
+  };
 
   const signOutEverywhere = async () => {
     setBusy("signout");
@@ -94,6 +141,52 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
           </div>
         </Card>
       </div>
+
+      {user.role === "user" && (
+        <div>
+          <SectionTitle>Mellow Vault Integration</SectionTitle>
+          <Card>
+            <dl>
+              <Row label="Mellow Vault status">
+                {vaultSync?.found ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-3xs font-bold text-emerald-400">
+                    <CheckCircle2 className="h-3 w-3" /> Synced (dev_id: #{vaultSync.dev_id})
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-status-warning/15 px-2 py-0.5 text-3xs font-bold text-status-warning">
+                    <Clock className="h-3 w-3" /> Not in Mellow Vault yet
+                  </span>
+                )}
+              </Row>
+              <Row label="Target database table">
+                <span className="font-mono text-2xs text-text-secondary">mellow_vault.developer_details_tb</span>
+              </Row>
+              <Row label="Mellow Vault login">
+                <span className="text-2xs text-text-secondary">
+                  {vaultSync?.has_password ? "Active with AptRun credentials" : "Pending password sync"}
+                </span>
+              </Row>
+              {vaultSync?.clg_name && <Row label="Affiliation">{vaultSync.clg_name}</Row>}
+              {vaultSync?.phone && <Row label="Synced phone">{vaultSync.phone}</Row>}
+              {vaultSync?.aptrun_synced_at && <Row label="Last synced">{timeAgo(vaultSync.aptrun_synced_at)}</Row>}
+            </dl>
+            <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-3">
+              <span className="text-3xs text-text-muted">
+                Credentials (Name, Email, Password &amp; Phone) are synced so candidate can log in to Mellow Vault.
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleManualVaultSync()}
+                disabled={syncingVault}
+                className={cn(ghostButton, "shrink-0 py-1 text-2xs")}
+              >
+                <RefreshCw className={cn("h-3 w-3", syncingVault && "animate-spin")} />
+                {syncingVault ? "Syncing..." : "Sync to Mellow Vault"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       <div>
         <SectionTitle>Access</SectionTitle>

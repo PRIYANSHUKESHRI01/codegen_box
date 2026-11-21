@@ -53,9 +53,9 @@ class MockInterviewCatalog
         return max(1, (int) config('mock_interviews.min_questions_per_round', 5));
     }
 
-    public static function roundId(string $stackKey, int $round): string
+    public static function roundId(string $stackKey, int $round, int $set = 1): string
     {
-        return "mock-{$stackKey}-r{$round}";
+        return $set === 1 ? "mock-{$stackKey}-r{$round}" : "mock-{$stackKey}-s{$set}-r{$round}";
     }
 
     public function isRoundReady(array $round): bool
@@ -81,22 +81,46 @@ class MockInterviewCatalog
     }
 
     /**
-     * @return array{role: array<string, mixed>, stack: array<string, mixed>, round: array<string, mixed>}|null
+     * @return array{role: array<string, mixed>, stack: array<string, mixed>, round: array<string, mixed>, parent_set?: array<string, mixed>}|null
      */
     public function round(string $roundId): ?array
     {
-        if (! preg_match('/^mock-([a-z0-9_]+)-r([1-9][0-9]{0,2})$/', $roundId, $m)) {
+        $stackKey = null;
+        $setNum = 1;
+        $roundNum = null;
+
+        if (preg_match('/^mock-([a-z0-9_]+)-s([1-9][0-9]?)-r([1-9][0-9]?)$/', $roundId, $m)) {
+            $stackKey = $m[1];
+            $setNum = (int) $m[2];
+            $roundNum = (int) $m[3];
+        } elseif (preg_match('/^mock-([a-z0-9_]+)-r([1-9][0-9]{0,2})$/', $roundId, $m)) {
+            $stackKey = $m[1];
+            $setNum = 1;
+            $roundNum = (int) $m[2];
+        } else {
             return null;
         }
 
-        $found = $this->stack($m[1]);
+        $found = $this->stack($stackKey);
 
         if ($found === null) {
             return null;
         }
 
+        if (! empty($found['stack']['parent_sets'])) {
+            foreach ($found['stack']['parent_sets'] as $pset) {
+                if ((int) $pset['set_number'] === $setNum) {
+                    foreach ($pset['rounds'] as $round) {
+                        if ((int) $round['round_number'] === $roundNum || $round['id'] === $roundId) {
+                            return $found + ['round' => $round, 'parent_set' => $pset];
+                        }
+                    }
+                }
+            }
+        }
+
         foreach ($found['stack']['rounds'] as $round) {
-            if ((int) $round['round_number'] === (int) $m[2]) {
+            if ($round['id'] === $roundId || ((int) $round['round_number'] === $roundNum && $setNum === 1)) {
                 return $found + ['round' => $round];
             }
         }
@@ -107,9 +131,18 @@ class MockInterviewCatalog
     /** @return array{ready_rounds: int, total_rounds: int, live: bool} */
     public function progress(array $stack): array
     {
-        $ready = count(array_filter($stack['rounds'] ?? [], fn (array $r) => $this->isRoundReady($r)));
+        $rounds = $stack['rounds'] ?? [];
+        if (! empty($stack['parent_sets'])) {
+            $rounds = [];
+            foreach ($stack['parent_sets'] as $pset) {
+                foreach ($pset['rounds'] as $r) {
+                    $rounds[] = $r;
+                }
+            }
+        }
+        $ready = count(array_filter($rounds, fn (array $r) => $this->isRoundReady($r)));
 
-        return ['ready_rounds' => $ready, 'total_rounds' => count($stack['rounds'] ?? []), 'live' => $ready > 0];
+        return ['ready_rounds' => $ready, 'total_rounds' => count($rounds), 'live' => $ready > 0];
     }
 
     /** @return array<string, bool> stack key => live */
@@ -134,27 +167,16 @@ class MockInterviewCatalog
         $custom = $this->questions();
         $roles = [];
 
+        $parentConfig = config('mock_interview_parent_sets');
+        $defaultSets = $parentConfig['default_sets'] ?? [];
+        $stackOverrides = $parentConfig['stacks'] ?? [];
+
         foreach ($this->vault->roles() as $roleKey => $role) {
             $stacks = [];
 
             foreach ($role['stacks'] as $stackKey => $stack) {
                 $stackKey = (string) $stackKey;
-                $rounds = [];
-
-                // The three rounds are the three themes of the stack's first Vault series.
-                foreach (array_slice($stack['series'][0]['sets'] ?? [], 0, self::ROUNDS) as $index => $set) {
-                    $number = $index + 1;
-
-                    $rounds[] = [
-                        'id' => self::roundId($stackKey, $number),
-                        'round_number' => $number,
-                        'title' => 'Round '.$number.': '.preg_replace('/^Set\s*\d+\s*:\s*/i', '', (string) ($set['title'] ?? "Round {$number}")),
-                        'description' => (string) ($set['description'] ?? ''),
-                        'duration_minutes' => (int) ($set['duration_minutes'] ?? 15),
-                        'tags' => array_values(array_unique(array_merge([$stackKey, (string) $roleKey, 'mock'], $stack['tags'] ?? []))),
-                        'questions' => $custom[$stackKey][$number] ?? [],
-                    ];
-                }
+                $parentSets = $this->buildParentSets($stackKey, (string) $roleKey, $stack, $custom, $defaultSets, $stackOverrides);
 
                 $stacks[$stackKey] = [
                     'key' => $stackKey,
@@ -163,7 +185,8 @@ class MockInterviewCatalog
                     'icon' => $stack['icon'] ?? 'Code2',
                     'aliases' => $stack['aliases'] ?? [],
                     'tags' => $stack['tags'] ?? [],
-                    'rounds' => $rounds,
+                    'parent_sets' => $parentSets,
+                    'rounds' => $parentSets[0]['rounds'] ?? [],
                 ];
             }
 
@@ -178,7 +201,77 @@ class MockInterviewCatalog
             ];
         }
 
-        return $roles + $this->extraRoles($custom, $roles);
+        return $roles + $this->extraRoles($custom, $roles, $defaultSets, $stackOverrides);
+    }
+
+    /**
+     * Builds the 10 standard Parent Sets (Series 1 to 10) for a tech stack.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function buildParentSets(string $stackKey, string $roleKey, array $stack, array $custom, array $defaultSets, array $stackOverrides): array
+    {
+        $parentSets = [];
+        $totalSets = max(10, count($defaultSets));
+
+        for ($s = 1; $s <= $totalSets; $s++) {
+            $setMeta = $defaultSets[$s] ?? [
+                'title' => "Series {$s}",
+                'level' => $s === 1 ? 'Foundational' : ($s <= 3 ? 'Intermediate' : ($s <= 6 ? 'Advanced' : 'Staff-Level FAANG')),
+                'blurb' => "Comprehensive interview questions for {$stack['name']}.",
+                'rounds' => [],
+            ];
+
+            if (isset($stackOverrides[$stackKey][$s])) {
+                if (! empty($stackOverrides[$stackKey][$s]['title'])) {
+                    $setMeta['title'] = $stackOverrides[$stackKey][$s]['title'];
+                }
+                if (! empty($stackOverrides[$stackKey][$s]['blurb'])) {
+                    $setMeta['blurb'] = $stackOverrides[$stackKey][$s]['blurb'];
+                }
+            }
+
+            $setRounds = [];
+
+            for ($r = 1; $r <= self::ROUNDS; $r++) {
+                $roundMeta = $setMeta['rounds'][$r] ?? [];
+
+                $roundTitle = $roundMeta['title'] ?? "Round {$r}";
+                $roundDesc = $roundMeta['description'] ?? "Practice round {$r} for {$stack['name']}.";
+
+                if ($s === 1 && isset($stack['series'][0]['sets'][$r - 1])) {
+                    $vaultSet = $stack['series'][0]['sets'][$r - 1];
+                    $roundTitle = 'Round '.$r.': '.preg_replace('/^Set\s*\d+\s*:\s*/i', '', (string) ($vaultSet['title'] ?? "Round {$r}"));
+                    $roundDesc = (string) ($vaultSet['description'] ?? $roundDesc);
+                }
+
+                $roundQuestions = $custom[$stackKey][$s][$r] ?? ($s === 1 ? ($custom[$stackKey][$r] ?? []) : []);
+
+                $roundId = self::roundId($stackKey, $r, $s);
+
+                $setRounds[] = [
+                    'id' => $roundId,
+                    'parent_set_number' => $s,
+                    'round_number' => $r,
+                    'title' => $roundTitle,
+                    'description' => $roundDesc,
+                    'duration_minutes' => (int) ($roundMeta['duration_minutes'] ?? 15),
+                    'tags' => array_values(array_unique(array_merge([$stackKey, $roleKey, 'mock', 'set-'.$s], $stack['tags'] ?? []))),
+                    'questions' => $roundQuestions,
+                ];
+            }
+
+            $parentSets[] = [
+                'id' => "set-{$s}",
+                'set_number' => $s,
+                'title' => $setMeta['title'],
+                'level' => $setMeta['level'] ?? 'Foundational',
+                'description' => $setMeta['blurb'] ?? "Curated interview practice questions for {$stack['name']}.",
+                'rounds' => $setRounds,
+            ];
+        }
+
+        return $parentSets;
     }
 
     /**
@@ -208,7 +301,7 @@ class MockInterviewCatalog
      * @param  array<string, array<string, mixed>>  $taken  the Vault-derived roles, to avoid a key clash
      * @return array<string, array<string, mixed>>
      */
-    private function extraRoles(array $custom, array $taken): array
+    private function extraRoles(array $custom, array $taken, array $defaultSets = [], array $stackOverrides = []): array
     {
         $takenStacks = collect($taken)->flatMap(fn ($r) => array_keys($r['stacks']))->all();
         $roles = [];
@@ -229,27 +322,31 @@ class MockInterviewCatalog
                     continue;
                 }
 
+                $parentSets = null;
                 $rounds = [];
 
-                $sitting = (int) ($stack['questions_per_interview'] ?? config('mock_interviews.questions_per_interview', 10));
+                if (! isset($stack['sets'])) {
+                    $parentSets = $this->buildParentSets($stackKey, $roleKey, $stack, $custom, $defaultSets, $stackOverrides);
+                    $rounds = $parentSets[0]['rounds'] ?? [];
+                } else {
+                    $sitting = (int) ($stack['questions_per_interview'] ?? config('mock_interviews.questions_per_interview', 10));
 
-                foreach ($this->extraRounds($stack) as $index => [$title, $description]) {
-                    $number = $index + 1;
-                    $questions = $custom[$stackKey][$number] ?? [];
+                    foreach ($this->extraRounds($stack) as $index => [$title, $description]) {
+                        $number = $index + 1;
+                        $questions = $custom[$stackKey][$number] ?? [];
 
-                    $rounds[] = [
-                        'id' => self::roundId($stackKey, $number),
-                        'round_number' => $number,
-                        'title' => $title,
-                        'description' => $description,
-                        // What the briefing page will say: the answer times of the questions one sitting asks, not a guess. The configured
-                        // number only stands in until a round has questions.
-                        'duration_minutes' => $questions === []
-                            ? (int) ($stack['duration_minutes'] ?? 15)
-                            : max(1, (int) ceil(array_sum(array_column($questions, 'duration_seconds')) / count($questions) * min(count($questions), $sitting) / 60)),
-                        'tags' => array_values(array_unique(array_merge([$stackKey, $roleKey, 'mock'], $stack['tags'] ?? []))),
-                        'questions' => $questions,
-                    ];
+                        $rounds[] = [
+                            'id' => self::roundId($stackKey, $number),
+                            'round_number' => $number,
+                            'title' => $title,
+                            'description' => $description,
+                            'duration_minutes' => $questions === []
+                                ? (int) ($stack['duration_minutes'] ?? 15)
+                                : max(1, (int) ceil(array_sum(array_column($questions, 'duration_seconds')) / count($questions) * min(count($questions), $sitting) / 60)),
+                            'tags' => array_values(array_unique(array_merge([$stackKey, $roleKey, 'mock'], $stack['tags'] ?? []))),
+                            'questions' => $questions,
+                        ];
+                    }
                 }
 
                 $stacks[$stackKey] = [
@@ -262,6 +359,7 @@ class MockInterviewCatalog
                     'discipline' => $stack['discipline'] ?? null,
                     'study_mode' => (bool) ($stack['study_mode'] ?? false),
                     'questions_per_interview' => isset($stack['questions_per_interview']) ? (int) $stack['questions_per_interview'] : null,
+                    'parent_sets' => $parentSets,
                     'rounds' => $rounds,
                 ];
             }
@@ -282,18 +380,22 @@ class MockInterviewCatalog
     }
 
     /**
-     * Staff-written questions by stack and round. A missing table (the migration has not run on this server yet) must not take the
-     * page down: it simply has no questions yet.
+     * Staff-written questions by stack, parent_set, and round.
      *
-     * @return array<string, array<int, list<array<string, mixed>>>>
+     * @return array<string, mixed>
      */
     private function questions(): array
     {
         try {
             $out = [];
 
-            foreach (MockInterviewQuestion::query()->orderBy('stack_key')->orderBy('round_number')->orderBy('position')->orderBy('id')->get() as $q) {
-                $out[$q->stack_key][$q->round_number][] = $q->toCatalog();
+            foreach (MockInterviewQuestion::query()->orderBy('stack_key')->orderBy('parent_set_number')->orderBy('round_number')->orderBy('position')->orderBy('id')->get() as $q) {
+                $setNum = (int) ($q->parent_set_number ?? 1);
+                $roundNum = (int) $q->round_number;
+                $out[$q->stack_key][$setNum][$roundNum][] = $q->toCatalog();
+                if ($setNum === 1) {
+                    $out[$q->stack_key][$roundNum][] = $q->toCatalog();
+                }
             }
 
             return $out;

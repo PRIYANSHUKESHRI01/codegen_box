@@ -35,6 +35,26 @@ export function OverviewTab({ h }: { h: HackathonDetail }) {
         </section>
       </Reveal>
 
+      {h.problem_statement && (
+        <Reveal y={14}>
+          <section aria-label="Official Problem Statement" className="ar-raised border border-indigo-500/25 bg-gradient-to-br from-[#0e1025] to-[#141432] p-5 sm:p-8">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.08] pb-3">
+              <span className="flex items-center gap-2 text-sm font-bold uppercase tracking-wider text-indigo-300">
+                <ScrollText className="h-4 w-4" /> Official Problem Statement
+              </span>
+              {h.is_reading_phase && (
+                <span className="rounded-full bg-amber-400/20 px-3 py-1 text-xs font-bold text-amber-200 ring-1 ring-amber-300/30">
+                  📖 {h.reading_time_minutes ?? 15}m Reading Phase Active
+                </span>
+              )}
+            </div>
+            <div className="dt-prose">
+              <ArenaMarkdown>{h.problem_statement}</ArenaMarkdown>
+            </div>
+          </section>
+        </Reveal>
+      )}
+
       {h.tracks.length > 0 && (
         <section aria-labelledby="tracks-heading">
           <SectionTitle icon={Layers} id="tracks-heading" title="Tracks" description="Pick one when you submit — judges compare projects within a track." />

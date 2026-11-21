@@ -192,6 +192,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [transcriptDraft, setTranscriptDraft] = useState("");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -222,6 +223,20 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Failed to reset interview session for re-attempt.");
       setReattempting(false);
+    }
+  };
+
+  const handleRetryScoring = async () => {
+    try {
+      const res = await api.post<InterviewResult>(`${basePath}/retry-scoring`, {});
+      setResult(res);
+      if (res.status === "scored") {
+        toast.success("Scoring completed successfully!");
+      } else {
+        toast.info("Scoring is currently processing. Your answers are safely recorded.");
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Scoring could not be completed right now. Please try again in a moment.");
     }
   };
 
@@ -496,6 +511,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     setTimedOut(false);
     setMicErrorMessage(null);
     setListenHint(null);
+    setIsTranscribing(false);
     setInterim({ text: "", committed: "" });
     signal.level = 0;
     setPhase("listening");
@@ -540,6 +556,28 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       setAudioUrl(URL.createObjectURL(blob));
     }
     setPhase("reviewing_answer");
+
+    // Real-time AI transcription fallback:
+    // If the browser SpeechRecognition dropped out on silence, was blocked by institutional firewalls,
+    // or returned empty while audio was voiced, immediately transcribe via Gemini Flash Audio!
+    if ((!transcript || transcript.trim().length < 5) && blob && blob.size > 1500) {
+      setIsTranscribing(true);
+      const fd = new FormData();
+      fd.append("audio", blob, "answer.webm");
+      api
+        .postFormData<{ transcript?: string }>("/interviews/transcribe", fd)
+        .then((res) => {
+          if (res?.transcript && res.transcript.trim()) {
+            setTranscriptDraft(res.transcript.trim());
+          }
+        })
+        .catch((err) => {
+          console.warn("[VoiceTranscription] Client fallback transcription error", err);
+        })
+        .finally(() => {
+          setIsTranscribing(false);
+        });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -566,7 +604,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const typingSecondsLeft = useCountdown(responseSeconds, phase === "text_fallback", () => handleTextFallbackContinue(true));
 
   const handleSubmitAnswer = async () => {
-    if (!question || !transcriptDraft.trim()) return;
+    if (!question || (!transcriptDraft.trim() && !audioBlob) || phase === "submitting" || isTranscribing) return;
     setPhase("submitting");
     setErrorMessage(null);
 
@@ -607,6 +645,63 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         presentQuestion(res.next_question);
       }
     } catch (err) {
+      const msg = err instanceof ApiError ? err.message : String(err ?? "");
+
+      // If the interview is already complete or no more questions remain, advance to complete
+      if (msg.toLowerCase().includes("already complete") || msg.toLowerCase().includes("no more questions")) {
+        if (interviewStartedAtRef.current > 0) {
+          setCompletionElapsedSeconds(Math.round((Date.now() - interviewStartedAtRef.current) / 1000));
+        }
+        proctoring.endSession();
+        setPhase("complete");
+        return;
+      }
+
+      // If network upload with large audio blob failed, retry once with text-only payload so student's answer is not lost!
+      if (audioBlob) {
+        try {
+          const fallbackData = new FormData();
+          fallbackData.append("interview_question_id", String(question.interview_question_id));
+          fallbackData.append("transcript_text", transcriptDraft.trim());
+          const fallbackRes = await api.postFormData<AnswerInterviewResponse>(`${basePath}/answer`, fallbackData);
+
+          if (fallbackRes.feedback) {
+            setFeedback(fallbackRes.feedback);
+            setPendingNext(fallbackRes.complete ? null : (fallbackRes.next_question ?? null));
+            setPhase("feedback");
+            return;
+          }
+
+          setAnsweredCount((c) => c + 1);
+          setAnswered((list) => [
+            ...list,
+            { id: question.interview_question_id, text: question.question_text, category: question.category, difficulty: question.difficulty, answer: transcriptDraft.trim() },
+          ]);
+
+          if (fallbackRes.complete || !fallbackRes.next_question) {
+            if (interviewStartedAtRef.current > 0) {
+              setCompletionElapsedSeconds(Math.round((Date.now() - interviewStartedAtRef.current) / 1000));
+            }
+            proctoring.endSession();
+            setPhase("complete");
+            return;
+          } else {
+            presentQuestion(fallbackRes.next_question);
+            return;
+          }
+        } catch (fallbackErr) {
+          const fallbackMsg = fallbackErr instanceof ApiError ? fallbackErr.message : String(fallbackErr ?? "");
+          if (fallbackMsg.toLowerCase().includes("already complete") || fallbackMsg.toLowerCase().includes("no more questions")) {
+            if (interviewStartedAtRef.current > 0) {
+              setCompletionElapsedSeconds(Math.round((Date.now() - interviewStartedAtRef.current) / 1000));
+            }
+            proctoring.endSession();
+            setPhase("complete");
+            return;
+          }
+        }
+      }
+
       setErrorMessage(err instanceof ApiError ? err.message : "Failed to submit your answer. Try again.");
       setPhase("reviewing_answer");
     }
@@ -742,6 +837,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
               onSubmit={handleSubmitAnswer}
               disabled={phase === "submitting"}
               audioUrl={audioUrl}
+              isTranscribing={isTranscribing}
             />
           ),
         });
@@ -888,8 +984,18 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
               <RotateCcw className="h-4 w-4" aria-hidden />
               Re-record
             </motion.button>
-            <motion.button whileTap={{ scale: 0.96 }} onClick={handleSubmitAnswer} disabled={phase === "submitting" || !transcriptDraft.trim()} className={PRIMARY_BUTTON}>
-              {phase === "submitting" ? (
+            <motion.button
+              whileTap={{ scale: 0.96 }}
+              onClick={handleSubmitAnswer}
+              disabled={phase === "submitting" || isTranscribing || (!transcriptDraft.trim() && !audioBlob)}
+              className={PRIMARY_BUTTON}
+            >
+              {isTranscribing ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Transcribing...
+                </>
+              ) : phase === "submitting" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                   Submitting...
@@ -1057,6 +1163,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
                     elapsedSeconds={completionElapsedSeconds}
                     reattempting={reattempting}
                     onReattempt={handleReattempt}
+                    onRetryScoring={handleRetryScoring}
                     onBack={() => router.push(home)}
                   />
                 )}

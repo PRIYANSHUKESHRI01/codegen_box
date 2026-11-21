@@ -34,10 +34,31 @@ class SuperAdminVaultAiController extends Controller
 
     public function reset(Request $request, User $user, string $stackKey): JsonResponse
     {
-        $validated = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:300']]);
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:300'],
+            'mode' => ['nullable', 'string', 'in:full_reset,single_attempt,retry_attempt'],
+            'attempt' => ['nullable', 'integer', 'min:1', 'max:3'],
+        ]);
         $this->knownStack($stackKey);
 
-        $this->admin->reset($this->student($user), $stackKey, $request->user(), $validated['reason']);
+        $mode = $validated['mode'] ?? 'full_reset';
+        $attempt = isset($validated['attempt']) ? (int) $validated['attempt'] : null;
+
+        $this->admin->resetOrGrant($this->student($user), $stackKey, $request->user(), $validated['reason'], $mode, $attempt);
+
+        return response()->json($this->payload($user->fresh()));
+    }
+
+    public function grantAttempt(Request $request, User $user, string $stackKey): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:300'],
+            'attempt' => ['nullable', 'integer', 'min:1', 'max:3'],
+        ]);
+        $this->knownStack($stackKey);
+
+        $attempt = isset($validated['attempt']) ? (int) $validated['attempt'] : null;
+        $this->admin->reopenAttempt($this->student($user), $stackKey, $request->user(), $validated['reason'], $attempt);
 
         return response()->json($this->payload($user->fresh()));
     }

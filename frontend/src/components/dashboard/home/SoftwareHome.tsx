@@ -138,6 +138,11 @@ export function SoftwareHome({ layout = "software", coreHome = null }: { layout?
         <MellowVaultInterviewBanner />
       )}
 
+      {/* 2b. Hack Arena: live countdown timer, 15m reading phase & local laptop build command center */}
+      {caps.hackathons && (
+        <HackArenaBanner />
+      )}
+
       {/* 3. How am I doing - a handful of numbers, each leading to the page that owns it. */}
       <OverviewStats stats={statTiles} />
 
@@ -161,11 +166,6 @@ export function SoftwareHome({ layout = "software", coreHome = null }: { layout?
           )}
         </div>
       </div>
-
-      {/* 5. The Hack Arena is its own full-screen world, so it is entered from here rather than from the sidebar. */}
-      {caps.hackathons && (
-        <HackArenaBanner />
-      )}
 
       {/* 6. Where everything else lives: one card per sidebar section, each with a button. */}
       <ExploreGrid tiles={tiles} hints={hints} />

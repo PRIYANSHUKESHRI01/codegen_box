@@ -1,43 +1,52 @@
 "use client";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRight,
   BarChart3,
-  Building2,
   CheckCircle2,
-  Clock,
+  Code2,
   FileBarChart,
-  Filter,
   Gauge,
-  Hourglass,
-  IndianRupee,
+  GraduationCap,
+  Layers,
+  Mail,
+  Phone,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
   Target,
-  TrendingDown,
-  TrendingUp,
   Trophy,
-  UserPlus,
-  AlertTriangle,
+  UserCheck,
+  Users2,
+  UserX,
   type LucideIcon,
+  Flame,
+  AlertTriangle,
+  CircuitBoard,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BarChart } from "@/components/dashboard/tpo/BarChart";
 import { CoreHeatmapCard } from "@/components/dashboard/tpo/CoreHeatmapCard";
 import { cn } from "@/lib/utils";
-import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
 import { api, ApiError } from "@/lib/api";
 import { branchGroupKey, branchShortLabel, useBranchCatalog } from "@/lib/branches";
-import { TpoReportsData } from "@/lib/generateTpoReports";
+import type { TpoReportsData, TpoReportStudent } from "@/lib/generateTpoReports";
+import { computeSectionStats, type SectionCoordinatorInfo } from "@/lib/sectionBreakdown";
+import { rollupLanguages } from "@/lib/cohortInsights";
+import { languageLabel } from "@/lib/judgeLanguages";
+import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
 import {
+  HpAvatar,
+  HpButton,
   HpCard,
   HpCompanyLogo,
   HpEmptyState,
-  HpFunnel,
   HpIconTile,
   HpItem,
   HpPill,
@@ -50,38 +59,34 @@ import {
   hpBtn,
   hpEase,
   hpTh,
+  type HpTone,
 } from "@/components/portal/kit";
 import { HpErrorCard } from "@/components/portal/pipeline-kit";
 
 /**
- * Chart hues. Two-series pairs are indigo-500 / teal-600 (the same pair the
- * Hiring Reports page ships), validated for colour-vision separation and ≥3:1
- * contrast on the card surface in both themes. Single-series magnitude uses
- * sky-600, the TPO portal's identity hue. Amber/rose stay reserved for risk.
+ * Chart hues for dual-series readiness & practice comparison.
+ * Indigo: Readiness Index (0-100)
+ * Teal: 7-day Practice Consistency (0-100)
  */
 const SERIES_READINESS = "#6366F1";
 const SERIES_PRACTICE = "#0D9488";
-const SERIES_PACKAGES = "#0284C7";
-
-/** Action-item type → glyph (types come from PlacementReportService::actionItems on the backend). */
-const ACTION_ICON: Record<string, LucideIcon> = {
-  stale_applications: Clock,
-  pending_offers: Hourglass,
-  unregistered_eligible: UserPlus,
-};
-
-const pctOf = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
-
-/** "60.00" → "60", "62.50" → "62.5" — the target arrives as a decimal string. */
-const fmtNum = (v: number) => String(Math.round(v * 10) / 10);
 
 type BranchReadinessRow = { branch: string; avgReadiness: number; avgPractice: number };
+
+function readinessTone(score: number): HpTone {
+  return score >= 75 ? "emerald" : score >= 45 ? "sky" : "amber";
+}
+
+function scopeLabel(section: string): string {
+  return section === "Unassigned" ? "No Section" : `Section ${section}`;
+}
 
 export default function ReadinessAnalyticsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
   const catalog = useBranchCatalog();
   const { scope: deptScope } = useDepartmentScope();
   const [data, setData] = useState<TpoReportsData | null>(null);
+  const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -89,10 +94,14 @@ export default function ReadinessAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.get<TpoReportsData>(deptScope === "ALL" ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`);
-      setData(res);
+      const [reportsRes, coordinatorsRes] = await Promise.all([
+        api.get<TpoReportsData>(deptScope === "ALL" ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`),
+        api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
+      ]);
+      setData(reportsRes);
+      setCoordinators(coordinatorsRes.coordinators ?? []);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load analytics.");
+      setError(err instanceof ApiError ? err.message : "Failed to load readiness analytics.");
     } finally {
       setLoading(false);
     }
@@ -103,17 +112,12 @@ export default function ReadinessAnalyticsPage() {
   }, [status, load]);
 
   if (status !== "ready") {
-    return (
-      <SessionLoader />
-    );
+    return <SessionLoader />;
   }
 
-  // Real branch-wise readiness, computed client-side from the already-real
-  // per-student readiness_score/practice_score (User::readinessScore()) —
-  // replaces the previously-fictional avgDsaScore/avgSpeedScore mock.
-  const branchReadiness = (() => {
+  // Branch-wise readiness aggregated client-side from real student readiness/practice scores
+  const branchReadiness: BranchReadinessRow[] = (() => {
     if (!data) return [];
-    // "Mechanical", "MECH" and "ME" are one branch: group by what it means, label with the short name.
     const groups = new Map<string, { label: string; readiness: number[]; practice: number[] }>();
     for (const s of data.students) {
       const key = branchGroupKey(s);
@@ -130,28 +134,28 @@ export default function ReadinessAnalyticsPage() {
     }));
   })();
 
-  const placements = data?.placements;
+  const sectionStats = data ? computeSectionStats(data.students, coordinators) : [];
 
   return (
     <DashboardShell
       role="admin_tpo"
       currentTpoView="tpo"
       title="Readiness Analytics"
-      subtitle="Real branch-wise readiness, package distribution, and placement trends — derived from your actual cohort and recorded outcomes."
+      subtitle="Comprehensive diagnostic intelligence on student placement readiness, coding practice consistency, skill tiers, and branch-level benchmarks."
     >
       {error && <HpErrorCard message={error} onRetry={load} />}
 
       {loading ? (
-        <AnalyticsSkeleton />
-      ) : data && placements ? (
-        <AnalyticsBody data={data} branchReadiness={branchReadiness} />
+        <ReadinessSkeleton />
+      ) : data ? (
+        <ReadinessBody data={data} branchReadiness={branchReadiness} sectionStats={sectionStats} />
       ) : (
         !error && (
           <HpEmptyState
-            icon={BarChart3}
-            tone="sky"
-            title="No data available"
-            description="Analytics appear here once your cohort and placement pipeline have records."
+            icon={Gauge}
+            tone="indigo"
+            title="No cohort data available"
+            description="Readiness analytics appear here once students are enrolled in your batch."
           />
         )
       )}
@@ -161,47 +165,58 @@ export default function ReadinessAnalyticsPage() {
 
 /* ── Body ───────────────────────────────────────────────────────────────── */
 
-function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branchReadiness: BranchReadinessRow[] }) {
-  const placements = data.placements;
-  const f = placements.funnel;
-  const target = placements.target;
+function ReadinessBody({
+  data,
+  branchReadiness,
+  sectionStats,
+}: {
+  data: TpoReportsData;
+  branchReadiness: BranchReadinessRow[];
+  sectionStats: ReturnType<typeof computeSectionStats>;
+}) {
+  const students = data.students;
+  const totalStudents = students.length;
 
+  // Readiness Metrics
   const avgReadiness =
-    branchReadiness.length > 0 ? Math.round(branchReadiness.reduce((s, b) => s + b.avgReadiness, 0) / branchReadiness.length) : 0;
-  const targetPct = target.target_percent ? Number(target.target_percent) : null;
-  const currentPct = target.current_percent;
-  const gapToTarget = targetPct !== null ? Math.max(0, targetPct - currentPct) : null;
+    totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.readiness_score, 0) / totalStudents) : 0;
+  const avgPractice =
+    totalStudents > 0 ? Math.round(students.reduce((sum, s) => sum + s.practice_score, 0) / totalStudents) : 0;
 
-  const funnelSteps: [string, number][] = [
-    ["Enrolled", f.batch_enrolled],
-    ["Registered", f.registered],
-    ["Shortlisted", f.shortlisted],
-    ["Interviewed", f.interviewed],
-    ["Offered", f.offered],
-    ["Accepted", f.accepted],
-  ];
+  // Tier distributions
+  const readyStudents = students.filter((s) => s.readiness_score >= 75);
+  const inProgressStudents = students.filter((s) => s.readiness_score >= 45 && s.readiness_score < 75);
+  const needsTrainingStudents = students.filter((s) => s.readiness_score < 45);
 
-  // Derived (not fabricated) — the weakest stage-to-stage carry-through of the real funnel counts.
-  const dropOff = funnelSteps.slice(1).reduce<{ from: string; to: string; rate: number } | null>((worst, [label, value], i) => {
-    const [prevLabel, prev] = funnelSteps[i];
-    if (prev <= 0) return worst;
-    const rate = pctOf(value, prev);
-    return worst === null || rate < worst.rate ? { from: prevLabel, to: label, rate } : worst;
-  }, null);
+  const readyPct = totalStudents > 0 ? Math.round((readyStudents.length / totalStudents) * 100) : 0;
+  const inProgressPct = totalStudents > 0 ? Math.round((inProgressStudents.length / totalStudents) * 100) : 0;
+  const needsTrainingPct = totalStudents > 0 ? Math.round((needsTrainingStudents.length / totalStudents) * 100) : 0;
 
-  // Straight sums of the real per-branch rows, for the card's overall line.
-  const trendApplications = placements.branch_trend.reduce((s, r) => s + r.applications, 0);
-  const trendAccepted = placements.branch_trend.reduce((s, r) => s + r.offers_accepted, 0);
+  // Practice & engagement
+  const activeWeekStudents = students.filter((s) => s.activity?.engagement === "active");
+  const activeWeekPct = totalStudents > 0 ? Math.round((activeWeekStudents.length / totalStudents) * 100) : 0;
 
-  const totalOffers = placements.package_distribution.reduce((s, b) => s + b.count, 0);
-  const peakBracket = placements.package_distribution.reduce<{ bracket: string; count: number } | null>(
-    (best, b) => (b.count > 0 && (best === null || b.count > best.count) ? b : best),
-    null
-  );
+  const cgpas = students.filter((s) => s.cgpa !== null).map((s) => Number(s.cgpa));
+  const avgCgpa = cgpas.length ? cgpas.reduce((a, b) => a + b, 0) / cgpas.length : null;
+
+  const totalSolved = students.reduce((sum, s) => sum + (s.solved?.total ?? 0), 0);
+  const avgSolved = totalStudents > 0 ? Math.round(totalSolved / totalStudents) : 0;
+
+  // Coding languages
+  const languageRollup = useMemo(() => rollupLanguages(students), [students]);
+
+  // Solved tiers
+  const solved50Plus = students.filter((s) => (s.solved?.total ?? 0) >= 50).length;
+  const solved20To49 = students.filter((s) => (s.solved?.total ?? 0) >= 20 && (s.solved?.total ?? 0) < 50).length;
+  const solved1To19 = students.filter((s) => (s.solved?.total ?? 0) >= 1 && (s.solved?.total ?? 0) < 20).length;
+  const solvedZero = students.filter((s) => (s.solved?.total ?? 0) === 0).length;
+
+  // At-risk cohort (low readiness or inactive with backlogs)
+  const atRiskStudents = students.filter((s) => s.readiness_score < 45 || (s.backlogs ?? 0) > 0);
 
   return (
     <HpStagger className="space-y-6">
-      {/* Context */}
+      {/* College Context Header Card */}
       <HpItem>
         <HpCard spotlight={false} className="relative overflow-hidden p-4 sm:p-5">
           <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_160%_at_0%_0%,rgb(var(--hp-id)/0.10),transparent_60%),radial-gradient(50%_160%_at_100%_0%,rgba(99,102,241,0.10),transparent_60%)]" />
@@ -218,12 +233,13 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
                   )}
                 </div>
                 <div className="tabular mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-text-muted">
-                  <HpPill tone="sky" size="sm" dot>
-                    Live cohort data
+                  <HpPill tone="indigo" size="sm" dot>
+                    Diagnostic Readiness Intelligence
                   </HpPill>
                   <span>
-                    {data.students.length} {data.students.length === 1 ? "student" : "students"} · {branchReadiness.length}{" "}
-                    {branchReadiness.length === 1 ? "branch" : "branches"} · {data.drives.length} mapped {data.drives.length === 1 ? "drive" : "drives"}
+                    {totalStudents} {totalStudents === 1 ? "student" : "students"} · {branchReadiness.length}{" "}
+                    {branchReadiness.length === 1 ? "branch" : "branches"} · {sectionStats.length}{" "}
+                    {sectionStats.length === 1 ? "section" : "sections"}
                   </span>
                 </div>
               </div>
@@ -231,122 +247,170 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
             <Link href="/admin/reports" className={hpBtn("secondary", "sm", "h-9 shrink-0 self-start px-4 sm:self-auto")}>
               <FileBarChart className="h-4 w-4" />
               Placement Reports
+              <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </HpCard>
       </HpItem>
 
-      {/* Headline numbers */}
+      {/* Headline Readiness Metrics */}
       <HpItem>
-        <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <HpStatCard
             label="Avg Readiness"
             value={avgReadiness}
             icon={Gauge}
             tone="indigo"
-            hint={`out of 100 · ${branchReadiness.length} ${branchReadiness.length === 1 ? "branch" : "branches"}`}
+            hint="out of 100 · batch-wide index"
           />
           <HpStatCard
-            label="Companies Hired"
-            value={placements.company_summary.length}
-            icon={Building2}
-            tone="sky"
-            hint="with an accepted offer"
-          />
-          <HpStatCard
-            label="Offers Accepted"
-            value={f.accepted}
-            icon={Trophy}
+            label="Placement Ready"
+            value={readyStudents.length}
+            icon={CheckCircle2}
             tone="emerald"
-            hint={`of ${f.offered} ${f.offered === 1 ? "offer" : "offers"} extended`}
+            hint={`${readyPct}% of cohort (Score ≥ 75)`}
           />
           <HpStatCard
-            label="Placement Rate"
-            value={currentPct}
-            suffix="%"
-            decimals={Number.isInteger(currentPct) ? 0 : 1}
+            label="In Progress"
+            value={inProgressStudents.length}
             icon={Target}
-            tone="violet"
-            hint={
-              targetPct !== null
-                ? gapToTarget && gapToTarget > 0
-                  ? `Target ${fmtNum(targetPct)}% · ${fmtNum(gapToTarget)} pts to go`
-                  : `Target ${fmtNum(targetPct)}% · reached`
-                : "No target set"
+            tone="sky"
+            hint={`${inProgressPct}% of cohort (Score 45–74)`}
+          />
+          <HpStatCard
+            label="Needs Training"
+            value={needsTrainingStudents.length}
+            icon={AlertTriangle}
+            tone="amber"
+            hint={`${needsTrainingPct}% of cohort (Score < 45)`}
+          />
+          <HpStatCard
+            label="Active Practicing"
+            value={activeWeekStudents.length}
+            icon={Flame}
+            tone="teal"
+            hint={`${activeWeekPct}% solved in last 7 days`}
+          />
+        </div>
+      </HpItem>
+
+      {/* Readiness Tier Spectrum & Core Diagnostic Pillars */}
+      <HpItem>
+        <HpCard className="p-5 sm:p-6">
+          <HpSectionHeader
+            title="Readiness Tier Spectrum & Competency Pillars"
+            subtitle="Batch distribution across readiness thresholds and core preparation indicators"
+            icon={Layers}
+            tone="indigo"
+            action={
+              <HpPill tone="indigo" size="sm" className="hidden sm:inline-flex">
+                <span className="tabular">{avgReadiness}/100 Batch Index</span>
+              </HpPill>
             }
           />
-        </div>
-      </HpItem>
 
-      {/* Funnel + attention */}
-      <HpItem>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <HpCard className="p-5 sm:p-6 xl:col-span-2">
-            <HpSectionHeader
-              title="Placement Funnel"
-              subtitle="Every stage counts each student who reached it"
-              icon={Filter}
-              tone="indigo"
-              action={
-                f.batch_enrolled > 0 ? (
-                  <HpPill tone="indigo" size="sm" className="hidden sm:inline-flex">
-                    <span className="tabular">{fmtNum((f.accepted / f.batch_enrolled) * 100)}% enrolled → placed</span>
-                  </HpPill>
-                ) : undefined
-              }
-            />
-            {f.batch_enrolled === 0 ? (
-              <InlineEmpty icon={Filter} title="No students enrolled yet" description="The funnel fills in as your batch is imported and registered for drives." />
-            ) : (
-              <div className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_14rem]">
-                <HpFunnel stages={funnelSteps.map(([label, value]) => ({ label, value, tone: "indigo" as const }))} />
-                <div className="grid grid-cols-1 gap-3 border-t border-border-subtle pt-5 sm:grid-cols-2 sm:items-center xl:flex xl:flex-col xl:items-stretch xl:border-l xl:border-t-0 xl:pl-6 xl:pt-0">
-                  <div className="flex items-center gap-4 xl:flex-col xl:items-start">
-                    <TargetRing value={currentPct} target={targetPct} />
-                    <div>
-                      <div className="text-xs font-bold text-primary">Placement vs target</div>
-                      <p className="tabular mt-0.5 text-2xs leading-relaxed text-text-muted">
-                        {targetPct !== null ? (
-                          <>
-                            Target {fmtNum(targetPct)}%
-                            {target.target_deadline &&
-                              ` by ${new Date(target.target_deadline).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`}
-                            .
-                          </>
-                        ) : (
-                          "No placement target set for this season."
-                        )}
-                      </p>
-                    </div>
-                  </div>
-                  {dropOff && dropOff.rate < 100 && (
-                    <div className="rounded-2xl bg-elevated/60 p-3 ring-1 ring-inset ring-border-subtle">
-                      <div className="flex items-center gap-1.5 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
-                        <TrendingDown className="h-3.5 w-3.5 text-amber-700 dark:text-amber-300" aria-hidden />
-                        Biggest drop-off
-                      </div>
-                      <div className="mt-1 text-xs font-bold text-primary">
-                        {dropOff.from} → {dropOff.to}
-                      </div>
-                      <div className="tabular text-2xs text-text-muted">{dropOff.rate}% carried through</div>
-                    </div>
-                  )}
-                </div>
+          {/* Tri-color Stacked Progress Bar */}
+          <div className="mt-6 space-y-3">
+            <div className="flex h-3.5 w-full overflow-hidden rounded-full bg-elevated ring-1 ring-inset ring-border-subtle">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${readyPct}%` }}
+                transition={{ duration: 0.8, ease: hpEase }}
+                className="bg-emerald-500 transition-all"
+                title={`Placement Ready: ${readyStudents.length} (${readyPct}%)`}
+              />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${inProgressPct}%` }}
+                transition={{ duration: 0.8, ease: hpEase, delay: 0.1 }}
+                className="bg-sky-500 transition-all"
+                title={`In Progress: ${inProgressStudents.length} (${inProgressPct}%)`}
+              />
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${needsTrainingPct}%` }}
+                transition={{ duration: 0.8, ease: hpEase, delay: 0.2 }}
+                className="bg-amber-500 transition-all"
+                title={`Needs Training: ${needsTrainingStudents.length} (${needsTrainingPct}%)`}
+              />
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs font-semibold">
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                <span className="text-primary">Placement Ready (75–100):</span>
+                <span className="tabular text-text-muted">{readyStudents.length} ({readyPct}%)</span>
               </div>
-            )}
-          </HpCard>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-sky-500" />
+                <span className="text-primary">In Progress (45–74):</span>
+                <span className="tabular text-text-muted">{inProgressStudents.length} ({inProgressPct}%)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500" />
+                <span className="text-primary">Needs Training (&lt;45):</span>
+                <span className="tabular text-text-muted">{needsTrainingStudents.length} ({needsTrainingPct}%)</span>
+              </div>
+            </div>
+          </div>
 
-          <AttentionCard items={placements.action_items} />
-        </div>
+          {/* 4 Pillar Mini Cards */}
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 border-t border-border-subtle pt-6">
+            <div className="rounded-2xl bg-elevated/40 p-4 ring-1 ring-inset ring-border-subtle">
+              <div className="flex items-center gap-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                <Code2 className="h-3.5 w-3.5 text-indigo-500" />
+                Coding Velocity
+              </div>
+              <div className="mt-2 text-xl font-extrabold text-primary">
+                {avgSolved} <span className="text-xs font-medium text-text-muted">problems / student</span>
+              </div>
+              <p className="mt-1 text-2xs text-text-muted">{totalSolved.toLocaleString()} total solutions accepted</p>
+            </div>
+
+            <div className="rounded-2xl bg-elevated/40 p-4 ring-1 ring-inset ring-border-subtle">
+              <div className="flex items-center gap-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                <Flame className="h-3.5 w-3.5 text-teal-500" />
+                Practice Consistency
+              </div>
+              <div className="mt-2 text-xl font-extrabold text-primary">
+                {avgPractice} <span className="text-xs font-medium text-text-muted">/ 100</span>
+              </div>
+              <p className="mt-1 text-2xs text-text-muted">7-day continuous activity tracking</p>
+            </div>
+
+            <div className="rounded-2xl bg-elevated/40 p-4 ring-1 ring-inset ring-border-subtle">
+              <div className="flex items-center gap-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                <GraduationCap className="h-3.5 w-3.5 text-sky-500" />
+                Academic Baseline
+              </div>
+              <div className="mt-2 text-xl font-extrabold text-primary">
+                {avgCgpa !== null ? avgCgpa.toFixed(2) : "—"} <span className="text-xs font-medium text-text-muted">CGPA</span>
+              </div>
+              <p className="mt-1 text-2xs text-text-muted">Verified college transcript standing</p>
+            </div>
+
+            <div className="rounded-2xl bg-elevated/40 p-4 ring-1 ring-inset ring-border-subtle">
+              <div className="flex items-center gap-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
+                <CircuitBoard className="h-3.5 w-3.5 text-violet-500" />
+                Core Engineering
+              </div>
+              <div className="mt-2 text-xl font-extrabold text-primary">
+                {students.filter((s) => !!s.core).length} <span className="text-xs font-medium text-text-muted">students</span>
+              </div>
+              <p className="mt-1 text-2xs text-text-muted">Active in Core Domain prep</p>
+            </div>
+          </div>
+        </HpCard>
       </HpItem>
 
-      {/* Branch readiness */}
+      {/* Branch-wise Readiness Benchmark (Dual BarChart + Ranked Table) */}
       {branchReadiness.length > 0 && (
         <HpItem>
           <HpCard className="p-5 sm:p-6">
             <HpSectionHeader
-              title="Branch-wise Readiness"
-              subtitle="Average readiness and 7-day practice consistency per branch, out of 100"
+              title="Branch-wise Readiness Benchmarks"
+              subtitle="Comparison of average readiness score and 7-day practice consistency by academic branch"
               icon={BarChart3}
               tone="indigo"
               action={
@@ -375,171 +439,296 @@ function AnalyticsBody({ data, branchReadiness }: { data: TpoReportsData; branch
         </HpItem>
       )}
 
-      {/* Placement rate + packages */}
+      {/* Coding Competency & Programming Languages */}
       <HpItem>
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Programming Languages */}
           <HpCard className="flex flex-col p-5 sm:p-6">
-            <HpSectionHeader title="Branch Placement Rate" subtitle="Accepted offers per application, by branch and year" icon={TrendingUp} tone="emerald" />
-            {placements.branch_trend.length === 0 ? (
+            <HpSectionHeader
+              title="Programming Language Adoption"
+              subtitle="Primary language distribution and coding engagement across the cohort"
+              icon={Code2}
+              tone="indigo"
+              action={
+                languageRollup.length > 0 ? (
+                  <HpPill tone="indigo" size="sm">
+                    <span className="tabular">{languageRollup.length} languages</span>
+                  </HpPill>
+                ) : undefined
+              }
+            />
+            {languageRollup.length === 0 ? (
               <InlineEmpty
-                icon={TrendingUp}
-                tone="emerald"
-                title="No placement outcomes yet"
-                description="No placement outcomes recorded yet this season — this fills in as offers are accepted."
+                icon={Code2}
+                title="No code submitted yet"
+                description="Languages appear as students write and submit problem solutions."
               />
             ) : (
-              <ul className="mt-6 space-y-4">
-                {placements.branch_trend.map((row) => (
-                  <li key={`${row.year}-${row.branch}`}>
-                    <div className="mb-1.5 flex items-baseline justify-between gap-3">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-xs font-semibold text-primary">{row.branch}</span>
-                        <HpPill tone="slate" size="sm">
-                          <span className="tabular">{row.year}</span>
-                        </HpPill>
-                      </span>
-                      <span className="flex shrink-0 items-baseline gap-2">
-                        <span className="tabular text-3xs font-semibold text-text-muted">
-                          {row.offers_accepted} of {row.applications}
+              <div className="mt-6 space-y-4">
+                {languageRollup.slice(0, 6).map((lang) => {
+                  const pct = totalStudents > 0 ? Math.round((lang.students / totalStudents) * 100) : 0;
+                  return (
+                    <div key={lang.language} className="space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-primary">{languageLabel(lang.language)}</span>
+                        <span className="tabular text-text-muted">
+                          {lang.students} students ({pct}%)
                         </span>
-                        <span className="tabular text-sm font-extrabold text-primary">{row.placement_rate}%</span>
-                      </span>
+                      </div>
+                      <HpProgress value={pct} tone="indigo" className="h-2" />
                     </div>
-                    <HpProgress value={row.placement_rate} tone="emerald" className="h-2" />
-                  </li>
-                ))}
-              </ul>
-            )}
-            {trendApplications > 0 && (
-              <div className="mt-auto pt-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4 text-2xs text-text-muted">
-                  <span className="tabular">
-                    <span className="font-bold text-primary">{trendAccepted}</span> of {trendApplications}{" "}
-                    {trendApplications === 1 ? "application" : "applications"} placed
-                  </span>
-                  <span className="tabular">
-                    Overall <span className="font-semibold text-text-secondary">{pctOf(trendAccepted, trendApplications)}%</span>
-                  </span>
-                </div>
+                  );
+                })}
               </div>
             )}
           </HpCard>
 
+          {/* Problem Solving Depth */}
           <HpCard className="flex flex-col p-5 sm:p-6">
             <HpSectionHeader
-              title="Package Distribution"
-              subtitle="Accepted offers by CTC bracket"
-              icon={IndianRupee}
-              tone="sky"
-              action={
-                totalOffers > 0 ? (
-                  <span className="tabular text-2xs font-semibold text-text-muted">
-                    {totalOffers} {totalOffers === 1 ? "offer" : "offers"}
-                  </span>
-                ) : undefined
-              }
+              title="Problem Solving Volume Tiers"
+              subtitle="Student distribution across solved problem volume milestones"
+              icon={Trophy}
+              tone="teal"
             />
-            {placements.package_distribution.every((b) => b.count === 0) ? (
-              <InlineEmpty icon={IndianRupee} title="No accepted offers yet" description="No accepted offers recorded yet." />
-            ) : (
-              <>
-                <div className="mt-8">
-                  <BarChart
-                    variant="premium"
-                    ariaLabel="Accepted offers by CTC bracket"
-                    categories={placements.package_distribution.map((b) => b.bracket)}
-                    series={[{ label: "Students", color: SERIES_PACKAGES, values: placements.package_distribution.map((b) => b.count) }]}
-                    suffix=""
-                    height={180}
-                    maxValue={Math.max(4, Math.ceil(Math.max(...placements.package_distribution.map((b) => b.count)) / 2) * 2)}
-                  />
+            <div className="mt-6 space-y-4">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-primary">50+ Problems (Advanced Practice)</span>
+                  <span className="tabular text-text-muted">
+                    {solved50Plus} students ({totalStudents > 0 ? Math.round((solved50Plus / totalStudents) * 100) : 0}%)
+                  </span>
                 </div>
-                <div className="mt-auto pt-5">
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border-subtle pt-4 text-2xs text-text-muted">
-                    <span className="tabular">
-                      <span className="font-bold text-primary">{totalOffers}</span> total accepted {totalOffers === 1 ? "offer" : "offers"}
-                    </span>
-                    {peakBracket && (
-                      <span className="tabular">
-                        Most common: <span className="font-semibold text-text-secondary">{peakBracket.bracket}</span>
-                      </span>
-                    )}
-                  </div>
+                <HpProgress
+                  value={totalStudents > 0 ? Math.round((solved50Plus / totalStudents) * 100) : 0}
+                  tone="emerald"
+                  className="h-2"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-primary">20 – 49 Problems (Consistent)</span>
+                  <span className="tabular text-text-muted">
+                    {solved20To49} students ({totalStudents > 0 ? Math.round((solved20To49 / totalStudents) * 100) : 0}%)
+                  </span>
                 </div>
-              </>
-            )}
+                <HpProgress
+                  value={totalStudents > 0 ? Math.round((solved20To49 / totalStudents) * 100) : 0}
+                  tone="sky"
+                  className="h-2"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-primary">1 – 19 Problems (Started)</span>
+                  <span className="tabular text-text-muted">
+                    {solved1To19} students ({totalStudents > 0 ? Math.round((solved1To19 / totalStudents) * 100) : 0}%)
+                  </span>
+                </div>
+                <HpProgress
+                  value={totalStudents > 0 ? Math.round((solved1To19 / totalStudents) * 100) : 0}
+                  tone="indigo"
+                  className="h-2"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-primary">0 Problems (Not Started)</span>
+                  <span className="tabular text-text-muted">
+                    {solvedZero} students ({totalStudents > 0 ? Math.round((solvedZero / totalStudents) * 100) : 0}%)
+                  </span>
+                </div>
+                <HpProgress
+                  value={totalStudents > 0 ? Math.round((solvedZero / totalStudents) * 100) : 0}
+                  tone="amber"
+                  className="h-2"
+                />
+              </div>
+            </div>
           </HpCard>
         </div>
       </HpItem>
 
-      {/* Core Prep, by branch and subject — renders nothing unless this college has students in a live core branch. */}
+      {/* Section Readiness & Coordinator Benchmarks */}
+      {sectionStats.length > 0 && (
+        <HpItem>
+          <HpCard spotlight={false} className="p-5 sm:p-6">
+            <HpSectionHeader
+              title="Section Performance & Coordinator Matrix"
+              subtitle="Ranked by average readiness score · identifies sections requiring mentor intervention"
+              icon={Users2}
+              tone="sky"
+              action={
+                <span className="tabular text-2xs font-semibold text-text-muted">
+                  {sectionStats.length} {sectionStats.length === 1 ? "section" : "sections"}
+                </span>
+              }
+            />
+            <div className="mt-5 hidden grid-cols-[minmax(0,1fr)_15rem] gap-4 px-3 pb-2 text-3xs font-bold uppercase tracking-[0.08em] text-text-muted lg:grid">
+              <div className="grid grid-cols-[2rem_9rem_minmax(0,1fr)_5.5rem] gap-4">
+                <span>#</span>
+                <span>Section</span>
+                <span>Avg readiness</span>
+                <span className="text-right">Avg CGPA</span>
+              </div>
+              <span>Coordinator</span>
+            </div>
+            <ul className="mt-3 space-y-2 lg:mt-0">
+              {sectionStats.map((s, i) => (
+                <li
+                  key={s.section}
+                  className="flex flex-col gap-3 rounded-2xl border border-border-subtle bg-elevated/30 p-3 transition-all duration-200 hover:border-indigo-500/25 hover:bg-elevated/60 lg:grid lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-center lg:gap-4"
+                >
+                  <div className="flex w-full min-w-0 items-center gap-x-4 gap-y-2.5 lg:grid lg:grid-cols-[2rem_9rem_minmax(0,1fr)_5.5rem]">
+                    <span
+                      className={cn(
+                        "tabular inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] text-3xs font-extrabold ring-1 ring-inset transition-colors",
+                        i === 0
+                          ? "bg-sky-500/10 text-sky-700 ring-sky-500/20 dark:text-sky-300"
+                          : "bg-elevated text-text-muted ring-border-subtle"
+                      )}
+                    >
+                      #{i + 1}
+                    </span>
+                    <div className="min-w-0 flex-1 lg:flex-none">
+                      <span className="block truncate text-13 font-bold text-primary">{scopeLabel(s.section)}</span>
+                      <span className="tabular block text-2xs text-text-muted">
+                        {s.studentCount} {s.studentCount === 1 ? "student" : "students"}
+                      </span>
+                    </div>
+                    <div className="order-last flex w-full min-w-0 items-center gap-2.5 lg:order-none lg:w-auto">
+                      <HpProgress value={s.avgReadiness} tone={readinessTone(s.avgReadiness)} className="h-2 flex-1" />
+                      <span className="tabular w-14 shrink-0 text-right text-xs font-bold text-primary">
+                        {s.avgReadiness}
+                        <span className="text-3xs font-semibold text-text-muted">/100</span>
+                      </span>
+                    </div>
+                    <span className="tabular shrink-0 text-right text-xs font-semibold text-text-secondary">
+                      {s.avgCgpa !== null ? s.avgCgpa.toFixed(2) : "—"}
+                    </span>
+                  </div>
+
+                  <div className="flex min-w-0 items-center justify-between gap-2 border-t border-border-subtle pt-3 lg:justify-start lg:border-0 lg:pt-0">
+                    {s.coordinator ? (
+                      <>
+                        <span className="flex min-w-0 items-center gap-2">
+                          <HpAvatar name={s.coordinator.name} size="xs" />
+                          <span className="truncate text-xs font-semibold text-text-secondary">{s.coordinator.name}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-0.5 lg:ml-auto">
+                          <a
+                            href={`mailto:${s.coordinator.email}`}
+                            title={`Email ${s.coordinator.name}`}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-text-muted transition-colors hover:bg-indigo-500/10 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                          >
+                            <Mail className="h-3.5 w-3.5" />
+                          </a>
+                          {s.coordinator.phone && (
+                            <a
+                              href={`tel:${s.coordinator.phone}`}
+                              title={`Call ${s.coordinator.name}`}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-[10px] text-text-muted transition-colors hover:bg-indigo-500/10 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+                            >
+                              <Phone className="h-3.5 w-3.5" />
+                            </a>
+                          )}
+                        </span>
+                      </>
+                    ) : (
+                      <HpPill tone="amber" size="sm" icon={UserX}>
+                        No coordinator
+                      </HpPill>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </HpCard>
+        </HpItem>
+      )}
+
+      {/* Core Prep Subject Heatmap */}
       <CoreHeatmapCard />
 
-      {/* Company-wise hiring */}
+      {/* Targeted Readiness Interventions */}
       <HpItem>
-        <CompanyTable rows={placements.company_summary} />
+        <HpCard className="p-5 sm:p-6">
+          <HpSectionHeader
+            title="Targeted Readiness Remediation & Action Plan"
+            subtitle="Actionable steps for students lagging behind placement thresholds"
+            icon={ShieldAlert}
+            tone="amber"
+            action={
+              atRiskStudents.length > 0 ? (
+                <HpPill tone="amber" size="sm">
+                  <span className="tabular">{atRiskStudents.length} students need support</span>
+                </HpPill>
+              ) : undefined
+            }
+          />
+          <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/[0.04] p-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-600 dark:text-amber-400">
+                <Sparkles className="h-4 w-4" />
+                Mock AI Interview Practice
+              </div>
+              <p className="mt-2 text-2xs leading-relaxed text-text-muted">
+                {needsTrainingStudents.length} students have a readiness score under 45. Assigning Series 1–3 of Mock AI Interviews accelerates question fluency and technical articulation.
+              </p>
+              <div className="mt-3">
+                <Link href="/admin/mock-interviews" className={hpBtn("secondary", "sm", "w-full")}>
+                  Manage Mock AI Interviews
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.04] p-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-600 dark:text-sky-400">
+                <Code2 className="h-4 w-4" />
+                Problem Solving Remedial
+              </div>
+              <p className="mt-2 text-2xs leading-relaxed text-text-muted">
+                {solvedZero} students haven't solved any problems yet. Schedule weekly mandatory coding sessions in laboratory slots to build basic DSA muscle memory.
+              </p>
+              <div className="mt-3">
+                <Link href="/admin/mock-contests" className={hpBtn("secondary", "sm", "w-full")}>
+                  Set Up Practice Contest
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-indigo-500/20 bg-indigo-500/[0.04] p-4">
+              <div className="flex items-center gap-2 text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                <UserCheck className="h-4 w-4" />
+                Coordinator Outreach
+              </div>
+              <p className="mt-2 text-2xs leading-relaxed text-text-muted">
+                Section coordinators can view section-specific rosters, monitor daily student logins, and directly conduct 1-on-1 counseling before drive dates.
+              </p>
+              <div className="mt-3">
+                <Link href="/admin/coordinators" className={hpBtn("secondary", "sm", "w-full")}>
+                  View Coordinators
+                </Link>
+              </div>
+            </div>
+          </div>
+        </HpCard>
       </HpItem>
     </HpStagger>
   );
 }
 
-/* ── Sections ───────────────────────────────────────────────────────────── */
+/* ── Small pieces ───────────────────────────────────────────────────────── */
 
-function AttentionCard({ items }: { items: TpoReportsData["placements"]["action_items"] }) {
-  return (
-    <HpCard className="flex flex-col p-5 sm:p-6">
-      <HpSectionHeader
-        title="Needs Your Attention"
-        subtitle="Follow-ups your placement pipeline is waiting on"
-        icon={AlertTriangle}
-        tone="amber"
-        action={
-          <HpPill tone={items.length > 0 ? "amber" : "slate"} size="sm" dot={items.length > 0} pulse={items.length > 0}>
-            <span className="tabular">{items.length}</span>
-          </HpPill>
-        }
-      />
-      {items.length === 0 ? (
-        <div className="mt-5 flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed border-border-subtle px-4 py-8 text-center">
-          <HpIconTile icon={CheckCircle2} tone="emerald" size="lg" />
-          <p className="mt-3 text-13 font-bold text-primary">All caught up</p>
-          <p className="mt-1 text-2xs text-text-muted">Nothing needs your attention right now.</p>
-        </div>
-      ) : (
-        <>
-          <ul className="mt-5 space-y-2.5">
-            {items.map((item, i) => (
-              <motion.li
-                key={i}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.35, ease: hpEase, delay: 0.2 + i * 0.06 }}
-                className="flex items-start gap-3 rounded-2xl bg-amber-500/[0.06] p-3.5 ring-1 ring-inset ring-amber-500/20 transition-colors duration-200 hover:bg-amber-500/10"
-              >
-                <HpIconTile icon={ACTION_ICON[item.type] ?? AlertTriangle} tone="amber" size="sm" />
-                <p className="pt-1 text-xs leading-relaxed text-text-secondary">{item.message}</p>
-              </motion.li>
-            ))}
-          </ul>
-          <div className="mt-auto pt-4">
-            <Link href="/admin/drives" className={hpBtn("soft", "sm", "w-full")}>
-              Open Campus Drives
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-        </>
-      )}
-    </HpCard>
-  );
-}
-
-/** The chart's table-view twin: every branch value in text, ranked by readiness. */
 function BranchTable({ rows }: { rows: BranchReadinessRow[] }) {
   const ranked = [...rows].sort((a, b) => b.avgReadiness - a.avgReadiness);
   return (
     <div className="border-t border-border-subtle pt-6 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
       <table className="w-full">
-        <caption className="sr-only">Branch-wise average readiness and practice consistency, out of 100, ranked by readiness</caption>
+        <caption className="sr-only">Branch-wise average readiness and practice consistency, ranked by readiness</caption>
         <thead>
           <tr className="text-3xs font-bold uppercase tracking-[0.08em] text-text-muted">
             <th scope="col" className="pb-2 pr-2 text-left font-bold">
@@ -575,8 +764,12 @@ function BranchTable({ rows }: { rows: BranchReadinessRow[] }) {
                   {r.branch}
                 </span>
               </th>
-              <td className="tabular w-12 py-2.5 text-right align-middle text-sm font-extrabold text-primary">{r.avgReadiness}</td>
-              <td className="tabular w-16 py-2.5 pl-3 text-right align-middle text-xs font-semibold text-text-secondary">{r.avgPractice}</td>
+              <td className="tabular w-12 py-2.5 text-right align-middle text-sm font-extrabold text-primary">
+                {r.avgReadiness}
+              </td>
+              <td className="tabular w-16 py-2.5 pl-3 text-right align-middle text-xs font-semibold text-text-secondary">
+                {r.avgPractice}
+              </td>
             </tr>
           ))}
         </tbody>
@@ -585,170 +778,27 @@ function BranchTable({ rows }: { rows: BranchReadinessRow[] }) {
   );
 }
 
-function CompanyTable({ rows }: { rows: TpoReportsData["placements"]["company_summary"] }) {
-  const totalAccepted = rows.reduce((s, c) => s + c.offers_accepted, 0);
-  return (
-    <HpCard spotlight={false} className="overflow-hidden">
-      <div className="px-5 py-4 sm:px-6">
-        <HpSectionHeader
-          title="Company-wise Hiring Summary"
-          subtitle="Accepted offers and packages by recruiter"
-          icon={Building2}
-          tone="sky"
-          action={
-            rows.length > 0 ? (
-              <HpPill tone="sky" size="sm" className="hidden sm:inline-flex">
-                <span className="tabular">
-                  {rows.length} {rows.length === 1 ? "company" : "companies"}
-                </span>
-              </HpPill>
-            ) : undefined
-          }
-        />
-      </div>
-      {rows.length === 0 ? (
-        <div className="border-t border-border-subtle px-5 pb-5 sm:px-6">
-          <InlineEmpty
-            icon={Building2}
-            title="No accepted offers yet"
-            description="No accepted offers recorded yet — this fills in as your placement pipeline records outcomes."
-          />
-        </div>
-      ) : (
-        <div className="overflow-x-auto border-t border-border-subtle">
-          <table className="w-full min-w-[600px]">
-            <thead className="bg-elevated/50">
-              <tr>
-                <th scope="col" className={hpTh}>Company</th>
-                <th scope="col" className={cn(hpTh, "w-56")}>Offers accepted</th>
-                <th scope="col" className={cn(hpTh, "text-right")}>Avg CTC</th>
-                <th scope="col" className={cn(hpTh, "text-right")}>Max CTC</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle">
-              {rows.map((c) => (
-                <tr key={c.company} className="group transition-colors duration-200 hover:bg-indigo-500/[0.035]">
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-3">
-                      <CompanyLogo name={c.company} size="sm" />
-                      <span className="max-w-[18rem] truncate text-13 font-bold text-primary">{c.company}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <span className="tabular w-6 shrink-0 text-13 font-extrabold text-primary">{c.offers_accepted}</span>
-                      <HpProgress value={pctOf(c.offers_accepted, totalAccepted)} tone="sky" className="flex-1" />
-                      <span className="tabular w-9 shrink-0 text-right text-3xs font-semibold text-text-muted">{pctOf(c.offers_accepted, totalAccepted)}%</span>
-                    </div>
-                  </td>
-                  <td className="tabular whitespace-nowrap px-5 py-3.5 text-right text-xs font-bold text-primary">
-                    <Ctc value={c.avg_ctc} />
-                  </td>
-                  <td className="tabular whitespace-nowrap px-5 py-3.5 text-right text-xs font-bold text-primary">
-                    <Ctc value={c.max_ctc} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </HpCard>
-  );
-}
-
-/* ── Small pieces ───────────────────────────────────────────────────────── */
-
-function Ctc({ value }: { value: number | null }) {
-  if (value === null) return <span className="font-medium text-text-muted">—</span>;
-  return (
-    <>
-      {value} <span className="text-3xs font-semibold text-text-muted">LPA</span>
-    </>
-  );
-}
-
-/** Placement-% donut with the season target marked as a tick on the track. */
-function TargetRing({ value, target, size = 100, stroke = 9 }: { value: number; target: number | null; size?: number; stroke?: number }) {
-  const reduce = useReducedMotion();
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const pct = Math.max(0, Math.min(100, value));
-  const t = target !== null ? Math.max(0, Math.min(100, target)) : null;
-  const angle = t !== null ? (t / 100) * 2 * Math.PI : 0;
-  const cx = size / 2;
-  const inner = r - stroke / 2 - 2;
-  const outer = r + stroke / 2 + 2;
-
-  return (
-    <div className="relative inline-flex shrink-0 items-center justify-center" style={{ width: size, height: size }}>
-      <svg
-        width={size}
-        height={size}
-        className="-rotate-90"
-        role="img"
-        aria-label={`${fmtNum(value)}% placed${t !== null ? `, against a ${fmtNum(t)}% target` : ""}`}
-      >
-        <circle cx={cx} cy={cx} r={r} fill="none" strokeWidth={stroke} className="stroke-border-subtle" />
-        <motion.circle
-          cx={cx}
-          cy={cx}
-          r={r}
-          fill="none"
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          stroke="#10B981"
-          strokeDasharray={c}
-          initial={{ strokeDashoffset: reduce ? c - (c * pct) / 100 : c }}
-          animate={{ strokeDashoffset: c - (c * pct) / 100 }}
-          transition={{ duration: 1.1, ease: hpEase, delay: 0.2 }}
-        />
-        {t !== null && (
-          <line
-            x1={cx + inner * Math.cos(angle)}
-            y1={cx + inner * Math.sin(angle)}
-            x2={cx + outer * Math.cos(angle)}
-            y2={cx + outer * Math.sin(angle)}
-            stroke="#6366F1"
-            strokeWidth={3}
-            strokeLinecap="round"
-          />
-        )}
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className="text-lg font-extrabold tracking-tight text-primary">{fmtNum(value)}%</span>
-        <span className="mt-1 text-3xs font-semibold uppercase tracking-[0.08em] text-text-muted">placed</span>
-      </div>
-    </div>
-  );
-}
-
 function InlineEmpty({
   icon,
   title,
   description,
-  action,
-  tone = "slate",
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
-  action?: ReactNode;
-  tone?: "slate" | "emerald" | "sky";
 }) {
   return (
     <div className="mt-5 flex flex-col items-center rounded-2xl border border-dashed border-border-subtle px-4 py-8 text-center">
-      <HpIconTile icon={icon} tone={tone} size="md" />
+      <HpIconTile icon={icon} tone="slate" size="md" />
       <p className="mt-3 text-13 font-bold text-primary">{title}</p>
       <p className="mt-1 max-w-xs text-2xs leading-relaxed text-text-muted">{description}</p>
-      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
 
-function AnalyticsSkeleton() {
+function ReadinessSkeleton() {
   return (
-    <div className="space-y-6" role="status" aria-label="Loading analytics">
+    <div className="space-y-6" role="status" aria-label="Loading readiness analytics">
       <HpCard spotlight={false} className="flex items-center gap-3.5 p-4 sm:p-5">
         <HpSkeleton className="h-11 w-11 rounded-[14px]" />
         <div className="flex-1 space-y-2">
@@ -757,34 +807,21 @@ function AnalyticsSkeleton() {
         </div>
         <HpSkeleton className="hidden h-9 w-40 rounded-[10px] sm:block" />
       </HpCard>
-      <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <HpStatCard label="Avg Readiness" value={0} icon={Gauge} tone="indigo" loading />
-        <HpStatCard label="Companies Hired" value={0} icon={Building2} tone="sky" loading />
-        <HpStatCard label="Offers Accepted" value={0} icon={Trophy} tone="emerald" loading />
-        <HpStatCard label="Placement Rate" value={0} icon={Target} tone="violet" loading />
-      </div>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-        <HpCard spotlight={false} className="space-y-5 p-5 sm:p-6 xl:col-span-2">
-          <HpSkeleton className="h-4 w-36" />
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <HpSkeleton className="h-3 w-24" />
-              <HpSkeleton className="h-2.5 rounded-full" />
-            </div>
-          ))}
-        </HpCard>
-        <HpCard spotlight={false} className="space-y-3 p-5 sm:p-6">
-          <HpSkeleton className="h-4 w-40" />
-          <HpSkeleton className="h-16 rounded-2xl" />
-          <HpSkeleton className="h-16 rounded-2xl" />
-        </HpCard>
+        <HpStatCard label="Placement Ready" value={0} icon={CheckCircle2} tone="emerald" loading />
+        <HpStatCard label="In Progress" value={0} icon={Target} tone="sky" loading />
+        <HpStatCard label="Needs Training" value={0} icon={AlertTriangle} tone="amber" loading />
+        <HpStatCard label="Active Practicing" value={0} icon={Flame} tone="teal" loading />
       </div>
       <HpCard spotlight={false} className="p-5 sm:p-6">
         <HpSkeleton className="h-4 w-44" />
-        <div className="mt-8 flex h-52 items-end gap-6 px-6">
-          {[62, 40, 78, 30, 55, 46].map((h, i) => (
-            <div key={i} aria-hidden className="hp-skeleton flex-1 rounded-b-none rounded-t-md" style={{ height: `${h}%` }} />
-          ))}
+        <HpSkeleton className="mt-4 h-4 rounded-full" />
+        <div className="mt-6 grid grid-cols-4 gap-4">
+          <HpSkeleton className="h-20 rounded-2xl" />
+          <HpSkeleton className="h-20 rounded-2xl" />
+          <HpSkeleton className="h-20 rounded-2xl" />
+          <HpSkeleton className="h-20 rounded-2xl" />
         </div>
       </HpCard>
       <HpSkeletonRows rows={3} />

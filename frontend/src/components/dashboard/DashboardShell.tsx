@@ -10,6 +10,7 @@ import { StudentOnboardingGate } from "@/components/onboarding/StudentOnboarding
 import { PlanSyncWatcher } from "@/components/billing/PlanSyncWatcher";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getStoredUser } from "@/lib/auth";
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -73,7 +74,7 @@ interface DashboardShellProps {
 export function DashboardShell({
   children,
   role,
-  currentTpoView = "mellow",
+  currentTpoView: rawTpoView,
   onSwitchTpoView,
   title,
   subtitle,
@@ -84,6 +85,10 @@ export function DashboardShell({
   fitViewport = false,
   back,
 }: DashboardShellProps) {
+  const storedUser = getStoredUser();
+  const effectiveRole: DashboardRole =
+    storedUser?.role === "superadmin" && role === "admin_internal" ? "superadmin" : role;
+  const currentTpoView = rawTpoView ?? (effectiveRole === "admin_tpo" ? "tpo" : "mellow");
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultSidebarCollapsed);
@@ -95,11 +100,11 @@ export function DashboardShell({
   // A student gets it on ordinary pages only: the proctored / immersive screens (no chrome, a pinned viewport, an edge-to-edge
   // workspace) keep their own purpose-built look, and flipping in and out of them mid-attempt only ever changes a class.
   const portal: "hiring" | "tpo" | "student" | null =
-    role === "admin_company"
+    effectiveRole === "admin_company"
       ? "hiring"
-      : role === "admin_tpo" && currentTpoView === "tpo"
+      : effectiveRole === "admin_tpo" && currentTpoView === "tpo"
         ? "tpo"
-        : role === "user" && !hideChrome && !fitViewport && !fullBleed
+        : effectiveRole === "user" && !hideChrome && !fitViewport && !fullBleed
           ? "student"
           : null;
   const isHiring = portal !== null;
@@ -135,7 +140,7 @@ export function DashboardShell({
       {!hideChrome && (
         <Suspense fallback={<div className={cn("hidden md:block flex-shrink-0", collapsed ? "md:w-rail-collapsed" : "md:w-rail")} />}>
           <DashboardSidebar
-            currentRole={role}
+            currentRole={effectiveRole}
             currentTpoView={currentTpoView}
             onSwitchTpoView={onSwitchTpoView}
             mobileOpen={mobileOpen}
@@ -165,7 +170,7 @@ export function DashboardShell({
           <DashboardHeader
             title={title}
             subtitle={subtitle}
-            role={role}
+            role={effectiveRole}
             currentTpoView={currentTpoView}
             onOpenMobile={() => setMobileOpen(true)}
             actionButton={actionButton}

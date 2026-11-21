@@ -129,6 +129,32 @@ describe("Manage drawer → Vault AI", () => {
     expect(screen.queryByText(/Failed all 3 series/)).toBeNull();
   });
 
+  it("can grant access to re-attempt Series 3 instead of a full reset", async () => {
+    const blocked = qual({ id: 1, attempt_history: [attempt(0, 40), attempt(1, 50), attempt(2, 45)] });
+    const reopened = { ...blocked, status: "in_progress" as const, is_blocked: false, current_attempt: 3, cooldown_until: null, cooldown_days_remaining: 0 };
+    mountSection(studentPayload([blocked]));
+    post.mockResolvedValue(studentPayload([reopened]));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Give access again" }));
+
+    const dialog = await screen.findByRole("dialog", { name: /Give 3 fresh attempts/ });
+    const reattemptRadio = within(dialog).getByLabelText(/Re-open Series/);
+    fireEvent.click(reattemptRadio);
+
+    fireEvent.change(within(dialog).getByLabelText(/Reason/), { target: { value: "Granted extra chance by TPO" } });
+    const submit = within(dialog).getByRole("button", { name: "Give attempts" });
+    fireEvent.click(submit);
+
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith("/superadmin/vault-ai/students/41/stacks/laravel/reset", {
+        reason: "Granted extra chance by TPO",
+        mode: "retry_attempt",
+        attempt: 3,
+      })
+    );
+    await waitFor(() => expect(toast).toHaveBeenCalledWith("Student 1 has been granted access to re-attempt Series 3 in Laravel (PHP)."));
+  });
+
   it("says what the marks will do before they are saved", async () => {
     const sitting = qual({ id: 1, status: "in_progress", is_blocked: false, current_attempt: 3, failed_attempts: 2, cooldown_until: null, cooldown_days_remaining: 0, series_scores: { "1": 40 }, attempt_history: [attempt(0, 40), attempt(1, 50)] });
     mountSection(studentPayload([sitting]));

@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\College;
+use App\Models\Company;
+use App\Models\DriveApplication;
+use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
 use App\Services\DriveCollegeProposalService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -24,7 +29,13 @@ class AdminPlacementDriveController extends Controller
 {
     public function index(Request $request)
     {
-        $query = PlacementDrive::with(['company', 'collegeMappings.college:id,name,short_code'])->latest('drive_date');
+        $query = PlacementDrive::with([
+            'company',
+            'owningCollege:id,name,short_code',
+            'collegeMappings.college:id,name,short_code',
+        ])
+        ->withCount('applications')
+        ->latest('drive_date');
 
         if ($companyId = $request->query('company_id')) {
             $query->where('company_id', $companyId);
@@ -34,9 +45,28 @@ class AdminPlacementDriveController extends Controller
             $query->where('status', $status);
         }
 
+        if ($collegeId = $request->query('college_id')) {
+            $query->where(function ($q) use ($collegeId) {
+                $q->where('owning_college_id', $collegeId)
+                  ->orWhereHas('collegeMappings', function ($sub) use ($collegeId) {
+                      $sub->where('college_id', $collegeId);
+                  });
+            });
+        }
+
+        if ($q = trim((string) $request->query('q', ''))) {
+            $query->where(function ($sub) use ($q) {
+                $sub->where('title', 'like', "%{$q}%")
+                    ->orWhere('role_title', 'like', "%{$q}%")
+                    ->orWhereHas('company', fn ($cq) => $cq->where('name', 'like', "%{$q}%"));
+            });
+        }
+
         return response()->json([
             'drives' => $query->get()->map(fn (PlacementDrive $d) => [
                 ...$d->toArray(),
+                'applications_count' => $d->applications_count,
+                'owning_college' => $d->owningCollege,
                 'interview_urgency' => $d->interviewUrgency(),
             ]),
         ]);
@@ -46,24 +76,124 @@ class AdminPlacementDriveController extends Controller
     {
         $validated = $this->validateDrive($request);
 
-        $drive = PlacementDrive::create($validated);
+        $collegeId = $request->input('college_id');
+        $collegeIds = $request->input('college_ids', []);
+        if ($collegeId && empty($collegeIds)) {
+            $collegeIds = [$collegeId];
+        }
 
-        return response()->json(['drive' => $drive->load('company')], 201);
+        // Auto-create company if company_name provided without company_id
+        if (empty($validated['company_id']) && $request->filled('company_name')) {
+            $companyName = trim($request->input('company_name'));
+            $company = Company::firstOrCreate(
+                ['name' => $companyName],
+                [
+                    'slug' => Str::slug($companyName),
+                    'is_active' => true,
+                    'account_type' => Company::ACCOUNT_TYPE_CATALOG_ONLY,
+                ]
+            );
+            $validated['company_id'] = $company->id;
+        }
+
+        if ($collegeId) {
+            $validated['owning_college_id'] = $collegeId;
+            $validated['source'] = PlacementDrive::SOURCE_TPO_CREATED;
+        } else {
+            $validated['source'] = PlacementDrive::SOURCE_CATALOG;
+        }
+
+        $validated['created_by'] = $request->user()->id;
+
+        $drive = DB::transaction(function () use ($validated, $collegeIds, $request) {
+            $drive = PlacementDrive::create($validated);
+
+            // Auto-map selected colleges with approved status so drive is instantly live for them
+            foreach ($collegeIds as $cid) {
+                DriveCollegeMapping::firstOrCreate(
+                    [
+                        'placement_drive_id' => $drive->id,
+                        'college_id' => $cid,
+                    ],
+                    [
+                        'status' => DriveCollegeMapping::STATUS_APPROVED,
+                        'is_active' => true,
+                        'mapped_by' => $request->user()->id,
+                        'approved_by' => $request->user()->id,
+                        'approved_at' => now(),
+                    ]
+                );
+            }
+
+            return $drive;
+        });
+
+        return response()->json(['drive' => $drive->load(['company', 'owningCollege', 'collegeMappings.college'])], 201);
     }
 
     public function update(Request $request, PlacementDrive $placementDrive)
     {
-        $validated = $this->validateDrive($request);
+        $validated = $this->validateDrive($request, $placementDrive);
 
         $placementDrive->update($validated);
 
-        return response()->json(['drive' => $placementDrive->fresh('company')]);
+        return response()->json(['drive' => $placementDrive->fresh(['company', 'owningCollege', 'collegeMappings.college'])]);
     }
 
-    private function validateDrive(Request $request): array
+    public function applications(PlacementDrive $placementDrive)
+    {
+        $applications = $placementDrive->applications()
+            ->with(['user:id,name,email,college_id,roll_number,branch,cgpa', 'college:id,name,short_code'])
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'drive' => [
+                'id' => $placementDrive->id,
+                'title' => $placementDrive->title,
+                'role_title' => $placementDrive->role_title,
+                'company' => $placementDrive->company?->only(['id', 'name', 'logo']),
+            ],
+            'applications' => $applications->map(fn ($app) => [
+                'id' => $app->id,
+                'user' => [
+                    'id' => $app->user?->id,
+                    'name' => $app->user?->name,
+                    'email' => $app->user?->email,
+                    'roll_number' => $app->user?->roll_number,
+                    'branch' => $app->user?->branch,
+                    'cgpa' => $app->user?->cgpa,
+                ],
+                'college' => $app->college ? [
+                    'id' => $app->college->id,
+                    'name' => $app->college->name,
+                    'short_code' => $app->college->short_code,
+                ] : null,
+                'stage' => $app->stage,
+                'stage_label' => DriveApplication::stageLabel($app->stage),
+                'ctc_offered' => $app->ctc_offered,
+                'registered_at' => $app->created_at?->toIso8601String(),
+                'notes' => $app->notes,
+            ]),
+        ]);
+    }
+
+    public function destroy(PlacementDrive $placementDrive)
+    {
+        DB::transaction(function () use ($placementDrive) {
+            $placementDrive->collegeMappings()->delete();
+            $placementDrive->applications()->delete();
+            $placementDrive->delete();
+        });
+
+        return response()->json(['message' => 'Placement drive removed successfully.']);
+    }
+
+    private function validateDrive(Request $request, ?PlacementDrive $placementDrive = null): array
     {
         return $request->validate([
-            'company_id' => ['required', 'exists:companies,id'],
+            'company_id' => [$request->filled('company_name') ? 'nullable' : 'required', 'exists:companies,id'],
+            'company_name' => ['nullable', 'string', 'max:255'],
             'title' => ['required', 'string', 'max:255'],
             'role_title' => ['required', 'string', 'max:255'],
             'ctc_range' => ['nullable', 'string', 'max:255'],
@@ -76,6 +206,9 @@ class AdminPlacementDriveController extends Controller
             'eligible_branches.*' => ['string', 'max:50'],
             'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
             'status' => ['nullable', Rule::in(PlacementDrive::STATUSES)],
+            'college_id' => ['nullable', 'integer', 'exists:colleges,id'],
+            'college_ids' => ['nullable', 'array'],
+            'college_ids.*' => ['integer', 'exists:colleges,id'],
         ]);
     }
 

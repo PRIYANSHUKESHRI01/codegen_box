@@ -51,7 +51,8 @@ class GeminiQuestionGeneratorService
         array $avoidQuestionTexts = [],
         ?string $discipline = null,
     ): array {
-        $apiKey = config('services.gemini.api_key');
+        $rotationService = app(GeminiKeyRotationService::class);
+        $apiKey = $rotationService->getActiveApiKeyString();
 
         if (! $apiKey) {
             throw new RuntimeException('AI question generation is not configured yet — add questions from the bank instead.');
@@ -61,22 +62,24 @@ class GeminiQuestionGeneratorService
         $prompt = $this->buildPrompt($role, $difficulty, $perCategoryCounts, $skills, $avoidQuestionTexts, $discipline);
 
         try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(20)
-                ->post(
-                    'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                    [
-                        'contents' => [
-                            ['parts' => [['text' => $prompt]]],
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.9,
-                            'maxOutputTokens' => 4096,
-                            'responseMimeType' => 'application/json',
-                            'responseSchema' => $this->responseSchema(),
-                        ],
-                    ]
-                );
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt) {
+                return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                    ->timeout(20)
+                    ->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        [
+                            'contents' => [
+                                ['parts' => [['text' => $prompt]]],
+                            ],
+                            'generationConfig' => [
+                                'temperature' => 0.9,
+                                'maxOutputTokens' => 4096,
+                                'responseMimeType' => 'application/json',
+                                'responseSchema' => $this->responseSchema(),
+                            ],
+                        ]
+                    );
+            });
         } catch (\Throwable $e) {
             Log::warning('[Gemini] request failed', ['error' => $e->getMessage()]);
             throw new RuntimeException('AI question generation is temporarily unavailable. Try again, or add questions from the bank.');

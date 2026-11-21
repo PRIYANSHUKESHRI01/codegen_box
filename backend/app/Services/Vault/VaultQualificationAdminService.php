@@ -80,6 +80,70 @@ class VaultQualificationAdminService
     }
 
     /**
+     * Gives a student access to re-attempt a specific series (e.g. Series 3 when they failed 3 attempts and were blocked),
+     * clearing cooldown and marks for that series while keeping prior history.
+     */
+    public function reopenAttempt(User $user, string $stackKey, User $admin, string $reason, ?int $targetAttempt = null): VaultInterviewQualification
+    {
+        $this->qualifications->getOrCreateQualification($user, $stackKey);
+
+        $qual = DB::transaction(function () use ($user, $stackKey, $admin, $reason, $targetAttempt) {
+            $qual = $this->lock($user, $stackKey);
+            $was = $qual->status;
+
+            $attempt = $targetAttempt !== null
+                ? max(1, min(VaultInterviewQualification::MAX_ATTEMPTS, (int) $targetAttempt))
+                : max(1, min(VaultInterviewQualification::MAX_ATTEMPTS, (int) $qual->current_attempt));
+
+            $qual->status = VaultInterviewQualification::STATUS_IN_PROGRESS;
+            $qual->cooldown_until = null;
+            $qual->current_attempt = $attempt;
+            $qual->active_series_id = "{$qual->role_key}-{$qual->stack_key}-series-{$attempt}";
+            $qual->series_scores = [];
+            $qual->series_average = null;
+            $qual->attempt_offset = (int) $qual->attempt_offset + 1;
+
+            if ($was === VaultInterviewQualification::STATUS_QUALIFIED) {
+                $qual->qualified_at = null;
+                $qual->qualified_by_admin_id = null;
+                $this->vault->revokeAiInterviewQualification($user, $this->remainingQualification($user, $qual));
+            }
+
+            $this->log($qual, $admin, 'grant_attempt', $reason, [
+                'attempt' => $attempt,
+                'mode' => 'single_attempt',
+                'from' => $was,
+            ]);
+
+            $qual->save();
+            $this->resyncLedger($user);
+
+            return $qual;
+        });
+
+        $this->audit($admin, $user, $qual, 'grant_attempt', $reason, ['attempt' => $qual->current_attempt]);
+        $this->qualifications->refreshLedger($qual);
+
+        $this->tell(
+            $user,
+            $this->stackName($stackKey)." — Series {$qual->current_attempt} re-opened",
+            "The AptRun team has given you access to re-attempt Series {$qual->current_attempt}. You can sit the interview whenever you are ready.",
+            '/dashboard/vault-interviews',
+        );
+
+        return $qual->refresh();
+    }
+
+    public function resetOrGrant(User $user, string $stackKey, User $admin, string $reason, string $mode = 'full_reset', ?int $targetAttempt = null): VaultInterviewQualification
+    {
+        if ($mode === 'single_attempt' || $mode === 'retry_attempt') {
+            return $this->reopenAttempt($user, $stackKey, $admin, $reason, $targetAttempt);
+        }
+
+        return $this->reset($user, $stackKey, $admin, $reason);
+    }
+
+    /**
      * @param  array<int|string, int|float|string|null>  $scores  set number (1-3) => percent; only the sets being changed
      * @param  int|null  $historyIndex  correct that past attempt (its position in the attempt history) instead of the series being sat
      */
@@ -413,6 +477,7 @@ class VaultQualificationAdminService
     {
         $label = [
             'reset' => 'Reset a student\'s Vault AI Interview',
+            'grant_attempt' => 'Re-opened a Vault AI Interview attempt for a student',
             'scores' => 'Corrected a student\'s Vault AI Interview marks',
             'qualified' => 'Marked a student qualified in the Vault AI Interview',
         ][$action] ?? 'Changed a Vault AI Interview qualification';

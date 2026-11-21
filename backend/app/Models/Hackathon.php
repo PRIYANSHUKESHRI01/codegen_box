@@ -96,6 +96,8 @@ class Hackathon extends Model
         'title',
         'tagline',
         'description',
+        'problem_statement',
+        'reading_time_minutes',
         'cover_image',
         'accent',
         'themes',
@@ -142,6 +144,7 @@ class Hackathon extends Model
             'results_published_at' => 'datetime',
             'published_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'reading_time_minutes' => 'integer',
             'min_team_size' => 'integer',
             'max_team_size' => 'integer',
             'max_participants' => 'integer',
@@ -336,6 +339,51 @@ class Hackathon extends Model
         $now ??= now();
 
         return $this->isPublished() && $now->gte($this->starts_at) && $now->lt($this->ends_at);
+    }
+
+    /** The exact moment the initial problem statement reading phase ends. */
+    public function readingEndsAt(): ?\Carbon\Carbon
+    {
+        if ($this->starts_at === null) {
+            return null;
+        }
+
+        $minutes = max(0, (int) ($this->reading_time_minutes ?? 15));
+
+        return $this->starts_at->copy()->addMinutes($minutes);
+    }
+
+    /** Whether the hackathon is live and currently in the problem statement reading period. */
+    public function isReadingPhase(?CarbonInterface $now = null): bool
+    {
+        $now ??= now();
+        $readingEnds = $this->readingEndsAt();
+
+        return $this->isPublished()
+            && $now->gte($this->starts_at)
+            && $readingEnds !== null
+            && $now->lt($readingEnds)
+            && $now->lt($this->ends_at);
+    }
+
+    /** Total hackathon window duration in decimal hours (e.g. 10.0). */
+    public function durationHours(): ?float
+    {
+        if (! $this->starts_at || ! $this->ends_at) {
+            return null;
+        }
+
+        return round($this->starts_at->diffInMinutes($this->ends_at) / 60, 1);
+    }
+
+    /** Total hackathon window duration in minutes. */
+    public function durationMinutes(): ?int
+    {
+        if (! $this->starts_at || ! $this->ends_at) {
+            return null;
+        }
+
+        return (int) $this->starts_at->diffInMinutes($this->ends_at);
     }
 
     public function hasEnded(?CarbonInterface $now = null): bool

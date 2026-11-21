@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\DriveApplication;
 use App\Models\DriveCollegeMapping;
 use App\Models\PlacementDrive;
@@ -176,5 +177,152 @@ class StudentDriveController extends Controller
                 'is_terminal' => $application->isTerminal(),
             ] : null,
         ];
+    }
+
+    /**
+     * Student self-registration for an active placement drive mapped to their college.
+     * Enforces plan entitlements, published state, college mapping, and academic eligibility criteria.
+     * Without registering, students are gated from sitting for linked drive assessments and interviews.
+     */
+    public function register(Request $request, PlacementDrive $placementDrive)
+    {
+        $user = $request->user();
+
+        abort_unless(
+            $user->effectiveEntitlements()['drive_access'],
+            402,
+            'Placement drives are not included on your current plan. Upgrade to register.'
+        );
+
+        if (! $placementDrive->isPublished()) {
+            return response()->json(['message' => 'This placement drive is not open for registration.'], 422);
+        }
+
+        if (! $user->college_id) {
+            return response()->json(['message' => 'You must be associated with a partner college to register for drives.'], 422);
+        }
+
+        // Must be actively mapped to the student's college
+        $mapping = DriveCollegeMapping::where('placement_drive_id', $placementDrive->id)
+            ->where('college_id', $user->college_id)
+            ->where('is_active', true)
+            ->where('status', DriveCollegeMapping::STATUS_APPROVED)
+            ->first();
+
+        if (! $mapping) {
+            return response()->json(['message' => 'This placement drive is not available for your college.'], 404);
+        }
+
+        // Academic eligibility verification
+        $eligibility = $mapping->effectiveEligibility();
+        $evaluation = EligibilityService::evaluate($user, $eligibility);
+
+        if ($evaluation['status'] === 'not_eligible') {
+            return response()->json([
+                'message' => 'You do not meet the eligibility criteria for this placement drive.',
+                'reasons' => $evaluation['reasons'] ?? [],
+            ], 422);
+        }
+
+        $existing = DriveApplication::where('placement_drive_id', $placementDrive->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if ($existing) {
+            if ($existing->stage === DriveApplication::STAGE_WITHDRAWN) {
+                $existing->update([
+                    'stage' => DriveApplication::STAGE_REGISTERED,
+                    'stage_updated_at' => now(),
+                    'stage_updated_by' => $user->id,
+                ]);
+
+                ActivityLog::record($user, 'Re-registered for placement drive', 'PlacementDrive', $placementDrive->title);
+
+                return response()->json([
+                    'message' => 'Successfully re-registered for '.$placementDrive->title.'.',
+                    'application' => [
+                        'stage' => $existing->stage,
+                        'stage_label' => DriveApplication::stageLabel($existing->stage),
+                        'ctc_offered' => $existing->ctc_offered,
+                        'is_terminal' => $existing->isTerminal(),
+                    ],
+                ]);
+            }
+
+            if ($existing->isTerminal()) {
+                return response()->json([
+                    'message' => 'Your application for this drive is concluded ('.$existing->stage.') and cannot be updated.',
+                ], 422);
+            }
+
+            return response()->json([
+                'message' => 'You are already registered for this placement drive.',
+                'application' => [
+                    'stage' => $existing->stage,
+                    'stage_label' => DriveApplication::stageLabel($existing->stage),
+                    'ctc_offered' => $existing->ctc_offered,
+                    'is_terminal' => $existing->isTerminal(),
+                ],
+            ]);
+        }
+
+        $application = DriveApplication::create([
+            'placement_drive_id' => $placementDrive->id,
+            'user_id' => $user->id,
+            'college_id' => $user->college_id,
+            'stage' => DriveApplication::STAGE_REGISTERED,
+            'stage_updated_at' => now(),
+            'stage_updated_by' => $user->id,
+        ]);
+
+        ActivityLog::record($user, 'Registered for placement drive', 'PlacementDrive', $placementDrive->title);
+
+        return response()->json([
+            'message' => 'Successfully registered for '.$placementDrive->title.'.',
+            'application' => [
+                'stage' => $application->stage,
+                'stage_label' => DriveApplication::stageLabel($application->stage),
+                'ctc_offered' => $application->ctc_offered,
+                'is_terminal' => $application->isTerminal(),
+            ],
+        ], 201);
+    }
+
+    /**
+     * Withdraw registration for a placement drive before it takes place.
+     */
+    public function withdraw(Request $request, PlacementDrive $placementDrive)
+    {
+        $user = $request->user();
+
+        $application = DriveApplication::where('placement_drive_id', $placementDrive->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $application) {
+            return response()->json(['message' => 'You have not registered for this placement drive.'], 404);
+        }
+
+        if ($application->stage !== DriveApplication::STAGE_REGISTERED) {
+            return response()->json(['message' => 'Cannot withdraw an application that has already progressed past registration.'], 422);
+        }
+
+        $application->update([
+            'stage' => DriveApplication::STAGE_WITHDRAWN,
+            'stage_updated_at' => now(),
+            'stage_updated_by' => $user->id,
+        ]);
+
+        ActivityLog::record($user, 'Withdrew from placement drive', 'PlacementDrive', $placementDrive->title);
+
+        return response()->json([
+            'message' => 'Registration withdrawn successfully.',
+            'application' => [
+                'stage' => $application->stage,
+                'stage_label' => DriveApplication::stageLabel($application->stage),
+                'ctc_offered' => $application->ctc_offered,
+                'is_terminal' => $application->isTerminal(),
+            ],
+        ]);
     }
 }

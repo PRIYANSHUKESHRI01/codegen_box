@@ -285,6 +285,12 @@ export class BrowserVoiceEngine implements VoiceEngine {
     };
 
     recognition.onend = () => {
+      // Safely preserve any unfinalized interim speech from this recognition window
+      if (this.interimChunk) {
+        this.finalTranscript = (this.finalTranscript + " " + this.interimChunk).trim();
+        this.interimChunk = "";
+      }
+
       if (this.stopRequested || fatal || this.recognition !== recognition) {
         this.recognitionEnded?.();
         return;
@@ -294,13 +300,19 @@ export class BrowserVoiceEngine implements VoiceEngine {
       if (this.restartCount >= 30) return;
       this.restartCount += 1;
       window.setTimeout(() => {
-        if (this.stopRequested || this.recognition !== recognition) return;
+        if (this.stopRequested || fatal) return;
         try {
           recognition.start();
         } catch {
-          // start() throws if the session is somehow already running — nothing to do.
+          // In real Chromium/Edge browsers, once onend fires the instance is permanently ended.
+          // Re-instantiating Ctor() seamlessly continues listening across speech pauses!
+          try {
+            this.startRecognition(Ctor, callbacks);
+          } catch {
+            // Recognizer unable to restart
+          }
         }
-      }, 250);
+      }, 200);
     };
 
     recognition.start();

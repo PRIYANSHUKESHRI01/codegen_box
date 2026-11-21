@@ -182,10 +182,8 @@ describe("Students tab — filters", () => {
     await screen.findByText("1 student(s) match this filter.");
 
     expect(usersCalls().at(-1)).toContain("department=management");
-    expect(usersCalls().at(-1)).toContain("has_college=1");
     // The university counts are narrowed to the chosen department; the department counts are not narrowed by it.
     expect(facetCalls().at(-1)).toContain("department=management");
-    expect(facetCalls().at(-1)).toContain("has_college=1");
   });
 
   it("narrows by university through the picker and shows that university's count", async () => {

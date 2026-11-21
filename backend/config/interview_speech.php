@@ -55,7 +55,7 @@ return [
 
         'gemini' => [
             // The same key as AI interview scoring (config/services.php).
-            'api_key' => env('GEMINI_API_KEY'),
+            'api_key' => env('GEMINI_API_KEY_1') ?: env('GEMINI_API_KEY'),
             // Prebuilt voice names and how Google describes them: Sulafat (warm), Achird (friendly), Kore (firm), Vindemiatrix (gentle),
             // Sadaltager (knowledgeable), Schedar (even), Erinome / Iapetus (clear). `php artisan interview:speech-sample` writes one
             // clip per voice so the choice can be made by ear.

@@ -118,6 +118,7 @@ use App\Http\Controllers\Api\SuperAdminWeeklyRewardController;
 use App\Http\Controllers\Api\ActivityTrackController;
 use App\Http\Controllers\Api\WeeklyRewardController;
 use App\Http\Controllers\Api\SuperAdminCredentialController;
+use App\Http\Controllers\Api\SuperAdminGeminiKeyController;
 use App\Http\Controllers\Api\SuperAdminPaymentController;
 use App\Http\Controllers\Api\SuperAdminReadinessController;
 use App\Http\Controllers\Api\SuperAdminVaultAiController;
@@ -138,6 +139,7 @@ use App\Http\Controllers\Api\TpoStudentController;
 use App\Http\Controllers\Api\TpoStudentNoteController;
 use App\Http\Controllers\Api\TpoStudentReportController;
 use App\Http\Controllers\Api\ReportDocumentController;
+use App\Http\Controllers\Api\MellowVaultSyncApiController;
 use App\Http\Controllers\Api\SectionInsightsController;
 use App\Http\Controllers\Api\TpoStudentManageController;
 use App\Http\Controllers\Api\TpoInterviewReportController;
@@ -149,11 +151,11 @@ use App\Http\Controllers\Api\SSOController;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:register');
 Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:login');
 
 // MellowVault 1-Click Single Sign-On (SSO)
-Route::get('/sso/login', [SSOController::class, 'handleSSOLogin'])->name('sso.login');
+Route::get('/sso/login', [SSOController::class, 'handleSSOLogin'])->name('sso.login')->middleware('throttle:sso-login');
 
 // The AptRun Guardian (the Windows desktop agent that watches the operating system during a proctored attempt). It is a
 // separate program with its own credentials, so these sit outside the student login: pairing redeems a one-time code, and
@@ -226,7 +228,26 @@ Route::prefix('vault/v1')
         Route::get('/profiles/{profile:public_id}', [VaultIntegrationController::class, 'show']);
         Route::get('/profiles/{profile:public_id}/resume', [VaultIntegrationController::class, 'resume']);
         Route::post('/profiles/{profile:public_id}/status', [VaultIntegrationController::class, 'status']);
+        Route::get('/ai-interviews', [VaultIntegrationController::class, 'aiInterviews']);
     });
+
+// Mellow Vault developer synchronization API (independent learners & college students straight into developer_details_tb)
+Route::prefix('vault/sync')->group(function () {
+    Route::get('/health', [MellowVaultSyncApiController::class, 'health']);
+    Route::post('/register-direct', [MellowVaultSyncApiController::class, 'registerDirect']);
+    Route::post('/user/{user}', [MellowVaultSyncApiController::class, 'syncUser']);
+    Route::get('/user/{user}/status', [MellowVaultSyncApiController::class, 'userStatus']);
+    Route::post('/batch', [MellowVaultSyncApiController::class, 'syncBatch']);
+});
+
+// Mellow Vault score transfer API (transfer Vault AI Interview scores >= 60% with qualification message)
+Route::prefix('vault/score-transfer')->group(function () {
+    Route::get('/schema', [\App\Http\Controllers\Api\VaultScoreTransferApiController::class, 'schema']);
+    Route::get('/logs', [\App\Http\Controllers\Api\VaultScoreTransferApiController::class, 'logs']);
+    Route::post('/qualification/{qualification}', [\App\Http\Controllers\Api\VaultScoreTransferApiController::class, 'transferQualification']);
+    Route::post('/interview/{interview}', [\App\Http\Controllers\Api\VaultScoreTransferApiController::class, 'transferInterview']);
+    Route::post('/{record}/retry', [\App\Http\Controllers\Api\VaultScoreTransferApiController::class, 'retry']);
+});
 
 Route::prefix('password')->group(function () {
     Route::post('/forgot', [PasswordResetController::class, 'forgot'])
@@ -417,6 +438,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::get('/placement-drives', [AdminPlacementDriveController::class, 'index']);
                 Route::post('/placement-drives', [AdminPlacementDriveController::class, 'store']);
                 Route::post('/placement-drives/{placementDrive}', [AdminPlacementDriveController::class, 'update']);
+                Route::delete('/placement-drives/{placementDrive}', [AdminPlacementDriveController::class, 'destroy']);
+                Route::get('/placement-drives/{placementDrive}/applications', [AdminPlacementDriveController::class, 'applications']);
 
                 // Mellow proactively proposing a drive to specific colleges —
                 // distinct from the tpo/ group's self-service map(), since a
@@ -547,6 +570,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                     Route::post('/hackathons/{hackathon}/publish', [AdminHackathonController::class, 'publish']);
                     Route::post('/hackathons/{hackathon}/unpublish', [AdminHackathonController::class, 'unpublish']);
                     Route::post('/hackathons/{hackathon}/cancel', [AdminHackathonController::class, 'cancel']);
+                    Route::post('/hackathons/{hackathon}/extend-deadline', [AdminHackathonController::class, 'extendDeadline']);
                     Route::get('/hackathons/{hackathon}/registrations', [AdminHackathonController::class, 'registrations']);
                     Route::get('/hackathons/{hackathon}/registrations/export', [AdminHackathonController::class, 'exportRegistrations']);
                     Route::get('/hackathons/{hackathon}/submissions', [AdminHackathonController::class, 'submissions']);
@@ -714,14 +738,23 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
         ->prefix('superadmin')
         ->group(function () {
             Route::get('/overview', [SuperAdminController::class, 'overview']);
+            Route::get('/traffic-pulse', [SuperAdminController::class, 'trafficPulse']);
             Route::get('/users', [SuperAdminController::class, 'users']);
+            Route::post('/users/bulk-action', [SuperAdminController::class, 'bulkAction']);
+            Route::get('/users/export', [SuperAdminController::class, 'exportUsers']);
+            Route::get('/students/readiness-export', [SuperAdminController::class, 'exportReadinessReport']);
+            Route::get('/students/readiness-summary', [SuperAdminController::class, 'readinessSummary']);
             Route::post('/users', [SuperAdminController::class, 'storeUser']);
             Route::get('/users/{user}/detail', [SuperAdminController::class, 'showUser']);
+            Route::get('/users/{user}/export-report', [SuperAdminController::class, 'exportUserReport']);
             Route::post('/users/{user}/toggle-block', [SuperAdminController::class, 'toggleBlock']);
             Route::post('/users/{user}/permissions', [SuperAdminController::class, 'updatePermissions']);
             // Both re-check the caller's own password, so they share a tight per-user limiter (see AppServiceProvider).
             Route::post('/users/{user}/reset-password', [SuperAdminController::class, 'resetPassword'])
                 ->middleware('throttle:superadmin-sensitive');
+            Route::post('/users/{user}/sync-mellow-vault', [MellowVaultSyncApiController::class, 'syncUser']);
+            Route::get('/users/{user}/mellow-vault-status', [MellowVaultSyncApiController::class, 'userStatus']);
+            Route::post('/mellow-vault/batch-sync', [MellowVaultSyncApiController::class, 'syncBatch']);
             // Filter-bar facets for the account directory: accounts per role and per university under the current filters.
             Route::get('/users/facets', [SuperAdminController::class, 'directoryFacets']);
             // The temporary login an account was issued, until its owner replaces it. Unlock = re-enter your own password
@@ -747,6 +780,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-sensitive');
             Route::delete('/marketing-team/{user}', [SuperAdminMarketingTeamController::class, 'destroy'])
                 ->middleware('throttle:superadmin-sensitive');
+            Route::get('/marketing-employees', [SuperAdminMarketingTeamController::class, 'activeEmployees']);
+            Route::post('/marketing-team/assign-leads', [SuperAdminMarketingTeamController::class, 'assignLeads']);
             Route::get('/audit-logs', [SuperAdminController::class, 'auditLogs']);
             Route::get('/judge-nodes', [SuperAdminController::class, 'judgeNodes']);
             // Whole sections switched on/off for every student (Merchant Navy). The switch is explicit and audited.
@@ -761,6 +796,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/weekly-rewards/winners', [SuperAdminWeeklyRewardController::class, 'winners']);
             Route::post('/weekly-rewards/winners/finalize', [SuperAdminWeeklyRewardController::class, 'finalizeWeek'])
                 ->middleware('throttle:superadmin-sensitive');
+            Route::post('/weekly-rewards/give-coupon', [SuperAdminWeeklyRewardController::class, 'giveCoupon'])
+                ->middleware('throttle:superadmin-sensitive');
             Route::patch('/weekly-rewards/winners/{winner}', [SuperAdminWeeklyRewardController::class, 'updateWinner'])
                 ->middleware('throttle:superadmin-sensitive');
             Route::put('/weekly-rewards/{card}', [SuperAdminWeeklyRewardController::class, 'update'])
@@ -772,10 +809,12 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::get('/live', [SuperAdminActivityController::class, 'live']);
                 Route::get('/pulse', [SuperAdminActivityController::class, 'pulse']);
                 Route::get('/patterns', [SuperAdminActivityController::class, 'patterns']);
+                Route::get('/feature-usage', [SuperAdminActivityController::class, 'featureUsage']);
                 Route::get('/glance', [SuperAdminActivityController::class, 'glance']);
                 Route::get('/colleges', [SuperAdminActivityController::class, 'colleges']);
                 Route::get('/colleges/{college}', [SuperAdminActivityController::class, 'college']);
                 Route::get('/colleges/{college}/people', [SuperAdminActivityController::class, 'people']);
+                Route::get('/visitors', [SuperAdminActivityController::class, 'visitors']);
                 Route::get('/users/{user}', [SuperAdminActivityController::class, 'person']);
                 Route::get('/sign-ins', [SuperAdminActivityController::class, 'signIns']);
             });
@@ -849,6 +888,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/vault-ai/students/{user}', [SuperAdminVaultAiController::class, 'show']);
             Route::post('/vault-ai/students/{user}/stacks/{stackKey}/reset', [SuperAdminVaultAiController::class, 'reset'])
                 ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/vault-ai/students/{user}/stacks/{stackKey}/grant-attempt', [SuperAdminVaultAiController::class, 'grantAttempt'])
+                ->middleware('throttle:superadmin-subscriptions');
             Route::put('/vault-ai/students/{user}/stacks/{stackKey}/scores', [SuperAdminVaultAiController::class, 'scores'])
                 ->middleware('throttle:superadmin-subscriptions');
             Route::post('/vault-ai/students/{user}/stacks/{stackKey}/qualify', [SuperAdminVaultAiController::class, 'qualify'])
@@ -862,6 +903,29 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-subscriptions');
             Route::delete('/readiness/{user}', [SuperAdminReadinessController::class, 'destroy'])
                 ->middleware('throttle:superadmin-subscriptions');
+
+            // Gemini API Keys & Real-Time Schedule Rotation (Multi-key fallback pool)
+            Route::get('/gemini-keys', [SuperAdminGeminiKeyController::class, 'index']);
+            Route::post('/gemini-keys', [SuperAdminGeminiKeyController::class, 'store'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::put('/gemini-keys/{geminiKey}', [SuperAdminGeminiKeyController::class, 'update'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::delete('/gemini-keys/{geminiKey}', [SuperAdminGeminiKeyController::class, 'destroy'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/{geminiKey}/timing', [SuperAdminGeminiKeyController::class, 'adjustTiming'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/{geminiKey}/toggle-active', [SuperAdminGeminiKeyController::class, 'toggleActive'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/{geminiKey}/reset-status', [SuperAdminGeminiKeyController::class, 'resetStatus'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/{geminiKey}/test', [SuperAdminGeminiKeyController::class, 'test'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/distribute-evenly', [SuperAdminGeminiKeyController::class, 'distributeEvenly'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/sync-env', [SuperAdminGeminiKeyController::class, 'syncEnv'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/gemini-keys/sync-to-env', [SuperAdminGeminiKeyController::class, 'syncToEnv'])
+                ->middleware('throttle:superadmin-sensitive');
         });
 
     // Mellow Marketing team's own surface — "Mellow Direct" leads only (see
@@ -1245,6 +1309,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::post('/hackathons/{hackathon}/publish', [CompanyHackathonController::class, 'publish']);
                 Route::post('/hackathons/{hackathon}/unpublish', [CompanyHackathonController::class, 'unpublish']);
                 Route::post('/hackathons/{hackathon}/cancel', [CompanyHackathonController::class, 'cancel']);
+                Route::post('/hackathons/{hackathon}/extend-deadline', [CompanyHackathonController::class, 'extendDeadline']);
                 Route::get('/hackathons/{hackathon}/registrations', [CompanyHackathonController::class, 'registrations']);
                 Route::get('/hackathons/{hackathon}/registrations/export', [CompanyHackathonController::class, 'exportRegistrations']);
                 Route::get('/hackathons/{hackathon}/submissions', [CompanyHackathonController::class, 'submissions']);
@@ -1378,6 +1443,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
 
             Route::get('/drives', [StudentDriveController::class, 'index']);
             Route::get('/drives/{placementDrive}', [StudentDriveController::class, 'show']);
+            Route::post('/drives/{placementDrive}/register', [StudentDriveController::class, 'register']);
+            Route::post('/drives/{placementDrive}/withdraw', [StudentDriveController::class, 'withdraw']);
 
             Route::get('/problems/{problem}', [ProblemController::class, 'show'])->middleware('capability:coding_practice');
             // Run/Submit only enqueue (202 + token) — the verdict is collected
@@ -1468,11 +1535,13 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // judge-* throttle needed (no judge involved), plain default.
             Route::get('/interviews', [InterviewController::class, 'index'])->middleware('capability:ai_interviews');
             Route::get('/interviews/{interview}', [InterviewController::class, 'show'])->middleware('capability:ai_interviews');
-            Route::post('/interviews/{interview}/start', [InterviewController::class, 'start'])->middleware('capability:ai_interviews');
-            Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer'])->middleware('capability:ai_interviews');
-            Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware('capability:ai_interviews');
-            Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/{interview}/start', [InterviewController::class, 'start'])->middleware(['capability:ai_interviews', 'throttle:interview-action']);
+            Route::post('/interviews/{interview}/answer', [InterviewController::class, 'answer'])->middleware(['capability:ai_interviews', 'throttle:interview-answer']);
+            Route::post('/interviews/{interview}/complete', [InterviewController::class, 'complete'])->middleware(['capability:ai_interviews', 'throttle:interview-action']);
+            Route::post('/interviews/{interview}/reattempt', [InterviewController::class, 'reattempt'])->middleware(['capability:ai_interviews', 'throttle:interview-action']);
+            Route::post('/interviews/{interview}/retry-scoring', [InterviewController::class, 'retryScoring'])->middleware(['capability:ai_interviews', 'throttle:interview-action']);
             Route::get('/interviews/{interview}/result', [InterviewController::class, 'result'])->middleware('capability:ai_interviews');
+            Route::post('/interviews/transcribe', [InterviewController::class, 'transcribeAudio'])->middleware(['capability:ai_interviews', 'throttle:60,1']);
             Route::post('/me/interviews/{interview}/report', [StudentInterviewReportController::class, 'store'])->middleware('capability:ai_interviews')->middleware('throttle:report-generate');
 
             // The student's own study history (Merchant Navy): the score of every set they have sat, and a full report of any sitting to download.

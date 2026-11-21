@@ -269,5 +269,6 @@ class DatabaseSeeder extends Seeder
 
         $this->call(CuratedSetQuestionsSeeder::class);
         $this->call(MockInterviewQuestionsSeeder::class);
+        $this->call(MockInterviewParentSetsSeeder::class);
     }
 }

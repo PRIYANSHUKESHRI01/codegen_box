@@ -64,6 +64,11 @@ class HackathonPresenter
             'max_participants' => $h->max_participants,
             'spots_left' => $h->max_participants === null ? null : max(0, $h->max_participants - $count),
             'registration_open' => $this->registrationState($h, $mine, $count) === 'open',
+            'reading_time_minutes' => (int) ($h->reading_time_minutes ?? 15),
+            'reading_ends_at' => $h->readingEndsAt()?->toIso8601String(),
+            'is_reading_phase' => $h->isReadingPhase(),
+            'duration_hours' => $h->durationHours(),
+            'duration_minutes' => $h->durationMinutes(),
             'mine' => $mine ? $this->mine($h, $mine) : null,
         ];
     }
@@ -80,6 +85,7 @@ class HackathonPresenter
 
         return $this->card($h, $mine) + [
             'description' => $h->description,
+            'problem_statement' => $h->problem_statement,
             'rules' => $h->rules,
             'eligibility' => $h->eligibility,
             'prizes' => array_values($h->prizes ?? []),
@@ -218,6 +224,8 @@ class HackathonPresenter
     {
         return $this->hostRow($h) + [
             'description' => $h->description,
+            'problem_statement' => $h->problem_statement,
+            'reading_time_minutes' => (int) ($h->reading_time_minutes ?? 15),
             'themes' => $h->themes ?? [],
             'location' => $h->location,
             'results_expected_at' => $h->results_expected_at?->toIso8601String(),

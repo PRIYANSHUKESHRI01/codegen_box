@@ -45,4 +45,10 @@ class CompanyHackathonController extends Controller
     {
         return false;
     }
+
+    /** Only AptRun administrators can schedule hackathons for now. */
+    public function store(Request $request, \App\Services\Hackathons\HackathonPresenter $presenter)
+    {
+        abort(403, 'Currently, hackathons can only be scheduled by AptRun platform administrators.');
+    }
 }

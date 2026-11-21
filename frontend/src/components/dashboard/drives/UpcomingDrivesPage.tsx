@@ -76,7 +76,7 @@ function DriveTile({ drive, past }: { drive: DriveCard; past: boolean }) {
               </HpPill>
             ) : elig.status === "eligible" ? (
               <HpPill tone="emerald" icon={CheckCircle2}>
-                Eligible
+                Eligible · Open for Registration
               </HpPill>
             ) : elig.status === "not_eligible" ? (
               <HpPill tone="rose" icon={XCircle}>
@@ -118,7 +118,13 @@ function DriveTile({ drive, past }: { drive: DriveCard; past: boolean }) {
               </span>
             )}
             <span className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 dark:text-indigo-300">
-              {past ? "View details" : "Prepare"}
+              {past
+                ? "View details"
+                : drive.myApplication
+                ? "Prepare for Drive"
+                : elig.status === "eligible"
+                ? "Register for Drive"
+                : "View Prep"}
               <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-1" aria-hidden />
             </span>
           </div>

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Search, Users2, UserPlus, CheckCircle2, TrendingUp, StickyNote, Ban, ExternalLink, UserCog, RefreshCw, AlertTriangle } from "lucide-react";
+import { Search, Users2, UserPlus, CheckCircle2, TrendingUp, StickyNote, Ban, ExternalLink, UserCog, RefreshCw, AlertTriangle, UserCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { LeadDetailDrawer } from "@/components/leads/LeadDetailDrawer";
@@ -60,6 +60,25 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
   const [managedId, setManagedId] = useState<number | null>(null);
   // A block/unblock the superadmin just did, shown at once; every fresh load starts from the server's own flags again.
   const [blockOverrides, setBlockOverrides] = useState<Map<number, boolean>>(new Map());
+
+  // Marketing staff assignment state
+  const [employees, setEmployees] = useState<{ id: number; name: string; email: string; open_leads_count?: number }[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [bulkTargetEmployee, setBulkTargetEmployee] = useState<string>("auto");
+  const [assigning, setAssigning] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ employees?: { id: number; name: string; email: string; open_leads_count?: number }[] }>("/superadmin/marketing-employees")
+      .then((res) => {
+        if (res && Array.isArray(res.employees)) {
+          setEmployees(res.employees);
+        } else {
+          setEmployees([]);
+        }
+      })
+      .catch(() => setEmployees([]));
+  }, []);
 
   const buildParams = useCallback(
     (extra: Record<string, string> = {}) => {
@@ -141,6 +160,70 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
       triggerToast(res.user.is_blocked ? `${lead.name}'s account blocked.` : `${lead.name}'s account unblocked.`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to update account.", "error");
+    }
+  };
+
+  const isAllOnPageSelected = leads.length > 0 && leads.every((l) => selectedIds.has(l.id));
+
+  const toggleSelectAllOnPage = () => {
+    const next = new Set(selectedIds);
+    if (isAllOnPageSelected) {
+      leads.forEach((l) => next.delete(l.id));
+    } else {
+      leads.forEach((l) => next.add(l.id));
+    }
+    setSelectedIds(next);
+  };
+
+  const toggleSelectLead = (id: number) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedIds(next);
+  };
+
+  const handleAssign = async (userIds: number[], marketingId: number | null, mode: "single" | "auto_distribute") => {
+    if (userIds.length === 0) return;
+    setAssigning(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string; count: number }>("/superadmin/marketing-team/assign-leads", {
+        user_ids: userIds,
+        marketing_id: marketingId,
+        mode,
+      });
+      triggerToast(res.message);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to assign leads.", "error");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
+  const handleAssignAllUnassigned = async () => {
+    const unassignedCount = facets?.unassigned ?? 0;
+    if (unassignedCount === 0) {
+      triggerToast("No unassigned leads found.", "error");
+      return;
+    }
+    if (!window.confirm(`Auto-distribute all ${unassignedCount} unassigned lead(s) evenly across active marketing staff?`)) return;
+    setAssigning(true);
+    try {
+      const res = await api.post<{ success: boolean; message: string; count: number }>("/superadmin/marketing-team/assign-leads", {
+        all_unassigned: true,
+        mode: "auto_distribute",
+      });
+      triggerToast(res.message);
+      setSelectedIds(new Set());
+      load();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to auto-assign unassigned leads.", "error");
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -249,6 +332,20 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
           {facets && <span className="rounded-full bg-surface px-1.5 text-3xs font-bold tabular-nums text-text-muted">{facets.unassigned.toLocaleString()}</span>}
         </button>
 
+        {/* 1-Click Auto-Assign All Unassigned Leads */}
+        {facets && facets.unassigned > 0 && (
+          <button
+            type="button"
+            onClick={handleAssignAllUnassigned}
+            disabled={assigning}
+            className="inline-flex items-center gap-1.5 rounded-control bg-accent-primary hover:bg-accent-primary/90 text-white px-3 py-1.5 text-2xs font-bold shadow-subtle transition-all disabled:opacity-50"
+            title="Auto-distribute all unassigned leads across active marketing employees in one click"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>{assigning ? "Assigning..." : `Auto-Assign All (${facets.unassigned})`}</span>
+          </button>
+        )}
+
         {filtered && (
           <button type="button" onClick={clearFilters} className="text-2xs font-bold text-accent-primary hover:underline">
             Clear filters
@@ -291,6 +388,15 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
             <table className="w-full text-left text-xs">
               <thead className="bg-elevated/70 border-b border-border-subtle text-text-muted font-bold uppercase tracking-wider text-3xs">
                 <tr>
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={isAllOnPageSelected}
+                      onChange={toggleSelectAllOnPage}
+                      className="rounded border-border-subtle text-accent-primary focus:ring-accent-primary cursor-pointer"
+                      aria-label="Select all leads on current page"
+                    />
+                  </th>
                   <th className="px-4 py-3">Name</th>
                   <th className="px-4 py-3">Signed Up</th>
                   <th className="px-4 py-3">Assigned To</th>
@@ -304,19 +410,84 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
                 {leads.map((lead) => {
                   const isBlocked = blockOverrides.get(lead.id) ?? lead.is_blocked;
                   return (
-                    <tr key={lead.id} className="hover:bg-surface-hover/60 transition-colors">
+                    <tr
+                      key={lead.id}
+                      className={cn(
+                        "hover:bg-surface-hover/60 transition-colors",
+                        selectedIds.has(lead.id) && "bg-accent-primary/5"
+                      )}
+                    >
+                      <td className="px-3 py-3 w-8" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(lead.id)}
+                          onChange={() => toggleSelectLead(lead.id)}
+                          className="rounded border-border-subtle text-accent-primary focus:ring-accent-primary cursor-pointer"
+                          aria-label={`Select ${lead.name}`}
+                        />
+                      </td>
                       <td className="px-4 py-3 cursor-pointer" onClick={() => setActiveLeadId(lead.id)}>
                         <div className="font-bold text-primary">{lead.name}</div>
                         <div className="text-3xs text-text-muted">{lead.email}</div>
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{formatDate(lead.created_at)}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         {lead.assigned_to_name ? (
-                          <span className="text-text-secondary font-medium">{lead.assigned_to_name}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-text-secondary font-medium">{lead.assigned_to_name}</span>
+                            <select
+                              aria-label={`Reassign ${lead.name}`}
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) return;
+                                if (val === "auto") {
+                                  handleAssign([lead.id], null, "auto_distribute");
+                                } else {
+                                  handleAssign([lead.id], Number(val), "single");
+                                }
+                              }}
+                              disabled={assigning}
+                              className="text-3xs border border-border-subtle bg-surface text-text-muted hover:text-primary rounded px-1.5 py-0.5 outline-none cursor-pointer transition-opacity"
+                              title="Reassign to another marketing employee"
+                            >
+                              <option value="" disabled>Reassign ▾</option>
+                              <option value="auto">⚡ Auto-Distribute</option>
+                              {(employees ?? []).map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  Assign to {emp.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         ) : (
-                          <span className="text-3xs font-bold text-status-warning bg-status-warning/10 px-2 py-0.5 rounded-full border border-status-warning/25">
-                            Unassigned
-                          </span>
+                          /* 1-Click Individual Quick Assign Dropdown */
+                          <div className="inline-flex items-center gap-1">
+                            <select
+                              aria-label={`Assign ${lead.name} to marketing employee`}
+                              value=""
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (!val) return;
+                                if (val === "auto") {
+                                  handleAssign([lead.id], null, "auto_distribute");
+                                } else {
+                                  handleAssign([lead.id], Number(val), "single");
+                                }
+                              }}
+                              disabled={assigning}
+                              className="text-3xs font-bold bg-status-warning/15 hover:bg-status-warning/25 text-status-warning border border-status-warning/40 rounded-full px-2.5 py-1 outline-none cursor-pointer transition-all shadow-subtle"
+                              title="Assign this user to a marketing employee in 1 click"
+                            >
+                              <option value="" disabled>⚠️ Unassigned ▾ Click to assign</option>
+                              <option value="auto">⚡ Auto-Assign (Least Loaded)</option>
+                              {(employees ?? []).map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  👤 Assign to {emp.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         )}
                       </td>
                       <td className="px-4 py-3 text-text-secondary">{lead.plan_name ?? "—"}</td>
@@ -391,6 +562,68 @@ export function LeadsPanel({ triggerToast }: { triggerToast: ToastTrigger }) {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Floating Bulk Operations Toolbar for 1-click marketing assignment */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-panel bg-elevated/95 backdrop-blur-md border border-accent-primary/50 shadow-2xl animate-in fade-in slide-in-from-bottom-4">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-primary text-3xs font-black text-white">
+              {selectedIds.size}
+            </span>
+            <span className="text-xs font-bold text-primary">
+              lead(s) selected
+            </span>
+          </div>
+
+          <div className="h-4 w-px bg-border-subtle" />
+
+          {/* Employee dropdown selector */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-2xs text-text-muted font-semibold">Assign to:</span>
+            <select
+              value={bulkTargetEmployee}
+              onChange={(e) => setBulkTargetEmployee(e.target.value)}
+              className="rounded-control border border-border-subtle bg-surface px-2.5 py-1 text-xs text-primary outline-none focus:border-accent-primary font-medium cursor-pointer"
+            >
+              <option value="auto">⚡ Auto-Distribute (Least Loaded)</option>
+              {(employees ?? []).map((emp) => (
+                <option key={emp.id} value={String(emp.id)}>
+                  👤 {emp.name} ({emp.open_leads_count ?? 0} active)
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 1-Click Bulk Assign Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (bulkTargetEmployee === "auto") {
+                handleAssign(Array.from(selectedIds), null, "auto_distribute");
+              } else {
+                handleAssign(Array.from(selectedIds), Number(bulkTargetEmployee), "single");
+              }
+            }}
+            disabled={assigning}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-control text-xs font-bold bg-accent-primary hover:bg-accent-primary/90 text-white shadow-subtle disabled:opacity-50 transition-all cursor-pointer"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>{assigning ? "Assigning..." : "Assign Now"}</span>
+          </button>
+
+          <div className="h-4 w-px bg-border-subtle" />
+
+          {/* Deselect */}
+          <button
+            type="button"
+            onClick={() => setSelectedIds(new Set())}
+            disabled={assigning}
+            className="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-primary transition-colors disabled:opacity-50"
+          >
+            Deselect
+          </button>
         </div>
       )}
 

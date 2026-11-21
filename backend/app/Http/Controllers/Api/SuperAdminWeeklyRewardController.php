@@ -83,11 +83,32 @@ class SuperAdminWeeklyRewardController extends Controller
     public function updateWinner(Request $request, WeeklyRewardWinner $winner): JsonResponse
     {
         $data = $request->validate([
+            'card' => ['sometimes', 'string'],
             'status' => ['sometimes', Rule::in(WeeklyRewardWinner::STATUSES)],
             'voucher_code' => ['sometimes', 'nullable', 'string', 'max:200'],
             'note' => ['sometimes', 'nullable', 'string', 'max:255'],
         ]);
 
         return response()->json(['winner' => $this->rewards->winnerPayload($this->rewards->updateWinner($winner, $data, $request->user()))]);
+    }
+
+    public function giveCoupon(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'card' => ['required', 'string'],
+            'voucher_code' => ['required', 'string', 'min:3', 'max:200'],
+            'week' => ['nullable', 'date'],
+            'rank' => ['nullable', 'integer', 'min:1'],
+            'contest_score' => ['nullable', 'integer', 'min:0'],
+            'note' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $winner = $this->rewards->awardCoupon($request->user(), $data);
+
+        return response()->json([
+            'winner' => $this->rewards->winnerPayload($winner),
+            'message' => "Successfully awarded {$winner->brand} voucher to {$winner->user_name}!",
+        ]);
     }
 }

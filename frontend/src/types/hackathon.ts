@@ -101,6 +101,11 @@ export interface HackathonCard {
   max_participants: number | null;
   spots_left: number | null;
   registration_open: boolean;
+  reading_time_minutes?: number;
+  reading_ends_at?: string | null;
+  is_reading_phase?: boolean;
+  duration_hours?: number | null;
+  duration_minutes?: number | null;
   mine: MyEntry | null;
 }
 
@@ -197,6 +202,7 @@ export interface SubmissionAccess {
 
 export interface HackathonDetail extends HackathonCard {
   description: string;
+  problem_statement?: string | null;
   rules: string | null;
   eligibility: string | null;
   prizes: HackathonPrize[];
@@ -291,6 +297,10 @@ export interface HostHackathonRow {
 
 export interface HostHackathonDetail extends HostHackathonRow {
   description: string;
+  problem_statement: string | null;
+  reading_time_minutes: number;
+  reading_ends_at: string | null;
+  duration_hours: number | null;
   themes: string[];
   location: string | null;
   results_expected_at: string | null;
@@ -357,6 +367,8 @@ export interface HackathonFormPayload {
   title: string;
   tagline: string;
   description: string;
+  problem_statement: string | null;
+  reading_time_minutes: number;
   accent: HackathonAccent;
   themes: string[];
   mode: HackathonMode;

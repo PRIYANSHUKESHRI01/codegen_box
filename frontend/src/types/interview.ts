@@ -233,6 +233,8 @@ export interface InterviewResult {
   /** A study set only: where this sitting stands among the student's sittings of the set, and what to download the report with. */
   attempt?: StudyAttemptStanding | null;
   status: InterviewResultStatus;
+  answers_saved?: boolean;
+  answers_count?: number;
   composite_score_percent: number | null;
   /** Only ever non-null for a track round — a standalone interview has no pass/fail concept. */
   passed: boolean | null;

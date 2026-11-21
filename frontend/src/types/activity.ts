@@ -86,6 +86,73 @@ export interface PatternsResponse {
   sections: SectionStat[];
 }
 
+export interface RankedFeature {
+  rank: number;
+  section: string;
+  category: string;
+  color: string;
+  views: number;
+  users: number;
+  total_seconds: number;
+  total_minutes: number;
+  avg_seconds: number;
+  avg_minutes: number;
+  avg_scroll: number;
+  direct_attempts: number;
+  total_engagements: number;
+  share_percentage: number;
+  usage_tier: "most_popular" | "high_engagement" | "moderate" | "least_used";
+  last_at: string | null;
+}
+
+export interface FeatureCategoryGroup {
+  category: string;
+  color: string;
+  views: number;
+  direct_attempts: number;
+  engagements: number;
+  users: number;
+  minutes: number;
+  features_count: number;
+  share_percentage: number;
+}
+
+export interface FeatureUsageDailyPoint {
+  day: string;
+  label: string;
+  views: number;
+  users: number;
+  minutes: number;
+}
+
+export interface FeatureUsageSummary {
+  total_views: number;
+  total_minutes: number;
+  total_practice_actions: number;
+  total_features_tracked: number;
+  top_feature: string;
+  least_feature: string;
+  top_category: string;
+}
+
+export interface FeatureUsageResponse {
+  period_days: number;
+  summary: FeatureUsageSummary;
+  ranked_features: RankedFeature[];
+  most_used: RankedFeature[];
+  least_used: RankedFeature[];
+  categories: FeatureCategoryGroup[];
+  daily_trend: FeatureUsageDailyPoint[];
+  practice_totals: {
+    coding_submissions: number;
+    core_answers: number;
+    speaking_attempts: number;
+    listening_attempts: number;
+    vocabulary_attempts: number;
+    contest_submissions: number;
+  };
+}
+
 export interface PlanInfo {
   name: string;
   is_demo: boolean;
@@ -213,10 +280,84 @@ export interface PersonVisit {
   views: { section: string; path: string; at: string; seconds: number; scroll: number }[];
 }
 
+export interface PersonInterviewSessionSummary {
+  id: number;
+  title: string;
+  round_name: string | null;
+  type: string | null;
+  status: string;
+  composite_score_percent: number | null;
+  started_at: string | null;
+  completed_at: string | null;
+  duration_minutes: number | null;
+}
+
+export interface PersonInterviewSummary {
+  total_sessions: number;
+  completed_sessions: number;
+  total_practice_minutes: number;
+  average_score: number;
+  sessions: PersonInterviewSessionSummary[];
+}
+
+export interface PersonPlatformSummary {
+  devices: string[];
+  browsers: string[];
+  os_list: string[];
+  primary_device: string | null;
+  last_ip: string | null;
+}
+
+export interface VisitorSection {
+  section: string;
+  views: number;
+  active_minutes: number;
+  active_seconds: number;
+}
+
+export interface VisitorRow {
+  user: {
+    id: number;
+    name: string;
+    email: string;
+    role: ActivityRole;
+    roll_number: string | null;
+    college_id: number | null;
+    college: string;
+    is_independent: boolean;
+  };
+  visits_count: number;
+  active_minutes: number;
+  active_seconds: number;
+  pages_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  is_online: boolean;
+  device: string | null;
+  browser: string | null;
+  os: string | null;
+  ip: string | null;
+  current_section: string | null;
+  current_path: string | null;
+  sections: VisitorSection[];
+}
+
+export interface VisitorsResponse {
+  period: string;
+  label: string;
+  total: number;
+  page: number;
+  per_page: number;
+  last_page: number;
+  rows: VisitorRow[];
+}
+
 export interface PersonDetail {
-  user: PersonRef & { college: string | null; is_blocked: boolean };
+  user: PersonRef & { college: string | null; is_blocked: boolean; is_independent?: boolean };
   facts: AccountFacts;
   online_now: boolean;
+  interviews?: PersonInterviewSummary | null;
+  platforms?: PersonPlatformSummary;
   events: { event: string; reason: string | null; portal: string | null; device: string | null; browser: string | null; os: string | null; ip: string | null; at: string }[];
   visits: PersonVisit[];
   sections: { section: string; views: number; seconds: number; avg_scroll: number; last_at: string }[];

@@ -9,7 +9,20 @@ const post = vi.fn();
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
-  return { ...actual, api: { get: (path: string) => get(path), post: (path: string, body?: unknown) => post(path, body), put: vi.fn(), delete: vi.fn() } };
+  return {
+    ...actual,
+    api: {
+      get: (path: string) => {
+        if (path.startsWith("/superadmin/marketing-employees")) {
+          return Promise.resolve({ employees: [] });
+        }
+        return get(path);
+      },
+      post: (path: string, body?: unknown) => post(path, body),
+      put: vi.fn(),
+      delete: vi.fn(),
+    },
+  };
 });
 
 // The drawers have their own tests; here they only need to exist.

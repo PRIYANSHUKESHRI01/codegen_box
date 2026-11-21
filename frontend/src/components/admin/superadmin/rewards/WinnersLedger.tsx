@@ -6,6 +6,7 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ToastTrigger } from "@/lib/toast";
 import type { LedgerWinner, WinnerStatus } from "@/types/weeklyRewards";
+import { VOUCHER_COMPANIES } from "./AwardCouponModal";
 
 const MEDAL: Record<number, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
 const TH = "py-2 pr-3 text-left text-3xs font-bold uppercase tracking-wider text-text-muted";
@@ -64,12 +65,12 @@ export function WinnersLedger({ triggerToast, closeOutNeeded, onClosedOut }: { t
     }
   };
 
-  const save = async (row: LedgerWinner, patch: { status?: WinnerStatus; voucher_code?: string; note?: string }) => {
+  const save = async (row: LedgerWinner, patch: { card?: string; status?: WinnerStatus; voucher_code?: string; note?: string }) => {
     if (row.id === null) return;
     setBusy(row.id);
     try {
       await api.patch(`/superadmin/weekly-rewards/winners/${row.id}`, patch);
-      triggerToast(patch.status === "sent" ? `${row.user.name} has been told their ${row.prize?.brand} voucher is on its way.` : "Saved.");
+      triggerToast(patch.status === "sent" ? `🎉 ${row.user.name} has been told: voucher coupon code sent via email & dashboard.` : "Saved.");
       load();
       onClosedOut();
     } catch (err) {
@@ -143,29 +144,51 @@ export function WinnersLedger({ triggerToast, closeOutNeeded, onClosedOut }: { t
   );
 }
 
-function LedgerRow({ row, busy, onSave }: { row: LedgerWinner; busy: boolean; onSave: (patch: { status?: WinnerStatus; voucher_code?: string; note?: string }) => void }) {
+function LedgerRow({ row, busy, onSave }: { row: LedgerWinner; busy: boolean; onSave: (patch: { card?: string; status?: WinnerStatus; voucher_code?: string; note?: string }) => void }) {
+  const [card, setCard] = useState(row.prize?.key ?? "dominos");
   const [code, setCode] = useState(row.voucher_code ?? "");
   const [note, setNote] = useState(row.note ?? "");
-  const dirty = code !== (row.voucher_code ?? "") || note !== (row.note ?? "");
+  const dirty = card !== (row.prize?.key ?? "") || code !== (row.voucher_code ?? "") || note !== (row.note ?? "");
+
+  const activeCompany = VOUCHER_COMPANIES.find((c) => c.key === card) || VOUCHER_COMPANIES[0];
 
   return (
-    <tr className="border-b border-border-subtle align-top last:border-0">
+    <tr className="border-b border-border-subtle align-top last:border-0 hover:bg-elevated/30">
       <td className="py-3 pr-3 text-text-muted">{weekLabel(row.week_key)}</td>
       <td className="py-3 pr-3">
         <div className="font-bold text-primary">
           <span aria-hidden>{MEDAL[row.rank] ?? `#${row.rank}`}</span> {row.user.name}
         </div>
-        <div className="text-2xs text-text-muted">{row.email ?? "no email on file"}</div>
-        {row.college && <div className="text-2xs text-text-muted">{row.college}</div>}
+        <div className="text-2xs font-medium text-accent-primary">{row.email ?? "no email on file"}</div>
+        {row.college && <div className="text-3xs text-text-muted">{row.college}</div>}
       </td>
       <td className="py-3 pr-3">
-        {row.prize && (
+        {row.id !== null ? (
+          <div className="space-y-1">
+            <select
+              value={card}
+              onChange={(e) => setCard(e.target.value)}
+              className="h-8 w-full rounded-control border border-border-subtle bg-elevated px-2 text-2xs font-bold text-primary outline-none focus:border-accent-primary"
+            >
+              {VOUCHER_COMPANIES.map((c) => (
+                <option key={c.key} value={c.key}>
+                  {c.brand} (₹{c.amount})
+                </option>
+              ))}
+            </select>
+            <div className="flex items-center gap-1.5 text-3xs text-text-muted">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={activeCompany.logo} alt="" width={16} height={16} className="h-4 w-4 rounded-full bg-white object-contain p-0.5" />
+              <span>₹{activeCompany.amount} value</span>
+            </div>
+          </div>
+        ) : row.prize ? (
           <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full py-0.5 pl-0.5 pr-2 text-3xs font-bold text-white" style={{ background: row.prize.color }}>
             {/* eslint-disable-next-line @next/next/no-img-element -- static export: next/image's optimiser is unavailable */}
             <img src={row.prize.logo} alt="" width={16} height={16} className="h-4 w-4 rounded-full bg-white object-contain p-0.5" />
             {row.prize.brand} ₹{row.prize.amount}
           </span>
-        )}
+        ) : null}
       </td>
       <td className="py-3 pr-3">
         <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-3xs font-bold", STATUS_TONE[row.status])}>{STATUS_LABEL[row.status]}</span>
@@ -176,11 +199,11 @@ function LedgerRow({ row, busy, onSave }: { row: LedgerWinner; busy: boolean; on
           <span className="text-2xs text-text-muted">—</span>
         ) : (
           <div className="flex min-w-[13rem] flex-col gap-1.5">
-            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Voucher code or link" aria-label={`Voucher code for ${row.user.name}`} className="h-8 rounded-control border border-border-subtle bg-elevated px-2 font-mono text-2xs text-primary placeholder:text-text-muted focus:border-accent-primary focus:outline-none" />
+            <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="Type voucher code (e.g. DOMINOS-50)" aria-label={`Voucher code for ${row.user.name}`} className="h-8 rounded-control border border-border-subtle bg-elevated px-2 font-mono text-2xs font-bold text-primary placeholder:font-sans placeholder:font-normal placeholder:text-text-muted focus:border-accent-primary focus:outline-none" />
             <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (e.g. sent by e-mail)" aria-label={`Note for ${row.user.name}`} className="h-8 rounded-control border border-border-subtle bg-elevated px-2 text-2xs text-primary placeholder:text-text-muted focus:border-accent-primary focus:outline-none" />
             {dirty && (
-              <button type="button" disabled={busy} onClick={() => onSave({ voucher_code: code, note })} className="self-start rounded-control border border-border-strong px-2.5 py-1 text-3xs font-bold text-primary hover:bg-elevated disabled:opacity-60">
-                Save code &amp; note
+              <button type="button" disabled={busy} onClick={() => onSave({ card, voucher_code: code, note })} className="self-start rounded-control border border-border-strong px-2.5 py-1 text-3xs font-bold text-primary hover:bg-elevated disabled:opacity-60">
+                Save details
               </button>
             )}
           </div>
@@ -190,8 +213,13 @@ function LedgerRow({ row, busy, onSave }: { row: LedgerWinner; busy: boolean; on
         {row.id !== null && (
           <div className="flex flex-col items-end gap-1.5">
             {row.status !== "sent" && row.status !== "cancelled" && (
-              <button type="button" disabled={busy} onClick={() => onSave({ status: "sent", voucher_code: code, note })} className="inline-flex items-center gap-1 rounded-btn bg-status-success px-2.5 py-1.5 text-2xs font-bold text-white hover:opacity-90 disabled:opacity-60">
-                {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <Check className="h-3 w-3" aria-hidden />} Mark sent
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onSave({ status: "sent", ...(card !== (row.prize?.key ?? "") ? { card } : {}), voucher_code: code, note })}
+                className="inline-flex items-center gap-1 rounded-btn bg-status-success px-3 py-1.5 text-2xs font-bold text-white shadow-subtle hover:opacity-95 disabled:opacity-60"
+              >
+                {busy ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <Gift className="h-3 w-3" aria-hidden />} Give Coupon &amp; Mark sent
               </button>
             )}
             {row.status === "pending" && (

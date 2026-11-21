@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAccountCredentialsEmail;
 use App\Services\IssuedCredentialVault;
+use App\Services\Vault\MellowVaultUserSyncService;
 use App\Models\User;
 use App\Services\CollegeDepartmentService;
 use App\Services\StudentBulkNotificationService;
@@ -163,6 +164,16 @@ class TpoStudentController extends Controller
         $student->save();
 
         app(IssuedCredentialVault::class)->keep($student, $plainPassword, 'created');
+
+        // Automatically sync to Mellow Vault developer_details_tb
+        try {
+            app(MellowVaultUserSyncService::class)->syncUser($student, $plainPassword, [
+                'phone' => $validated['phone'] ?? null,
+                'branch' => $validated['branch'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            // Fail soft
+        }
 
         SingleMail::afterResponse(new SendAccountCredentialsEmail($student->id, $plainPassword));
 

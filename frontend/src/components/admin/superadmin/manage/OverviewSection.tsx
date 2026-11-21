@@ -1,18 +1,60 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, GraduationCap, Loader2, Pencil, ShieldCheck, Target, Trophy } from "lucide-react";
+import { Activity, AlertTriangle, Award, CheckCircle2, Clock, ExternalLink, GraduationCap, Laptop, Loader2, Mic, Pencil, ShieldCheck, Target, Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import type { ManagedUser } from "@/types/adminSubscriptions";
 import { formatDate, formatDateTime, type ApiCollege } from "../types";
+import { span } from "../activity/format";
 import { ReadinessEditModal } from "../ReadinessEditModal";
 import { Card, Row, SectionTitle, ghostButton, inputClass, primaryButton, timeAgo, type SectionProps } from "./shared";
 
 /** The student-only numbers the drawer adds from /superadmin/users/{id}/detail. */
 export interface StudentDetail {
-  user: { readiness_score: number; readiness_tier: "Placement Ready" | "In Progress" | "Needs Training"; readiness_overridden?: boolean };
+  user: {
+    readiness_score: number;
+    readiness_tier: "Placement Ready" | "In Progress" | "Needs Training";
+    readiness_overridden?: boolean;
+    is_independent?: boolean;
+  };
   stats: { solved_by_difficulty: { total_solved: number }; solved_score: number; streak: { current: number; max: number } };
+  interview_stats?: {
+    total_sessions: number;
+    completed_sessions: number;
+    total_practice_minutes: number;
+    average_score_percent: number | null;
+    sessions: {
+      id: number;
+      title: string;
+      round_name: string | null;
+      company_name: string | null;
+      interview_type: string | null;
+      status: string;
+      composite_score_percent: number | null;
+      has_score: boolean;
+      started_at: string | null;
+      completed_at: string | null;
+      duration_minutes: number | null;
+      responses_count: number;
+    }[];
+  };
+  platform_activity?: {
+    devices: string[];
+    browsers: string[];
+    os_list: string[];
+    primary_device: string | null;
+    last_ip: string | null;
+    total_active_minutes: number;
+    total_visits: number;
+    top_sections: {
+      section: string;
+      views: number;
+      minutes: number;
+      seconds: number;
+      last_at: string;
+    }[];
+  };
 }
 
 const TIER_STYLE: Record<string, string> = {
@@ -51,7 +93,13 @@ function toDraft(user: ManagedUser): Record<EditableKey, string> {
   };
 }
 
-export function OverviewSection({ data, reload, triggerToast, detail }: SectionProps & { detail: StudentDetail | null }) {
+export function OverviewSection({
+  data,
+  reload,
+  triggerToast,
+  detail,
+  onOpenLiveActivity,
+}: SectionProps & { detail: StudentDetail | null; onOpenLiveActivity?: () => void }) {
   const { user, capabilities } = data;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => toDraft(user));
@@ -163,6 +211,155 @@ export function OverviewSection({ data, reload, triggerToast, detail }: SectionP
               </button>
             </div>
           </div>
+
+          {detail.interview_stats && (
+            <div className="rounded-control border border-border-subtle bg-surface p-3.5 text-xs shadow-subtle">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-bold text-primary">
+                  <Mic className="h-4 w-4 text-violet-500" /> Mock AI Interviews Practice
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-violet-500/10 px-2 py-0.5 font-mono text-3xs font-bold text-violet-600 dark:text-violet-400">
+                    {detail.interview_stats.total_sessions} {detail.interview_stats.total_sessions === 1 ? "Session" : "Sessions"}
+                  </span>
+                  {onOpenLiveActivity && (
+                    <button
+                      type="button"
+                      onClick={onOpenLiveActivity}
+                      className="inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-3xs font-bold text-primary hover:bg-surface-hover hover:text-accent-primary transition-colors"
+                      title="Open complete screen & practice timeline"
+                    >
+                      <span>Timeline</span>
+                      <ExternalLink className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <p className="mt-0.5 text-3xs text-text-muted">Total practice time and spoken mock interview performance.</p>
+
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded bg-elevated p-2">
+                  <span className="text-3xs uppercase font-bold text-text-muted">Practice Time</span>
+                  <p className="font-mono text-sm font-black text-primary">
+                    {span(detail.interview_stats.total_practice_minutes * 60)}
+                  </p>
+                </div>
+                <div className="rounded bg-elevated p-2">
+                  <span className="text-3xs uppercase font-bold text-text-muted">Completed</span>
+                  <p className="font-mono text-sm font-black text-primary">{detail.interview_stats.completed_sessions}</p>
+                </div>
+                <div className="rounded bg-elevated p-2">
+                  <span className="text-3xs uppercase font-bold text-text-muted">Avg Score</span>
+                  <p className="font-mono text-sm font-black text-primary">
+                    {detail.interview_stats.average_score_percent !== null ? `${detail.interview_stats.average_score_percent}%` : "—"}
+                  </p>
+                </div>
+              </div>
+
+              {detail.interview_stats.sessions.length > 0 && (
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-3xs">
+                    <thead>
+                      <tr className="border-b border-border-subtle font-bold uppercase text-text-muted">
+                        <th className="py-1.5 pr-2">Interview</th>
+                        <th className="py-1.5 pr-2">Duration</th>
+                        <th className="py-1.5 pr-2">Score</th>
+                        <th className="py-1.5 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border-subtle">
+                      {detail.interview_stats.sessions.slice(0, 5).map((sess) => (
+                        <tr key={sess.id}>
+                          <td className="py-1.5 pr-2 font-semibold text-primary">
+                            <div>{sess.title}</div>
+                            {sess.round_name && <div className="text-text-muted">{sess.round_name}</div>}
+                          </td>
+                          <td className="py-1.5 pr-2 font-mono text-text-secondary">
+                            {sess.duration_minutes ? `${sess.duration_minutes}m` : "—"}
+                          </td>
+                          <td className="py-1.5 pr-2">
+                            {sess.composite_score_percent !== null ? (
+                              <span className="font-mono font-bold text-emerald-600">{sess.composite_score_percent}%</span>
+                            ) : (
+                              <span className="text-text-muted">Awaiting score</span>
+                            )}
+                          </td>
+                          <td className="py-1.5 text-right">
+                            <span
+                              className={cn(
+                                "rounded-full px-1.5 py-0.5 capitalize font-bold",
+                                sess.status === "completed" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
+                              )}
+                            >
+                              {sess.status.replace("_", " ")}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {detail.platform_activity && (
+            <div className="rounded-control border border-border-subtle bg-surface p-3.5 text-xs shadow-subtle">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 font-bold text-primary">
+                  <Laptop className="h-4 w-4 text-cyan-500" /> Platform & Device Activity
+                </div>
+                {onOpenLiveActivity && (
+                  <button
+                    type="button"
+                    onClick={onOpenLiveActivity}
+                    className="inline-flex items-center gap-1 rounded bg-elevated px-2 py-0.5 text-3xs font-bold text-primary hover:bg-surface-hover hover:text-accent-primary transition-colors"
+                    title="Open complete screen & practice timeline"
+                  >
+                    <span>Full Live Activity</span>
+                    <ExternalLink className="h-2.5 w-2.5" />
+                  </button>
+                )}
+              </div>
+              <p className="mt-0.5 text-3xs text-text-muted">Devices, browsers and total active time recorded across AptRun.</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2 text-3xs sm:grid-cols-4">
+                <div className="rounded bg-elevated p-2">
+                  <span className="uppercase font-bold text-text-muted">Active Time</span>
+                  <p className="mt-0.5 font-mono text-xs font-black text-primary">
+                    {span(detail.platform_activity.total_active_minutes * 60)}
+                  </p>
+                </div>
+                <div className="rounded bg-elevated p-2">
+                  <span className="uppercase font-bold text-text-muted">Device</span>
+                  <p className="mt-0.5 font-semibold text-primary truncate">
+                    {detail.platform_activity.devices.length > 0 ? detail.platform_activity.devices.join(", ") : "Desktop"}
+                  </p>
+                </div>
+                <div className="rounded bg-elevated p-2">
+                  <span className="uppercase font-bold text-text-muted">Browser & OS</span>
+                  <p className="mt-0.5 font-semibold text-primary truncate" title={`${detail.platform_activity.browsers.join(", ")} on ${detail.platform_activity.os_list.join(", ")}`}>
+                    {[detail.platform_activity.browsers[0], detail.platform_activity.os_list[0]].filter(Boolean).join(" · ") || "Web client"}
+                  </p>
+                </div>
+                <div className="rounded bg-elevated p-2">
+                  <span className="uppercase font-bold text-text-muted">Last IP</span>
+                  <p className="mt-0.5 font-mono text-primary truncate">{detail.platform_activity.last_ip ?? "—"}</p>
+                </div>
+              </div>
+
+              {detail.platform_activity.top_sections.length > 0 && (
+                <div className="mt-2.5 flex flex-wrap gap-1">
+                  {detail.platform_activity.top_sections.map((sec, i) => (
+                    <span key={i} className="inline-flex items-center gap-1 rounded border border-border-subtle bg-elevated px-1.5 py-0.5 text-3xs text-text-secondary">
+                      <span className="font-semibold text-primary">{sec.section}</span>
+                      <span className="font-mono text-text-muted">({sec.minutes}m)</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 

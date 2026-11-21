@@ -69,8 +69,14 @@ class PlanGate
     ];
 
     /** @throws PlanRequiredException */
-    public function requireHackathonAccess(User $user): void
+    public function requireHackathonAccess(User $user, ?\App\Models\Hackathon $hackathon = null): void
     {
+        // When AptRun schedules a hackathon for all users or mapped to a user's college,
+        // all eligible users in that audience are permitted to register and submit projects.
+        if ($hackathon !== null && $hackathon->isAvailableTo($user)) {
+            return;
+        }
+
         if (! $user->effectiveEntitlements()['hackathon_access']) {
             throw new PlanRequiredException(
                 'Hack Arena is part of the Expert plan. Upgrade to compete for prizes and placement opportunities.',

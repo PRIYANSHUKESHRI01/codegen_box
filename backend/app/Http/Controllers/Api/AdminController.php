@@ -20,6 +20,7 @@ use App\Services\CollegeDepartmentService;
 use App\Services\SectionCoordinatorService;
 use App\Support\BranchAudience;
 use App\Services\SubscriptionService;
+use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\SingleMail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -561,6 +562,13 @@ class AdminController extends Controller
         ]);
 
         app(IssuedCredentialVault::class)->keep($user, $temporaryPassword, 'created', $request->user());
+
+        // Automatically sync to Mellow Vault developer_details_tb
+        try {
+            app(MellowVaultUserSyncService::class)->syncUser($user, $temporaryPassword);
+        } catch (\Throwable $e) {
+            // Fail soft
+        }
 
         ActivityLog::record($request->user(), 'Created a student account', 'User', $user->name, ['email' => $user->email]);
 

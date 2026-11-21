@@ -20,6 +20,7 @@ export default function TpoVaultAiResultsPage() {
   return (
     <DashboardShell
       role="admin_tpo"
+      currentTpoView="tpo"
       title="Vault AI Interview results"
       subtitle="Your students' final averages across the three sets, their attempts, and the PDF report for each."
     >

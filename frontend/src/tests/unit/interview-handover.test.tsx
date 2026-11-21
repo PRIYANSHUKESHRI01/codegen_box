@@ -13,7 +13,7 @@ vi.mock("@/lib/api", async () => {
   return { ...actual, api: { get: net.get, post: vi.fn(), getFile: vi.fn() } };
 });
 vi.mock("@/lib/useAuthGuard", () => ({ useAuthGuard: () => ({ status: "ready", user: { id: 1 } }) }));
-vi.mock("@/lib/voice/VoiceEngine", () => ({ hasSpeechRecognition: () => true, hasSpeechSynthesis: () => true }));
+vi.mock("@/lib/voice/VoiceEngine", () => ({ hasSpeechRecognition: () => true, hasSpeechSynthesis: () => true, hasMediaRecorder: () => true }));
 vi.mock("@/components/dashboard/DashboardShell", () => ({
   DashboardShell: ({ title, children }: { title: string; children: React.ReactNode }) => (
     <main>

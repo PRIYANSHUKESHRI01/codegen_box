@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog, FilterX, RefreshCw, AlertTriangle } from "lucide-react";
+import { KeyRound, Search, Ban, CheckCircle2, Clock, UserCog, FilterX, RefreshCw, AlertTriangle, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
+import { downloadApiFile } from "@/lib/download";
 import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
 import { PLAN_FILTERS, ROLE_FILTERS, roleInfo } from "./accountRoles";
 import { ResetPasswordModal } from "./ResetPasswordModal";
@@ -64,8 +65,22 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
   const [roleFilter, setRoleFilter] = useState("");
   const [planFilter, setPlanFilter] = useState("");
   const [collegeId, setCollegeId] = useState("");
+  const [downloading, setDownloading] = useState(false);
   const [resetTarget, setResetTarget] = useState<ApiPlatformUser | null>(null);
   const [managedId, setManagedId] = useState<number | null>(null);
+
+  const handleDownloadReport = async () => {
+    setDownloading(true);
+    try {
+      const params = buildParams();
+      await downloadApiFile(`/superadmin/users/export?${params.toString()}`, "aptrun-accounts-report.csv");
+      triggerToast("Accounts report downloaded successfully.");
+    } catch {
+      triggerToast("Failed to download accounts report.", "error");
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const facets = useDirectoryFacets({ role: roleFilter, collegeId, search: searchDebounced, plan: planFilter });
 
@@ -245,6 +260,16 @@ export function AccountsPanel({ triggerToast }: AccountsPanelProps) {
               className="pl-8 pr-3 py-1.5 text-xs rounded-control bg-surface border border-border-subtle text-primary placeholder-text-muted outline-none focus:border-accent-primary"
             />
           </div>
+          <button
+            type="button"
+            onClick={handleDownloadReport}
+            disabled={downloading || total === 0}
+            title="Download accounts report (CSV)"
+            className="inline-flex items-center gap-1.5 rounded-control border border-border-subtle bg-surface px-3 py-1.5 text-xs font-bold text-primary shadow-subtle hover:bg-surface-hover hover:border-border-strong disabled:opacity-50"
+          >
+            <Download className={cn("h-3.5 w-3.5 text-accent-primary", downloading && "animate-bounce")} />
+            <span>{downloading ? "Exporting..." : "Download Report"}</span>
+          </button>
           {filtered && (
             <button
               type="button"

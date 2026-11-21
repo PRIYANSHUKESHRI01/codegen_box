@@ -79,6 +79,15 @@ class VaultPayloadBuilder
                     ->all(),
             ],
             'core' => $this->coreStrengths($user),
+            'ai_interview' => $profile->ai_interview_score !== null ? [
+                'score' => (float) $profile->ai_interview_score,
+                'stack_key' => $profile->ai_interview_stack,
+                'role_key' => $profile->ai_interview_role,
+                'scores' => $profile->ai_interview_scores,
+                'attempt' => (int) $profile->ai_interview_attempt,
+                'status' => 'qualified',
+                'qualified_at' => $profile->ai_interview_qualified_at?->toIso8601String(),
+            ] : null,
             'qualified_at' => $profile->qualified_at?->toIso8601String(),
         ];
     }

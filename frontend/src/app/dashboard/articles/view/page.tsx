@@ -112,7 +112,16 @@ function ArticleReaderPageContent() {
   if (status !== "ready") return <SessionLoader />;
 
   return (
-    <DashboardShell role="user" title="Article" fullBleed>
+    <DashboardShell
+      role="user"
+      title="Article"
+      fullBleed
+      back={
+        article
+          ? { href: `/dashboard/articles/topic?topicSlug=${article.article_topic.slug}`, label: article.article_topic.name }
+          : { href: "/dashboard/articles", label: "All Topics" }
+      }
+    >
       {loading ? (
         <div className="flex-1 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />

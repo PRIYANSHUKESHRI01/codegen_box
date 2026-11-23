@@ -15,7 +15,7 @@ vi.mock("@/lib/api", async () => {
 });
 vi.mock("@/lib/useAuthGuard", () => ({ useAuthGuard: () => ({ status: "ready", user: { id: 1, name: "Alex" } }) }));
 vi.mock("@/lib/toast", () => ({ toast: { error: vi.fn() } }));
-vi.mock("@/lib/voice/VoiceEngine", () => ({ hasSpeechRecognition: () => true, hasSpeechSynthesis: () => true }));
+vi.mock("@/lib/voice/VoiceEngine", () => ({ hasSpeechRecognition: () => true, hasSpeechSynthesis: () => true, hasMediaRecorder: () => true }));
 vi.mock("@/components/dashboard/DashboardShell", () => ({
   DashboardShell: ({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) => (
     <main>
@@ -175,7 +175,7 @@ describe("a Vault AI Interview set, after it is sat", () => {
     serve(summary({ my_session_status: "completed" }), { status: "needs_human_review", reattemptable: true, is_qualification: true, responses: [] });
     render(<VaultInterviewSetPage />);
 
-    expect(await screen.findByText(/Scoring didn.t complete for this set, so it hasn.t counted/)).toBeTruthy();
+    expect(await screen.findByText(/All Answers Recorded & Safely Saved/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: /Sit this set again/ }));
 
     await waitFor(() => expect(net.post).toHaveBeenCalledWith("/interviews/laravel-set-2/reattempt", {}));
@@ -186,7 +186,29 @@ describe("a Vault AI Interview set, after it is sat", () => {
     serve(summary({ my_session_status: "completed" }), { status: "needs_human_review", reattemptable: false, is_qualification: true, responses: [] });
     render(<VaultInterviewSetPage />);
 
-    expect(await screen.findByText(/A reviewer has been notified/)).toBeTruthy();
+    expect(await screen.findByText(/All Answers Recorded & Safely Saved/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Sit this set again/ })).toBeNull();
+  });
+
+  it("offers 'Proceed to Set 3' button when Set 2 is scored, and launches the next set", async () => {
+    net.post.mockResolvedValue({
+      message: "Qualification set launched.",
+      interview: { id: 6, title: "Set 3", slug: "laravel-set-3", practice_config: {} },
+    });
+    serve(summary({ my_session_status: "completed" }), scored(85));
+    render(<VaultInterviewSetPage />);
+
+    const proceedButtons = await screen.findAllByRole("button", { name: /Proceed to Set 3/ });
+    expect(proceedButtons.length).toBeGreaterThan(0);
+
+    fireEvent.click(proceedButtons[0]);
+
+    await waitFor(() => {
+      expect(net.post).toHaveBeenCalledWith("/vault-qualification/start-set", {
+        stack: "laravel",
+        set_number: 3,
+      });
+      expect(nav.push).toHaveBeenCalledWith("/dashboard/vault-interviews/session?slug=laravel-set-3");
+    });
   });
 });

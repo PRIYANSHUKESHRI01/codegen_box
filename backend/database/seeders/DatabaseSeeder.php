@@ -270,5 +270,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CuratedSetQuestionsSeeder::class);
         $this->call(MockInterviewQuestionsSeeder::class);
         $this->call(MockInterviewParentSetsSeeder::class);
+        $this->call(GeminiApiKeySeeder::class);
+        $this->call(AptBotFaqSeeder::class);
     }
 }

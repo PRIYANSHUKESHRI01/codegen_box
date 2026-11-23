@@ -45,6 +45,7 @@ class AuthController extends Controller
             'handle' => ['required', 'string', 'max:64', 'alpha_dash', 'unique:users,handle'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'graduation_year' => ['nullable', 'integer', 'min:2000', 'max:2040'],
         ]);
 
         $user = User::create([
@@ -53,6 +54,7 @@ class AuthController extends Controller
             'handle' => $validated['handle'],
             'password' => Hash::make($validated['password']),
             'phone' => $validated['phone'] ?? null,
+            'graduation_year' => $validated['graduation_year'] ?? null,
             'role' => User::ROLE_USER,
         ]);
 

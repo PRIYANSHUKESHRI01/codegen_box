@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { SessionLoader } from "@/components/ui/SessionLoader";
-import { Sparkles, Mic, Headphones, SpellCheck2, Newspaper, Flame, Trophy, BookOpen } from "lucide-react";
+import { Sparkles, Mic, Headphones, SpellCheck2, Newspaper, Flame, Trophy, BookOpen, ChevronLeft } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ModuleCard } from "@/components/dashboard/learningCentre/ModuleCard";
 import { StatTile } from "@/components/dashboard/student/StatTile";
@@ -27,8 +28,19 @@ export default function LearningCentrePage() {
       role="user"
       title="Learning Centre"
       subtitle="Your own space to read, listen, and speak your way to sharper English — scored by AI, built for practice."
+      back={{ href: "/dashboard", label: "Overview" }}
     >
       <div className="space-y-6">
+        <div>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Overview
+          </Link>
+        </div>
+
         {/* ── Hero ─────────────────────────────────────────────────────── */}
         <section
           className={cn(

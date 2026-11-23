@@ -405,3 +405,43 @@ export interface AttentionItem {
   tab: string;
   examples: { id?: number; label: string; note?: string | null }[];
 }
+
+export interface UsageTimelineDataPoint {
+  time_key: string;
+  label: string;
+  full_label: string;
+  users: number;
+  visits: number;
+  minutes: number;
+  actions: number;
+  interviews: number;
+  submissions: number;
+  sign_ins: number;
+}
+
+export interface UsageTimelineKpis {
+  unique_users: number;
+  total_visits: number;
+  total_minutes: number;
+  total_hours: number;
+  avg_minutes_per_user: number;
+  interviews_completed: number;
+  interviews_total: number;
+  submissions_total: number;
+  sign_ins_total: number;
+  peak_metric_label: string;
+}
+
+export interface UsageTimelineResponse {
+  period: "today" | "yesterday" | "this_week" | "this_month" | "day";
+  selected_date: string;
+  date_formatted: string;
+  timezone: string;
+  view_mode: "hourly" | "daily";
+  kpis: UsageTimelineKpis;
+  graph: UsageTimelineDataPoint[];
+  available_range: {
+    min_date: string;
+    max_date: string;
+  };
+}

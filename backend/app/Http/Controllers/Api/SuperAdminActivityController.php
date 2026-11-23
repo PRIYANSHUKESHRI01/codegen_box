@@ -79,6 +79,15 @@ class SuperAdminActivityController extends Controller
         return response()->json($this->analytics->detailedFeatureUsage($days, $role, $collegeId));
     }
 
+    /** Authentic platform usage timeline (hourly for today/yesterday/any-day, daily for week/month) excluding superadmin. */
+    public function usageTimeline(Request $request): JsonResponse
+    {
+        $period = $request->query('period', 'today');
+        $date = $request->query('date');
+
+        return response()->json($this->analytics->usageTimeline((string) $period, $date ? (string) $date : null));
+    }
+
     public function glance(): JsonResponse
     {
         return response()->json($this->analytics->glance());

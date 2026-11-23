@@ -60,38 +60,60 @@ class GeminiQuestionGeneratorService
 
         $perCategoryCounts = $this->splitCountAcrossCategories($count, $categories);
         $prompt = $this->buildPrompt($role, $difficulty, $perCategoryCounts, $skills, $avoidQuestionTexts, $discipline);
+        $primaryModel = (string) config('services.gemini.model', 'gemini-2.5-flash');
+        $models = array_values(array_unique(array_filter([
+            $primaryModel,
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+        ])));
 
-        try {
-            $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt) {
-                return Http::withHeaders(['x-goog-api-key' => $currentKey])
-                    ->timeout(20)
-                    ->post(
-                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
-                        [
-                            'contents' => [
-                                ['parts' => [['text' => $prompt]]],
-                            ],
-                            'generationConfig' => [
-                                'temperature' => 0.9,
-                                'maxOutputTokens' => 4096,
-                                'responseMimeType' => 'application/json',
-                                'responseSchema' => $this->responseSchema(),
-                            ],
-                        ]
-                    );
-            });
-        } catch (\Throwable $e) {
-            Log::warning('[Gemini] request failed', ['error' => $e->getMessage()]);
-            throw new RuntimeException('AI question generation is temporarily unavailable. Try again, or add questions from the bank.');
+        $lastException = null;
+
+        foreach ($models as $model) {
+            try {
+                $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt, $model) {
+                    return Http::withHeaders(['x-goog-api-key' => $currentKey])
+                        ->timeout(20)
+                        ->post(
+                            "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
+                            [
+                                'contents' => [
+                                    ['parts' => [['text' => $prompt]]],
+                                ],
+                                'generationConfig' => [
+                                    'temperature' => 0.9,
+                                    'maxOutputTokens' => 4096,
+                                    'responseMimeType' => 'application/json',
+                                    'responseSchema' => $this->responseSchema(),
+                                ],
+                            ]
+                        );
+                });
+
+                if ($response->successful()) {
+                    $text = $response->json('candidates.0.content.parts.0.text');
+                    $clean = preg_replace('/^```(?:json)?\s*/i', '', trim((string) $text));
+                    $clean = preg_replace('/\s*```$/', '', (string) $clean);
+                    $items = json_decode(trim((string) $clean), true);
+
+                    if (is_array($items) && ! empty($items)) {
+                        $sanitized = $this->sanitizeItems($items, $categories, $difficulty);
+                        if (! empty($sanitized)) {
+                            return $sanitized;
+                        }
+                    }
+                }
+
+                Log::warning("[GeminiQuestionGenerator] Model '{$model}' returned status {$response->status()}, trying fallback model...");
+            } catch (\Throwable $e) {
+                Log::warning("[GeminiQuestionGenerator] Model '{$model}' failed: {$e->getMessage()}, trying fallback...");
+                $lastException = $e;
+            }
         }
 
-        if ($response->failed()) {
-            Log::warning('[Gemini] non-2xx response', ['status' => $response->status(), 'body' => $response->body()]);
-            throw new RuntimeException('AI question generation is temporarily unavailable. Try again, or add questions from the bank.');
-        }
-
-        $text = $response->json('candidates.0.content.parts.0.text');
-        $items = $text ? json_decode($text, true) : null;
+        Log::warning('[Gemini] All models failed in question generation', ['error' => $lastException?->getMessage()]);
+        throw new RuntimeException('AI question generation is temporarily unavailable across all models. Try again, or add questions from the bank.');
 
         if (! is_array($items)) {
             Log::warning('[Gemini] unparseable response body', ['body' => $response->body()]);

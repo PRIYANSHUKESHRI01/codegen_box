@@ -22,18 +22,22 @@ export interface Observation {
   pitch: number | null;
   /** Best "cell phone" score from the object detector for this frame, if it ran. */
   phone?: number;
+  /** Normalized cosine similarity (0.0 - 1.0) compared to verified photo baseline, or null if baseline not set / no face. */
+  faceSimilarity?: number | null;
 }
 
 export type Finding =
   | { type: "no_face"; data: { seconds: number } }
   | { type: "multiple_faces"; data: { faces: number; seconds: number } }
   | { type: "face_away"; data: { seconds: number; yaw: number; pitch: number } }
-  | { type: "phone_detected"; data: { score: number } };
+  | { type: "phone_detected"; data: { score: number } }
+  | { type: "face_mismatch"; data: { similarity: number; seconds: number } };
 
 export const NO_FACE_MS = 8_000;
 export const MULTI_MS = 4_000;
 export const AWAY_MS = 8_000;
-const REARM_MS = { no_face: 45_000, multiple_faces: 60_000, face_away: 45_000, phone_detected: 60_000 } as const;
+export const MISMATCH_MS = 3_000;
+const REARM_MS = { no_face: 45_000, multiple_faces: 60_000, face_away: 45_000, phone_detected: 60_000, face_mismatch: 45_000 } as const;
 
 const YAW_LIMIT = 0.22;
 const PITCH_LIMIT = 0.2;
@@ -73,6 +77,7 @@ export class AttentionRules {
   private noFaceSince: number | null = null;
   private multiSince: number | null = null;
   private awaySince: number | null = null;
+  private mismatchSince: number | null = null;
   private firstPhoneAt: number | null = null;
   private baseline: { yaw: number; pitch: number } | null = null;
   private samples: { yaw: number[]; pitch: number[] } = { yaw: [], pitch: [] };
@@ -122,6 +127,26 @@ export class AttentionRules {
       }
     } else if (o.faces !== 1) {
       this.awaySince = null;
+    }
+
+    // ── face mismatch (different person from registered photo) ──
+    if (o.faces === 1 && o.faceSimilarity !== undefined && o.faceSimilarity !== null) {
+      if (o.faceSimilarity < 0.82) {
+        this.mismatchSince ??= o.t;
+        if (o.t - this.mismatchSince >= MISMATCH_MS && this.armed("face_mismatch", o.t)) {
+          out.push({
+            type: "face_mismatch",
+            data: {
+              similarity: round(o.faceSimilarity),
+              seconds: Math.round((o.t - this.mismatchSince) / 1000),
+            },
+          });
+        }
+      } else {
+        this.mismatchSince = null;
+      }
+    } else {
+      this.mismatchSince = null;
     }
 
     // ── a phone, seen twice ──

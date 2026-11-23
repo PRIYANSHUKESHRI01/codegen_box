@@ -469,7 +469,7 @@ function PastAttempts({ attempts }: { attempts?: VaultQualificationStatusRespons
   );
 }
 
-export function CuratedSetsExplorer({ className }: { className?: string }) {
+export function CuratedSetsExplorer({ className, initialStack }: { className?: string; initialStack?: string }) {
   const router = useRouter();
   const [catalog, setCatalog] = useState<CuratedCatalogResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -479,6 +479,22 @@ export function CuratedSetsExplorer({ className }: { className?: string }) {
   // Navigation Drill-Down State
   const [selectedRoleKey, setSelectedRoleKey] = useState<string | null>(null);
   const [selectedStackKey, setSelectedStackKey] = useState<string | null>(null);
+
+  // If a ?stack=... query param or initialStack prop is provided, jump straight to that track
+  useEffect(() => {
+    if (!catalog) return;
+    const urlStack = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("stack") : null;
+    const stackParam = initialStack ?? urlStack;
+    if (!stackParam) return;
+    for (const r of catalog.roles) {
+      const found = r.stacks.find((st) => st.key.toLowerCase() === stackParam.toLowerCase());
+      if (found) {
+        setSelectedRoleKey(r.key);
+        setSelectedStackKey(found.key);
+        break;
+      }
+    }
+  }, [catalog, initialStack]);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState("");

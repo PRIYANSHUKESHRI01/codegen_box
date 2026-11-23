@@ -20,7 +20,7 @@ class ArticleTopic extends Model
     public const COLORS = ['indigo', 'emerald', 'amber', 'sky', 'rose'];
 
     /** Curated lucide-react icon names a topic (or an article overriding it) may use. */
-    public const ICONS = ['Binary', 'Code2', 'Terminal', 'Cpu', 'Network', 'Database', 'GitBranch', 'Layers'];
+    public const ICONS = ['Binary', 'Code2', 'Terminal', 'Cpu', 'Network', 'Database', 'GitBranch', 'Layers', 'Cloud', 'ShieldCheck'];
 
     protected $fillable = [
         'name',

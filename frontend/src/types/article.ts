@@ -4,7 +4,7 @@ export type ArticleStatus = "draft" | "published";
 export type TopicColor = "indigo" | "emerald" | "amber" | "sky" | "rose";
 
 /** Kept in eyeball-lockstep with backend ArticleTopic::ICONS. */
-export const TOPIC_ICON_NAMES = ["Binary", "Code2", "Terminal", "Cpu", "Network", "Database", "GitBranch", "Layers"] as const;
+export const TOPIC_ICON_NAMES = ["Binary", "Code2", "Terminal", "Cpu", "Network", "Database", "GitBranch", "Layers", "Cloud", "ShieldCheck"] as const;
 export type TopicIconName = (typeof TOPIC_ICON_NAMES)[number];
 
 export const TOPIC_COLORS: Record<TopicColor, string> = {

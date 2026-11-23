@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
+  ChevronLeft,
   Loader2,
   Mic,
   Square,
@@ -285,7 +286,11 @@ export default function SpeakingSessionPage() {
 
   if (stage === "not_found" || !prompt) {
     return (
-      <DashboardShell role="user" title="Speaking Practice">
+      <DashboardShell
+        role="user"
+        title="Speaking Practice"
+        back={{ href: "/dashboard/learning-centre/speaking", label: "Speaking Practice" }}
+      >
         <div className="p-10 text-center text-xs text-status-danger rounded-panel bg-surface border border-border-subtle space-y-3">
           <p>This prompt couldn&apos;t be found.</p>
           <Link href="/dashboard/learning-centre/speaking" className="text-accent-primary font-semibold hover:underline">
@@ -300,8 +305,22 @@ export default function SpeakingSessionPage() {
   const showInterviewNudge = !!result?.passed && prompt.category === "Interview Ready";
 
   return (
-    <DashboardShell role="user" title="Speaking Practice" subtitle={prompt.title}>
+    <DashboardShell
+      role="user"
+      title="Speaking Practice"
+      subtitle={prompt.title}
+      back={{ href: "/dashboard/learning-centre/speaking", label: "Speaking Practice" }}
+    >
       <div className="max-w-2xl mx-auto space-y-4">
+        <div>
+          <Link
+            href="/dashboard/learning-centre/speaking"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Speaking Practice
+          </Link>
+        </div>
         {error && stage !== "recording" && (
           <div role="alert" className="flex items-start gap-2 p-3 rounded-control bg-status-danger/10 border border-status-danger/25 text-xs text-status-danger">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />

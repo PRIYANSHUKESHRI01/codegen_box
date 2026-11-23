@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BadgeCheck, Loader2, LockOpen, PencilLine, RotateCcw } from "lucide-react";
+import { BadgeCheck, Loader2, LockOpen, PencilLine, RotateCcw, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { Modal } from "@/components/ui/Modal";
@@ -14,7 +14,8 @@ export type VaultAiAction =
   | { kind: "reset"; stackKey: string; stackName: string; row: VaultAiQualificationRow }
   | { kind: "scores"; stackKey: string; stackName: string; row: VaultAiQualificationRow; attempt: VaultAiAttempt | null }
   | { kind: "qualify"; stackKey: string; stackName: string; row: VaultAiQualificationRow | null }
-  | { kind: "unlock" };
+  | { kind: "unlock" }
+  | { kind: "reinstate_proctoring" };
 
 interface Props {
   studentId: number;
@@ -98,6 +99,9 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
       } else if (action.kind === "qualify") {
         const res = await api.post<VaultAiStudentResponse>(`${base}/stacks/${action.stackKey}/qualify`, { average: qualifyNumber, reason: reason.trim() });
         onDone(res, `${studentName} is now qualified in ${action.stackName} at ${qualifyNumber}%.`);
+      } else if (action.kind === "reinstate_proctoring") {
+        const res = await api.post<VaultAiStudentResponse>(`${base}/reinstate-proctoring`, { reason: reason.trim() });
+        onDone(res, `Proctoring session reinstated and full access re-granted for ${studentName}.`);
       } else {
         const res = await api.post<VaultAiStudentResponse>(`${base}/unlock-access`, { reason: reason.trim() });
         onDone(res, `The Vault AI Interview is open for ${studentName}.`);
@@ -136,9 +140,10 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
     scores: { title: action.kind === "scores" && action.attempt ? `Correct attempt ${action.attempt.attempt}` : "Enter marks", icon: PencilLine, cta: "Save marks" },
     qualify: { title: "Mark qualified", icon: BadgeCheck, cta: "Mark qualified" },
     unlock: { title: "Open the interview now", icon: LockOpen, cta: "Open it" },
+    reinstate_proctoring: { title: "Reinstate Proctoring & Re-grant Access", icon: ShieldCheck, cta: "Reinstate Access" },
   }[action.kind];
 
-  const subtitle = action.kind === "unlock" ? studentName : `${studentName} · ${action.stackName}`;
+  const subtitle = action.kind === "unlock" || action.kind === "reinstate_proctoring" ? studentName : `${studentName} · ${action.stackName}`;
   const destructive = action.kind === "reset" && action.row.status === "qualified";
 
   return (
@@ -317,6 +322,18 @@ export function VaultAiActionModal({ studentId, studentName, action, onClose, on
             <strong className="text-primary">{studentName}</strong> is still inside the waiting period or below the readiness line. This opens the Vault AI Interview for them now, and it stays open — it is recorded exactly as if they had earned the unlock. They are
             told by notification.
           </p>
+        )}
+
+        {action.kind === "reinstate_proctoring" && (
+          <div className="rounded-2xl border border-accent-primary/20 bg-accent-primary/5 p-4 text-xs space-y-2">
+            <p className="font-bold text-primary">Unblock Candidate & Reset Proctoring</p>
+            <p className="text-text-secondary leading-relaxed">
+              This will immediately unlock any terminated proctoring sessions, reset strike counts to zero, unblock the candidate account, and clear any cooling down restriction.
+            </p>
+            <p className="text-3xs text-text-muted">
+              An audit record will be logged with your reason, and the candidate will receive an immediate in-app notification confirming their access has been restored.
+            </p>
+          </div>
         )}
 
         <div>

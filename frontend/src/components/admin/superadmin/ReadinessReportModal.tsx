@@ -389,3 +389,4 @@ export function ReadinessReportModal({ collegeId = "", department = "", affiliat
     </div>
   );
 }
+

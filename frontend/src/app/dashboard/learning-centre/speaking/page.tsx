@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Loader2, Mic, ArrowRight, Trophy, Sparkles, AlertTriangle } from "lucide-react";
+import { Loader2, Mic, ArrowRight, Trophy, Sparkles, AlertTriangle, ChevronLeft } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
@@ -181,7 +181,18 @@ export default function SpeakingPracticeListPage() {
       role="user"
       title="Speaking Practice"
       subtitle="Read a passage aloud and get coached on clarity, fluency and accuracy — the way an interviewer will hear you. Score 60+ to pass, or try again instantly."
+      back={{ href: "/dashboard/learning-centre", label: "Learning Centre" }}
     >
+      <div className="mb-4">
+        <Link
+          href="/dashboard/learning-centre"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Learning Centre
+        </Link>
+      </div>
+
       <FreeTrialBanner feature="speaking" />
 
       {loading ? (

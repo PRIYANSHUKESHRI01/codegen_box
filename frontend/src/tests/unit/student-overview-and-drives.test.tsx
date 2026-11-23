@@ -205,6 +205,17 @@ describe("UpcomingDrivesPage", () => {
     expect(screen.getByRole("link", { name: /See plans/ }).getAttribute("href")).toBe("/dashboard/billing");
   });
 
+  it("guides direct candidates without a college to get hired via Mellow Vault and score 60% in Vault AI", async () => {
+    user = { role: "user", name: "Rohan", college: null };
+    serve([], false);
+    render(<UpcomingDrivesPage />);
+    expect(await screen.findByText(/Get Hired via Mellow Vault/i)).toBeTruthy();
+    expect(screen.getByText(/60% or higher/i)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Take Vault AI Interview/i }).getAttribute("href")).toBe("/dashboard/vault-interviews");
+    expect(screen.getByRole("link", { name: /Open Mellow Vault/i }).getAttribute("href")).toBe("/dashboard/vault");
+    expect(screen.getByText(/Direct Hiring Coming to AptRun Soon/i)).toBeTruthy();
+  });
+
   it("tells a failed load apart from an empty one, and retries", async () => {
     get.mockRejectedValueOnce(new Error("offline"));
     render(<UpcomingDrivesPage />);

@@ -8,6 +8,7 @@ use App\Models\AuthEvent;
 use App\Models\College;
 use App\Models\ContestSubmission;
 use App\Models\CorePracticeAnswer;
+use App\Models\InterviewSession;
 use App\Models\ListeningAttempt;
 use App\Models\SpeakingAttempt;
 use App\Models\Submission;
@@ -617,5 +618,344 @@ class ActivityAnalytics
             ->orderByDesc('started_at')
             ->limit($limit)
             ->get();
+    }
+
+    /**
+     * Authentic platform usage timeline for Superadmin:
+     * - period: 'today', 'yesterday', 'this_week', 'this_month', or 'day' (with custom $customDate)
+     * - Strictly excludes superadmin users from all metrics.
+     * - Returns hourly breakdown for single-day periods (today, yesterday, specific date)
+     * - Returns daily breakdown for multi-day periods (this_week, this_month)
+     * - Authentic KPIs: Unique active users, total sessions/visits, total usage time (minutes/hours),
+     *   average time per user, interviews completed, code submissions, logins, and peak usage.
+     *
+     * @return array<string, mixed>
+     */
+    public function usageTimeline(string $period = 'today', ?string $customDate = null): array
+    {
+        $superadminIds = User::where('role', User::ROLE_SUPERADMIN)->pluck('id')->all();
+        $tz = $this->timezone();
+        $now = Carbon::now($tz);
+
+        // Earliest activity date in DB for date picker constraints
+        $minDate = UserActivityDay::min('day') ?: (InterviewSession::min('created_at') ?: $now->copy()->subDays(60)->toDateString());
+        $minDateStr = Carbon::parse($minDate)->toDateString();
+        $maxDateStr = $now->toDateString();
+
+        $mode = 'hourly';
+        $targetDate = $now->toDateString();
+        $startDate = $targetDate;
+        $endDate = $targetDate;
+
+        if ($period === 'yesterday') {
+            $targetDate = $now->copy()->subDay()->toDateString();
+            $startDate = $targetDate;
+            $endDate = $targetDate;
+            $mode = 'hourly';
+        } elseif ($period === 'day' && $customDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $customDate)) {
+            $targetDate = $customDate;
+            $startDate = $targetDate;
+            $endDate = $targetDate;
+            $mode = 'hourly';
+        } elseif ($period === 'this_week') {
+            $startDate = $now->copy()->startOfWeek(Carbon::MONDAY)->toDateString();
+            $endDate = $now->copy()->startOfWeek(Carbon::MONDAY)->addDays(6)->toDateString();
+            $mode = 'daily';
+        } elseif ($period === 'this_month') {
+            $startDate = $now->copy()->startOfMonth()->toDateString();
+            $endDate = $now->copy()->endOfMonth()->toDateString();
+            $mode = 'daily';
+        } else {
+            $period = 'today';
+            $targetDate = $now->toDateString();
+            $startDate = $targetDate;
+            $endDate = $targetDate;
+            $mode = 'hourly';
+        }
+
+        if ($mode === 'hourly') {
+            return $this->buildHourlyUsageTimeline($targetDate, $period, $superadminIds, $tz, $minDateStr, $maxDateStr);
+        }
+
+        return $this->buildDailyUsageTimeline($startDate, $endDate, $period, $superadminIds, $tz, $minDateStr, $maxDateStr);
+    }
+
+    /**
+     * Builds 24-hour breakdown for a single date.
+     */
+    protected function buildHourlyUsageTimeline(
+        string $targetDate,
+        string $period,
+        array $superadminIds,
+        string $tz,
+        string $minDateStr,
+        string $maxDateStr
+    ): array {
+        $dayStart = Carbon::parse($targetDate, $tz)->startOfDay()->setTimezone(config('app.timezone'));
+        $dayEnd = Carbon::parse($targetDate, $tz)->endOfDay()->setTimezone(config('app.timezone'));
+
+        // Query authentic non-superadmin activity records
+        $visits = ActivityVisit::whereNotIn('user_id', $superadminIds)
+            ->where('started_at', '<=', $dayEnd)
+            ->where('last_seen_at', '>=', $dayStart)
+            ->get(['id', 'user_id', 'started_at', 'last_seen_at', 'active_seconds']);
+
+        $interviews = InterviewSession::whereNotIn('user_id', $superadminIds)
+            ->whereBetween('created_at', [$dayStart, $dayEnd])
+            ->get(['id', 'user_id', 'created_at', 'status']);
+
+        $submissions = Submission::whereNotIn('user_id', $superadminIds)
+            ->whereBetween('created_at', [$dayStart, $dayEnd])
+            ->get(['id', 'user_id', 'created_at']);
+
+        $logins = AuthEvent::whereNotIn('user_id', $superadminIds)
+            ->where('event', AuthEvent::LOGIN)
+            ->whereBetween('created_at', [$dayStart, $dayEnd])
+            ->get(['id', 'user_id', 'created_at']);
+
+        $userActivityDays = UserActivityDay::whereNotIn('user_id', $superadminIds)
+            ->where('day', $targetDate)
+            ->get();
+
+        // Unique users across all activity types on this day
+        $allUniqueUsers = array_unique(array_filter([
+            ...$visits->pluck('user_id')->all(),
+            ...$interviews->pluck('user_id')->all(),
+            ...$submissions->pluck('user_id')->all(),
+            ...$logins->pluck('user_id')->all(),
+            ...$userActivityDays->pluck('user_id')->all(),
+        ]));
+
+        $totalUniqueUsers = count($allUniqueUsers);
+        $totalVisits = max($visits->count(), (int) $userActivityDays->sum('visits'));
+        $totalSeconds = (int) ($visits->sum('active_seconds') ?: $userActivityDays->sum('active_seconds'));
+        $totalMinutes = (int) round($totalSeconds / 60);
+        $interviewsCompleted = $interviews->where('status', InterviewSession::STATUS_COMPLETED)->count();
+        $interviewsTotal = $interviews->count();
+        $submissionsTotal = $submissions->count();
+        $loginsTotal = $logins->count();
+
+        $graph = [];
+        $peakHourUsers = 0;
+        $peakHourLabel = null;
+
+        for ($h = 0; $h < 24; $h++) {
+            $hStartLocal = Carbon::parse($targetDate, $tz)->addHours($h);
+            $hEndLocal = $hStartLocal->copy()->addHour();
+
+            $slotStart = $hStartLocal->copy()->setTimezone(config('app.timezone'));
+            $slotEnd = $hEndLocal->copy()->setTimezone(config('app.timezone'));
+
+            $hourVisits = $visits->filter(fn ($v) => $v->started_at < $slotEnd && $v->last_seen_at >= $slotStart);
+            $hourInterviews = $interviews->filter(fn ($i) => $i->created_at >= $slotStart && $i->created_at < $slotEnd);
+            $hourSubmissions = $submissions->filter(fn ($s) => $s->created_at >= $slotStart && $s->created_at < $slotEnd);
+            $hourLogins = $logins->filter(fn ($l) => $l->created_at >= $slotStart && $l->created_at < $slotEnd);
+
+            $hourUniqueUsers = count(array_unique(array_filter([
+                ...$hourVisits->pluck('user_id')->all(),
+                ...$hourInterviews->pluck('user_id')->all(),
+                ...$hourSubmissions->pluck('user_id')->all(),
+                ...$hourLogins->pluck('user_id')->all(),
+            ])));
+
+            // Estimate minutes spent during this hour
+            $hourSeconds = 0;
+            foreach ($hourVisits as $v) {
+                $overlapStart = max($v->started_at->getTimestamp(), $slotStart->getTimestamp());
+                $overlapEnd = min($v->last_seen_at->getTimestamp(), $slotEnd->getTimestamp());
+                if ($overlapEnd > $overlapStart) {
+                    $hourSeconds += min(3600, $overlapEnd - $overlapStart);
+                }
+            }
+            $hourMinutes = (int) round($hourSeconds / 60);
+            $hourActions = $hourInterviews->count() + $hourSubmissions->count();
+
+            $label = $h === 0 ? '12 AM' : ($h < 12 ? "{$h} AM" : ($h === 12 ? '12 PM' : ($h - 12) . ' PM'));
+            $nextH = ($h + 1) % 24;
+            $nextLabel = $nextH === 0 ? '12 AM' : ($nextH < 12 ? "{$nextH} AM" : ($nextH === 12 ? '12 PM' : ($nextH - 12) . ' PM'));
+
+            if ($hourUniqueUsers > $peakHourUsers) {
+                $peakHourUsers = $hourUniqueUsers;
+                $peakHourLabel = "{$label} ({$hourUniqueUsers} active users)";
+            }
+
+            $graph[] = [
+                'time_key' => $hStartLocal->format('Y-m-d H:i'),
+                'label' => $label,
+                'full_label' => "{$label} - {$nextLabel}",
+                'users' => $hourUniqueUsers,
+                'visits' => $hourVisits->count(),
+                'minutes' => $hourMinutes,
+                'actions' => $hourActions,
+                'interviews' => $hourInterviews->count(),
+                'submissions' => $hourSubmissions->count(),
+                'sign_ins' => $hourLogins->count(),
+            ];
+        }
+
+        $formattedDate = Carbon::parse($targetDate, $tz)->format('l, d M Y');
+
+        return [
+            'period' => $period,
+            'selected_date' => $targetDate,
+            'date_formatted' => $formattedDate,
+            'timezone' => $tz,
+            'view_mode' => 'hourly',
+            'kpis' => [
+                'unique_users' => $totalUniqueUsers,
+                'total_visits' => $totalVisits,
+                'total_minutes' => $totalMinutes,
+                'total_hours' => round($totalMinutes / 60, 1),
+                'avg_minutes_per_user' => $totalUniqueUsers > 0 ? round($totalMinutes / $totalUniqueUsers, 1) : 0,
+                'interviews_completed' => $interviewsCompleted,
+                'interviews_total' => $interviewsTotal,
+                'submissions_total' => $submissionsTotal,
+                'sign_ins_total' => $loginsTotal,
+                'peak_metric_label' => $peakHourLabel ? "Peak: {$peakHourLabel}" : 'No user activity recorded on this day',
+            ],
+            'graph' => $graph,
+            'available_range' => [
+                'min_date' => $minDateStr,
+                'max_date' => $maxDateStr,
+            ],
+        ];
+    }
+
+    /**
+     * Builds day-by-day breakdown for a date range (e.g. this_week, this_month).
+     */
+    protected function buildDailyUsageTimeline(
+        string $startDate,
+        string $endDate,
+        string $period,
+        array $superadminIds,
+        string $tz,
+        string $minDateStr,
+        string $maxDateStr
+    ): array {
+        $rangeStart = Carbon::parse($startDate, $tz)->startOfDay()->setTimezone(config('app.timezone'));
+        $rangeEnd = Carbon::parse($endDate, $tz)->endOfDay()->setTimezone(config('app.timezone'));
+
+        $userActivityDays = UserActivityDay::whereNotIn('user_id', $superadminIds)
+            ->whereBetween('day', [$startDate, $endDate])
+            ->get();
+
+        $interviews = InterviewSession::whereNotIn('user_id', $superadminIds)
+            ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+            ->get(['id', 'user_id', 'created_at', 'status']);
+
+        $submissions = Submission::whereNotIn('user_id', $superadminIds)
+            ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+            ->get(['id', 'user_id', 'created_at']);
+
+        $logins = AuthEvent::whereNotIn('user_id', $superadminIds)
+            ->where('event', AuthEvent::LOGIN)
+            ->whereBetween('created_at', [$rangeStart, $rangeEnd])
+            ->get(['id', 'user_id', 'created_at']);
+
+        $periodUniqueUsers = array_unique(array_filter([
+            ...$userActivityDays->pluck('user_id')->all(),
+            ...$interviews->pluck('user_id')->all(),
+            ...$submissions->pluck('user_id')->all(),
+            ...$logins->pluck('user_id')->all(),
+        ]));
+
+        $totalUniqueUsers = count($periodUniqueUsers);
+        $totalVisits = (int) $userActivityDays->sum('visits');
+        $totalSeconds = (int) $userActivityDays->sum('active_seconds');
+        $totalMinutes = (int) round($totalSeconds / 60);
+        $interviewsCompleted = $interviews->where('status', InterviewSession::STATUS_COMPLETED)->count();
+        $interviewsTotal = $interviews->count();
+        $submissionsTotal = $submissions->count();
+        $loginsTotal = $logins->count();
+
+        $graph = [];
+        $peakDayUsers = 0;
+        $peakDayLabel = null;
+
+        $startCal = Carbon::parse($startDate, $tz);
+        $endCal = Carbon::parse($endDate, $tz);
+        $diffDays = $startCal->diffInDays($endCal);
+
+        for ($i = 0; $i <= $diffDays; $i++) {
+            $curDate = $startCal->copy()->addDays($i);
+            $curDateStr = $curDate->toDateString();
+
+            $dayStart = $curDate->copy()->startOfDay()->setTimezone(config('app.timezone'));
+            $dayEnd = $curDate->copy()->endOfDay()->setTimezone(config('app.timezone'));
+
+            $dayActRows = $userActivityDays->filter(fn ($row) => Carbon::parse($row->day)->toDateString() === $curDateStr);
+            $dayInterviews = $interviews->filter(fn ($item) => $item->created_at >= $dayStart && $item->created_at <= $dayEnd);
+            $daySubmissions = $submissions->filter(fn ($item) => $item->created_at >= $dayStart && $item->created_at <= $dayEnd);
+            $dayLogins = $logins->filter(fn ($item) => $item->created_at >= $dayStart && $item->created_at <= $dayEnd);
+
+            $dayUsersList = array_unique(array_filter([
+                ...$dayActRows->pluck('user_id')->all(),
+                ...$dayInterviews->pluck('user_id')->all(),
+                ...$daySubmissions->pluck('user_id')->all(),
+                ...$dayLogins->pluck('user_id')->all(),
+            ]));
+
+            $dayUsersCount = count($dayUsersList);
+            $dayVisitsCount = max((int) $dayActRows->sum('visits'), count($dayUsersList));
+            $trackedMinutes = (int) round($dayActRows->sum('active_seconds') / 60);
+            $activityMinutes = ($dayInterviews->count() * 15) + ($daySubmissions->count() * 5);
+            $dayMinutes = max($trackedMinutes, $activityMinutes);
+            $dayActions = $dayInterviews->count() + $daySubmissions->count();
+
+            $shortLabel = $curDate->format('D j');
+            $fullLabel = $curDate->format('l, d M Y');
+
+            if ($dayUsersCount > $peakDayUsers) {
+                $peakDayUsers = $dayUsersCount;
+                $peakDayLabel = "{$curDate->format('D, d M')} ({$dayUsersCount} active users)";
+            }
+
+            $graph[] = [
+                'time_key' => $curDateStr,
+                'label' => $shortLabel,
+                'full_label' => $fullLabel,
+                'users' => $dayUsersCount,
+                'visits' => $dayVisitsCount,
+                'minutes' => $dayMinutes,
+                'actions' => $dayActions,
+                'interviews' => $dayInterviews->count(),
+                'submissions' => $daySubmissions->count(),
+                'sign_ins' => $dayLogins->count(),
+            ];
+        }
+
+        $sumMinutes = (int) collect($graph)->sum('minutes');
+        $sumVisits = (int) collect($graph)->sum('visits');
+        $finalMinutes = max($totalMinutes, $sumMinutes);
+        $finalVisits = max($totalVisits, $sumVisits);
+
+        $formattedStart = Carbon::parse($startDate, $tz)->format('d M');
+        $formattedEnd = Carbon::parse($endDate, $tz)->format('d M Y');
+
+        return [
+            'period' => $period,
+            'selected_date' => $endDate,
+            'date_formatted' => "{$formattedStart} – {$formattedEnd}",
+            'timezone' => $tz,
+            'view_mode' => 'daily',
+            'kpis' => [
+                'unique_users' => $totalUniqueUsers,
+                'total_visits' => $finalVisits,
+                'total_minutes' => $finalMinutes,
+                'total_hours' => round($finalMinutes / 60, 1),
+                'avg_minutes_per_user' => $totalUniqueUsers > 0 ? round($finalMinutes / $totalUniqueUsers, 1) : 0,
+                'interviews_completed' => $interviewsCompleted,
+                'interviews_total' => $interviewsTotal,
+                'submissions_total' => $submissionsTotal,
+                'sign_ins_total' => $loginsTotal,
+                'peak_metric_label' => $peakDayLabel ? "Peak: {$peakDayLabel}" : 'No user activity recorded in this period',
+            ],
+            'graph' => $graph,
+            'available_range' => [
+                'min_date' => $minDateStr,
+                'max_date' => $maxDateStr,
+            ],
+        ];
     }
 }

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronLeft, Info } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MeetWords } from "@/components/vocabulary/MeetWords";
@@ -202,7 +202,11 @@ export default function VocabularySessionPage() {
 
   if (phase === "error" || !session) {
     return (
-      <DashboardShell role="user" title="Vocabulary Sprint">
+      <DashboardShell
+        role="user"
+        title="Vocabulary Sprint"
+        back={{ href: HOME, label: "Vocabulary Sprint" }}
+      >
         <div className="mx-auto max-w-xl space-y-3 rounded-panel border border-border-subtle bg-surface p-10 text-center">
           <p className="text-sm font-semibold text-text-secondary">{state.error ?? "That practice session couldn't be found."}</p>
           <Link href={HOME} className="inline-block text-sm font-bold text-accent-primary hover:underline">
@@ -217,8 +221,24 @@ export default function VocabularySessionPage() {
   const inQuestions = phase === "question" || phase === "feedback";
 
   return (
-    <DashboardShell role="user" title="Vocabulary Sprint" subtitle={phase === "summary" ? undefined : session.title}>
+    <DashboardShell
+      role="user"
+      title="Vocabulary Sprint"
+      subtitle={phase === "summary" ? undefined : session.title}
+      back={{ href: HOME, label: "Vocabulary Sprint" }}
+    >
       <div ref={topRef} className="mx-auto max-w-2xl space-y-4">
+        {phase === "meet" && (
+          <div>
+            <Link
+              href={HOME}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Exit to Vocabulary
+            </Link>
+          </div>
+        )}
         {state.error && (
           <div role="alert" className="flex items-start gap-2 rounded-control border border-status-danger/25 bg-status-danger/10 p-3 text-xs font-semibold text-status-danger">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

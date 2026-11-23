@@ -40,6 +40,7 @@ export function ProctoringConsentGate({
   cameraStream = null,
   candidateName = "",
   onLeave,
+  startLabel,
 }: {
   phase: ProctoringPhase;
   consentError: string | null;
@@ -55,6 +56,8 @@ export function ProctoringConsentGate({
   candidateName?: string;
   /** Leaves without starting. When given, the lobby shows a "Leave" button. */
   onLeave?: () => void;
+  /** Optional custom button label for beginning the assessment. */
+  startLabel?: string;
 }) {
   const copy = CONSENT_COPY[activity];
   const integrity = useIntegrityUi().policy !== null;
@@ -88,7 +91,7 @@ export function ProctoringConsentGate({
         onConsent={onConsent}
         starting={phase === "starting"}
         blocked={phase === "blocked"}
-        startLabel="Start Proctored Session"
+        startLabel={startLabel ?? "Start Proctored Session"}
         consentError={consentError}
         rules={rules}
         disclosure={integrity ? <IntegrityDisclosure /> : null}

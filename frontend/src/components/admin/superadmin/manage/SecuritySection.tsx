@@ -244,9 +244,29 @@ export function SecuritySection({ data, reload, triggerToast, onDeleted }: Secti
             </div>
 
             {user.is_blocked ? (
-              <button type="button" onClick={() => void toggleBlock()} disabled={busy !== null} className={cn(ghostButton, "w-full")}>
-                Unblock account
-              </button>
+              <div className="space-y-2">
+                <button type="button" onClick={() => void toggleBlock()} disabled={busy !== null} className={cn(ghostButton, "w-full")}>
+                  Unblock account
+                </button>
+                {user.role === "user" && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await api.post(`/superadmin/users/${user.id}/reinstate-proctoring`, { reason: "Proctoring access reinstated by superadmin" });
+                        triggerToast(`Reinstated proctoring & re-granted access for ${user.name}.`);
+                        await reload();
+                      } catch (err) {
+                        triggerToast(err instanceof ApiError ? err.message : "Couldn't reinstate access.", "error");
+                      }
+                    }}
+                    className={cn(ghostButton, "w-full text-accent-primary border-accent-primary/30 hover:bg-accent-primary/10 flex items-center justify-center gap-1.5")}
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Reinstate Proctoring & Unblock
+                  </button>
+                )}
+              </div>
             ) : askBlock ? (
               <div className="space-y-2">
                 <label htmlFor="block-reason" className="block text-2xs font-semibold text-text-secondary">

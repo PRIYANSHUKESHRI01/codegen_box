@@ -32,8 +32,8 @@ const ROOT = null;
 export const ROUTE_TREE: Record<string, RouteNode> = {
   // ── Student ──
   "/dashboard": { title: "Overview", parent: ROOT },
-  "/dashboard/articles": { title: "Articles", parent: "/dashboard" },
-  "/dashboard/articles/topic": { title: "Article topic", parent: "/dashboard/articles" },
+  "/dashboard/articles": { title: "Articles", parent: "/dashboard/learning-centre", backLabel: "Learning Centre" },
+  "/dashboard/articles/topic": { title: "Article topic", parent: "/dashboard/articles", backLabel: "All Topics" },
   "/dashboard/articles/view": { title: "Article", parent: "/dashboard/articles" },
   "/dashboard/billing": { title: "Plans & Billing", parent: "/dashboard" },
   "/dashboard/company-prep": { title: "Company PYQs", parent: "/dashboard" },

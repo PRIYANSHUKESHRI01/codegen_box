@@ -18,6 +18,12 @@ export interface GuardianUi {
   error: string | null;
 }
 
+export interface GraceWarning {
+  type: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited";
+  message: string;
+  secondsRemaining: number;
+}
+
 export interface IntegrityUiState {
   /** An engine is attached (the attempt's gate or exam is on screen). */
   attached: boolean;
@@ -29,6 +35,8 @@ export interface IntegrityUiState {
   /** Short per-attempt marker shown in the window title — what the Guardian looks for. */
   marker: string | null;
   ai: "off" | "loading" | "ready" | "unavailable";
+  /** Active grace-period countdown for face mismatch, missing face, or phone detection */
+  graceWarning: GraceWarning | null;
   /** Stills sent as evidence so far this attempt (shown to the student: nothing is sent silently). */
   stillsSent: number;
   screenShared: boolean;
@@ -45,6 +53,7 @@ const INITIAL: IntegrityUiState = {
   assurance: null,
   marker: null,
   ai: "off",
+  graceWarning: null,
   stillsSent: 0,
   screenShared: false,
   actions: null,

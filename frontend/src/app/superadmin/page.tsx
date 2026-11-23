@@ -42,6 +42,7 @@ import { ActivityPanel } from "@/components/admin/superadmin/activity/ActivityPa
 import { SuperAdminHackathonsPanel } from "@/components/admin/superadmin/SuperAdminHackathonsPanel";
 import { GeminiKeysPanel } from "@/components/admin/superadmin/GeminiKeysPanel";
 import { PlatformUsageAnalytics } from "@/components/admin/superadmin/PlatformUsageAnalytics";
+import { PlatformUsageTimelineGraph } from "@/components/admin/superadmin/PlatformUsageTimelineGraph";
 import { TrafficPulseBar } from "@/components/admin/superadmin/TrafficPulseBar";
 import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList";
 import { SuperAdminDrivesPanel } from "@/components/admin/superadmin/SuperAdminDrivesPanel";
@@ -158,7 +159,12 @@ function SuperAdminPageContent() {
       </div>
 
       {activeTab === "overview" && <OverviewPanel onViewAuditLog={() => goToTab("audit")} onOpenTab={(tab, collegeId) => isTab(tab) && goToTab(tab, collegeId)} />}
-      {activeTab === "platform_usage" && <PlatformUsageAnalytics />}
+      {activeTab === "platform_usage" && (
+        <div className="space-y-6">
+          <PlatformUsageTimelineGraph defaultPeriod="today" />
+          <PlatformUsageAnalytics />
+        </div>
+      )}
       {activeTab === "activity" && <ActivityPanel key={collegeParam ?? "all"} initialCollegeId={collegeParam} />}
       {activeTab === "gemini_keys" && <GeminiKeysPanel triggerToast={triggerToast} />}
       {activeTab === "drives" && <SuperAdminDrivesPanel />}

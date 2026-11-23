@@ -60,7 +60,8 @@ final class EventCatalog
         'no_face' => ['No face in the camera', 'medium', 6, 0, ['web'], null],
         'multiple_faces' => ['More than one face in the camera', 'high', 15, 0, ['web'], null],
         'face_away' => ['Looking away from the screen', 'low', 4, 0, ['web'], null],
-        'phone_detected' => ['Phone visible in the camera', 'medium', 10, 0, ['web'], null],
+        'phone_detected' => ['Phone visible in the camera', 'critical', 25, 1, ['web'], null],
+        'face_mismatch' => ['Candidate face does not match verified photo', 'critical', 30, 1, ['web'], null],
         'speech_detected' => ['Sustained speech', 'low', 3, 0, ['web'], null],
         'ai_unavailable' => ['Camera analysis unavailable on this device', 'info', 1, 0, ['web'], null],
                 'offline_period' => ['Browser was offline', 'info', 1, 0, ['web'], null],
@@ -198,12 +199,20 @@ final class EventCatalog
                 }
                 break;
 
+            case 'face_mismatch':
+                $strike = ! empty($data['grace_period_exceeded']) ? self::STRIKE_LOCK : 1;
+                break;
+
             case 'multiple_faces':
             case 'no_face':
             case 'face_away':
             case 'phone_detected':
             case 'speech_detected':
-                $strike = in_array($type, (array) ($profile['ai_strikes'] ?? []), true) ? 1 : 0;
+                if (! empty($data['grace_period_exceeded'])) {
+                    $strike = self::STRIKE_LOCK;
+                } else {
+                    $strike = in_array($type, (array) ($profile['ai_strikes'] ?? []), true) ? 1 : 0;
+                }
                 break;
 
             case 'ip_changed':

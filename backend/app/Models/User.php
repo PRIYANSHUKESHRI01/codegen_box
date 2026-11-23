@@ -198,6 +198,7 @@ class User extends Authenticatable
         'company_id',
         'invited_by_company_id',
         'roll_number',
+        'graduation_year',
         'branch',
         'section',
         'cgpa',

@@ -350,7 +350,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
     setSyncingEnv(true);
     try {
       const res = await api.post<{ message: string; schedule: PoolDetailsResponse }>(
-        "/gemini-keys/sync-to-env",
+        "/superadmin/gemini-keys/sync-to-env",
         {}
       );
       setData(res.schedule);
@@ -366,7 +366,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
     setSyncingEnv(true);
     try {
       const res = await api.post<{ message: string; schedule: PoolDetailsResponse }>(
-        "/gemini-keys/sync-env",
+        "/superadmin/gemini-keys/sync-env",
         {}
       );
       setData(res.schedule);

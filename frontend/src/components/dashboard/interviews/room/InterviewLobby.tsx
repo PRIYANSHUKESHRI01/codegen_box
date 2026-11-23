@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, type ReactNode, type RefObject } from "react";
+import { useMemo, useState, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowLeft, Camera, CheckCircle2, Loader2, ShieldCheck, Sparkles, type LucideIcon } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Loader2, ShieldCheck, Sparkles, UserCheck, type LucideIcon } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { IntegrityChecklist } from "@/components/proctoring/IntegrityChecklist";
 import { StrikeMeter } from "@/components/proctoring/ConsentScreen";
 import { checksPass, useIntegrityUi } from "@/lib/integrity/store";
+import { captureVideoStill } from "@/lib/integrity/detectors/faceIdentity";
 import { cn } from "@/lib/utils";
 import { AptRunOrb } from "./AptRunOrb";
 import { MicStrip } from "./MicStrip";
@@ -31,7 +32,7 @@ export interface InterviewLobbyProps {
   cameraStream: MediaStream | null;
   devicePreviewReady: boolean;
   onEnableDevices: () => void;
-  onConsent: () => void;
+  onConsent: (verifiedPhoto?: string | null, verifiedDescriptor?: number[] | null) => void;
   starting: boolean;
   blocked: boolean;
   startLabel: string;
@@ -89,10 +90,69 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   const signal = useRoomSignal();
   const heard = useMicLevel(cameraStream, devicePreviewReady, signal);
 
+  const [verifiedPhoto, setVerifiedPhoto] = useState<string | null>(null);
+  const [verifiedDescriptor, setVerifiedDescriptor] = useState<number[] | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const [capturingPhoto, setCapturingPhoto] = useState(false);
+
   const integrity = ui.policy !== null;
   const ready = !integrity || checksPass(ui.checks);
   const missing = ui.checks.filter((c) => c.required && c.status !== "ok" && c.status !== "skipped").map((c) => c.label);
   const firstName = useMemo(() => candidateName.trim().split(/\s+/)[0] || "", [candidateName]);
+
+  const handleCapturePhoto = async () => {
+    setPhotoError(null);
+    if (!previewVideoRef.current) {
+      setPhotoError("Camera preview is not active. Please enable camera first.");
+      return;
+    }
+    setCapturingPhoto(true);
+    try {
+      const still = captureVideoStill(previewVideoRef.current);
+      if (!still) {
+        setPhotoError("Unable to capture camera frame. Please ensure camera is active.");
+        setCapturingPhoto(false);
+        return;
+      }
+      let descriptor: number[] | null = null;
+      try {
+        const { loadVision } = await import("@/lib/integrity/detectors/vision");
+        const vision = await loadVision("/integrity", "CPU");
+        const analysis = vision.analyse(previewVideoRef.current, false);
+        vision.close();
+        if (analysis) {
+          if (analysis.faces === 0) {
+            setPhotoError("No face detected. Please face the camera directly in good lighting.");
+            setCapturingPhoto(false);
+            return;
+          }
+          if (analysis.faces > 1) {
+            setPhotoError("Multiple faces detected. Only the candidate should be in frame.");
+            setCapturingPhoto(false);
+            return;
+          }
+          descriptor = analysis.faceDescriptor ?? null;
+        }
+      } catch {
+        /* If vision fails or WASM unavailable, still allow captured photo */
+      }
+      setVerifiedPhoto(still);
+      setVerifiedDescriptor(descriptor);
+    } catch {
+      setPhotoError("Failed to capture verification photo. Please try again.");
+    } finally {
+      setCapturingPhoto(false);
+    }
+  };
+
+  const handleConsentClick = () => {
+    let finalPhoto = verifiedPhoto;
+    let finalDescriptor = verifiedDescriptor;
+    if (!finalPhoto && previewVideoRef.current) {
+      finalPhoto = captureVideoStill(previewVideoRef.current);
+    }
+    onConsent(finalPhoto, finalDescriptor);
+  };
 
   const status = !devicePreviewReady
     ? { tone: "idle" as const, text: "First, allow your camera and microphone so we can check your setup." }
@@ -196,6 +256,70 @@ export function InterviewLobby(props: InterviewLobbyProps) {
                       </motion.p>
                     )}
                   </AnimatePresence>
+
+                  {/* Verification Photo Card */}
+                  <div className="rounded-[24px] border border-border-subtle bg-surface/80 p-4 shadow-sm space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("flex h-8 w-8 items-center justify-center rounded-xl", verifiedPhoto ? "bg-status-success/15 text-status-success" : "bg-accent-primary/10 text-accent-primary")}>
+                          {verifiedPhoto ? <UserCheck className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-primary">Identity Verification Photo</p>
+                          <p className="text-3xs text-text-muted">
+                            {verifiedPhoto ? "Baseline identity locked for interview matching" : "Take a reference photo before starting"}
+                          </p>
+                        </div>
+                      </div>
+                      {verifiedPhoto && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-status-success/15 px-2.5 py-0.5 text-3xs font-extrabold text-status-success">
+                          <CheckCircle2 className="h-3 w-3" /> Verified
+                        </span>
+                      )}
+                    </div>
+
+                    {photoError && (
+                      <div role="alert" className="rounded-xl border border-status-danger/25 bg-status-danger/10 px-3 py-2 text-2xs text-status-danger">
+                        {photoError}
+                      </div>
+                    )}
+
+                    {verifiedPhoto ? (
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border-2 border-status-success shadow-sm">
+                          <img src={verifiedPhoto} alt="Verified candidate reference" className="h-full w-full object-cover -scale-x-100" />
+                        </div>
+                        <div className="min-w-0 flex-1 text-2xs text-text-secondary leading-relaxed">
+                          Your face will be matched continuously during the interview to ensure you remain present.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCapturePhoto}
+                          disabled={capturingPhoto}
+                          className="rounded-full border border-border-strong bg-surface px-3 py-1.5 text-2xs font-semibold text-text-secondary hover:bg-surface-hover hover:text-primary transition-colors"
+                        >
+                          Retake
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleCapturePhoto}
+                        disabled={capturingPhoto}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent-primary/30 bg-accent-primary/10 py-2.5 text-xs font-bold text-accent-primary hover:bg-accent-primary/15 transition-colors"
+                      >
+                        {capturingPhoto ? (
+                          <>
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying Face...
+                          </>
+                        ) : (
+                          <>
+                            <Camera className="h-3.5 w-3.5" /> Take Verification Photo
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
                 </>
               )}
             </motion.div>
@@ -269,7 +393,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
           </div>
 
           {devicePreviewReady ? (
-            <button type="button" onClick={onConsent} disabled={!ready || starting} className={cn(PRIMARY, "whitespace-nowrap sm:min-w-[19rem]")}>
+            <button type="button" onClick={handleConsentClick} disabled={!ready || starting} className={cn(PRIMARY, "whitespace-nowrap sm:min-w-[19rem]")}>
               {starting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Starting...

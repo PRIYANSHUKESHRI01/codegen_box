@@ -36,16 +36,14 @@ return [
     ],
 
     /*
-    | AI Interview question generation (see App\Services\GeminiQuestionGeneratorService).
-    | No key set = the generate endpoint honestly reports "not configured" and
-    | every creation flow falls back to picking from the existing bank —
-    | never a 500, same safety net config('whatsapp.provider') gives WhatsApp.
-    | Model is its own env var (not hardcoded) so a naming/version change is
-    | a one-line .env edit, not a code change.
+    | AI Interview question generation and scoring (see App\Services\GeminiQuestionGeneratorService & GeminiInterviewScoringService).
+    | Multi-tier fallback hierarchy: if primary model fails (404/429/503/etc.),
+    | smoothly cascades through gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash -> gemini-2.0-flash-lite -> gemini-1.5-pro.
     */
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY_1') ?: env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-3.1-flash-lite'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+        'fallback_models' => array_filter(array_map('trim', explode(',', env('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash,gemini-2.0-flash-lite,gemini-1.5-pro')))),
         // Second, informational "worth a second listen" call per speaking attempt; turn off on a tight quota.
         'speaking_pronunciation_notes' => env('GEMINI_SPEAKING_PRONUNCIATION_NOTES', true),
     ],

@@ -421,48 +421,71 @@ class GeminiKeyRotationService
             ];
         }
 
-        $model = (string) config('services.gemini.model', 'gemini-3.1-flash-lite');
+        $primaryModel = (string) config('services.gemini.model', 'gemini-2.5-flash');
+        $models = array_values(array_unique(array_filter([
+            $primaryModel,
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+        ])));
+
         $startTime = microtime(true);
+        $lastResponse = null;
 
-        try {
-            $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
-                ->timeout(10)
-                ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
-                    'contents' => [
-                        ['parts' => [['text' => 'ping']]],
-                    ],
-                    'generationConfig' => [
-                        'maxOutputTokens' => 5,
-                    ],
-                ]);
+        foreach ($models as $model) {
+            try {
+                $response = Http::withHeaders(['x-goog-api-key' => $apiKey])
+                    ->timeout(10)
+                    ->post("https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent", [
+                        'contents' => [
+                            ['parts' => [['text' => 'ping']]],
+                        ],
+                        'generationConfig' => [
+                            'maxOutputTokens' => 5,
+                        ],
+                    ]);
 
-            $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
+                $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
 
-            if ($response->successful()) {
+                if ($response->successful()) {
+                    return [
+                        'valid' => true,
+                        'status' => 200,
+                        'latency_ms' => $latencyMs,
+                        'message' => "Key is active and responding via {$model} (Latency: {$latencyMs}ms).",
+                    ];
+                }
+
+                $lastResponse = $response;
+
+                // If 404 model not found, try next model in hierarchy
+                if ($response->status() === 404) {
+                    continue;
+                }
+
+                $errMsg = $response->json('error.message') ?? $response->body();
                 return [
-                    'valid' => true,
-                    'status' => 200,
+                    'valid' => false,
+                    'status' => $response->status(),
                     'latency_ms' => $latencyMs,
-                    'message' => "Key is active and responding (Latency: {$latencyMs}ms).",
+                    'message' => "HTTP {$response->status()}: " . substr($errMsg, 0, 300),
                 ];
+            } catch (Throwable $e) {
+                // If network exception on one model, try next before failing
+                continue;
             }
-
-            $errMsg = $response->json('error.message') ?? $response->body();
-            return [
-                'valid' => false,
-                'status' => $response->status(),
-                'latency_ms' => $latencyMs,
-                'message' => "HTTP {$response->status()}: " . substr($errMsg, 0, 300),
-            ];
-        } catch (Throwable $e) {
-            $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
-            return [
-                'valid' => false,
-                'status' => 500,
-                'latency_ms' => $latencyMs,
-                'message' => 'Connection failed: ' . $e->getMessage(),
-            ];
         }
+
+        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
+        $status = $lastResponse ? $lastResponse->status() : 500;
+        $errMsg = $lastResponse ? ($lastResponse->json('error.message') ?? $lastResponse->body()) : 'Connection failed across all fallback models';
+
+        return [
+            'valid' => false,
+            'status' => $status,
+            'latency_ms' => $latencyMs,
+            'message' => "HTTP {$status}: " . substr($errMsg, 0, 300),
+        ];
     }
 
     /**
@@ -472,7 +495,8 @@ class GeminiKeyRotationService
     public function syncToEnv(): int
     {
         $envPath = base_path('.env');
-        if (! file_exists($envPath)) {
+        if (! file_exists($envPath) || ! is_writable($envPath)) {
+            Log::info("GeminiKeyRotationService: .env is missing or not writable at {$envPath}; skipping .env sync (keys remain active in DB pool).");
             return 0;
         }
 
@@ -513,7 +537,13 @@ class GeminiKeyRotationService
             $envContent = preg_replace('/(GEMINI_MODEL=.*)/', "$1\nGEMINI_API_KEYS={$combinedStr}", $envContent);
         }
 
-        file_put_contents($envPath, $envContent);
+        try {
+            file_put_contents($envPath, $envContent);
+        } catch (Throwable $e) {
+            Log::warning("GeminiKeyRotationService: Could not write to .env ({$e->getMessage()}); keys remain active in DB pool.");
+            return 0;
+        }
+
         return $keys->count();
     }
 
@@ -523,28 +553,58 @@ class GeminiKeyRotationService
     public function syncFromEnv(): int
     {
         $envKeys = [];
+        $envPath = base_path('.env');
 
-        // 1. Scan GEMINI_API_KEYS comma-separated
-        $rawCombined = (string) env('GEMINI_API_KEYS', '');
-        if ($rawCombined !== '') {
-            $split = array_values(array_filter(array_map('trim', explode(',', $rawCombined))));
-            foreach ($split as $i => $val) {
-                $envKeys[$i + 1] = $val;
+        // 1. Parse directly from .env file if readable (guarantees reading fresh values even when config is cached)
+        if (file_exists($envPath) && is_readable($envPath)) {
+            $lines = file($envPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach ($lines as $line) {
+                $line = trim($line);
+                if ($line === '' || str_starts_with($line, '#')) {
+                    continue;
+                }
+                if (preg_match('/^GEMINI_API_KEY_(\d+)=(.*)$/', $line, $matches)) {
+                    $slot = (int) $matches[1];
+                    $val = trim($matches[2], " \t\n\r\0\x0B\"'");
+                    if ($val !== '') {
+                        $envKeys[$slot] = $val;
+                    }
+                } elseif (preg_match('/^GEMINI_API_KEYS=(.*)$/', $line, $matches)) {
+                    $raw = trim($matches[1], " \t\n\r\0\x0B\"'");
+                    $split = array_values(array_filter(array_map('trim', explode(',', $raw))));
+                    foreach ($split as $i => $val) {
+                        $envKeys[$i + 1] = $val;
+                    }
+                } elseif (preg_match('/^GEMINI_API_KEY=(.*)$/', $line, $matches)) {
+                    $val = trim($matches[1], " \t\n\r\0\x0B\"'");
+                    if ($val !== '' && ! isset($envKeys[1])) {
+                        $envKeys[1] = $val;
+                    }
+                }
             }
         }
 
-        // 2. Scan GEMINI_API_KEY_1 to GEMINI_API_KEY_50
-        for ($i = 1; $i <= 50; $i++) {
-            $val = trim((string) env("GEMINI_API_KEY_{$i}", ''));
-            if ($val !== '') {
-                $envKeys[$i] = $val;
+        // 2. Fallback to runtime env() variables if .env was missing or in container environments
+        if (empty($envKeys)) {
+            $rawCombined = (string) env('GEMINI_API_KEYS', '');
+            if ($rawCombined !== '') {
+                $split = array_values(array_filter(array_map('trim', explode(',', $rawCombined))));
+                foreach ($split as $i => $val) {
+                    $envKeys[$i + 1] = $val;
+                }
             }
-        }
 
-        // 3. Fallback GEMINI_API_KEY
-        $single = trim((string) env('GEMINI_API_KEY', ''));
-        if ($single !== '' && ! isset($envKeys[1])) {
-            $envKeys[1] = $single;
+            for ($i = 1; $i <= 50; $i++) {
+                $val = trim((string) env("GEMINI_API_KEY_{$i}", ''));
+                if ($val !== '') {
+                    $envKeys[$i] = $val;
+                }
+            }
+
+            $single = trim((string) env('GEMINI_API_KEY', ''));
+            if ($single !== '' && ! isset($envKeys[1])) {
+                $envKeys[1] = $single;
+            }
         }
 
         $updated = 0;

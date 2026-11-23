@@ -97,9 +97,45 @@ describe("the interview's result screen", () => {
   it("tells the candidate a person will review the answers when the AI could not score them, and lets them retry if allowed", () => {
     view({ result: { status: "needs_human_review", composite_score_percent: null, passed: null, reattemptable: true, responses: [] } });
 
-    expect(screen.getByText("Your answers have been saved. A real person will review your responses.")).toBeTruthy();
-    expect(screen.getByText("A reviewer reads your transcripts and listens to your recordings.")).toBeTruthy();
+    expect(screen.getByText("All Answers Saved & Secure")).toBeTruthy();
+    expect(screen.getByText(/All answers safely captured/)).toBeTruthy();
     expect(screen.getByRole("button", { name: /Re-attempt Interview/ })).toBeTruthy();
+  });
+
+  it("offers 'Proceed to Set 2' and auto-advances when Set 1 of a Vault qualification is scored", () => {
+    const onStartNextSet = vi.fn();
+    view({
+      vault: true,
+      result: scored(75, { passed: null }),
+      qualification: { stack_key: "laravel", role_key: "backend", series_number: 1, set_number: 1 },
+      onStartNextSet,
+    });
+
+    expect(screen.getByText(/Up Next · Set 2 of 3/)).toBeTruthy();
+    expect(screen.getByText("Ready for Set 2?")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Start Set 2 Now/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Proceed to Set 2/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Pause Timer/ })).toBeTruthy();
+
+    // Clicking pause timer pauses auto-advance
+    fireEvent.click(screen.getByRole("button", { name: /Pause Timer/ }));
+    expect(screen.queryByRole("button", { name: /Pause Timer/ })).toBeNull();
+
+    // Clicking proceed to set 2 calls onStartNextSet with 2
+    fireEvent.click(screen.getByRole("button", { name: /Proceed to Set 2/ }));
+    expect(onStartNextSet).toHaveBeenCalledWith(2);
+  });
+
+  it("shows Series 3 of 3 Completed celebration card when Set 3 is finished", () => {
+    view({
+      vault: true,
+      result: scored(80, { passed: null }),
+      qualification: { stack_key: "laravel", role_key: "backend", series_number: 1, set_number: 3 },
+    });
+
+    expect(screen.getByText(/Series 3 of 3 Completed!/)).toBeTruthy();
+    expect(screen.getByText("You Have Completed All 3 Qualification Sets")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /View Circuit Standing/ })).toBeTruthy();
   });
 });
 

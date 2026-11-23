@@ -80,13 +80,69 @@ export interface VaultAiGate {
   readiness: { score: number | null; required: number; met: boolean; points_needed: number } | null;
 }
 
+export interface VaultAiBlockDetails {
+  is_blocked: boolean;
+  has_account_block: boolean;
+  has_proctoring_lock: boolean;
+  has_cooldown: boolean;
+  is_gate_locked: boolean;
+  summary_message: string | null;
+  primary_trigger: {
+    type: string;
+    title: string;
+    message: string;
+    severity: "critical" | "high" | "warning";
+  } | null;
+  account_block: {
+    reason: string | null;
+    blocked_at: string | null;
+    blocked_by: string | null;
+  } | null;
+  proctoring_lock: {
+    session_id: number;
+    interview_title: string;
+    locked_at: string | null;
+    violation_count: number;
+    violations: Array<{
+      id: number;
+      type: string;
+      label: string;
+      occurred_at: string | null;
+      counted: boolean;
+    }>;
+    flags: Record<string, number>;
+    risk_level: string | null;
+    risk_score: number | null;
+  } | null;
+  cooldowns: Array<{
+    stack_key: string;
+    stack_name: string;
+    cooldown_until: string | null;
+    days_remaining: number;
+    current_attempt: number;
+    max_attempts: number;
+  }>;
+}
+
 export interface VaultAiStudentResponse {
-  student: { id: number; name: string; email: string; college: string | null; study_year: number | null; is_blocked: boolean; vault_ai_score: number | null };
+  student: {
+    id: number;
+    name: string;
+    email: string;
+    college: string | null;
+    study_year: number | null;
+    is_blocked: boolean;
+    blocked_reason?: string | null;
+    blocked_at?: string | null;
+    blocked_by?: string | null;
+    vault_ai_score: number | null;
+  };
   gate: VaultAiGate;
   readiness: { score: number; tier: string; overridden: boolean };
   vault: { status: string; is_eligible: boolean; source: string | null; ai_interview_stack: string | null } | null;
   qualifications: VaultAiQualificationRow[];
   stacks: VaultAiStackOption[];
+  block_details?: VaultAiBlockDetails;
 }
 
 export interface StudentSearchHit {

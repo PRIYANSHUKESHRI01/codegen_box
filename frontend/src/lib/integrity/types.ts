@@ -32,6 +32,7 @@ export type WebEventType =
   | "multiple_faces"
   | "face_away"
   | "phone_detected"
+  | "face_mismatch"
   | "speech_detected"
   | "ai_unavailable"
   | "offline_period"

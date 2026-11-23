@@ -23,7 +23,8 @@ import {
 import { installConnectivityDetector, startNetworkProbe, type NetView } from "./detectors/network";
 import { isChromium, requestEntireScreen, ShareError, supportsScreenShare, type ShareResult } from "./detectors/screenShare";
 import { levelDb, SpeechGate } from "./detectors/speech";
-import { loadVision, type Delegate, type VisionEngine } from "./detectors/vision";
+import { loadVision, type Delegate, type VisionEngine, type FrameAnalysis } from "./detectors/vision";
+import { computeFaceSimilarity, FACE_MATCH_THRESHOLD } from "./detectors/faceIdentity";
 import { captureStill, EvidenceUploader, jitteredMs } from "./evidence";
 import { browserFamily, deviceFingerprint, newInstanceId } from "./fingerprint";
 import { claim, discard, park } from "./keeper";
@@ -133,6 +134,13 @@ export class IntegrityEngine {
   private ended = false;
   private starting = false;
   private guardianPollFailures = 0;
+  private baselinePhoto: string | null = null;
+  private baselineDescriptor: number[] | null = null;
+  private activeGraceViolation: {
+    type: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited";
+    deadlineAt: number;
+    message: string;
+  } | null = null;
   /** Bumped by every init/destroy so an init that is still awaiting the network cannot wire anything up after the page left. */
   private gen = 0;
 
@@ -324,6 +332,17 @@ export class IntegrityEngine {
     forgetEditorClipboard();
     resetIntegrityUi();
     this.setPhase("completed");
+  }
+
+  setBaselineIdentity(photo: string, descriptor?: number[] | null): void {
+    this.baselinePhoto = photo;
+    if (descriptor && descriptor.length > 0) {
+      this.baselineDescriptor = descriptor;
+    }
+  }
+
+  getBaselineIdentity(): { photo: string | null; descriptor: number[] | null } {
+    return { photo: this.baselinePhoto, descriptor: this.baselineDescriptor };
   }
 
   // ═══ policy & checklist ═════════════════════════════════════════════════════════════════════════════════════════════
@@ -733,9 +752,16 @@ export class IntegrityEngine {
     this.recomputeHold();
   }
 
-  private lockNow(): void {
+  lockNow(reason?: string): void {
     if (this.ended) return;
     this.ended = true;
+    if (reason && typeof window !== "undefined") {
+      try {
+        sessionStorage.setItem("aptrun_proctoring_lock_reason", reason);
+      } catch {
+        /* storage may be restricted */
+      }
+    }
     this.stopWork();
     this.releaseMedia();
     discard(this.o.keepKey);
@@ -1000,10 +1026,27 @@ export class IntegrityEngine {
         avg = avg === 0 ? dt : avg * 0.8 + dt * 0.2;
 
         if (analysis) {
-          for (const f of rules.feed({ t: Date.now(), faces: analysis.faces, yaw: analysis.yaw, pitch: analysis.pitch, phone: analysis.phone })) {
+          let faceSimilarity: number | null = null;
+          if (this.baselineDescriptor && analysis.faces === 1 && analysis.faceDescriptor) {
+            faceSimilarity = computeFaceSimilarity(analysis.faceDescriptor, this.baselineDescriptor);
+          } else if (!this.baselineDescriptor && analysis.faces === 1 && analysis.faceDescriptor) {
+            this.baselineDescriptor = analysis.faceDescriptor;
+            faceSimilarity = 1.0;
+          }
+
+          for (const f of rules.feed({
+            t: Date.now(),
+            faces: analysis.faces,
+            yaw: analysis.yaw,
+            pitch: analysis.pitch,
+            phone: analysis.phone,
+            faceSimilarity,
+          })) {
             this.emit(f.type, f.data);
             void this.still("webcam", { flagged: true, reason: f.type, meta: f.data });
           }
+
+          this.evaluateGraceGuard(analysis, faceSimilarity);
         }
 
         // Adapt to the machine: a slow laptop gets fewer looks, and a hopeless one gets none (the stills still go).
@@ -1046,8 +1089,91 @@ export class IntegrityEngine {
     return times[1] <= 600;
   }
 
+  private evaluateGraceGuard(analysis: FrameAnalysis, faceSimilarity: number | null, overrideViolation?: "speech_prohibited" | null): void {
+    if (this.ended || this.phase !== "active") return;
+
+    let violationType: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited" | null = overrideViolation ?? null;
+    let message = "";
+
+    if (!violationType) {
+      if (analysis.phone !== undefined && analysis.phone >= 0.45) {
+        violationType = "phone_detected";
+        message = "Prohibited mobile phone detected. Remove it immediately or your interview will be terminated.";
+      } else if (analysis.faces === 0) {
+        violationType = "no_face";
+        message = "No face detected in camera view. Please face the camera directly.";
+      } else if (analysis.faces > 1) {
+        violationType = "multiple_faces";
+        message = "Multiple faces detected. Only the registered candidate may be present during the interview.";
+      } else if (this.baselineDescriptor && faceSimilarity !== null && faceSimilarity < FACE_MATCH_THRESHOLD) {
+        violationType = "face_mismatch";
+        message = "Face mismatch detected. The person in view does not match the verified candidate photo.";
+      } else if (analysis.faces === 1 && analysis.yaw !== null && Math.abs(analysis.yaw) > 0.18) {
+        violationType = "face_away";
+        message = "Looking away from screen detected. Please face the interview camera directly.";
+      }
+    } else if (violationType === "speech_prohibited") {
+      message = "Prohibited speech / conversation detected while interviewer is speaking or during preparation.";
+    }
+
+    const now = Date.now();
+    const GRACE_SECONDS = 2; // Strict 2-second grace: immediate warning and fast termination
+
+    if (violationType) {
+      if (!this.activeGraceViolation || this.activeGraceViolation.type !== violationType) {
+        this.activeGraceViolation = {
+          type: violationType,
+          deadlineAt: now + GRACE_SECONDS * 1000,
+          message,
+        };
+      }
+
+      if (!this.activeGraceViolation) return;
+      const violation = this.activeGraceViolation;
+      const secondsRemaining = Math.max(0, Math.ceil((violation.deadlineAt - now) / 1000));
+
+      setIntegrityUi({
+        graceWarning: {
+          type: violation.type,
+          message: violation.message,
+          secondsRemaining,
+        },
+      });
+
+      if (secondsRemaining <= 0) {
+        const type = violation.type;
+        const reason =
+          type === "phone_detected"
+            ? "A prohibited mobile phone was detected in front of the camera and was not removed within 2 seconds."
+            : type === "face_mismatch"
+            ? "Face mismatch detected: the person facing the camera did not match the verified candidate photo."
+            : type === "no_face"
+            ? "Candidate left the camera view and was not detected for more than 2 seconds."
+            : type === "multiple_faces"
+            ? "Multiple people were detected in the camera frame for more than 2 seconds (unauthorized person present beside candidate)."
+            : type === "face_away"
+            ? "Candidate looked away / turned head sideways towards an off-screen person for more than 2 seconds."
+            : "Prohibited side conversation detected while interviewer was speaking or during preparation time.";
+
+        this.emit(type === "speech_prohibited" ? "speech_detected" : type, {
+          grace_period_exceeded: true,
+          duration_seconds: GRACE_SECONDS,
+        });
+        void this.still("webcam", { flagged: true, reason: type });
+        this.activeGraceViolation = null;
+        setIntegrityUi({ graceWarning: null });
+        this.lockNow(reason);
+      }
+    } else {
+      if (this.activeGraceViolation) {
+        this.activeGraceViolation = null;
+        setIntegrityUi({ graceWarning: null });
+      }
+    }
+  }
+
   private startSpeech(): void {
-    if (this.o.surface === "interview" || !this.camera || this.camera.stream.getAudioTracks().length === 0) return;
+    if (!this.camera || this.camera.stream.getAudioTracks().length === 0) return;
 
     try {
       const AudioCtx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -1062,7 +1188,22 @@ export class IntegrityEngine {
       this.every(100, () => {
         analyser.getFloatTimeDomainData(buf);
         const seconds = gate.feed(levelDb(buf), Date.now());
-        if (seconds !== null) this.emit("speech_detected", { seconds });
+        if (seconds !== null) {
+          if (this.o.surface === "interview") {
+            const context = this.o.getContext?.(false);
+            const phase = (context as { phase?: string })?.phase;
+            const prohibitedPhase = phase === "prep" || phase === "speaking" || phase === "greeting" || phase === "ready" || phase === "feedback";
+            if (prohibitedPhase) {
+              this.emit("speech_detected", { seconds, phase, prohibited: true });
+              void this.still("webcam", { flagged: true, reason: "speech_detected", meta: { phase, seconds } });
+              this.evaluateGraceGuard({ faces: 1, yaw: null, pitch: null }, null, "speech_prohibited");
+            } else {
+              this.emit("speech_detected", { seconds, phase });
+            }
+          } else {
+            this.emit("speech_detected", { seconds });
+          }
+        }
       });
       this.cleanups.push(() => void ctx.close().catch(() => undefined));
     } catch {

@@ -64,8 +64,25 @@ function VaultInterviewSetContent() {
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
   const [reattempting, setReattempting] = useState(false);
   const [retryingScoring, setRetryingScoring] = useState(false);
+  const [launchingNext, setLaunchingNext] = useState(false);
   // Pressing Start gives feedback at once; the interview is a full-screen experience and takes a moment to open.
   const [opening, setOpening] = useState(false);
+
+  const handleLaunchNextSet = async () => {
+    if (!interview?.qualification?.stack_key || setNumber === null || launchingNext) return;
+    const nextSet = setNumber + 1;
+    setLaunchingNext(true);
+    try {
+      const res = await api.post<{ interview: { slug: string } }>("/vault-qualification/start-set", {
+        stack: interview.qualification.stack_key,
+        set_number: nextSet,
+      });
+      router.push(`${HOME}/session?slug=${encodeURIComponent(res.interview.slug)}`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Could not launch next set. Please try from the qualification circuit.");
+      setLaunchingNext(false);
+    }
+  };
 
   const handleRetryScoring = async () => {
     if (retryingScoring) return;
@@ -274,12 +291,25 @@ function VaultInterviewSetContent() {
                                 : "That's fine: it's your average across all three sets that counts, so the other sets can make it up."}
                             </p>
                           </div>
-                          <Link
-                            href={HOME}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition-all hover:-translate-y-0.5 hover:shadow-lg"
-                          >
-                            Back to the circuit <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-                          </Link>
+                          <div className="flex flex-wrap items-center gap-2.5">
+                            {setNumber !== null && setNumber < 3 && interview?.qualification?.stack_key && (
+                              <button
+                                type="button"
+                                onClick={handleLaunchNextSet}
+                                disabled={launchingNext}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition-all hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-60"
+                              >
+                                {launchingNext ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                                <span>Proceed to Set {setNumber + 1}</span>
+                              </button>
+                            )}
+                            <Link
+                              href={HOME}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-border-subtle bg-surface px-4 py-2.5 text-xs font-bold text-text-secondary hover:text-primary transition-all"
+                            >
+                              Back to the circuit <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+                            </Link>
+                          </div>
                         </div>
 
                         {result.responses.length > 0 && (
@@ -378,7 +408,31 @@ function VaultInterviewSetContent() {
             aside={
               <Rise delay={1}>
                 {completed ? (
-                  <InterviewerCard title="Set complete" subtitle="Your score and the feedback on every answer are alongside." showChecks={false} />
+                  <InterviewerCard
+                    title={setNumber && setNumber < 3 ? `Set ${setNumber} Complete` : "Series Complete"}
+                    subtitle={setNumber && setNumber < 3 ? `Ready to tackle Set ${setNumber + 1}?` : "All 3 sets of this series have been completed."}
+                    showChecks={false}
+                  >
+                    {setNumber && setNumber < 3 && interview?.qualification?.stack_key ? (
+                      <button
+                        type="button"
+                        disabled={launchingNext}
+                        onClick={handleLaunchNextSet}
+                        className="va-sheen relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 py-3.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:-translate-y-0.5"
+                      >
+                        {launchingNext ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
+                        <span>Proceed to Set {setNumber + 1}</span>
+                      </button>
+                    ) : (
+                      <Link
+                        href={interview?.qualification?.stack_key ? `${HOME}?stack=${encodeURIComponent(interview.qualification.stack_key)}` : HOME}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 py-3 text-xs sm:text-sm font-bold text-white shadow-md shadow-emerald-500/25 transition-all hover:-translate-y-0.5"
+                      >
+                        <span>View Series Standing</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    )}
+                  </InterviewerCard>
                 ) : (
                   <InterviewerCard
                     title={inProgress ? "Pick up where you left off" : "Ready when you are"}

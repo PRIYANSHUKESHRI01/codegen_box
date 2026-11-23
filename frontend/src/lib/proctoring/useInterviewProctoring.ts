@@ -12,6 +12,7 @@ interface UseInterviewProctoringOptions {
    * Defaults to "interview"; Soft Skills and Core tests pass "test", study sittings "practice sitting".
    */
   activityLabel?: string;
+  getContext?: (withCode: boolean) => Record<string, unknown> | null;
 }
 
 export type UseInterviewProctoringResult = UseIntegrityEngineResult;
@@ -21,6 +22,6 @@ export type UseInterviewProctoringResult = UseIntegrityEngineResult;
  * mechanics are the same shared integrity engine contests use (lib/integrity); the surface is read off the base path,
  * and the server decides which profile (how strict) that surface runs under.
  */
-export function useInterviewProctoring({ basePath, enabled, activityLabel = "interview" }: UseInterviewProctoringOptions): UseInterviewProctoringResult {
-  return useIntegrityEngine({ surface: surfaceFromBasePath(basePath), basePath, keepKey: basePath, activityLabel, enabled });
+export function useInterviewProctoring({ basePath, enabled, activityLabel = "interview", getContext }: UseInterviewProctoringOptions): UseInterviewProctoringResult {
+  return useIntegrityEngine({ surface: surfaceFromBasePath(basePath), basePath, keepKey: basePath, activityLabel, enabled, getContext });
 }

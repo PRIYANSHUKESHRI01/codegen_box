@@ -17,6 +17,8 @@ import {
   Trophy,
   ArrowUpRight,
   Info,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { AuthChrome } from "@/components/auth/AuthChrome";
 import { FormField, authInputClass } from "@/components/auth/FormField";
@@ -57,6 +59,8 @@ const STRENGTH_META = [
   { label: "Strong password", color: "bg-status-success" },
 ];
 
+const GRAD_YEAR_OPTIONS = Array.from({ length: 15 }, (_, i) => 2018 + i);
+
 export default function SignupPage() {
   const router = useRouter();
   const { login } = useAuth();
@@ -66,6 +70,7 @@ export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [handle, setHandle] = useState("");
   const [gradYear, setGradYear] = useState("2026");
   const [agreeTerms, setAgreeTerms] = useState(true);
@@ -100,6 +105,7 @@ export default function SignupPage() {
         handle,
         password,
         password_confirmation: password,
+        graduation_year: gradYear ? Number(gradYear) : undefined,
       });
       login(token, user);
       router.push(homeRouteForRole(user.role));
@@ -288,10 +294,11 @@ export default function SignupPage() {
                         onChange={(e) => setGradYear(e.target.value)}
                         className={cn(authInputClass, "pl-9 pr-3")}
                       >
-                        <option value="2025">2025</option>
-                        <option value="2026">2026</option>
-                        <option value="2027">2027</option>
-                        <option value="2028">2028</option>
+                        {GRAD_YEAR_OPTIONS.map((yr) => (
+                          <option key={yr} value={yr}>
+                            {yr}
+                          </option>
+                        ))}
                       </select>
                     </FormField>
                   </div>
@@ -318,13 +325,36 @@ export default function SignupPage() {
                 <motion.div variants={fieldVariants}>
                   <FormField label="Password *" icon={Lock}>
                     <input
-                      type="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="new-password"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
                       required
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Create a strong password"
-                      className={cn(authInputClass, "pl-9 pr-3 font-mono")}
+                      className={cn(authInputClass, "pl-9 pr-11 font-mono")}
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-1 top-1/2 -translate-y-1/2 p-2.5 text-text-muted hover:text-primary transition-colors"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        <motion.span
+                          key={showPassword ? "hide" : "show"}
+                          initial={{ opacity: 0, rotate: -45 }}
+                          animate={{ opacity: 1, rotate: 0 }}
+                          exit={{ opacity: 0, rotate: 45 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </motion.span>
+                      </AnimatePresence>
+                    </button>
                   </FormField>
 
                   {/* Strength Bar */}

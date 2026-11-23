@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Api\Concerns\ConfirmsSuperadminPassword;
 use App\Http\Controllers\Controller;
+use App\Enums\NotificationType;
 use App\Jobs\SendAccountCredentialsEmail;
 use App\Models\ActivityLog;
 use App\Models\ActivityPageView;
@@ -13,16 +14,20 @@ use App\Models\College;
 use App\Models\Company;
 use App\Models\ContactRequest;
 use App\Models\FeatureFlag;
+use App\Models\IntegritySession;
+use App\Models\InterviewProctoringSession;
 use App\Models\InterviewSession;
 use App\Models\NewsletterSubscriber;
 use App\Models\Plan;
 use App\Models\Submission;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\VaultInterviewQualification;
 use App\Services\CollegePurgeService;
 use App\Services\IssuedCredentialVault;
 use App\Services\Judge\JudgeStatusService;
 use App\Services\LeadAssignmentService;
+use App\Services\NotificationService;
 use App\Services\ReadinessScoreService;
 use App\Services\ScoreLedger;
 use App\Services\StudentStatsService;
@@ -1248,6 +1253,93 @@ class SuperAdminController extends Controller
             app(LeadAssignmentService::class)->assignUnassignedLeads();
             app(LeadAssignmentService::class)->assignUnassignedContactRequests();
         }
+
+        return response()->json(['user' => $user->fresh(['college:id,name'])]);
+    }
+
+    /**
+     * Reinstates a user's proctoring access: unblocks account, resets locked proctoring and integrity
+     * sessions to active, clears cooldown on qualifications, logs the action, and notifies the user.
+     */
+    public function reinstateProctoring(Request $request, User $user): JsonResponse
+    {
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:300'],
+        ]);
+
+        $admin = $request->user();
+        $reason = $validated['reason'];
+
+        DB::transaction(function () use ($user, $admin, $reason) {
+            if ($user->is_blocked) {
+                $user->forceFill([
+                    'is_blocked' => false,
+                    'blocked_at' => null,
+                    'blocked_by' => null,
+                    'blocked_reason' => null,
+                ])->save();
+            }
+
+            $interviewSessions = InterviewSession::where('user_id', $user->id)->get();
+            foreach ($interviewSessions as $sess) {
+                $ps = $sess->proctoringSession;
+                if ($ps && $ps->isLocked()) {
+                    $ps->update([
+                        'status' => InterviewProctoringSession::STATUS_ACTIVE,
+                        'locked_at' => null,
+                        'violation_count' => 0,
+                    ]);
+                }
+            }
+
+            IntegritySession::where('user_id', $user->id)
+                ->where('status', IntegritySession::STATUS_LOCKED)
+                ->update([
+                    'status' => IntegritySession::STATUS_ACTIVE,
+                    'last_incident_at' => null,
+                ]);
+
+            $qualifications = VaultInterviewQualification::where('user_id', $user->id)->get();
+            foreach ($qualifications as $qual) {
+                if ($qual->status === VaultInterviewQualification::STATUS_COOLING_DOWN || $qual->cooldown_until !== null) {
+                    $qual->status = VaultInterviewQualification::STATUS_IN_PROGRESS;
+                    $qual->cooldown_until = null;
+                    $log = $qual->admin_log ?? [];
+                    $log[] = [
+                        'action' => 'reinstate_proctoring',
+                        'by' => $admin->name,
+                        'at' => now()->toIso8601String(),
+                        'reason' => $reason,
+                    ];
+                    $qual->admin_log = $log;
+                    $qual->save();
+                }
+            }
+
+            ActivityLog::record(
+                $admin,
+                'Reinstated proctoring & re-granted access for user',
+                'User',
+                $user->name,
+                ['user_id' => $user->id, 'reason' => $reason]
+            );
+
+            try {
+                app(NotificationService::class)->notify(
+                    $user,
+                    NotificationType::VaultActivity,
+                    'Access Reinstated',
+                    'Your interview session has been reviewed and your access has been reinstated by an administrator. You may now continue or re-attempt your interview.',
+                    [
+                        'url' => '/dashboard/vault-interviews',
+                        'severity' => 'success',
+                        'group_key' => 'vault.proctoring_reinstated:'.$user->id.':'.now()->timestamp,
+                    ]
+                );
+            } catch (\Throwable $e) {
+                // Ignore notification failure
+            }
+        });
 
         return response()->json(['user' => $user->fresh(['college:id,name'])]);
     }

@@ -55,7 +55,7 @@ export function InterviewSessionHud({
 }) {
   const [toast, setToast] = useState<{ type: ViolationType; count: number; max: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const marker = useIntegrityUi().marker;
+  const { marker, graceWarning } = useIntegrityUi();
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -115,6 +115,48 @@ export function InterviewSessionHud({
           "you're on camera," so this drops the redundant "Recording" label
           ProctoringOverlay shows and keeps just the security-relevant count. */}
       {!embedded && session && <StrikePill session={session} className="fixed top-4 right-4 z-50" />}
+
+      {/* Active 15-second grace countdown warning for phone / face mismatch / absent face */}
+      {graceWarning && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed top-3 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[70] max-w-lg w-full rounded-2xl border-2 border-status-danger bg-status-danger/95 text-white p-4 shadow-2xl backdrop-blur-md animate-pulse"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wider text-white">
+                  {graceWarning.type === "phone_detected"
+                    ? "PROHIBITED DEVICE DETECTED"
+                    : graceWarning.type === "face_mismatch"
+                    ? "FACE IDENTITY MISMATCH"
+                    : graceWarning.type === "no_face"
+                    ? "FACE NOT DETECTED"
+                    : graceWarning.type === "face_away"
+                    ? "LOOKING AWAY / HEAD TURNED SIDEWAYS"
+                    : graceWarning.type === "speech_prohibited"
+                    ? "PROHIBITED SPEECH / CONVERSATION DETECTED"
+                    : "MULTIPLE PEOPLE DETECTED"}
+                </p>
+                <span className="rounded-full bg-black/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-white">
+                  {graceWarning.secondsRemaining}s left
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-white/95 leading-snug">
+                {graceWarning.message}
+              </p>
+              <div className="mt-2.5 flex items-center justify-between gap-2 text-2xs text-white/80">
+                <span>Session will terminate automatically if not resolved.</span>
+                <span className="font-semibold underline">Auto-recovers when resolved</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="fixed top-16 right-4 z-50 max-w-xs p-3.5 rounded-panel bg-status-danger/10 border border-status-danger/30 shadow-card">

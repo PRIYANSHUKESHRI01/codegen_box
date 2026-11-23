@@ -83,7 +83,7 @@ return [
             'block_multi_monitor' => (bool) env('INTEGRITY_STANDARD_BLOCK_MULTI_MONITOR', true),
             'focus_loss_strike' => (int) env('INTEGRITY_STANDARD_FOCUS_LOSS', 4),
             'ai' => (bool) env('INTEGRITY_STANDARD_AI', true),
-            'ai_strikes' => [],
+            'ai_strikes' => ['multiple_faces', 'face_mismatch', 'face_away', 'phone_detected'],
             'clipboard' => 'block_all',
         ],
         'practice' => [

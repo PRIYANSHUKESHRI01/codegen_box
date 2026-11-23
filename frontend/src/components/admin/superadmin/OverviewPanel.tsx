@@ -29,6 +29,7 @@ import { usePoll } from "./activity/usePoll";
 import type { AttentionItem, Glance } from "@/types/activity";
 import { formatDateTime, formatInr, type ApiAuditLog } from "./types";
 import { PlatformUsageAnalytics } from "./PlatformUsageAnalytics";
+import { PlatformUsageTimelineGraph } from "./PlatformUsageTimelineGraph";
 
 interface OverviewResponse {
   segments: {
@@ -371,6 +372,9 @@ export function OverviewPanel({ onViewAuditLog, onOpenTab }: { onViewAuditLog: (
           sub={`${data.institutional_recurring.count} priced college(s) · ${data.institutional_recurring.custom_priced_count} custom`}
         />
       </div>
+
+      {/* Platform Usage & Traffic Timeline Graph (Today, Yesterday, Any Day, Week, Month) */}
+      <PlatformUsageTimelineGraph defaultPeriod="today" />
 
       {/* Platform Practice & Feature Usage Analytics (Most Used vs Least Used Graphs) */}
       <PlatformUsageAnalytics defaultDays={30} initialRole="user" />

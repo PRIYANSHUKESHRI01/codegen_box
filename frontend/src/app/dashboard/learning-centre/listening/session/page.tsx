@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Check, CheckCircle2, Loader2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, ChevronLeft, Loader2 } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AudioPlayer } from "@/components/listening/AudioPlayer";
@@ -134,7 +134,11 @@ export default function ListeningSessionPage() {
 
   if (stage === "not_found" || !lesson) {
     return (
-      <DashboardShell role="user" title="Listening Lab">
+      <DashboardShell
+        role="user"
+        title="Listening Lab"
+        back={{ href: "/dashboard/learning-centre/listening", label: "Listening Lab" }}
+      >
         <div className="space-y-3 rounded-panel border border-border-subtle bg-surface p-10 text-center text-xs text-status-danger">
           <p>This lesson couldn&apos;t be found.</p>
           <Link href="/dashboard/learning-centre/listening" className="font-semibold text-accent-primary hover:underline">
@@ -149,8 +153,25 @@ export default function ListeningSessionPage() {
   const allAnswered = answeredCount === answers.length;
 
   return (
-    <DashboardShell role="user" title="Listening Lab" subtitle={stage === "brief" ? undefined : lesson.title}>
+    <DashboardShell
+      role="user"
+      title="Listening Lab"
+      subtitle={stage === "brief" ? undefined : lesson.title}
+      back={{ href: "/dashboard/learning-centre/listening", label: "Listening Lab" }}
+    >
       <div ref={topRef} className={cn("mx-auto space-y-4", stage === "task" || stage === "submitting" ? "max-w-5xl" : stage === "result" ? "max-w-3xl" : "max-w-2xl")}>
+        {stage === "brief" && (
+          <div>
+            <Link
+              href="/dashboard/learning-centre/listening"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Back to Listening Lab
+            </Link>
+          </div>
+        )}
+
         {error && (
           <div role="alert" className="flex items-start gap-2 rounded-control border border-status-danger/25 bg-status-danger/10 p-3 text-xs text-status-danger">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />

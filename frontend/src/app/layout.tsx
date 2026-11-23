@@ -6,6 +6,7 @@ import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { NotificationRuntime } from "@/components/notifications/NotificationRuntime";
 import { ActivityRuntime } from "@/components/system/ActivityRuntime";
 import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
+import { AptBotWidget } from "@/components/chat/AptBotWidget";
 import { Toaster } from "@/components/ui/Toaster";
 import { DialogHost } from "@/components/ui/DialogHost";
 import "./globals.css";
@@ -129,6 +130,8 @@ export default function RootLayout({
           <NotificationRuntime />
           {/* Where the signed-in person is (screen, time, scroll depth) for Superadmin → Live Activity. Silent; see lib/activityTracker. */}
           <ActivityRuntime />
+          {/* AptBot Instant Placement & Support Chatbot */}
+          <AptBotWidget />
         </AuthProvider>
         {/* The app's feedback toasts and confirm/prompt dialogs (lib/toast, lib/dialogs): mounted once, above every page,
             modal and drawer, so any handler anywhere can raise one without owning the markup. */}

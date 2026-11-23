@@ -115,52 +115,27 @@ class AudioTranscriptionService
 
     /**
      * Transcribe using Google Gemini Multimodal Audio via GeminiKeyRotationService.
+     * Cascades through the model hierarchy: gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash.
      */
     protected function transcribeWithGemini(string $audioBytes, string $mimeType): string
     {
         $base64Audio = base64_encode($audioBytes);
-        $model = env('GEMINI_TRANSCRIPTION_MODEL', 'gemini-1.5-flash');
+        $configuredPrimary = env('GEMINI_TRANSCRIPTION_MODEL', config('services.gemini.model', 'gemini-2.5-flash'));
+        $models = array_values(array_unique(array_filter([
+            $configuredPrimary,
+            'gemini-2.5-flash',
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+        ])));
 
-        $response = $this->rotationService->runWithFallback(function (string $currentKey) use ($base64Audio, $mimeType, $model) {
-            return Http::withHeaders(['x-goog-api-key' => $currentKey])
-                ->timeout(25)
-                ->retry(2, 500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException)
-                ->post(
-                    "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
-                    [
-                        'contents' => [
-                            [
-                                'role' => 'user',
-                                'parts' => [
-                                    [
-                                        'inline_data' => [
-                                            'mime_type' => $mimeType,
-                                            'data' => $base64Audio,
-                                        ],
-                                    ],
-                                    [
-                                        'text' => self::PROMPT,
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'generationConfig' => [
-                            'temperature' => 0.0,
-                            'maxOutputTokens' => 2048,
-                        ],
-                    ]
-                );
-        });
-
-        if ($response->failed()) {
-            // If model was 1.5-flash and returned 404/not supported, attempt with fallback model
-            $fallbackModel = config('services.gemini.model', 'gemini-2.0-flash');
-            if ($fallbackModel !== $model) {
-                $retryRes = $this->rotationService->runWithFallback(function (string $currentKey) use ($base64Audio, $mimeType, $fallbackModel) {
+        foreach ($models as $model) {
+            try {
+                $response = $this->rotationService->runWithFallback(function (string $currentKey) use ($base64Audio, $mimeType, $model) {
                     return Http::withHeaders(['x-goog-api-key' => $currentKey])
                         ->timeout(25)
+                        ->retry(2, 500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException)
                         ->post(
-                            "https://generativelanguage.googleapis.com/v1beta/models/{$fallbackModel}:generateContent",
+                            "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
                             [
                                 'contents' => [
                                     [
@@ -186,21 +161,21 @@ class AudioTranscriptionService
                         );
                 });
 
-                if ($retryRes->successful()) {
-                    $text = (string) $retryRes->json('candidates.0.content.parts.0.text');
-                    return $this->cleanTranscript($text);
+                if ($response->successful()) {
+                    $text = (string) $response->json('candidates.0.content.parts.0.text');
+                    $cleaned = $this->cleanTranscript($text);
+                    if ($cleaned !== '') {
+                        return $cleaned;
+                    }
                 }
-            }
 
-            Log::warning('[AudioTranscriptionService] Gemini API non-200 response', [
-                'status' => $response->status(),
-                'body' => substr($response->body(), 0, 500),
-            ]);
-            return '';
+                Log::warning("[AudioTranscriptionService] Model '{$model}' returned status {$response->status()}, trying next model in hierarchy...");
+            } catch (Throwable $e) {
+                Log::warning("[AudioTranscriptionService] Model '{$model}' exception: {$e->getMessage()}, trying next model...");
+            }
         }
 
-        $text = (string) $response->json('candidates.0.content.parts.0.text');
-        return $this->cleanTranscript($text);
+        return '';
     }
 
     /**
@@ -259,3 +234,4 @@ class AudioTranscriptionService
         return $cleaned;
     }
 }
+

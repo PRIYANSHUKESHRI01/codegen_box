@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BadgeCheck, History, LockOpen, PencilLine, Plus, RotateCcw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, BadgeCheck, Ban, Clock, History, LockOpen, PencilLine, Plus, RotateCcw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { type ToastTrigger } from "@/lib/toast";
@@ -219,6 +219,114 @@ export function VaultAiSection({ userId, reload, triggerToast }: { userId: numbe
 
       {data && gate && (
         <>
+          {/* Detailed Blocked Diagnostic Alert Card */}
+          {(data.block_details?.is_blocked || data.student.is_blocked || rows.some((r) => r.is_blocked)) && (
+            <div
+              role="alert"
+              className="rounded-panel border-2 border-status-danger/40 bg-status-danger/[0.06] p-4 text-xs shadow-md space-y-3.5"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-status-danger/15 text-status-danger border border-status-danger/30 shadow-sm">
+                    <ShieldAlert className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-status-danger">
+                        {data.block_details?.primary_trigger?.title ?? "Candidate Blocked from Vault AI Interview"}
+                      </span>
+                      <span className="rounded-full bg-status-danger/20 border border-status-danger/30 px-2 py-0.5 text-3xs font-black uppercase tracking-wider text-status-danger">
+                        {data.block_details?.primary_trigger?.severity ?? "Blocked"}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-primary font-medium leading-relaxed max-w-2xl">
+                      {data.block_details?.primary_trigger?.message ??
+                        data.block_details?.summary_message ??
+                        data.student.blocked_reason ??
+                        "This candidate has been locked out of the Vault AI Interview due to proctoring policy enforcement or exhausted attempts."}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setAction({ kind: "reinstate_proctoring" })}
+                  className="inline-flex items-center gap-1.5 shrink-0 rounded-control bg-status-danger px-4 py-2 text-xs font-bold text-white shadow hover:bg-status-danger/90 transition-colors"
+                >
+                  <ShieldCheck className="h-4 w-4" /> Reinstate Proctoring & Unblock
+                </button>
+              </div>
+
+              {/* Proctoring Violation Breakdown Details */}
+              {data.block_details?.proctoring_lock && (
+                <div className="rounded-control border border-status-danger/25 bg-surface/90 p-3 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-2xs">
+                    <span className="font-bold uppercase tracking-wider text-status-danger flex items-center gap-1.5">
+                      <AlertTriangle className="h-3.5 w-3.5" /> Proctoring Session #{data.block_details.proctoring_lock.session_id} Terminated
+                    </span>
+                    <span className="text-text-muted font-mono">
+                      Locked at: {fmt(data.block_details.proctoring_lock.locked_at)} · {data.block_details.proctoring_lock.violation_count} strikes recorded
+                    </span>
+                  </div>
+
+                  {data.block_details.proctoring_lock.violations.length > 0 && (
+                    <div className="space-y-1">
+                      <p className="text-3xs font-bold uppercase tracking-wide text-text-muted">Recorded Violations in Attempt:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {data.block_details.proctoring_lock.violations.map((v) => (
+                          <span
+                            key={v.id}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-3xs font-medium border",
+                              v.type === "phone_detected" || v.type === "face_mismatch"
+                                ? "bg-status-danger/15 border-status-danger/30 text-status-danger font-bold"
+                                : "bg-elevated border-border-subtle text-text-secondary"
+                            )}
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-status-danger" />
+                            {v.label}
+                            {v.occurred_at && (
+                              <span className="text-text-muted ml-0.5">
+                                ({new Date(v.occurred_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })})
+                              </span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Series Cooldown Breakdown */}
+              {data.block_details?.cooldowns && data.block_details.cooldowns.length > 0 && (
+                <div className="rounded-control border border-status-warning/30 bg-status-warning/10 p-3 text-xs text-text-secondary space-y-1">
+                  <p className="font-bold text-status-warning flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" /> Series Cooldown Restrictions:
+                  </p>
+                  {data.block_details.cooldowns.map((c) => (
+                    <p key={c.stack_key} className="text-2xs">
+                      • <strong>{c.stack_name}</strong>: Blocked until <strong className="text-primary">{fmt(c.cooldown_until)}</strong> ({c.days_remaining} day{c.days_remaining === 1 ? "" : "s"} left) after failing all {c.max_attempts} attempts.
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Account Block Breakdown */}
+              {data.block_details?.account_block && (
+                <div className="rounded-control border border-border-subtle bg-elevated/70 p-2.5 text-2xs text-text-muted flex flex-wrap items-center justify-between gap-2">
+                  <span>
+                    <strong>Account Status:</strong> Blocked {data.block_details.account_block.blocked_by ? `by ${data.block_details.account_block.blocked_by}` : ""}
+                    {data.block_details.account_block.blocked_at ? ` on ${fmt(data.block_details.account_block.blocked_at)}` : ""}
+                  </span>
+                  {data.block_details.account_block.reason && (
+                    <span className="italic text-primary">“{data.block_details.account_block.reason}”</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-panel border border-border-subtle bg-elevated/50 p-3.5 sm:col-span-2">
               <div className="text-3xs font-bold uppercase tracking-wide text-text-muted">Access to the interview</div>
@@ -233,11 +341,25 @@ export function VaultAiSection({ userId, reload, triggerToast }: { userId: numbe
                   ))}
                 </ul>
               )}
-              {unlockable && (
-                <button type="button" onClick={() => setAction({ kind: "unlock" })} className={cn(btn, "mt-2.5")}>
-                  <LockOpen className="h-3 w-3" /> Open it now
+              <div className="mt-3 flex flex-wrap gap-2">
+                {unlockable && (
+                  <button type="button" onClick={() => setAction({ kind: "unlock" })} className={btn}>
+                    <LockOpen className="h-3 w-3" /> Open it now
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setAction({ kind: "reinstate_proctoring" })}
+                  className={cn(
+                    btn,
+                    data.student.is_blocked || rows.some((r) => r.is_blocked)
+                      ? "border-status-danger bg-status-danger/10 text-status-danger hover:bg-status-danger/20"
+                      : "border-accent-primary/30 text-accent-primary hover:bg-accent-primary/10"
+                  )}
+                >
+                  <ShieldCheck className="h-3 w-3" /> Reinstate Proctoring / Re-grant Access
                 </button>
-              )}
+              </div>
             </div>
             <div className="rounded-panel border border-border-subtle bg-elevated/50 p-3.5">
               <div className="text-3xs font-bold uppercase tracking-wide text-text-muted">Readiness</div>

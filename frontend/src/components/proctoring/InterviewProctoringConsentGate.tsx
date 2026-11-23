@@ -35,7 +35,7 @@ export function InterviewProctoringConsentGate({
   devicePreviewReady: boolean;
   previewVideoRef: React.RefObject<HTMLVideoElement>;
   onEnableDevices: () => void;
-  onConsent: () => void;
+  onConsent: (verifiedPhoto?: string | null, verifiedDescriptor?: number[] | null) => void;
   cameraStream?: MediaStream | null;
   candidateName?: string;
   sessionLabel?: string;

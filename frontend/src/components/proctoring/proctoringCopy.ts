@@ -43,14 +43,16 @@ export const CONSENT_COPY: Record<ProctoringActivity, ConsentCopy> = {
     footer: "By continuing you consent to being recorded and monitored for the duration of this contest attempt as described above.",
   },
   soft_skill: {
-    title: "This is a proctored test",
-    subtitle: "Required for every Soft Skills test.",
-    badge: "Proctored test",
-    label: "Soft Skills test",
-    intro: "Required for every Soft Skills test. A quick look at your camera, microphone and screen — then you can start.",
+    title: "This is a proctored assessment",
+    subtitle: "Required for every Soft Skills assessment.",
+    badge: "Proctored assessment",
+    label: "Soft Skills Assessment",
+    intro: "A quick look at your camera, microphone and screen — then you can begin your assessment.",
     strikes:
       "Leaving this window or tab, exiting fullscreen, opening developer tools, or stopping your camera or screen share counts as a strike. You get 2 warnings — a 3rd strike submits the answers you've saved so far and ends your attempt. The result is marked as ended by proctoring and can't count as a pass.",
-    footer: "By continuing you consent to being recorded and monitored for the duration of this test attempt.",
+    paste:
+      "Text selection, copying questions, and right-clicking are strictly prohibited and disabled during this assessment.",
+    footer: "By continuing you consent to being recorded and monitored for the duration of this assessment.",
   },
   core_test: {
     title: "This is a proctored test",

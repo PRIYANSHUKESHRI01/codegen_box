@@ -211,6 +211,9 @@ export function UserManageDrawer({ userId, onClose, onChanged, triggerToast, ini
                 )}
               >
                 {t.label}
+                {t.id === "vault_ai" && user?.is_blocked && (
+                  <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-status-danger inline-block" title="Candidate is currently blocked" />
+                )}
               </button>
             ))}
           </div>

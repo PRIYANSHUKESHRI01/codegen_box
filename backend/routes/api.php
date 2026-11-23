@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\AdminSoftSkillQuestionBankController;
 use App\Http\Controllers\Api\AdminVaultController;
 use App\Http\Controllers\Api\AdminMockInterviewQuestionController;
 use App\Http\Controllers\Api\AdminVaultQuestionController;
+use App\Http\Controllers\Api\AptBotController;
 use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CheckoutController;
@@ -173,6 +174,11 @@ Route::post('/contact-requests', [ContactRequestController::class, 'store'])
 // The public footer's newsletter signup — unauthenticated, its own tiny surface.
 Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
     ->middleware('throttle:newsletter-subscribe');
+
+// AptBot Interactive Chatbot & Support Ticket Routing
+Route::get('/aptbot/faqs', [AptBotController::class, 'index']);
+Route::post('/aptbot/support-ticket', [AptBotController::class, 'createTicket'])
+    ->middleware('throttle:contact-request');
 
 // The unsubscribe page behind the link in every nudge e-mail (and its List-Unsubscribe header). Signed, not
 // authenticated: the person is reading an e-mail, not using the app. GET only shows the state; POST changes it.
@@ -748,6 +754,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/users/{user}/detail', [SuperAdminController::class, 'showUser']);
             Route::get('/users/{user}/export-report', [SuperAdminController::class, 'exportUserReport']);
             Route::post('/users/{user}/toggle-block', [SuperAdminController::class, 'toggleBlock']);
+            Route::post('/users/{user}/reinstate-proctoring', [SuperAdminController::class, 'reinstateProctoring'])
+                ->middleware('throttle:superadmin-subscriptions');
             Route::post('/users/{user}/permissions', [SuperAdminController::class, 'updatePermissions']);
             // Both re-check the caller's own password, so they share a tight per-user limiter (see AppServiceProvider).
             Route::post('/users/{user}/reset-password', [SuperAdminController::class, 'resetPassword'])
@@ -810,6 +818,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::get('/pulse', [SuperAdminActivityController::class, 'pulse']);
                 Route::get('/patterns', [SuperAdminActivityController::class, 'patterns']);
                 Route::get('/feature-usage', [SuperAdminActivityController::class, 'featureUsage']);
+                Route::get('/usage-timeline', [SuperAdminActivityController::class, 'usageTimeline']);
                 Route::get('/glance', [SuperAdminActivityController::class, 'glance']);
                 Route::get('/colleges', [SuperAdminActivityController::class, 'colleges']);
                 Route::get('/colleges/{college}', [SuperAdminActivityController::class, 'college']);
@@ -896,6 +905,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-subscriptions');
             Route::post('/vault-ai/students/{user}/unlock-access', [SuperAdminVaultAiController::class, 'unlockAccess'])
                 ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/vault-ai/students/{user}/reinstate-proctoring', [SuperAdminVaultAiController::class, 'reinstateProctoring'])
+                ->middleware('throttle:superadmin-subscriptions');
 
             // Readiness: every student's score, and the hand tool to set it. A hand-set score replaces the calculated one everywhere.
             Route::get('/readiness/{user}', [SuperAdminReadinessController::class, 'show']);
@@ -927,6 +938,14 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/gemini-keys/sync-to-env', [SuperAdminGeminiKeyController::class, 'syncToEnv'])
                 ->middleware('throttle:superadmin-sensitive');
         });
+
+    // Compatibility aliases for gemini-keys without the /superadmin prefix
+    Route::middleware('role:'.User::ROLE_SUPERADMIN)->group(function () {
+        Route::post('/gemini-keys/sync-env', [SuperAdminGeminiKeyController::class, 'syncEnv'])
+            ->middleware('throttle:superadmin-sensitive');
+        Route::post('/gemini-keys/sync-to-env', [SuperAdminGeminiKeyController::class, 'syncToEnv'])
+            ->middleware('throttle:superadmin-sensitive');
+    });
 
     // Mellow Marketing team's own surface — "Mellow Direct" leads only (see
     // User::isMellowDirectLead()). Superadmin included for oversight, same

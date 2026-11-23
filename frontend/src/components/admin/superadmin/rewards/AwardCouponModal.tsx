@@ -226,3 +226,4 @@ export function AwardCouponModal({ student, weekKey, onClose, onSuccess, trigger
     </Modal>
   );
 }
+

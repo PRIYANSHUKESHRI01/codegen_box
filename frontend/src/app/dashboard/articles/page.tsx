@@ -2,7 +2,8 @@
 import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Newspaper } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Newspaper, ChevronLeft } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ArticleTopicCard } from "@/components/dashboard/articles/ArticleTopicCard";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -44,7 +45,15 @@ export default function ArticlesTopicsPage() {
       role="user"
       title="Articles"
       subtitle="Curated, topic-by-topic knowledge from Mellow — read at your own pace, one article to the next."
+      back={{ href: "/dashboard/learning-centre", label: "Learning Centre" }}
     >
+      <Link
+        href="/dashboard/learning-centre"
+        className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors -mt-2 mb-4 group"
+      >
+        <ChevronLeft className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" />
+        Back to Learning Centre
+      </Link>
       {loading ? (
         <div className="p-16 flex items-center justify-center gap-2 text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
           <Loader2 className="w-4 h-4 animate-spin" />

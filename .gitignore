@@ -27,6 +27,10 @@ Thumbs.db
 __pycache__/
 *.py[cod]
 
+# Dependencies & cache
+node_modules/
+.vitest-cache/
+
 # Scratch or temporary dumps at repository root
 /*.docx
 /*.txt

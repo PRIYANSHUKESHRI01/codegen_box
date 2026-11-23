@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Ear, Headphones, Loader2, PartyPopper, Sparkles, Target } from "lucide-react";
+import { ArrowRight, ChevronLeft, Ear, Headphones, Loader2, PartyPopper, Sparkles, Target } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
@@ -81,7 +81,18 @@ export default function ListeningLabListPage() {
       role="user"
       title="Listening Lab"
       subtitle="Train your ear for interviews, calls and placement tests — passages, real conversations and dictation, with a skill-by-skill picture of how you listen."
+      back={{ href: "/dashboard/learning-centre", label: "Learning Centre" }}
     >
+      <div className="mb-4">
+        <Link
+          href="/dashboard/learning-centre"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Learning Centre
+        </Link>
+      </div>
+
       <FreeTrialBanner feature="listening" />
 
       {loading ? (

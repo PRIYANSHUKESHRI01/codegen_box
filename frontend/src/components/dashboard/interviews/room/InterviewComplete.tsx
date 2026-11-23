@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, Mail, RefreshCw, RotateCcw, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, UserCheck } from "lucide-react";
+import { AlertTriangle, ArrowRight, CheckCircle2, Loader2, Mail, RefreshCw, RotateCcw, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, Trophy, UserCheck } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { ScoreRing } from "@/components/dashboard/vaultAi/vaultKit";
 import { AnimatedCounter } from "@/components/ui/AnimatedCounter";
@@ -83,6 +83,9 @@ export function InterviewComplete({
   onReattempt,
   onRetryScoring,
   onBack,
+  qualification,
+  onStartNextSet,
+  startingNextSet = false,
 }: {
   vault: boolean;
   /** A study set (the Merchant Navy orals): no AI scoring, so the summary is the matches with the model answers, to revise from. */
@@ -97,6 +100,14 @@ export function InterviewComplete({
   onReattempt: () => void;
   onRetryScoring?: () => Promise<void> | void;
   onBack: () => void;
+  qualification?: {
+    stack_key: string | null;
+    role_key: string | null;
+    series_number: number | null;
+    set_number: number | null;
+  } | null;
+  onStartNextSet?: (nextSetNumber: number) => Promise<void> | void;
+  startingNextSet?: boolean;
 }) {
   const signal = useRoomSignal();
   const reduce = useReducedMotion() ?? false;
@@ -109,6 +120,40 @@ export function InterviewComplete({
   // A study set can always be practised again; any other interview only when it scored below the bar.
   // For pending review/eval, answers are saved so reattempt is an optional alternative, not the main CTA.
   const canReattempt = study ? done !== null && done.reattemptable !== false : belowBar;
+
+  const currentSetNumber = qualification?.set_number ?? null;
+  const hasNextSet = vault && currentSetNumber !== null && currentSetNumber < 3 && !!qualification?.stack_key && !!onStartNextSet;
+  const nextSetNumber = hasNextSet ? currentSetNumber + 1 : null;
+  const isFinalSet = vault && currentSetNumber === 3;
+
+  const AUTO_ADVANCE_SECONDS = 12;
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [autoAdvancePaused, setAutoAdvancePaused] = useState(false);
+  const timerStartedRef = useRef(false);
+
+  useEffect(() => {
+    // Only start timer once scored result is ready and there is a next set
+    if (!done || !hasNextSet || autoAdvancePaused || timerStartedRef.current) return;
+    timerStartedRef.current = true;
+    setCountdown(AUTO_ADVANCE_SECONDS);
+  }, [done, hasNextSet, autoAdvancePaused]);
+
+  useEffect(() => {
+    if (countdown === null || autoAdvancePaused || !nextSetNumber || !onStartNextSet) return;
+    if (countdown <= 0) {
+      void onStartNextSet(nextSetNumber);
+      return;
+    }
+    const timer = setInterval(() => {
+      setCountdown((prev) => (prev !== null && prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown, autoAdvancePaused, nextSetNumber, onStartNextSet]);
+
+  const handlePause = () => {
+    setAutoAdvancePaused(true);
+    setCountdown(null);
+  };
 
   const rise = (delay: number) => (reduce ? {} : { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay } });
 
@@ -170,6 +215,107 @@ export function InterviewComplete({
                 This set counts toward your Mellow Vault series and is scored once.{" "}
                 <strong className="font-semibold text-primary">Your average across all three sets decides whether you qualify</strong> (60% or higher), so one lower set can still be made up by the others.
               </motion.p>
+            )}
+
+            {hasNextSet && nextSetNumber && onStartNextSet && (
+              <motion.div
+                {...rise(0.24)}
+                className="relative overflow-hidden rounded-2xl border border-indigo-500/35 bg-gradient-to-br from-indigo-500/[0.1] via-violet-500/[0.06] to-fuchsia-500/[0.08] p-5 shadow-subtle backdrop-blur-sm"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-accent-primary/15 px-2.5 py-0.5 text-3xs font-black uppercase tracking-wider text-accent-primary ring-1 ring-inset ring-accent-primary/25">
+                        <Sparkles className="h-3 w-3" /> Up Next · Set {nextSetNumber} of 3
+                      </span>
+                      {countdown !== null && !autoAdvancePaused && (
+                        <span className="tabular text-3xs font-bold text-indigo-600 dark:text-indigo-400">
+                          Auto-advancing in {countdown}s
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="mt-1 text-base font-black text-primary">
+                      Ready for Set {nextSetNumber}?
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                      {countdown !== null && !autoAdvancePaused
+                        ? `Starting your next assessment automatically in ${countdown}s. Pause anytime to review your feedback below.`
+                        : `Keep your technical momentum going! Each round contributes equally to your 60% qualification average.`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {countdown !== null && !autoAdvancePaused && (
+                      <button
+                        type="button"
+                        onClick={handlePause}
+                        className="rounded-full border border-border-strong bg-surface/90 px-4 py-2 text-xs font-bold text-text-secondary hover:text-primary shadow-sm transition-colors"
+                      >
+                        Pause Timer
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handlePause();
+                        void onStartNextSet(nextSetNumber);
+                      }}
+                      disabled={startingNextSet}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all hover:-translate-y-0.5 hover:shadow-indigo-500/40 active:translate-y-0 disabled:opacity-60"
+                    >
+                      {startingNextSet ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Launching Set {nextSetNumber}...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Start Set {nextSetNumber} Now</span>
+                          <ArrowRight className="h-4 w-4" />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {countdown !== null && !autoAdvancePaused && (
+                  <div className="mt-3.5 h-1.5 w-full overflow-hidden rounded-full bg-indigo-500/15">
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 transition-all duration-1000 ease-linear"
+                      style={{ width: `${(countdown / AUTO_ADVANCE_SECONDS) * 100}%` }}
+                    />
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {isFinalSet && (
+              <motion.div
+                {...rise(0.24)}
+                className="relative overflow-hidden rounded-2xl border border-emerald-500/35 bg-gradient-to-br from-emerald-500/[0.09] via-teal-500/[0.05] to-cyan-500/[0.08] p-5 shadow-subtle backdrop-blur-sm"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between text-left">
+                  <div className="min-w-0 flex-1">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-3xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-300 ring-1 ring-inset ring-emerald-500/30">
+                      <Trophy className="h-3 w-3" /> Series 3 of 3 Completed!
+                    </span>
+                    <h3 className="mt-1 text-base font-black text-primary">
+                      You Have Completed All 3 Qualification Sets
+                    </h3>
+                    <p className="mt-0.5 text-xs leading-relaxed text-text-secondary">
+                      Your series average across all 3 rounds is calculated. Head to your qualification circuit to review your final standing and Mellow Vault profile.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="inline-flex items-center justify-center gap-2 shrink-0 rounded-full bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-lg shadow-emerald-500/30 transition-all hover:-translate-y-0.5"
+                  >
+                    <span>View Circuit Standing</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </motion.div>
             )}
 
             {belowBar && (
@@ -290,7 +436,7 @@ export function InterviewComplete({
 
         <motion.div {...rise(0.2)} className="flex flex-wrap items-center justify-center gap-3 pb-6 pt-2">
           {canReattempt && (
-            <button onClick={onReattempt} disabled={reattempting} className={PRIMARY}>
+            <button onClick={onReattempt} disabled={reattempting} className={hasNextSet ? SECONDARY : PRIMARY}>
               {reattempting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -304,7 +450,32 @@ export function InterviewComplete({
               )}
             </button>
           )}
-          <button onClick={onBack} className={vault && !canReattempt ? PRIMARY : SECONDARY}>
+
+          {hasNextSet && nextSetNumber && onStartNextSet && (
+            <button
+              type="button"
+              onClick={() => {
+                handlePause();
+                void onStartNextSet(nextSetNumber);
+              }}
+              disabled={startingNextSet}
+              className={PRIMARY}
+            >
+              {startingNextSet ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  <span>Launching Set {nextSetNumber}...</span>
+                </>
+              ) : (
+                <>
+                  <span>Proceed to Set {nextSetNumber}</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </>
+              )}
+            </button>
+          )}
+
+          <button onClick={onBack} className={vault && !hasNextSet && !canReattempt ? PRIMARY : SECONDARY}>
             {backLabel ?? (vault ? "Back to Qualification Circuit" : "Back to Interviews")}
           </button>
         </motion.div>

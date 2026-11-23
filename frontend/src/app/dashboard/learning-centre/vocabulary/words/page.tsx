@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, Loader2, Search, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, Loader2, Search, X } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Pill } from "@/components/listening/listeningUi";
@@ -161,8 +162,22 @@ export default function VocabularyWordBankPage() {
   const counts = data?.counts;
 
   return (
-    <DashboardShell role="user" title="Word bank" subtitle="Every word in your library, and exactly where you stand with each one.">
+    <DashboardShell
+      role="user"
+      title="Word bank"
+      subtitle="Every word in your library, and exactly where you stand with each one."
+      back={{ href: "/dashboard/learning-centre/vocabulary", label: "Vocabulary Sprint" }}
+    >
       <div className="mx-auto max-w-3xl space-y-5">
+        <div>
+          <Link
+            href="/dashboard/learning-centre/vocabulary"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-text-muted hover:text-primary transition-colors"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Back to Vocabulary Sprint
+          </Link>
+        </div>
         <div className="space-y-3">
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative flex-1">

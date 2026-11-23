@@ -1,4 +1,5 @@
 import { headPose } from "./attention";
+import { extractFaceDescriptor } from "./faceIdentity";
 
 /**
  * In-browser face and phone detection with MediaPipe (WebAssembly, served from our own origin — see public/integrity).
@@ -16,6 +17,8 @@ export interface FrameAnalysis {
   pitch: number | null;
   /** Highest "cell phone" confidence, only when the (slower) object detector ran for this frame. */
   phone?: number;
+  /** 24-dimensional normalized facial landmark descriptor for live candidate verification. */
+  faceDescriptor?: number[] | null;
 }
 
 export interface VisionEngine {
@@ -70,15 +73,17 @@ export async function loadVision(base = "/integrity", delegate: Delegate = "CPU"
       const list = result.faceLandmarks ?? [];
       let yaw: number | null = null;
       let pitch: number | null = null;
+      let faceDescriptor: number[] | null = null;
 
       if (list.length >= 1) {
         const l = list[0];
         const pose = l[NOSE] && l[LEFT_CHEEK] && l[RIGHT_CHEEK] && l[FOREHEAD] && l[CHIN] ? headPose(l[NOSE], l[LEFT_CHEEK], l[RIGHT_CHEEK], l[FOREHEAD], l[CHIN]) : null;
         yaw = pose?.yaw ?? null;
         pitch = pose?.pitch ?? null;
+        faceDescriptor = extractFaceDescriptor(l);
       }
 
-      const out: FrameAnalysis = { faces: list.length, yaw, pitch };
+      const out: FrameAnalysis = { faces: list.length, yaw, pitch, faceDescriptor };
 
       if (withObjects && objects) {
         let best = 0;

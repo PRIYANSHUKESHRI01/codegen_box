@@ -35,6 +35,9 @@ export interface UseIntegrityEngineResult {
   shareScreen: () => Promise<void>;
   connectGuardian: () => Promise<void>;
   resolveHold: () => Promise<void>;
+  setBaselineIdentity: (photoDataUrl: string, descriptor?: number[] | null) => void;
+  getBaselineIdentity: () => { photo: string | null; descriptor: number[] | null };
+  lockSession: (reason?: string) => void;
 }
 
 /**
@@ -105,6 +108,12 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
   const shareScreen = useCallback(() => engine.shareScreen(), [engine]);
   const connectGuardian = useCallback(() => engine.connectGuardian(), [engine]);
   const resolveHold = useCallback(() => engine.resolveHold(), [engine]);
+  const setBaselineIdentity = useCallback(
+    (photo: string, descriptor?: number[] | null) => engine.setBaselineIdentity(photo, descriptor),
+    [engine]
+  );
+  const getBaselineIdentity = useCallback(() => engine.getBaselineIdentity(), [engine]);
+  const lockSession = useCallback((reason?: string) => engine.lockNow(reason), [engine]);
 
   return {
     phase,
@@ -121,6 +130,9 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
     shareScreen,
     connectGuardian,
     resolveHold,
+    setBaselineIdentity,
+    getBaselineIdentity,
+    lockSession,
   };
 }
 

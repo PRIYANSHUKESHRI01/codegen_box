@@ -1,12 +1,13 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, Info, Layers, Mic, ShieldCheck, Target, Trophy } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CuratedSetsExplorer } from "@/components/dashboard/interviews/CuratedSetsExplorer";
 import { VaultAiLockedPanel } from "@/components/dashboard/vaultAi/VaultAiLockedPanel";
 import { VaultAiResultsCard } from "@/components/dashboard/vaultAi/VaultAiResultsCard";
-import { Reveal, ScoreRing } from "@/components/dashboard/vaultAi/vaultKit";
+import { Reveal, ScoreRing, VaSkeleton } from "@/components/dashboard/vaultAi/vaultKit";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -136,7 +137,9 @@ export default function VaultInterviewsPage() {
         <Intro access={access} />
         {/* The final average of the three sets (best series), the attempts behind it, and the PDF report — once a series has been completed. */}
         <VaultAiResultsCard />
-        <CuratedSetsExplorer />
+        <Suspense fallback={<VaSkeleton className="h-64" />}>
+          <CuratedSetsExplorer />
+        </Suspense>
       </div>
     </DashboardShell>
   );

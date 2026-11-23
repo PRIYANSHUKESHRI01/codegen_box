@@ -163,9 +163,15 @@ export type InterviewSessionVariant = "mock" | "vault";
 export function InterviewSessionView({ variant = "mock" }: { variant?: InterviewSessionVariant }) {
   return (
     <Suspense fallback={<InterviewBoot />}>
-      <InterviewSessionViewContent variant={variant} />
+      <InterviewSessionViewSlugWrapper variant={variant} />
     </Suspense>
   );
+}
+
+function InterviewSessionViewSlugWrapper({ variant }: { variant: InterviewSessionVariant }) {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug") ?? "";
+  return <InterviewSessionViewContent key={slug} variant={variant} />;
 }
 
 function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVariant }) {
@@ -261,6 +267,25 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   // Vault only: which set of which series this is, for the header above the questions. Everyone: how long it is expected to take.
   const [setInfo, setSetInfo] = useState<StudentInterviewSummary["qualification"]>(null);
+  const [startingNextSet, setStartingNextSet] = useState(false);
+
+  const handleStartNextSet = useCallback(
+    async (nextSetNumber: number) => {
+      if (!setInfo?.stack_key || startingNextSet) return;
+      setStartingNextSet(true);
+      try {
+        const res = await api.post<{ interview: { slug: string } }>("/vault-qualification/start-set", {
+          stack: setInfo.stack_key,
+          set_number: nextSetNumber,
+        });
+        router.push(`/dashboard/vault-interviews/session?slug=${encodeURIComponent(res.interview.slug)}`);
+      } catch (err) {
+        toast.error(err instanceof ApiError ? err.message : "Could not launch next set. Please try from the qualification circuit.");
+        setStartingNextSet(false);
+      }
+    },
+    [setInfo?.stack_key, startingNextSet, router]
+  );
   useEffect(() => {
     if (status !== "ready") return;
     let alive = true;
@@ -312,7 +337,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
-  const proctoring = useInterviewProctoring({ basePath, enabled: status === "ready" });
+  const proctoring = useInterviewProctoring({
+    basePath,
+    enabled: status === "ready",
+    getContext: () => ({ phase, questionId: question?.interview_question_id, vault, answeredCount }),
+  });
 
   useEffect(() => {
     // (Reset on every mount: React's dev double-mount runs the cleanup once before the page is really used.)
@@ -1081,7 +1110,12 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
             devicePreviewReady={proctoring.devicePreviewReady}
             previewVideoRef={proctoring.previewVideoRef}
             onEnableDevices={proctoring.enableDevicePreview}
-            onConsent={proctoring.grantConsentAndStart}
+            onConsent={(photo?: string | null, descriptor?: number[] | null) => {
+              if (photo) {
+                proctoring.setBaselineIdentity(photo, descriptor ?? null);
+              }
+              void proctoring.grantConsentAndStart();
+            }}
             cameraStream={proctoring.cameraStream}
             candidateName={user?.name ?? "Candidate"}
             sessionLabel={sessionLabel}
@@ -1164,7 +1198,16 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
                     reattempting={reattempting}
                     onReattempt={handleReattempt}
                     onRetryScoring={handleRetryScoring}
-                    onBack={() => router.push(home)}
+                    onBack={() => {
+                      if (vault && setInfo?.stack_key) {
+                        router.push(`/dashboard/vault-interviews?stack=${encodeURIComponent(setInfo.stack_key)}`);
+                      } else {
+                        router.push(home);
+                      }
+                    }}
+                    qualification={setInfo}
+                    onStartNextSet={handleStartNextSet}
+                    startingNextSet={startingNextSet}
                   />
                 )}
               </>

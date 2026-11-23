@@ -55,7 +55,7 @@ function ArticleTopicPageContent() {
   const readCount = articles.filter((a) => a.is_read).length;
 
   return (
-    <DashboardShell role="user" title="Articles">
+    <DashboardShell role="user" title="Articles" back={{ href: "/dashboard/articles", label: "All Topics" }}>
       <button
         onClick={() => router.push("/dashboard/articles")}
         className="flex items-center gap-1 text-2xs font-semibold text-text-muted hover:text-primary transition-colors -mt-2"

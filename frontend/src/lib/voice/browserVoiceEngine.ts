@@ -114,7 +114,16 @@ export class BrowserVoiceEngine implements VoiceEngine {
   // silently cut the transcript off there.
   private stopRequested = false;
   private restartCount = 0;
+  private consecutiveEmptyRestarts = 0;
+  private restartTimerId: number | null = null;
   private recognitionEnded: (() => void) | null = null;
+
+  // Track silent-pause dropouts, non-Latin mis-recognition, and voiced audio after STT stalls
+  // so long candidate pauses trigger clean AI audio recovery instead of truncated answers.
+  private hadRecognitionError = false;
+  private hasSpeechGap = false;
+  private lastSpeechResultAt = 0;
+  private voicedAfterSpeechStallMs = 0;
 
   // Real speech detected by the level meter, so callers can refuse to score a
   // recording of a muted mic without needing the (optional) recognizer.
@@ -215,19 +224,31 @@ export class BrowserVoiceEngine implements VoiceEngine {
   }
 
   async startListening(callbacks?: VoiceListenCallbacks): Promise<void> {
+    this.clearRestartTimer();
     this.chunks = [];
     this.finalTranscript = "";
     this.interimChunk = "";
     this.stopRequested = false;
     this.restartCount = 0;
+    this.consecutiveEmptyRestarts = 0;
     this.recognitionEnded = null;
+    this.hadRecognitionError = false;
+    this.hasSpeechGap = false;
+    this.lastSpeechResultAt = performance.now();
+    this.voicedAfterSpeechStallMs = 0;
     this.voicedMs = 0;
     this.lastLevelTickAt = 0;
     this.meterRan = false;
 
     if (!this.stream) {
       try {
-        this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
       } catch (err) {
         const name = err instanceof DOMException ? err.name : "";
         const cause: VoiceListenError = name === "NotAllowedError" || name === "PermissionDeniedError" ? "permission_denied" : "unknown";
@@ -240,7 +261,8 @@ export class BrowserVoiceEngine implements VoiceEngine {
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.chunks.push(e.data);
       };
-      recorder.start();
+      // Capture chunks every second so long answers + pauses flush safely in memory.
+      recorder.start(1000);
       this.recorder = recorder;
     }
 
@@ -258,6 +280,8 @@ export class BrowserVoiceEngine implements VoiceEngine {
     recognition.lang = "en-IN";
 
     let fatal = false;
+    let instanceHadError = false;
+    let receivedResultInWindow = false;
 
     recognition.onresult = (event: SpeechRecognitionEventLike) => {
       let interimChunk = "";
@@ -270,11 +294,27 @@ export class BrowserVoiceEngine implements VoiceEngine {
         }
       }
       this.interimChunk = interimChunk.trim();
-      callbacks?.onInterimTranscript?.((this.finalTranscript + " " + interimChunk).trim(), { final: this.finalTranscript, interim: this.interimChunk });
+      const fullText = (this.finalTranscript + " " + interimChunk).trim();
+      if (fullText) {
+        receivedResultInWindow = true;
+        this.consecutiveEmptyRestarts = 0;
+        this.restartCount = 0;
+        this.lastSpeechResultAt = performance.now();
+        // Flag Urdu/Arabic/Devanagari mis-decodes so AI audio transcription fixes them on stop.
+        if (/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F]/.test(fullText)) {
+          this.hasSpeechGap = true;
+        }
+      }
+      callbacks?.onInterimTranscript?.(fullText, { final: this.finalTranscript, interim: this.interimChunk });
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEventLike) => {
       const kind = mapRecognitionError(event.error);
+      instanceHadError = true;
+      this.hadRecognitionError = true;
+      if (kind !== "unknown") {
+        this.hasSpeechGap = true;
+      }
       // Permission problems will not fix themselves on a restart.
       if (kind === "permission_denied") fatal = true;
       // A no-speech/network blip shouldn't kill the session — the
@@ -295,12 +335,34 @@ export class BrowserVoiceEngine implements VoiceEngine {
         this.recognitionEnded?.();
         return;
       }
-      // Ended on its own mid-answer (silence timeout) — pick up again, with a cap so a
-      // recognizer that dies instantly cannot spin forever.
-      if (this.restartCount >= 30) return;
+      // Ended on its own mid-answer (silence timeout or engine stall) — restart cleanly
+      // with progressive backoff across long 15s+ candidate pauses.
+      if (this.restartCount >= 120) {
+        this.hasSpeechGap = true;
+        return;
+      }
       this.restartCount += 1;
-      window.setTimeout(() => {
-        if (this.stopRequested || fatal) return;
+      if (!receivedResultInWindow) {
+        this.consecutiveEmptyRestarts += 1;
+      }
+      const delayMs =
+        this.consecutiveEmptyRestarts <= 2 ? 250 : this.consecutiveEmptyRestarts <= 6 ? 600 : 1200;
+
+      this.clearRestartTimer();
+      this.restartTimerId = window.setTimeout(() => {
+        this.restartTimerId = null;
+        if (this.stopRequested || fatal || this.recognition !== recognition) return;
+        // Real Chrome instances stall permanently after `no-speech` / `network`;
+        // spin up a fresh Ctor() after errors so post-pause speech resumes reliably.
+        if (instanceHadError) {
+          this.hasSpeechGap = true;
+          try {
+            this.startRecognition(Ctor, callbacks);
+          } catch {
+            // Recognizer unable to restart — MediaRecorder audio still backs up the full answer.
+          }
+          return;
+        }
         try {
           recognition.start();
         } catch {
@@ -312,7 +374,7 @@ export class BrowserVoiceEngine implements VoiceEngine {
             // Recognizer unable to restart
           }
         }
-      }, 200);
+      }, delayMs);
     };
 
     recognition.start();
@@ -349,7 +411,14 @@ export class BrowserVoiceEngine implements VoiceEngine {
 
       const now = performance.now();
       this.meterRan = true;
-      if (this.lastLevelTickAt && level > VOICED_LEVEL) this.voicedMs += now - this.lastLevelTickAt;
+      if (this.lastLevelTickAt && level > VOICED_LEVEL) {
+        const delta = now - this.lastLevelTickAt;
+        this.voicedMs += delta;
+        // Detect voiced speech occurring >3.5s after the last STT update (silent-crash / stalled recognizer)
+        if (this.lastSpeechResultAt && now - this.lastSpeechResultAt > 3500) {
+          this.voicedAfterSpeechStallMs += delta;
+        }
+      }
       this.lastLevelTickAt = now;
 
       this.levelRafId = requestAnimationFrame(tick);
@@ -365,7 +434,8 @@ export class BrowserVoiceEngine implements VoiceEngine {
     }
   }
 
-  async stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null }> {
+  async stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null; hasSpeechGap?: boolean }> {
+    this.clearRestartTimer();
     this.stopLevelMetering();
     this.stopRequested = true;
 
@@ -406,10 +476,29 @@ export class BrowserVoiceEngine implements VoiceEngine {
     this.finalTranscript = "";
     this.interimChunk = "";
 
-    return { transcript, audioBlob, voicedMs: this.meterRan ? Math.round(this.voicedMs) : null };
+    const hasSpeechGap =
+      this.hasSpeechGap ||
+      this.voicedAfterSpeechStallMs >= 2000 ||
+      this.hadRecognitionError ||
+      /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F]/.test(transcript);
+
+    return {
+      transcript,
+      audioBlob,
+      voicedMs: this.meterRan ? Math.round(this.voicedMs) : null,
+      hasSpeechGap,
+    };
+  }
+
+  private clearRestartTimer(): void {
+    if (this.restartTimerId !== null) {
+      window.clearTimeout(this.restartTimerId);
+      this.restartTimerId = null;
+    }
   }
 
   cancel(): void {
+    this.clearRestartTimer();
     this.speechCancelled = true;
     this.currentSpeechAudio?.cancel();
     this.currentSpeechAudio = null;

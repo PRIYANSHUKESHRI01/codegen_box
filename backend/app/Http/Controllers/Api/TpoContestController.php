@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\NotificationType;
 use App\Http\Controllers\Controller;
 use App\Models\Contest;
 use App\Models\ContestProblem;
 use App\Models\ContestSubmission;
 use App\Models\User;
+use App\Services\ActivityLog;
 use App\Services\ContestFinalizeService;
 use App\Services\ContestReportService;
+use App\Services\NotificationService;
 use App\Support\BranchAudience;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -188,6 +191,95 @@ class TpoContestController extends Controller
         abort_unless($student->college_id === $contest->owning_college_id, 404);
 
         return response()->json(['submissions' => $report->participantSubmissions($contest, $student)]);
+    }
+
+    public function destroy(Request $request, Contest $contest)
+    {
+        $this->authorizeOwnership($request, $contest);
+
+        if ($contest->status !== Contest::STATUS_DRAFT && $contest->participants()->exists()) {
+            return response()->json([
+                'message' => 'Only draft contests (or contests with zero participants) can be deleted. Cancel active contests instead.',
+            ], 422);
+        }
+
+        $title = $contest->title;
+        $contest->delete();
+
+        ActivityLog::record($request->user(), 'Deleted mock contest', 'Contest', $title);
+
+        return response()->json(['message' => "{$title} deleted."]);
+    }
+
+    public function duplicate(Request $request, Contest $contest)
+    {
+        $this->authorizeOwnership($request, $contest);
+
+        $title = $contest->title.' (Copy)';
+        $copy = Contest::create([
+            'title' => $title,
+            'slug' => Contest::uniqueSlug($title),
+            'description' => $contest->description,
+            'start_at' => now()->addDays(7)->setTime(10, 0),
+            'end_at' => now()->addDays(7)->setTime(12, 0),
+            'is_rated' => false,
+            'status' => Contest::STATUS_DRAFT,
+            'contest_type' => Contest::CONTEST_TYPE_TPO_MOCK,
+            'owning_college_id' => $contest->owning_college_id,
+            'created_by' => $request->user()->id,
+            'branch_audience' => $contest->branch_audience,
+        ]);
+
+        foreach ($contest->contestProblems()->orderBy('order_index')->get() as $cp) {
+            ContestProblem::create([
+                'contest_id' => $copy->id,
+                'problem_id' => $cp->problem_id,
+                'points' => $cp->points,
+                'order_index' => $cp->order_index,
+            ]);
+        }
+
+        ActivityLog::record($request->user(), 'Duplicated mock contest', 'Contest', $copy->title);
+
+        return response()->json(['contest' => $copy->loadCount('participants')], 201);
+    }
+
+    public function announce(Request $request, Contest $contest, NotificationService $notifications)
+    {
+        $this->authorizeOwnership($request, $contest);
+
+        abort_unless($contest->status === Contest::STATUS_PUBLISHED, 422, 'Publish the contest before sending student announcements.');
+
+        $studentsQuery = User::where('college_id', $contest->owning_college_id)
+            ->where('role', User::ROLE_USER)
+            ->where('is_blocked', false);
+
+        if (! empty($contest->branch_audience)) {
+            $studentsQuery->forBranchAudience($contest->branch_audience);
+        }
+
+        $startLabel = $contest->start_at?->timezone(config('app.timezone', 'Asia/Kolkata'))->format('d M Y, h:i A');
+        $body = $startLabel
+            ? "Starts {$startLabel}. Check your Contests tab to register and practice."
+            : 'Open now on your Contests tab.';
+
+        $sent = $notifications->notifyMany(
+            $studentsQuery,
+            NotificationType::AssessmentScheduled,
+            "Mock Contest: {$contest->title}",
+            $body,
+            [
+                'url' => '/dashboard/contests',
+                'actor' => $request->user(),
+            ]
+        );
+
+        ActivityLog::record($request->user(), 'Announced mock contest to students', 'Contest', $contest->title, ['notified' => $sent]);
+
+        return response()->json([
+            'notified' => $sent,
+            'message' => "In-app notification sent to {$sent} eligible student(s).",
+        ]);
     }
 
     private function ownedContests(Request $request)

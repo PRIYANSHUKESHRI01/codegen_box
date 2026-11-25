@@ -414,13 +414,7 @@ export function AptBotWidget() {
     }
   }, [isOpen, messages.length, user]);
 
-  // If in an active proctored assessment session, do NOT show the chatbot
-  const isProctoredSession = pathname?.includes("/session") || pathname?.includes("/exam/");
-  if (isProctoredSession) {
-    return null;
-  }
-
-  // Find all FAQs in a flat map for quick related lookups
+  // Find all FAQs in a flat map for quick related lookups (kept above early return so hook order never changes on navigation)
   const allFaqsMap = React.useMemo(() => {
     const map = new Map<string, AptBotFaqItem>();
     categories.forEach((cat) => {
@@ -430,6 +424,12 @@ export function AptBotWidget() {
     });
     return map;
   }, [categories]);
+
+  // If in an active proctored assessment session, do NOT show the chatbot
+  const isProctoredSession = pathname?.includes("/session") || pathname?.includes("/exam/");
+  if (isProctoredSession) {
+    return null;
+  }
 
   /**
    * Select a Topic:

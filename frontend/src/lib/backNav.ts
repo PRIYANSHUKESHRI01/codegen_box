@@ -89,6 +89,7 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   // ── Placement cell (TPO), platform ops and hiring partners all live under /admin ──
   "/admin": { title: "Home", parent: ROOT },
   "/admin/analytics": { title: "Analytics", parent: "/admin" },
+  "/admin/calendar": { title: "Calendar", parent: "/admin" },
   "/admin/articles": { title: "Articles", parent: "/admin" },
   "/admin/articles/new": { title: "New article", parent: "/admin/articles" },
   "/admin/articles/edit": { title: "Edit article", parent: "/admin/articles" },
@@ -127,6 +128,7 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/admin/projects": { title: "Projects", parent: "/admin" },
   "/admin/projects/edit": { title: "Projects", parent: "/admin/projects" },
   "/admin/projects/review": { title: "Projects", parent: "/admin/projects?tab=review", backLabel: "Review queue" },
+  "/admin/recruiters": { title: "Recruiters", parent: "/admin" },
   "/admin/reports": { title: "Reports", parent: "/admin" },
   "/admin/reports/archive": { title: "Report archive", parent: "/admin/reports" },
   "/admin/vault-ai": { title: "Vault AI results", parent: "/admin" },

@@ -30,7 +30,10 @@ class DriveCollegeMapping extends Model
         'college_id',
         'min_cgpa_override',
         'max_backlogs_override',
+        'min_tenth_override',
+        'min_twelfth_override',
         'eligible_branches_override',
+        'eligible_years_override',
         'mapped_by',
         'mapped_at',
         'unmapped_at',
@@ -45,7 +48,10 @@ class DriveCollegeMapping extends Model
     {
         return [
             'eligible_branches_override' => 'array',
+            'eligible_years_override' => 'array',
             'min_cgpa_override' => 'decimal:2',
+            'min_tenth_override' => 'decimal:2',
+            'min_twelfth_override' => 'decimal:2',
             'mapped_at' => 'datetime',
             'unmapped_at' => 'datetime',
             'is_active' => 'boolean',
@@ -103,7 +109,12 @@ class DriveCollegeMapping extends Model
         return [
             'min_cgpa' => $this->min_cgpa_override ?? $base['min_cgpa'],
             'max_backlogs' => $this->max_backlogs_override ?? $base['max_backlogs'],
+            'min_tenth_percentage' => $this->min_tenth_override ?? $base['min_tenth_percentage'],
+            'min_twelfth_percentage' => $this->min_twelfth_override ?? $base['min_twelfth_percentage'],
             'eligible_branches' => $this->eligible_branches_override ?? $base['eligible_branches'],
+            'eligible_years' => $this->eligible_years_override ?? $base['eligible_years'],
+            'drive_ctc' => $base['drive_ctc'] ?? null,
+            'drive_tier' => $base['drive_tier'] ?? 'standard',
         ];
     }
 }

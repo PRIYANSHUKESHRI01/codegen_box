@@ -59,8 +59,10 @@ export interface VoiceEngine {
    * Stops capture and resolves with whatever was captured. `audioBlob` is null if MediaRecorder isn't supported or capture never started.
    * `voicedMs` is how long actual speech was detected by the level meter, or null when it was never measured (no `onAudioLevel`
    * callback, or no AudioContext) — lets a caller refuse to submit a recording of a muted mic without ever blocking on "unknown".
+   * `hasSpeechGap` is true when speech-to-text stalled or errored (e.g. prolonged silent pause timeout or non-Latin mis-decode)
+   * while voiced audio was captured, signaling the caller to recover the full transcript from server AI audio transcription.
    */
-  stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null }>;
+  stopListening(): Promise<{ transcript: string; audioBlob: Blob | null; voicedMs: number | null; hasSpeechGap?: boolean }>;
   /** Stops any in-flight speech/listening without resolving a result — used on navigation away mid-question. */
   cancel(): void;
 }

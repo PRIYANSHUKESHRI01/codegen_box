@@ -34,6 +34,7 @@ import { CoreHeatmapCard } from "@/components/dashboard/tpo/CoreHeatmapCard";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
+import { StudyYearBar } from "@/components/dashboard/tpo/StudyYearBar";
 import { api, ApiError } from "@/lib/api";
 import { branchGroupKey, branchShortLabel, useBranchCatalog } from "@/lib/branches";
 import type { TpoReportsData, TpoReportStudent } from "@/lib/generateTpoReports";
@@ -85,6 +86,7 @@ export default function ReadinessAnalyticsPage() {
   const { status } = useAuthGuard(["admin_tpo"]);
   const catalog = useBranchCatalog();
   const { scope: deptScope } = useDepartmentScope();
+  const [studyYear, setStudyYear] = useState<number | null>(null);
   const [data, setData] = useState<TpoReportsData | null>(null);
   const [coordinators, setCoordinators] = useState<(SectionCoordinatorInfo & { section: string })[]>([]);
   const [loading, setLoading] = useState(true);
@@ -94,8 +96,12 @@ export default function ReadinessAnalyticsPage() {
     setLoading(true);
     setError(null);
     try {
+      const qs = new URLSearchParams();
+      if (deptScope !== "ALL") qs.set("department", deptScope);
+      if (studyYear !== null) qs.set("year", String(studyYear));
+      const queryStr = qs.toString();
       const [reportsRes, coordinatorsRes] = await Promise.all([
-        api.get<TpoReportsData>(deptScope === "ALL" ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`),
+        api.get<TpoReportsData>(queryStr ? `/tpo/reports/data?${queryStr}` : "/tpo/reports/data"),
         api.get<{ coordinators: (SectionCoordinatorInfo & { section: string })[] }>("/tpo/coordinators"),
       ]);
       setData(reportsRes);
@@ -105,7 +111,7 @@ export default function ReadinessAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  }, [deptScope]);
+  }, [deptScope, studyYear]);
 
   useEffect(() => {
     if (status === "ready") load();
@@ -148,7 +154,13 @@ export default function ReadinessAnalyticsPage() {
       {loading ? (
         <ReadinessSkeleton />
       ) : data ? (
-        <ReadinessBody data={data} branchReadiness={branchReadiness} sectionStats={sectionStats} />
+        <ReadinessBody
+          data={data}
+          branchReadiness={branchReadiness}
+          sectionStats={sectionStats}
+          studyYear={studyYear}
+          onStudyYearChange={setStudyYear}
+        />
       ) : (
         !error && (
           <HpEmptyState
@@ -169,10 +181,14 @@ function ReadinessBody({
   data,
   branchReadiness,
   sectionStats,
+  studyYear,
+  onStudyYearChange,
 }: {
   data: TpoReportsData;
   branchReadiness: BranchReadinessRow[];
   sectionStats: ReturnType<typeof computeSectionStats>;
+  studyYear: number | null;
+  onStudyYearChange: (y: number | null) => void;
 }) {
   const students = data.students;
   const totalStudents = students.length;
@@ -244,11 +260,14 @@ function ReadinessBody({
                 </div>
               </div>
             </div>
-            <Link href="/admin/reports" className={hpBtn("secondary", "sm", "h-9 shrink-0 self-start px-4 sm:self-auto")}>
-              <FileBarChart className="h-4 w-4" />
-              Placement Reports
-              <ArrowRight className="h-3.5 w-3.5" />
-            </Link>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <StudyYearBar availableYears={data.placements?.available_years} value={studyYear} onChange={onStudyYearChange} />
+              <Link href="/admin/reports" className={hpBtn("secondary", "sm", "h-9 shrink-0 self-start px-4 sm:self-auto")}>
+                <FileBarChart className="h-4 w-4" />
+                Placement Reports
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         </HpCard>
       </HpItem>

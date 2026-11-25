@@ -111,8 +111,12 @@ class StudentCohortService
         $blockerIds = $students->filter(fn (User $s) => $s->is_blocked && $s->blocked_by !== null)->pluck('blocked_by')->unique()->values()->all();
         $blockerRoles = $blockerIds === [] ? [] : User::whereIn('id', $blockerIds)->pluck('role', 'id')->all();
 
+        $collegeId = $students->first()?->college_id;
+        $college = $activeMappings->isNotEmpty() && $collegeId ? \App\Models\College::find($collegeId) : null;
+        $offerStats = $college ? EligibilityService::acceptedOfferStatsForCollege($college->id) : [];
+
         return $students
-            ->map(fn (User $student) => $this->row($student, $activeMappings, $activity[$student->id] ?? $this->emptyActivity(), $coding[$student->id], $core[$student->id] ?? null, $blockerRoles))
+            ->map(fn (User $student) => $this->row($student, $activeMappings, $activity[$student->id] ?? $this->emptyActivity(), $coding[$student->id], $core[$student->id] ?? null, $blockerRoles, $college, $offerStats[$student->id] ?? null))
             ->all();
     }
 
@@ -178,19 +182,16 @@ class StudentCohortService
     }
 
     /** @param  array{answered_30d: int, weakest_subject: ?string, weakest_accuracy: ?int}|null  $core */
-    private function row(User $student, Collection $activeMappings, array $activity, array $coding, ?array $core = null, array $blockerRoles = []): array
+    private function row(User $student, Collection $activeMappings, array $activity, array $coding, ?array $core = null, array $blockerRoles = [], ?\App\Models\College $college = null, ?array $studentOfferStats = null): array
     {
-        // A plain "eligible for at least one active drive" boolean goes
-        // silently misleading the moment any one mapped drive has no real
-        // requirements (open to all branches, no CGPA floor, no backlog cap)
-        // — that single drive alone then marks every student "Eligible",
-        // making an Eligible Only filter look broken even though it's doing
-        // exactly what it's told. Surfacing the actual count (and the total
-        // active drives it's out of) lets the cohort table show real
-        // signal — "Eligible for 2 of 3 drives" — instead of a badge that
-        // can't explain itself.
-        $eligibleDriveCount = $activeMappings->filter(function (DriveCollegeMapping $mapping) use ($student) {
-            return EligibilityService::evaluate($student, $mapping->effectiveEligibility())['status'] === 'eligible';
+        $policy = $college ? [
+            'college' => $college,
+            'accepted_offers' => $studentOfferStats['accepted_offers'] ?? 0,
+            'best_ctc' => $studentOfferStats['best_ctc'] ?? 0.0,
+        ] : null;
+
+        $eligibleDriveCount = $activeMappings->filter(function (DriveCollegeMapping $mapping) use ($student, $policy) {
+            return EligibilityService::evaluate($student, $mapping->effectiveEligibility(), $policy)['status'] === 'eligible';
         })->count();
 
         $activated = ! $student->must_change_password;
@@ -221,7 +222,12 @@ class StudentCohortService
             'phone' => $student->phone,
             'parent_phone' => $student->parent_phone,
             'cgpa' => $student->cgpa,
+            'tenth_percentage' => $student->tenth_percentage,
+            'twelfth_percentage' => $student->twelfth_percentage,
             'backlogs' => $student->backlogs,
+            'placement_status' => $student->placement_status ?? User::PLACEMENT_STATUS_SEEKING,
+            'academics_locked' => $student->academics_locked_at !== null,
+            'has_resume' => (bool) $student->resume_path,
             'is_blocked' => $student->is_blocked,
             // Why and by whom, so a TPO can see what a coordinator did: null while the account is active.
             'blocked' => $student->is_blocked ? [

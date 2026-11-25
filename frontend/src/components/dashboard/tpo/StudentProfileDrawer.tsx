@@ -21,12 +21,16 @@ import {
   CalendarDays,
   Briefcase,
   Info,
+  FileText,
+  Lock,
   type LucideIcon,
 } from "lucide-react";
 import type { CohortStudent } from "@/types/cohort";
 import { EligibilityBadge } from "../EligibilityBadge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
+import { api, ApiError } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import { HP_TONES, HpAvatar, HpPill, HpProgress, HpRing, hpBtn, hpEase, type HpTone } from "@/components/portal/kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
 import { EngagementPill, LanguageChips, lastPracticeText } from "./cohortProgress";
@@ -510,6 +514,28 @@ function PremiumDrawer({
                         tone="violet"
                         value={new Date(student.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                       />
+                      <FactTile
+                        icon={GraduationCap}
+                        label="10th / 12th %"
+                        tone="sky"
+                        muted={student.tenth_percentage == null && student.twelfth_percentage == null}
+                        value={
+                          student.tenth_percentage != null || student.twelfth_percentage != null
+                            ? `${student.tenth_percentage ?? "—"}% / ${student.twelfth_percentage ?? "—"}%`
+                            : "Not on file"
+                        }
+                      />
+                      <FactTile
+                        icon={student.academics_locked ? Lock : FileText}
+                        label="Placement Status"
+                        tone={student.placement_status === "placed" ? "emerald" : student.placement_status === "opted_out" || student.placement_status === "higher_studies" || student.placement_status === "entrepreneurship" ? "rose" : "indigo"}
+                        value={
+                          <span className="capitalize">
+                            {(student.placement_status ?? "seeking").replace(/_/g, " ")}
+                            {student.academics_locked ? " · Locked" : ""}
+                          </span>
+                        }
+                      />
                     </div>
                   </section>
 
@@ -584,6 +610,24 @@ function PremiumDrawer({
                       contest/interview/drive this student has been in, a
                       day-by-day activity calendar, and the real code behind
                       any of their submissions — see StudentReportService. */}
+                  {student.has_resume && (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const blob = await api.getFile(`/tpo/students/${student.id}/resume`);
+                          const url = URL.createObjectURL(blob);
+                          window.open(url, "_blank", "noopener");
+                        } catch (err) {
+                          toast.error(err instanceof ApiError ? err.message : "Could not open student resume.");
+                        }
+                      }}
+                      className={hpBtn("secondary", "md", "w-full")}
+                    >
+                      <FileText className="h-4 w-4" />
+                      View / Download Resume (PDF)
+                    </button>
+                  )}
                   <Link href={`/admin/students/report?studentId=${student.id}`} className={hpBtn("primary", "md", "w-full")}>
                     <BarChart3 className="h-4 w-4" />
                     View Full Activity Report

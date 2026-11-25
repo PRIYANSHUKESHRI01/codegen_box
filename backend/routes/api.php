@@ -93,6 +93,9 @@ use App\Http\Controllers\Api\PublicPlanController;
 use App\Http\Controllers\Api\SuperAdminBranchController;
 use App\Http\Controllers\Api\SuperAdminDepartmentController;
 use App\Http\Controllers\Api\TpoBranchController;
+use App\Http\Controllers\Api\TpoCalendarController;
+use App\Http\Controllers\Api\TpoPolicyController;
+use App\Http\Controllers\Api\TpoRecruiterController;
 use App\Http\Controllers\Api\PayuReturnController;
 use App\Http\Controllers\Api\PayuWebhookController;
 use App\Http\Controllers\Api\RazorpayWebhookController;
@@ -996,11 +999,24 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/drives/available', [TpoDriveController::class, 'available']);
             Route::get('/drives/pending', [TpoDriveController::class, 'pending']);
             Route::post('/drives', [TpoDriveController::class, 'store']);
+            Route::put('/drives/{placementDrive}', [TpoDriveController::class, 'update']);
+            Route::post('/drives/{placementDrive}/cancel', [TpoDriveController::class, 'cancel']);
             Route::post('/drives/{placementDrive}/map', [TpoDriveController::class, 'map']);
             Route::post('/drives/{placementDrive}/mapping', [TpoDriveController::class, 'updateMapping']);
             Route::post('/drives/{placementDrive}/unmap', [TpoDriveController::class, 'unmap']);
             Route::post('/drives/{placementDrive}/respond', [TpoDriveController::class, 'respond']);
             Route::get('/companies/search', [TpoDriveController::class, 'searchCompanies']);
+
+            // Placement policy, recruiter CRM & unified campus calendar
+            Route::get('/policy', [TpoPolicyController::class, 'show']);
+            Route::put('/policy', [TpoPolicyController::class, 'update']);
+            Route::post('/students/placement-status', [TpoPolicyController::class, 'bulkPlacementStatus']);
+            Route::post('/students/academics-lock', [TpoPolicyController::class, 'bulkAcademicsLock']);
+            Route::get('/recruiters', [TpoRecruiterController::class, 'index']);
+            Route::post('/recruiters/contacts', [TpoRecruiterController::class, 'storeContact']);
+            Route::put('/recruiters/contacts/{contact}', [TpoRecruiterController::class, 'updateContact']);
+            Route::delete('/recruiters/contacts/{contact}', [TpoRecruiterController::class, 'destroyContact']);
+            Route::get('/calendar', [TpoCalendarController::class, 'index']);
 
             // Self-serve bulk roster import — the primary path for a college
             // onboarding their whole batch at once.
@@ -1048,6 +1064,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             // Running one student's account (see TpoStudentManageController for what is, and is not, allowed): the account at a glance,
             // corrected details, block / unblock, a new e-mailed login, sign-out everywhere, and removing an account never used.
             Route::get('/students/{student}/manage', [TpoStudentManageController::class, 'show'])->whereNumber('student');
+            Route::get('/students/{student}/resume', [TpoStudentManageController::class, 'resume'])->whereNumber('student');
             Route::patch('/students/{student}/profile', [TpoStudentManageController::class, 'updateProfile'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
             Route::post('/students/{student}/block', [TpoStudentManageController::class, 'block'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
             Route::post('/students/{student}/unblock', [TpoStudentManageController::class, 'unblock'])->whereNumber('student')->middleware('throttle:tpo-student-actions');
@@ -1081,7 +1098,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/coordinators', [TpoCoordinatorController::class, 'index']);
             Route::post('/coordinators', [TpoCoordinatorController::class, 'store']);
             Route::put('/coordinators/{user}', [TpoCoordinatorController::class, 'update']);
+            Route::post('/coordinators/{user}/send-login', [TpoCoordinatorController::class, 'sendLogin']);
             Route::post('/coordinators/{user}/toggle-block', [TpoCoordinatorController::class, 'toggleBlock']);
+            Route::delete('/coordinators/{user}', [TpoCoordinatorController::class, 'destroy']);
 
             // Soft Skills — this college's own private practice tests, for
             // their own students only (assessment_type=tpo_mock). See
@@ -1121,7 +1140,11 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/drives/{placementDrive}/applications', [TpoDriveApplicationController::class, 'index']);
             Route::post('/drives/{placementDrive}/applications', [TpoDriveApplicationController::class, 'store']);
             Route::post('/drives/{placementDrive}/applications/bulk-register', [TpoDriveApplicationController::class, 'bulkRegister']);
+            Route::post('/drives/{placementDrive}/applications/bulk-stage', [TpoDriveApplicationController::class, 'bulkStage']);
+            Route::post('/drives/{placementDrive}/applications/import-shortlist', [TpoDriveApplicationController::class, 'importShortlist']);
+            Route::get('/drives/{placementDrive}/resumes.zip', [TpoDriveApplicationController::class, 'exportResumesZip']);
             Route::post('/drives/{placementDrive}/applications/{application}/stage', [TpoDriveApplicationController::class, 'updateStage']);
+            Route::post('/drives/{placementDrive}/applications/{application}/joining-status', [TpoDriveApplicationController::class, 'updateJoiningStatus']);
 
             // A TPO's own private "mock" contests for their own college's
             // students only — entirely separate from Mellow's platform-run
@@ -1130,6 +1153,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/contests', [TpoContestController::class, 'index']);
             Route::post('/contests', [TpoContestController::class, 'store']);
             Route::post('/contests/{contest}', [TpoContestController::class, 'update']);
+            Route::delete('/contests/{contest}', [TpoContestController::class, 'destroy']);
+            Route::post('/contests/{contest}/duplicate', [TpoContestController::class, 'duplicate']);
+            Route::post('/contests/{contest}/announce', [TpoContestController::class, 'announce']);
             Route::get('/contests/{contest}/problems', [TpoContestController::class, 'problems']);
             Route::post('/contests/{contest}/problems', [TpoContestController::class, 'storeProblem']);
             Route::delete('/contests/{contest}/problems/{contestProblem}', [TpoContestController::class, 'destroyProblem']);

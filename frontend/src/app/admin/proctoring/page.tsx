@@ -90,16 +90,30 @@ export default function TpoProctoringPage() {
   });
 
   const hasAny = sessions.length > 0;
+  const [sectionView, setSectionView] = useState<"all" | "contests" | "integrity" | "network">("all");
 
   return (
     <DashboardShell
       role="admin_tpo"
       currentTpoView="tpo"
-      title="Proctoring Activity"
-      subtitle="Every contest attempt flagged for a fullscreen exit, tab switch, or blocked action — across your whole college."
+      title="Proctoring & Exam Integrity"
+      subtitle="Unified integrity console for coding contests, AI interviews, soft skills, core tests, and campus IP allowlisting."
     >
       <HpStagger className="space-y-6">
-        {(loading || hasAny) && (
+        <HpItem>
+          <HpTabs<"all" | "contests" | "integrity" | "network">
+            value={sectionView}
+            onChange={setSectionView}
+            tabs={[
+              { id: "all", label: "Unified Overview" },
+              { id: "contests", label: "Contest Flags", count: sessions.length },
+              { id: "integrity", label: "Cross-Exam Integrity" },
+              { id: "network", label: "Campus Exam Network" },
+            ]}
+          />
+        </HpItem>
+
+        {(sectionView === "all" || sectionView === "contests") && (loading || hasAny) && (
           <HpItem>
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <HpStatCard label="Flagged" value={sessions.length} icon={ShieldAlert} tone="sky" loading={loading} hint="Attempts with a violation" />
@@ -146,7 +160,7 @@ export default function TpoProctoringPage() {
           </HpItem>
         )}
 
-        {hasAny && (
+        {(sectionView === "all" || sectionView === "contests") && hasAny && (
           <HpItem>
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <HpTabs<FilterId>
@@ -187,48 +201,54 @@ export default function TpoProctoringPage() {
           </HpItem>
         )}
 
-        <HpItem>
-          {loading ? (
-            <HpSkeletonRows rows={4} />
-          ) : hasAny && visible.length === 0 ? (
-            <HpEmptyState
-              icon={SearchX}
-              tone="slate"
-              title="Nothing matches"
-              description="No flagged sessions fit this filter or search."
-              action={
-                <HpButton
-                  variant="secondary"
-                  onClick={() => {
-                    setFilter("all");
-                    setQuery("");
-                    setSectionFilter(ALL_SECTIONS);
-                  }}
-                >
-                  Clear filters
-                </HpButton>
-              }
-            />
-          ) : (
-            <ProctoringSessionList
-              variant="premium"
-              sessions={visible}
-              apiBasePath="/tpo/proctoring"
-              onToast={triggerToast}
-              onReinstated={loadSessions}
-            />
-          )}
-        </HpItem>
+        {(sectionView === "all" || sectionView === "contests") && (
+          <HpItem>
+            {loading ? (
+              <HpSkeletonRows rows={4} />
+            ) : hasAny && visible.length === 0 ? (
+              <HpEmptyState
+                icon={SearchX}
+                tone="slate"
+                title="Nothing matches"
+                description="No flagged sessions fit this filter or search."
+                action={
+                  <HpButton
+                    variant="secondary"
+                    onClick={() => {
+                      setFilter("all");
+                      setQuery("");
+                      setSectionFilter(ALL_SECTIONS);
+                    }}
+                  >
+                    Clear filters
+                  </HpButton>
+                }
+              />
+            ) : (
+              <ProctoringSessionList
+                variant="premium"
+                sessions={visible}
+                apiBasePath="/tpo/proctoring"
+                onToast={triggerToast}
+                onReinstated={loadSessions}
+              />
+            )}
+          </HpItem>
+        )}
 
         {/* Every proctored attempt (contests, interviews, tests, practice) with its tamper-evident log, pictures and network. */}
-        <HpItem>
-          <IntegrityReview apiBase="/tpo/integrity" />
-        </HpItem>
+        {(sectionView === "all" || sectionView === "integrity") && (
+          <HpItem>
+            <IntegrityReview apiBase="/tpo/integrity" />
+          </HpItem>
+        )}
 
         {/* Where students may start a proctored attempt from. */}
-        <HpItem>
-          <ExamNetworkCard />
-        </HpItem>
+        {(sectionView === "all" || sectionView === "network") && (
+          <HpItem>
+            <ExamNetworkCard />
+          </HpItem>
+        )}
       </HpStagger>
     </DashboardShell>
   );

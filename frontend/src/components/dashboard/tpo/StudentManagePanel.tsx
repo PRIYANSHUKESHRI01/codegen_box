@@ -300,14 +300,19 @@ function EditDetailsModal({
     roll_number: student.roll_number ?? "",
     branch: student.branch ?? "",
     cgpa: student.cgpa ?? "",
+    tenth_percentage: student.tenth_percentage === null || student.tenth_percentage === undefined ? "" : String(student.tenth_percentage),
+    twelfth_percentage: student.twelfth_percentage === null || student.twelfth_percentage === undefined ? "" : String(student.twelfth_percentage),
     backlogs: student.backlogs === null || student.backlogs === undefined ? "" : String(student.backlogs),
+    placement_status: (student.placement_status ?? "seeking") as "seeking" | "placed" | "higher_studies" | "entrepreneurship" | "opted_out",
+    academics_locked: !!student.academics_locked,
     phone: student.phone ?? "",
     parent_phone: student.parent_phone ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((p) => ({ ...p, [key]: e.target.value }));
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((p) => ({ ...p, [key]: e.target.value }));
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -321,7 +326,11 @@ function EditDetailsModal({
         roll_number: orNull(form.roll_number),
         branch: orNull(form.branch),
         cgpa: form.cgpa === "" ? null : Number(form.cgpa),
+        tenth_percentage: form.tenth_percentage === "" ? null : Number(form.tenth_percentage),
+        twelfth_percentage: form.twelfth_percentage === "" ? null : Number(form.twelfth_percentage),
         backlogs: form.backlogs === "" ? null : Number(form.backlogs),
+        placement_status: form.placement_status,
+        academics_locked: form.academics_locked,
         phone: orNull(form.phone),
         parent_phone: orNull(form.parent_phone),
       });
@@ -371,6 +380,32 @@ function EditDetailsModal({
           <Field id="ed-backlogs" label="Active backlogs">
             <input id="ed-backlogs" type="number" min={0} max={99} value={form.backlogs} onChange={set("backlogs")} className={hpInput} />
           </Field>
+          <Field id="ed-10th" label="10th %">
+            <input id="ed-10th" type="number" step="0.01" min={0} max={100} value={form.tenth_percentage} onChange={set("tenth_percentage")} placeholder="e.g. 92.4" className={hpInput} />
+          </Field>
+          <Field id="ed-12th" label="12th / Diploma %">
+            <input id="ed-12th" type="number" step="0.01" min={0} max={100} value={form.twelfth_percentage} onChange={set("twelfth_percentage")} placeholder="e.g. 88.0" className={hpInput} />
+          </Field>
+          <Field id="ed-placement-status" label="Placement status">
+            <select id="ed-placement-status" value={form.placement_status} onChange={set("placement_status")} className={hpInput}>
+              <option value="seeking">Seeking Placement</option>
+              <option value="placed">Placed</option>
+              <option value="higher_studies">Higher Studies</option>
+              <option value="entrepreneurship">Entrepreneurship</option>
+              <option value="opted_out">Opted Out</option>
+            </select>
+          </Field>
+          <div className="flex items-end pb-1">
+            <label className="flex w-full cursor-pointer items-center gap-2.5 rounded-xl border border-border-subtle bg-elevated/40 px-3 py-2 text-xs font-semibold text-primary">
+              <input
+                type="checkbox"
+                checked={form.academics_locked}
+                onChange={(e) => setForm((p) => ({ ...p, academics_locked: e.target.checked }))}
+                className="h-4 w-4 rounded border-border-strong text-indigo-600 focus:ring-indigo-500"
+              />
+              <span>Lock verified academics for audit</span>
+            </label>
+          </div>
           <Field id="ed-phone" label="Phone">
             <input id="ed-phone" value={form.phone} onChange={set("phone")} className={hpInput} />
           </Field>

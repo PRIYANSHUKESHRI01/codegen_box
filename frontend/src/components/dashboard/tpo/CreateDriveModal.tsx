@@ -85,7 +85,11 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
   const [driveDate, setDriveDate] = useState("");
   const [durationMinutes, setDurationMinutes] = useState("");
   const [minCgpa, setMinCgpa] = useState("");
+  const [minTenth, setMinTenth] = useState("");
+  const [minTwelfth, setMinTwelfth] = useState("");
   const [maxBacklogs, setMaxBacklogs] = useState("");
+  const [driveTier, setDriveTier] = useState<"standard" | "dream" | "super_dream">("standard");
+  const [eligibleYears, setEligibleYears] = useState<number[]>([]);
   const [allBranches, setAllBranches] = useState(true);
   const [branches, setBranches] = useState<string[]>([]);
   const [termsAndConditions, setTermsAndConditions] = useState("");
@@ -162,7 +166,11 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
         drive_date: localDatetimeInputToUtcIso(driveDate),
         duration_minutes: durationMinutes ? Number(durationMinutes) : null,
         min_cgpa: minCgpa ? Number(minCgpa) : null,
+        min_tenth_percentage: minTenth ? Number(minTenth) : null,
+        min_twelfth_percentage: minTwelfth ? Number(minTwelfth) : null,
         max_backlogs: maxBacklogs ? Number(maxBacklogs) : null,
+        eligible_years: eligibleYears.length > 0 ? eligibleYears : null,
+        drive_tier: driveTier,
         eligible_branches: allBranches ? null : branches,
         terms_and_conditions: termsAndConditions.trim() || null,
       };
@@ -182,7 +190,7 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
   return (
     <Modal
       onClose={onClose}
-      title="Create a Campus Drive"
+      title="Post a Campus Drive"
       subtitle={`Visible only to ${collegeName}'s students`}
       icon={Briefcase}
       size="xl"
@@ -199,9 +207,9 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
             isLoading={saving}
             leftIcon={<Plus className="h-4 w-4" />}
             className="min-w-0"
-            title={`Create & Add to ${collegeName}`}
+            title={`Post Drive to ${collegeName}`}
           >
-            <span className="truncate">Create &amp; Add to {collegeName}</span>
+            <span className="truncate">Post Drive to {collegeName}</span>
           </HpButton>
         </>
       }
@@ -527,6 +535,77 @@ export function CreateDriveModal({ collegeName, onClose, onCreated }: CreateDriv
                 onChange={(e) => setMaxBacklogs(e.target.value)}
                 className={cn(hpInput, "tabular")}
               />
+            </div>
+            <div>
+              <label htmlFor="cd-10th" className={hpLabel}>
+                Min 10th % <Optional />
+              </label>
+              <input
+                id="cd-10th"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                placeholder="e.g. 70"
+                value={minTenth}
+                onChange={(e) => setMinTenth(e.target.value)}
+                className={cn(hpInput, "tabular")}
+              />
+            </div>
+            <div>
+              <label htmlFor="cd-12th" className={hpLabel}>
+                Min 12th % <Optional />
+              </label>
+              <input
+                id="cd-12th"
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                placeholder="e.g. 70"
+                value={minTwelfth}
+                onChange={(e) => setMinTwelfth(e.target.value)}
+                className={cn(hpInput, "tabular")}
+              />
+            </div>
+            <div>
+              <label htmlFor="cd-tier" className={hpLabel}>
+                Drive Tier
+              </label>
+              <select
+                id="cd-tier"
+                value={driveTier}
+                onChange={(e) => setDriveTier(e.target.value as "standard" | "dream" | "super_dream")}
+                className={hpInput}
+              >
+                <option value="standard">Standard</option>
+                <option value="dream">Dream (bypasses single-offer lock via policy)</option>
+                <option value="super_dream">Super Dream</option>
+              </select>
+            </div>
+            <div>
+              <span className={hpLabel}>Eligible Study Years <Optional /></span>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {[1, 2, 3, 4].map((yr) => {
+                  const active = eligibleYears.includes(yr);
+                  return (
+                    <button
+                      key={yr}
+                      type="button"
+                      onClick={() =>
+                        setEligibleYears((prev) => (prev.includes(yr) ? prev.filter((y) => y !== yr) : [...prev, yr].sort()))
+                      }
+                      className={cn(
+                        "rounded-lg border px-2.5 py-1 text-2xs font-bold transition-colors",
+                        active ? "border-indigo-500 bg-indigo-500/15 text-indigo-600 dark:text-indigo-300" : "border-border-subtle bg-elevated/60 text-text-muted"
+                      )}
+                    >
+                      Year {yr}
+                    </button>
+                  );
+                })}
+                {eligibleYears.length === 0 && <span className="self-center text-3xs text-text-muted">All years</span>}
+              </div>
             </div>
           </div>
 

@@ -50,6 +50,8 @@ class DriveApplication extends Model
         self::STAGE_WITHDRAWN,
     ];
 
+    public const JOINING_STATUSES = ['pending', 'joined', 'deferred', 'reneged'];
+
     protected $fillable = [
         'placement_drive_id',
         'user_id',
@@ -59,12 +61,15 @@ class DriveApplication extends Model
         'stage_updated_by',
         'ctc_offered',
         'notes',
+        'joining_status',
+        'joined_at',
     ];
 
     protected function casts(): array
     {
         return [
             'stage_updated_at' => 'datetime',
+            'joined_at' => 'datetime',
             'ctc_offered' => 'decimal:2',
         ];
     }

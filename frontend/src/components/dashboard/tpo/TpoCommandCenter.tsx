@@ -17,6 +17,7 @@ import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { BranchScopeBar } from "@/components/branches/BranchScopeBar";
 import { branchGroupKey, branchShortLabel, inBranchScope, SCOPE_ALL, useBranchCatalog } from "@/lib/branches";
 import { departmentCan, useDepartmentScope } from "@/lib/departments";
+import { StudyYearBar } from "@/components/dashboard/tpo/StudyYearBar";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
@@ -125,7 +126,7 @@ const QUICK_LINKS: { label: string; hint: string; href: string; icon: LucideIcon
 const GETTING_STARTED: { step: string; title: string; body: string; href: string; icon: LucideIcon; tone: HpTone }[] = [
   { step: "01", title: "Import your roster", body: "Bring in your batch with roll numbers, branches, sections and CGPA.", href: "/admin/students", icon: Upload, tone: "sky" },
   { step: "02", title: "Assign coordinators", body: "Give every section a coordinator your students can reach.", href: "/admin/coordinators", icon: UserCog, tone: "indigo" },
-  { step: "03", title: "Map campus drives", body: "Bring published drives into your catalog and register eligible students.", href: "/admin/drives", icon: Briefcase, tone: "violet" },
+  { step: "03", title: "Post campus drives", body: "Publish your college's drives, set eligibility, and track student offers.", href: "/admin/drives", icon: Briefcase, tone: "violet" },
 ];
 
 /** Keyed by PlacementReportService::actionItems() `type` — unknown types still render, just without a shortcut. */
@@ -391,7 +392,14 @@ export function TpoCommandCenter({ user }: Props) {
   // -----------------------------------------------------------------
   // The department the TPO is looking at (the switcher under the page title): every figure below — students, readiness, placements — is that department's.
   const { scope: deptScope } = useDepartmentScope();
-  const reportsUrl = deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`;
+  const [studyYear, setStudyYear] = useState<number | null>(null);
+  const reportsUrl = (() => {
+    const qs = new URLSearchParams();
+    if (deptScope !== SCOPE_ALL) qs.set("department", deptScope);
+    if (studyYear !== null) qs.set("year", String(studyYear));
+    const q = qs.toString();
+    return q ? `/tpo/reports/data?${q}` : "/tpo/reports/data";
+  })();
   const [tpoReportsData, setTpoReportsData] = useState<TpoReportsData | null>(null);
   const [tpoDataLoading, setTpoDataLoading] = useState(true);
   const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
@@ -488,15 +496,16 @@ export function TpoCommandCenter({ user }: Props) {
   const students = branchScope === SCOPE_ALL ? allStudents : allStudents.filter((s) => inBranchScope(s, branchScope));
 
   const enrolled = funnel?.batch_enrolled ?? 0;
+  const seekingPlacement = funnel?.seeking_placement ?? enrolled;
   const accepted = funnel?.accepted ?? 0;
+  const uniquePlaced = funnel?.unique_placed ?? accepted;
   const registered = funnel?.registered ?? 0;
   const currentPct = target?.current_percent ?? 0;
   const hasTarget = !!target?.target_percent;
   const targetPct = hasTarget ? Number(target?.target_percent) : null;
   const reached = targetPct !== null && currentPct >= targetPct;
   const progressToGoal = targetPct !== null ? (targetPct > 0 ? Math.min(100, (currentPct / targetPct) * 100) : 100) : 0;
-  // current_percent is accepted offers / cohort size (PlacementReportService), so this is the same arithmetic in reverse.
-  const offersToGo = targetPct !== null && enrolled > 0 ? Math.max(0, Math.ceil((targetPct / 100) * enrolled - 1e-9) - accepted) : null;
+  const offersToGo = targetPct !== null && seekingPlacement > 0 ? Math.max(0, Math.ceil((targetPct / 100) * seekingPlacement - 1e-9) - uniquePlaced) : null;
   const deadlineDays = target?.target_deadline ? daysFromToday(target.target_deadline) : null;
 
   const avgReadiness =
@@ -729,14 +738,15 @@ export function TpoCommandCenter({ user }: Props) {
     <HpStagger className="space-y-8">
       <HpItem>{hero}</HpItem>
 
-      {allStudents.length > 0 && (
+      {(allStudents.length > 0 || (placements?.available_years?.length ?? 0) > 0) && (
         <HpItem>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-            <BranchScopeBar students={allStudents} value={branchScope} onChange={setBranchScope} />
-            {branchScope !== SCOPE_ALL && (
-              <p className="text-2xs text-text-muted">Readiness, tiers and sections below show this branch only. Placement outcomes and drives are college-wide.</p>
-            )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {allStudents.length > 0 && <BranchScopeBar students={allStudents} value={branchScope} onChange={setBranchScope} />}
+            <StudyYearBar availableYears={placements?.available_years} value={studyYear} onChange={setStudyYear} />
           </div>
+          {branchScope !== SCOPE_ALL && (
+            <p className="mt-2 text-2xs text-text-muted">Readiness, tiers and sections below show this branch only. Placement outcomes and drives respect the selected batch year.</p>
+          )}
         </HpItem>
       )}
 
@@ -748,16 +758,23 @@ export function TpoCommandCenter({ user }: Props) {
             value={enrolled}
             icon={Users2}
             tone="sky"
-            hint={cohortBranchCount > 0 ? `Across ${plural(cohortBranchCount, "branch", "branches")}` : "Students on your roster"}
+            hint={
+              seekingPlacement !== enrolled
+                ? `${seekingPlacement} seeking · ${cohortBranchCount} branches`
+                : cohortBranchCount > 0
+                ? `Across ${plural(cohortBranchCount, "branch", "branches")}`
+                : "Students on your roster"
+            }
           />
           <HpStatCard
             label="Students placed"
-            value={accepted}
+            value={uniquePlaced}
             icon={CheckCircle2}
             tone="emerald"
             hint={
               <>
-                <span className="tabular font-semibold text-text-secondary">{fmtPct(currentPct)}%</span> placement rate
+                <span className="tabular font-semibold text-text-secondary">{fmtPct(currentPct)}%</span> placed
+                {accepted !== uniquePlaced && <> · {accepted} total offers</>}
                 {targetPct !== null && <> · goal {fmtPct(targetPct)}%</>}
               </>
             }
@@ -1054,7 +1071,7 @@ export function TpoCommandCenter({ user }: Props) {
               icon={Briefcase}
               tone="indigo"
               title="Campus drives"
-              subtitle={drivesLoading ? "Loading your mapped drives…" : `${upcomingCount} upcoming · ${tpoMappedDrives.length} live on your campus`}
+              subtitle={drivesLoading ? "Loading your campus drives…" : `${upcomingCount} upcoming · ${tpoMappedDrives.length} live on your campus`}
               action={<SectionLink href="/admin/drives">Manage all</SectionLink>}
             />
             {drivesLoading ? (
@@ -1064,12 +1081,12 @@ export function TpoCommandCenter({ user }: Props) {
                 icon={Briefcase}
                 tone="indigo"
                 className="bg-surface/60"
-                title="No live drives mapped yet"
-                description="Map a published drive into your campus catalog so students can see it and you can register them."
+                title="No campus drives posted yet"
+                description="Post your college's placement drives so students can see eligibility and apply."
                 action={
                   <Link href="/admin/drives" className={hpBtn("primary", "sm")}>
                     <Plus className="h-3.5 w-3.5" />
-                    Map a drive
+                    Post campus drive
                   </Link>
                 }
               />
@@ -1174,7 +1191,7 @@ export function TpoCommandCenter({ user }: Props) {
                           <p className="text-xs leading-relaxed text-text-secondary">{item.message}</p>
                           {meta && (
                             <Link
-                              href={meta.href}
+                              href={item.drive_id ? `/admin/drives?driveId=${item.drive_id}` : meta.href}
                               className="mt-1.5 inline-flex items-center gap-0.5 rounded text-2xs font-bold text-amber-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:text-amber-300"
                             >
                               {meta.cta}

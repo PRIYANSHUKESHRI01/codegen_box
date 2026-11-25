@@ -92,6 +92,8 @@ class TpoStudentController extends Controller
             // The year of study they are in now (1st-4th): the vault AI interview's rules, and the TPO's year-wise view, run on it.
             'year' => ['nullable', 'integer', Rule::in(AcademicYear::selectableYears())],
             'cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'tenth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'twelfth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'backlogs' => ['nullable', 'integer', 'min:0'],
             'phone' => ['nullable', 'string', 'max:20'],
             'parent_phone' => ['nullable', 'string', 'max:20'],
@@ -150,6 +152,8 @@ class TpoStudentController extends Controller
             'branch' => $validated['branch'] ?? null,
             'section' => $validated['section'] ?? null,
             'cgpa' => $validated['cgpa'] ?? null,
+            'tenth_percentage' => $validated['tenth_percentage'] ?? null,
+            'twelfth_percentage' => $validated['twelfth_percentage'] ?? null,
             'backlogs' => $validated['backlogs'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'parent_phone' => $validated['parent_phone'] ?? null,
@@ -344,12 +348,16 @@ class TpoStudentController extends Controller
             'student_ids' => 'required|array|min:1|max:5000',
             'student_ids.*' => 'integer',
             'channel' => 'required|in:email,whatsapp,in_app',
-            'template' => 'required_unless:channel,in_app|in:generic,termination',
+            'template' => 'required_unless:channel,in_app|in:generic,termination,custom',
             'recipient' => 'required_unless:channel,in_app|in:student,parent',
-            // An in-app announcement is the one channel with free text: it lands in each student's notification bell.
             'title' => 'required_if:channel,in_app|nullable|string|max:120',
-            'message' => 'required_if:channel,in_app|nullable|string|max:500',
+            'subject' => 'nullable|string|max:160',
+            'message' => 'nullable|string|max:2000',
         ]);
+
+        if ((($validated['channel'] ?? null) === 'in_app' || ($validated['template'] ?? null) === 'custom') && trim((string) ($validated['message'] ?? '')) === '') {
+            throw ValidationException::withMessages(['message' => ['Please write your message before sending.']]);
+        }
 
         // Scoped to the caller's own college — a TPO id-guessing another
         // college's student ids must never reach them, silently dropped
@@ -390,7 +398,9 @@ class TpoStudentController extends Controller
             $validated['channel'],
             $validated['template'],
             $validated['recipient'],
-            'tpo-'.$collegeId
+            'tpo-'.$collegeId,
+            $validated['subject'] ?? null,
+            $validated['message'] ?? null,
         );
 
         $message = "Queued a notification for {$result['queued_count']} student(s).";

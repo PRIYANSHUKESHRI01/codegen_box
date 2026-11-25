@@ -50,6 +50,8 @@ import { cn } from "@/lib/utils";
 import { CompanyLogo } from "@/components/ui/CompanyLogo";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { useDepartmentScope } from "@/lib/departments";
+import { StudyYearBar } from "@/components/dashboard/tpo/StudyYearBar";
+import { PlacementPolicyModal } from "@/components/dashboard/tpo/PlacementPolicyModal";
 import { api, ApiError } from "@/lib/api";
 import type { TpoReportsData, ReportPreview } from "@/lib/generateTpoReports";
 import { Modal } from "@/components/ui/Modal";
@@ -254,6 +256,17 @@ const REPORTS: ReportDef[] = [
     generate: async (data) => (await loadReportLib()).generateManagementDeck(data),
     liveStat: (s) => ({ text: `${s.avgReadiness}/100 avg readiness across the batch` }),
   },
+  {
+    id: "accreditation",
+    name: "NAAC / NIRF Accreditation & CTC Audit",
+    description: "Statutory summary of unique placed students, opted-out/higher-studies cohort, median & mean CTC, and recruiter breakdown.",
+    format: "PDF",
+    category: "Compliance",
+    icon: ShieldCheck,
+    generate: async (data) => (await loadReportLib()).generateAccreditationPdf(data),
+    preview: async (data) => (await loadReportLib()).accreditationRows(data),
+    liveStat: (s) => ({ text: `${s.totalStudents} cohort · statutory NAAC/NIRF metrics` }),
+  },
 ];
 
 const CATEGORY_FILTERS = ["All", "Compliance", "Operations", "Analytics"] as const;
@@ -290,6 +303,8 @@ export default function PlacementReportsPage() {
   const [sectionFilter, setSectionFilter] = useState<string | null>(null);
   const [rawData, setData] = useState<TpoReportsData | null>(null);
   const [branchScope, setBranchScope] = useState<string>(SCOPE_ALL);
+  const [studyYear, setStudyYear] = useState<number | null>(null);
+  const [showPolicy, setShowPolicy] = useState(false);
 
   const data = useMemo<TpoReportsData | null>(() => {
     if (!rawData || branchScope === SCOPE_ALL) return rawData;
@@ -309,7 +324,6 @@ export default function PlacementReportsPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [previewReport, setPreviewReport] = useState<{ name: string; preview: ReportPreview } | null>(null);
-  const [pdfUrls, setPdfUrls] = useState<Record<string, string>>({});
 
   // Search & filter for placed students table
   const [placementSearch, setPlacementSearch] = useState("");
@@ -321,9 +335,11 @@ export default function PlacementReportsPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const reportsRes = await api.get<TpoReportsData>(
-        deptScope === SCOPE_ALL ? "/tpo/reports/data" : `/tpo/reports/data?department=${encodeURIComponent(deptScope)}`
-      );
+      const qs = new URLSearchParams();
+      if (deptScope !== SCOPE_ALL) qs.set("department", deptScope);
+      if (studyYear !== null) qs.set("year", String(studyYear));
+      const q = qs.toString();
+      const reportsRes = await api.get<TpoReportsData>(q ? `/tpo/reports/data?${q}` : "/tpo/reports/data");
       setData(reportsRes);
       setBranchScope(SCOPE_ALL);
     } catch (err) {
@@ -331,31 +347,26 @@ export default function PlacementReportsPage() {
     } finally {
       setLoading(false);
     }
-  }, [deptScope]);
+  }, [deptScope, studyYear]);
 
   useEffect(() => {
     if (status === "ready") loadData();
   }, [status, loadData]);
 
-  useEffect(() => {
+  const handleViewPdf = async (report: ReportDef) => {
     if (!data) return;
-    let cancelled = false;
-    const urls: Record<string, string> = {};
-
-    Promise.all(
-      REPORTS.filter((r) => !r.preview).map(async (r) => {
-        const { blob } = await r.generate(data, r.sectionAware ? sectionFilter : null);
-        urls[r.id] = URL.createObjectURL(blob);
-      })
-    ).then(() => {
-      if (!cancelled) setPdfUrls(urls);
-    });
-
-    return () => {
-      cancelled = true;
-      Object.values(urls).forEach((url) => URL.revokeObjectURL(url));
-    };
-  }, [data, sectionFilter]);
+    setBusyId(`${report.id}-view`);
+    try {
+      const { blob } = await report.generate(data, report.sectionAware ? sectionFilter : null);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      triggerToast(`Couldn't prepare "${report.name}". Please try again.`, "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   if (status !== "ready") {
     return <SessionLoader />;
@@ -413,11 +424,14 @@ export default function PlacementReportsPage() {
     .map((p) => parseFloat(p.ctc_offered))
     .filter((n) => !isNaN(n) && n > 0);
 
-  const highestCtc = allMaxCtcs.length > 0 ? Math.max(...allMaxCtcs) : recentCtcs.length > 0 ? Math.max(...recentCtcs) : null;
+  const highestCtc = placements?.package_stats?.max_ctc ?? (allMaxCtcs.length > 0 ? Math.max(...allMaxCtcs) : recentCtcs.length > 0 ? Math.max(...recentCtcs) : null);
+  const medianCtc = placements?.package_stats?.median_ctc ?? null;
   const totalOffersAccepted = companySummary.reduce((s, c) => s + c.offers_accepted, 0);
   const weightedCtcSum = companySummary.reduce((s, c) => s + (c.avg_ctc ?? 0) * c.offers_accepted, 0);
   const avgCtc =
-    totalOffersAccepted > 0 && weightedCtcSum > 0
+    placements?.package_stats?.avg_ctc !== undefined && placements.package_stats.avg_ctc !== null
+      ? String(placements.package_stats.avg_ctc)
+      : totalOffersAccepted > 0 && weightedCtcSum > 0
       ? (weightedCtcSum / totalOffersAccepted).toFixed(1)
       : recentCtcs.length > 0
       ? (recentCtcs.reduce((a, b) => a + b, 0) / recentCtcs.length).toFixed(1)
@@ -505,7 +519,11 @@ export default function PlacementReportsPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3">
+                  <StudyYearBar availableYears={placements.available_years} value={studyYear} onChange={setStudyYear} />
                   {rawData && <BranchScopeBar students={rawData.students} value={branchScope} onChange={setBranchScope} />}
+                  <HpButton variant="secondary" size="sm" onClick={() => setShowPolicy(true)} leftIcon={<ShieldCheck className="h-4 w-4" />}>
+                    Placement Policy
+                  </HpButton>
                   <Link href="/admin/analytics" className={hpBtn("secondary", "sm", "h-9 shrink-0")}>
                     <Gauge className="h-4 w-4" />
                     Readiness Analytics
@@ -519,7 +537,7 @@ export default function PlacementReportsPage() {
           <HpItem>
             <div className="grid grid-cols-1 gap-4 min-[440px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <HpStatCard
-                label="Placement Rate"
+                label="Unique Placed %"
                 value={currentPct}
                 suffix="%"
                 decimals={Number.isInteger(currentPct) ? 0 : 1}
@@ -528,9 +546,9 @@ export default function PlacementReportsPage() {
                 hint={
                   targetPct !== null
                     ? gapToTarget && gapToTarget > 0
-                      ? `Target ${fmtNum(targetPct)}% · ${fmtNum(gapToTarget)} pts to go`
+                      ? `Target ${fmtNum(targetPct)}% · ${gapToTarget.toFixed(1)} pts to go`
                       : `Target ${fmtNum(targetPct)}% · reached`
-                    : "No target set"
+                    : `${f.unique_placed ?? f.accepted} of ${f.seeking_placement ?? f.batch_enrolled} seeking`
                 }
               />
               <HpStatCard
@@ -538,7 +556,7 @@ export default function PlacementReportsPage() {
                 value={f.accepted}
                 icon={Trophy}
                 tone="emerald"
-                hint={`of ${f.offered} ${f.offered === 1 ? "offer" : "offers"} extended`}
+                hint={`${f.unique_placed ?? f.accepted} unique · ${f.offered} extended`}
               />
               <HpStatCard
                 label="Highest Package"
@@ -549,16 +567,16 @@ export default function PlacementReportsPage() {
                 hint={highestCtc !== null ? "Top offer secured" : "No offers yet"}
               />
               <HpStatCard
-                label="Average Package"
-                value={avgCtc !== null ? Number(avgCtc) : 0}
+                label="Median / Avg CTC"
+                value={medianCtc !== null ? medianCtc : avgCtc !== null ? Number(avgCtc) : 0}
                 suffix=" LPA"
                 decimals={1}
                 icon={BarChart3}
                 tone="sky"
-                hint="Across accepted offers"
+                hint={medianCtc !== null && avgCtc !== null ? `Median · Avg ${avgCtc} LPA` : "Across accepted offers"}
               />
               <HpStatCard
-                label="Hiring Partners"
+                label="Campus Recruiters"
                 value={companySummary.length}
                 icon={Building2}
                 tone="teal"
@@ -924,20 +942,16 @@ export default function PlacementReportsPage() {
                               View
                             </HpButton>
                           ) : (
-                            <a
-                              href={pdfUrls[report.id] ?? "#"}
-                              target="_blank"
-                              rel="noopener"
-                              aria-disabled={!pdfUrls[report.id]}
-                              title={pdfUrls[report.id] ? undefined : "Preparing preview…"}
-                              onClick={(e) => {
-                                if (!pdfUrls[report.id]) e.preventDefault();
-                              }}
-                              className={cn(hpBtn("secondary", "md", "w-full"), !pdfUrls[report.id] && "opacity-60 pointer-events-none")}
+                            <HpButton
+                              variant="secondary"
+                              className="w-full"
+                              onClick={() => void handleViewPdf(report)}
+                              disabled={loading || !data || viewBusy}
+                              isLoading={viewBusy}
+                              leftIcon={<Eye className="h-4 w-4" />}
                             >
-                              <Eye className="h-4 w-4" />
-                              View
-                            </a>
+                              View PDF
+                            </HpButton>
                           )
                         }
                         downloadAction={
@@ -1006,6 +1020,7 @@ export default function PlacementReportsPage() {
           </Modal>
         </OverlayPortal>
       )}
+      {showPolicy && <PlacementPolicyModal onClose={() => setShowPolicy(false)} onSaved={() => void loadData()} />}
     </DashboardShell>
   );
 }
@@ -1412,7 +1427,7 @@ function ReportsSkeleton() {
         <HpStatCard label="Offers Accepted" value={0} icon={Trophy} tone="emerald" loading />
         <HpStatCard label="Highest Package" value={0} icon={IndianRupee} tone="indigo" loading />
         <HpStatCard label="Average Package" value={0} icon={BarChart3} tone="sky" loading />
-        <HpStatCard label="Hiring Partners" value={0} icon={Building2} tone="teal" loading />
+        <HpStatCard label="Campus Recruiters" value={0} icon={Building2} tone="teal" loading />
       </div>
       <HpCard spotlight={false} className="space-y-3 p-5 sm:p-6">
         <HpSkeleton className="h-4 w-44" />

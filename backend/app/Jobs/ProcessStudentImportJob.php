@@ -147,6 +147,21 @@ class ProcessStudentImportJob implements ShouldQueue
             $backlogsRaw = trim((string) ($data['backlogs'] ?? ''));
             $backlogs = ($backlogsRaw !== '' && is_numeric($backlogsRaw)) ? (int) $backlogsRaw : null;
 
+            $parsePct = function (string ...$keys) use ($data): ?float {
+                foreach ($keys as $k) {
+                    $raw = trim((string) ($data[$k] ?? ''));
+                    if ($raw !== '' && is_numeric($raw)) {
+                        $val = round((float) $raw, 2);
+                        if ($val >= 0 && $val <= 100) {
+                            return $val;
+                        }
+                    }
+                }
+                return null;
+            };
+            $tenthPct = $parsePct('tenth_percentage', '10th_percentage', '10th', 'tenth');
+            $twelfthPct = $parsePct('twelfth_percentage', '12th_percentage', '12th', 'twelfth');
+
             $rowYearRaw = $yearColumn !== null ? trim((string) ($data[$yearColumn] ?? '')) : '';
             $rowYear = $rowYearRaw !== '' ? AcademicYear::parse($rowYearRaw) : null;
 
@@ -178,6 +193,8 @@ class ProcessStudentImportJob implements ShouldQueue
                 'branch' => trim((string) ($data['branch'] ?? '')) ?: null,
                 'section' => trim((string) ($data['section'] ?? '')) ?: null,
                 'cgpa' => $cgpa,
+                'tenth_percentage' => $tenthPct,
+                'twelfth_percentage' => $twelfthPct,
                 'backlogs' => $backlogs,
                 'phone' => trim((string) ($data['phone'] ?? '')) ?: null,
                 'parent_phone' => trim((string) ($data['parent_phone'] ?? '')) ?: null,

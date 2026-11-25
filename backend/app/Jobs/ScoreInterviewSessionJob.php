@@ -57,16 +57,25 @@ class ScoreInterviewSessionJob implements ShouldQueue
         $interview = $session->interview;
         $role = $interview->track?->role_title ?? $interview->placementDrive?->role_title ?? $interview->title;
 
-        // Lazy transcription recovery: if any response has an audio recording but an empty or placeholder
-        // transcript (e.g. from browser STT network drops), transcribe it with AI before scoring!
+        // Lazy transcription recovery: recover empty/placeholder transcripts, accidental non-Latin (Urdu/Hindi)
+        // transcripts, or answers cut short on pause when full recorded audio exists on disk.
         $transcriptionService = app(\App\Services\Speech\AudioTranscriptionService::class);
         foreach ($session->responses as $response) {
             $transcript = trim((string) ($response->transcript_text ?? ''));
-            if (($transcript === '' || $transcript === '(Audio response submitted)' || $transcript === '(No answer recorded)') && !empty($response->audio_path)) {
+            $duration = (int) ($response->audio_duration_seconds ?? 0);
+            $words = $transcript !== '' ? str_word_count($transcript) : 0;
+            $needsRecovery = $transcript === ''
+                || $transcript === '(Audio response submitted)'
+                || $transcript === '(No answer recorded)'
+                || \App\Services\Speech\AudioTranscriptionService::containsDisallowedScript($transcript)
+                || ($duration >= 15 && $words < max(6, (int) floor($duration * 0.35)));
+
+            if ($needsRecovery && !empty($response->audio_path)) {
                 try {
-                    $recovered = $transcriptionService->transcribeStoragePath($response->audio_path);
-                    if (!empty(trim($recovered))) {
-                        $response->update(['transcript_text' => trim($recovered)]);
+                    $questionContext = $response->interviewQuestion?->questionBank?->question_text;
+                    $recovered = trim($transcriptionService->transcribeStoragePath($response->audio_path, 'local', $questionContext));
+                    if ($recovered !== '' && ($transcript === '' || $transcript === '(Audio response submitted)' || $transcript === '(No answer recorded)' || \App\Services\Speech\AudioTranscriptionService::containsDisallowedScript($transcript) || str_word_count($recovered) > $words)) {
+                        $response->update(['transcript_text' => $recovered]);
                         $response->refresh();
                     }
                 } catch (\Throwable $e) {

@@ -1,19 +1,16 @@
 "use client";
 
-import { useLayoutEffect, useRef } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mic } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * The candidate's answer as an editable block inside the transcript — used when they are typing (no microphone) and when they review what
- * was heard before submitting. It grows with the text so the transcript never gets a nested scrollbar, and Ctrl/⌘+Enter submits.
+ * Read-only spoken answer transcript shown inside the live transcript room after voice capture stops.
+ * Paid & Vault AI interviews are strictly voice-verified — candidates cannot manually type or rewrite transcripts,
+ * only review what was captured, replay their recording, re-record if needed, and submit.
  */
 export function AnswerEditor({
   value,
-  onChange,
-  onSubmit,
   disabled = false,
-  autoFocus = false,
   label,
   placeholder,
   audioUrl,
@@ -21,7 +18,7 @@ export function AnswerEditor({
   className,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
   onSubmit?: () => void;
   disabled?: boolean;
   autoFocus?: boolean;
@@ -33,41 +30,50 @@ export function AnswerEditor({
   isTranscribing?: boolean;
   className?: string;
 }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  // Size to content: collapse first so a shrinking answer shrinks the box too.
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
+  const cleanText = value.trim();
+  const wordCount = cleanText ? cleanText.split(/\s+/).length : 0;
 
   return (
-    <div className={cn("rounded-2xl border border-accent-primary/40 bg-surface px-4 py-3 shadow-sm ring-4 ring-accent-primary/[0.07] transition-shadow focus-within:ring-accent-primary/20", className)}>
+    <div
+      role="region"
+      aria-label={label}
+      data-testid="spoken-transcript-preview"
+      className={cn(
+        "rounded-2xl border border-accent-primary/40 bg-surface px-4 py-3.5 shadow-sm ring-4 ring-accent-primary/[0.07]",
+        disabled && "opacity-75",
+        className
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-3xs font-bold uppercase tracking-wider text-accent-primary">
+          <Mic className="h-3 w-3" aria-hidden />
+          {label}
+        </span>
+        <span className="text-3xs font-semibold text-text-muted">
+          {wordCount > 0 ? `${wordCount} ${wordCount === 1 ? "word" : "words"} · ` : ""}Voice verified · Read-only
+        </span>
+      </div>
+
       {isTranscribing && (
-        <div className="mb-2 flex items-center gap-2 rounded-lg bg-accent-primary/10 px-3 py-1.5 text-xs font-semibold text-accent-primary animate-pulse">
+        <div className="mb-2.5 flex items-center gap-2 rounded-lg bg-accent-primary/10 px-3 py-1.5 text-xs font-semibold text-accent-primary animate-pulse">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-          <span>Transcribing your spoken answer with AI...</span>
+          <span>{cleanText ? "Refining transcript with AI for accuracy..." : "Transcribing your spoken answer with AI..."}</span>
         </div>
       )}
-      <textarea
-        ref={ref}
-        aria-label={label}
-        autoFocus={autoFocus}
-        rows={3}
-        value={value}
-        disabled={disabled || isTranscribing}
-        placeholder={isTranscribing ? "Generating verbatim transcript..." : placeholder}
-        onChange={(event) => onChange(event.target.value)}
-        onKeyDown={(event) => {
-          if (onSubmit && event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-            event.preventDefault();
-            onSubmit();
-          }
-        }}
-        className="block max-h-[40vh] min-h-[4.5rem] w-full resize-none bg-transparent text-base leading-relaxed text-primary outline-none focus-visible:outline-none placeholder:text-text-muted disabled:opacity-60 sm:text-lg"
-      />
+
+      {cleanText ? (
+        <p className="max-h-[40vh] overflow-y-auto whitespace-pre-wrap text-base leading-relaxed text-primary sm:text-lg">
+          {cleanText}
+        </p>
+      ) : !isTranscribing ? (
+        <p className="text-sm italic text-text-muted">
+          {placeholder ||
+            (audioUrl
+              ? "Your spoken audio recording is attached — click Submit answer to finalize transcription, or Re-record."
+              : "No speech detected in this recording. Click Re-record to answer again.")}
+        </p>
+      ) : null}
+
       {audioUrl && (
         <div className="mt-3 border-t border-border-subtle pt-3">
           <p className="mb-1 text-3xs font-bold uppercase tracking-wide text-text-muted">Your recording</p>

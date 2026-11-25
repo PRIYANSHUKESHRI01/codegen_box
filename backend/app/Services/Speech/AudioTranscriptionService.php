@@ -18,7 +18,19 @@ use Throwable;
  */
 class AudioTranscriptionService
 {
-    private const PROMPT = 'You are an accurate verbatim audio transcriber for job candidate technical and behavioral interviews. Transcribe the candidate speech verbatim and accurately. Preserve all technical terminology, programming concepts, algorithms, frameworks, and syntax names (e.g., Python, Java, SQL, REST, OOPS, Docker, Kubernetes, Big-O). If the audio is completely silent or contains only static/inaudible noise, output "(No audible speech detected)". Return ONLY the plain transcription text without any greetings, commentary, markdown quotes, or timestamps.';
+    private const PROMPT = <<<'PROMPT'
+You are a verbatim English audio transcriber for technical and behavioral job interviews.
+STRICT RULES:
+1. The interview is conducted strictly in English. Transcribe all candidate speech verbatim in standard English using ONLY Latin/ASCII letters and punctuation.
+2. NEVER output Urdu, Arabic, Persian, Hindi, Devanagari, or any non-Latin script under any circumstances — even if the speaker has a South Asian/Indian/Pakistani accent, pauses for breath, has background fan/static noise, or uses occasional regional filler words.
+3. Candidates often pause in silence for 10-20 seconds to think before resuming their answer. Do NOT stop early on silences, do NOT skip speech after a long pause, and do NOT hallucinate filler phrases ("Thank you for watching", etc.) during quiet gaps. Transcribe ALL spoken segments from the start of the clip to the end.
+4. Preserve technical terminology accurately (Python, Java, SQL, REST, OOPS, Docker, Kubernetes, Big-O, ECDIS, MARPOL, etc.).
+5. If the recording contains zero intelligible human speech (only silence or static), output strictly: (No audible speech detected)
+6. Return ONLY the plain English transcription text with no markdown, timestamps, or commentary.
+PROMPT;
+
+    /** Rejects Arabic, Urdu, Persian, Devanagari, and related non-Latin scripts produced by accidental multi-lingual decoding. */
+    public const NON_LATIN_SCRIPT_REGEX = '/[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}\x{0900}-\x{097F}\x{FB50}-\x{FDFF}\x{FE70}-\x{FEFF}]/u';
 
     public function __construct(
         protected GeminiKeyRotationService $rotationService
@@ -27,7 +39,7 @@ class AudioTranscriptionService
     /**
      * Transcribe an uploaded file directly from an HTTP request.
      */
-    public function transcribeUploadedFile(UploadedFile $file): string
+    public function transcribeUploadedFile(UploadedFile $file, ?string $questionContext = null): string
     {
         $mime = $file->getClientMimeType() ?: $file->getMimeType() ?: 'audio/webm';
         $contents = file_get_contents($file->getRealPath());
@@ -36,13 +48,13 @@ class AudioTranscriptionService
             return '';
         }
 
-        return $this->transcribeAudioData($contents, $mime);
+        return $this->transcribeAudioData($contents, $mime, $questionContext);
     }
 
     /**
      * Transcribe a file stored on the local or configured storage disk.
      */
-    public function transcribeStoragePath(string $storagePath, string $disk = 'local'): string
+    public function transcribeStoragePath(string $storagePath, string $disk = 'local', ?string $questionContext = null): string
     {
         if (!Storage::disk($disk)->exists($storagePath)) {
             Log::warning('[AudioTranscriptionService] File does not exist in storage', ['path' => $storagePath, 'disk' => $disk]);
@@ -63,14 +75,14 @@ class AudioTranscriptionService
             default => 'audio/webm',
         };
 
-        return $this->transcribeAudioData($contents, $mime);
+        return $this->transcribeAudioData($contents, $mime, $questionContext);
     }
 
     /**
      * Core transcription logic: attempts Gemini multimodal audio transcription first,
      * falling back to OpenAI Whisper if configured, or clean default.
      */
-    public function transcribeAudioData(string $audioBytes, string $mimeType): string
+    public function transcribeAudioData(string $audioBytes, string $mimeType, ?string $questionContext = null): string
     {
         if (strlen($audioBytes) < 200) {
             // Audio too small to contain voiced speech (<0.1s)
@@ -85,7 +97,7 @@ class AudioTranscriptionService
 
         // 1. Try Gemini Multimodal Speech Transcription (Flagship high-accuracy & key-rotated)
         try {
-            $geminiTranscript = $this->transcribeWithGemini($audioBytes, $cleanMime);
+            $geminiTranscript = $this->transcribeWithGemini($audioBytes, $cleanMime, $questionContext);
             if (!empty($geminiTranscript)) {
                 return $geminiTranscript;
             }
@@ -99,7 +111,7 @@ class AudioTranscriptionService
         $openAiKey = env('OPENAI_API_KEY');
         if (!empty($openAiKey)) {
             try {
-                $whisperTranscript = $this->transcribeWithWhisper($audioBytes, $cleanMime, $openAiKey);
+                $whisperTranscript = $this->transcribeWithWhisper($audioBytes, $cleanMime, $openAiKey, $questionContext);
                 if (!empty($whisperTranscript)) {
                     return $whisperTranscript;
                 }
@@ -117,7 +129,7 @@ class AudioTranscriptionService
      * Transcribe using Google Gemini Multimodal Audio via GeminiKeyRotationService.
      * Cascades through the model hierarchy: gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash.
      */
-    protected function transcribeWithGemini(string $audioBytes, string $mimeType): string
+    protected function transcribeWithGemini(string $audioBytes, string $mimeType, ?string $questionContext = null): string
     {
         $base64Audio = base64_encode($audioBytes);
         $configuredPrimary = env('GEMINI_TRANSCRIPTION_MODEL', config('services.gemini.model', 'gemini-2.5-flash'));
@@ -127,12 +139,13 @@ class AudioTranscriptionService
             'gemini-2.0-flash',
             'gemini-1.5-flash',
         ])));
+        $prompt = $this->buildPrompt($questionContext);
 
         foreach ($models as $model) {
             try {
-                $response = $this->rotationService->runWithFallback(function (string $currentKey) use ($base64Audio, $mimeType, $model) {
+                $response = $this->rotationService->runWithFallback(function (string $currentKey) use ($base64Audio, $mimeType, $model, $prompt) {
                     return Http::withHeaders(['x-goog-api-key' => $currentKey])
-                        ->timeout(25)
+                        ->timeout(45)
                         ->retry(2, 500, fn ($exception) => $exception instanceof \Illuminate\Http\Client\ConnectionException)
                         ->post(
                             "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
@@ -148,14 +161,14 @@ class AudioTranscriptionService
                                                 ],
                                             ],
                                             [
-                                                'text' => self::PROMPT,
+                                                'text' => $prompt,
                                             ],
                                         ],
                                     ],
                                 ],
                                 'generationConfig' => [
                                     'temperature' => 0.0,
-                                    'maxOutputTokens' => 2048,
+                                    'maxOutputTokens' => 4096,
                                 ],
                             ]
                         );
@@ -163,6 +176,12 @@ class AudioTranscriptionService
 
                 if ($response->successful()) {
                     $text = (string) $response->json('candidates.0.content.parts.0.text');
+                    if (self::containsDisallowedScript($text)) {
+                        Log::warning("[AudioTranscriptionService] Model '{$model}' emitted non-Latin/Urdu script; discarding and trying fallback.", [
+                            'sample' => mb_substr($text, 0, 80),
+                        ]);
+                        continue;
+                    }
                     $cleaned = $this->cleanTranscript($text);
                     if ($cleaned !== '') {
                         return $cleaned;
@@ -181,7 +200,7 @@ class AudioTranscriptionService
     /**
      * Fallback transcriber using OpenAI Whisper endpoint.
      */
-    protected function transcribeWithWhisper(string $audioBytes, string $mimeType, string $apiKey): string
+    protected function transcribeWithWhisper(string $audioBytes, string $mimeType, string $apiKey, ?string $questionContext = null): string
     {
         $ext = match ($mimeType) {
             'audio/wav' => 'wav',
@@ -194,20 +213,51 @@ class AudioTranscriptionService
         $response = Http::withHeaders([
             'Authorization' => 'Bearer ' . trim($apiKey),
         ])
-            ->timeout(25)
+            ->timeout(45)
             ->attach('file', $audioBytes, "audio.{$ext}")
             ->post('https://api.openai.com/v1/audio/transcriptions', [
                 'model' => 'whisper-1',
                 'language' => 'en',
-                'prompt' => 'Job interview technical and behavioral answers.',
+                'temperature' => '0',
+                'prompt' => $this->buildWhisperPrompt($questionContext),
             ]);
 
         if ($response->successful()) {
             $text = (string) $response->json('text');
+            if (self::containsDisallowedScript($text)) {
+                return '';
+            }
             return $this->cleanTranscript($text);
         }
 
         return '';
+    }
+
+    protected function buildPrompt(?string $questionContext): string
+    {
+        $cleanContext = trim((string) preg_replace('/\s+/', ' ', (string) ($questionContext ?? '')));
+        if ($cleanContext === '') {
+            return self::PROMPT;
+        }
+
+        $truncated = mb_substr($cleanContext, 0, 500);
+        return self::PROMPT . "\n\nINTERVIEW QUESTION CONTEXT: \"{$truncated}\". Use this topic context ONLY to disambiguate phonetic homophones and technical terms accurately from the audio (e.g., DOM vs Tom, SQL vs sequel, Docker vs talker, API vs a p i, Git vs get) while keeping the transcript strictly verbatim to what the candidate spoke.";
+    }
+
+    protected function buildWhisperPrompt(?string $questionContext): string
+    {
+        $cleanContext = trim((string) preg_replace('/\s+/', ' ', (string) ($questionContext ?? '')));
+        if ($cleanContext === '') {
+            return 'English-only job interview answer with technical terminology and natural silent thinking pauses.';
+        }
+
+        $truncated = mb_substr($cleanContext, 0, 220);
+        return "English technical job interview answer. Question: {$truncated}";
+    }
+
+    public static function containsDisallowedScript(string $text): bool
+    {
+        return $text !== '' && preg_match(self::NON_LATIN_SCRIPT_REGEX, $text) === 1;
     }
 
     /**
@@ -225,9 +275,14 @@ class AudioTranscriptionService
 
         $cleaned = trim($cleaned, "\"'\n\r\t ");
 
+        if (self::containsDisallowedScript($cleaned)) {
+            return '';
+        }
+
         if (strcasecmp($cleaned, '(No audible speech detected)') === 0
             || strcasecmp($cleaned, 'No audible speech detected.') === 0
-            || strcasecmp($cleaned, '(Silence)') === 0) {
+            || strcasecmp($cleaned, '(Silence)') === 0
+            || preg_match('/^(thanks?( you)? for watching\.?|subtitles by .*)$/i', $cleaned) === 1) {
             return '';
         }
 

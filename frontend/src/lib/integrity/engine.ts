@@ -158,7 +158,6 @@ export class IntegrityEngine {
       attached: true,
       actions: { shareScreen: () => void this.shareScreen(), connectGuardian: () => void this.connectGuardian(), resolveHold: () => void this.resolveHold() },
     });
-    this.setPhase("consent");
 
     const kept = claim(this.o.keepKey, this.o.userKey);
     if (kept) {
@@ -168,6 +167,9 @@ export class IntegrityEngine {
       if (isStreamLive(kept.screen)) this.adoptScreen(kept.screen as MediaStream);
     }
 
+    // Load policy & build pre-flight checks BEFORE entering the "consent" phase so
+    // the full proctored lobby layout mounts directly without flashing the narrow
+    // legacy single-column screen for ~1 second while policy is still in flight.
     await this.loadPolicy();
     if (gen !== this.gen) return;
     this.buildChecks();
@@ -175,8 +177,12 @@ export class IntegrityEngine {
 
     // The camera and screen survived the page change and the browser is still fullscreen: go straight back in.
     if (kept && this.camera && document.fullscreenElement && checksPass(getIntegrityUi().checks)) {
+      this.setPhase("consent");
       void this.begin(true);
+      return;
     }
+
+    this.setPhase("consent");
   }
 
   /** The page is going away. In-app navigation parks the streams for the next page; anything else releases them. */
@@ -1117,13 +1123,15 @@ export class IntegrityEngine {
     }
 
     const now = Date.now();
-    const GRACE_SECONDS = 2; // Strict 2-second grace: immediate warning and fast termination
+    // Looking away allows 5 full seconds before auto-lock so natural head movement/thinking
+    // isn't penalized immediately; higher-severity violations (phone, multiple faces, etc.) lock at 2s.
+    const graceSeconds = violationType === "face_away" ? 5 : 2;
 
     if (violationType) {
       if (!this.activeGraceViolation || this.activeGraceViolation.type !== violationType) {
         this.activeGraceViolation = {
           type: violationType,
-          deadlineAt: now + GRACE_SECONDS * 1000,
+          deadlineAt: now + graceSeconds * 1000,
           message,
         };
       }
@@ -1142,6 +1150,7 @@ export class IntegrityEngine {
 
       if (secondsRemaining <= 0) {
         const type = violation.type;
+        const elapsedGrace = type === "face_away" ? 5 : 2;
         const reason =
           type === "phone_detected"
             ? "A prohibited mobile phone was detected in front of the camera and was not removed within 2 seconds."
@@ -1152,12 +1161,12 @@ export class IntegrityEngine {
             : type === "multiple_faces"
             ? "Multiple people were detected in the camera frame for more than 2 seconds (unauthorized person present beside candidate)."
             : type === "face_away"
-            ? "Candidate looked away / turned head sideways towards an off-screen person for more than 2 seconds."
+            ? "Candidate looked away / turned head sideways towards an off-screen person for more than 5 seconds."
             : "Prohibited side conversation detected while interviewer was speaking or during preparation time.";
 
         this.emit(type === "speech_prohibited" ? "speech_detected" : type, {
           grace_period_exceeded: true,
-          duration_seconds: GRACE_SECONDS,
+          duration_seconds: elapsedGrace,
         });
         void this.still("webcam", { flagged: true, reason: type });
         this.activeGraceViolation = null;

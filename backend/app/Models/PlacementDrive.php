@@ -52,10 +52,14 @@ class PlacementDrive extends Model
         'duration_minutes',
         'min_cgpa',
         'max_backlogs',
+        'min_tenth_percentage',
+        'min_twelfth_percentage',
         'eligible_branches',
+        'eligible_years',
         'terms_and_conditions',
         'status',
         'source',
+        'drive_tier',
         'is_open_to_all',
         'owning_college_id',
         'created_by',
@@ -67,7 +71,10 @@ class PlacementDrive extends Model
             'drive_date' => 'datetime',
             'interview_date' => 'datetime',
             'eligible_branches' => 'array',
+            'eligible_years' => 'array',
             'min_cgpa' => 'decimal:2',
+            'min_tenth_percentage' => 'decimal:2',
+            'min_twelfth_percentage' => 'decimal:2',
             'is_open_to_all' => 'boolean',
         ];
     }
@@ -116,7 +123,12 @@ class PlacementDrive extends Model
         return [
             'min_cgpa' => $this->min_cgpa,
             'max_backlogs' => $this->max_backlogs,
+            'min_tenth_percentage' => $this->min_tenth_percentage,
+            'min_twelfth_percentage' => $this->min_twelfth_percentage,
             'eligible_branches' => $this->eligible_branches,
+            'eligible_years' => $this->eligible_years,
+            'drive_ctc' => $this->ctc_range,
+            'drive_tier' => $this->drive_tier ?? 'standard',
         ];
     }
 

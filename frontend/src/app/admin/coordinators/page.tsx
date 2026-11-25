@@ -17,12 +17,15 @@ import {
   Ban,
   SearchX,
   Save,
+  KeyRound,
+  Trash2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { AddCoordinatorModal } from "@/components/dashboard/tpo/AddCoordinatorModal";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
+import { confirmDialog } from "@/lib/dialogs";
 import { Modal } from "@/components/ui/Modal";
 import { audienceForRequest, audienceFrom, type BranchAudience } from "@/components/branches/BranchAudienceField";
 import { ScopePicker } from "@/components/coordinator/ScopePicker";
@@ -60,6 +63,8 @@ export interface Coordinator {
   /** "All branches", or "ECE, EEE" — what the scope reads as. */
   scope_label?: string;
   is_blocked: boolean;
+  activated?: boolean;
+  last_seen_at?: string | null;
   managed_student_count: number;
   avatar_url: string | null;
   created_at: string;
@@ -113,16 +118,17 @@ function EditCoordinatorModal({
   onClose: () => void;
   onSaved: (updated: Coordinator) => void;
 }) {
+  const [name, setName] = useState(coordinator.name);
+  const [email, setEmail] = useState(coordinator.email);
   const [section, setSection] = useState(coordinator.section);
   const [scope, setScope] = useState<BranchAudience>(audienceFrom(coordinator.branch_scope));
   const [phone, setPhone] = useState(coordinator.phone ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Any section can be chosen now — a section may have several coordinators, one per branch. The server refuses a
-  // choice that would put two coordinators on the same students, and the scope picker shows who is already where.
   const selectableSections = sections;
   const chosen = sections.find((s) => s.section === section);
+  const activated = Boolean(coordinator.activated);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,13 +136,15 @@ function EditCoordinatorModal({
     setError(null);
     try {
       const res = await api.put<{ coordinator: Coordinator }>(`/tpo/coordinators/${coordinator.id}`, {
+        name: name.trim(),
+        ...(activated ? {} : { email: email.trim() }),
         section,
         branch_scope: audienceForRequest(scope),
         phone: phone || undefined,
       });
       onSaved(res.coordinator);
     } catch (err) {
-      setError(err instanceof ApiError ? err.errors?.branch_scope?.[0] ?? err.errors?.section?.[0] ?? err.message : "Failed to update this coordinator.");
+      setError(err instanceof ApiError ? err.errors?.email?.[0] ?? err.errors?.branch_scope?.[0] ?? err.errors?.section?.[0] ?? err.message : "Failed to update this coordinator.");
     } finally {
       setSaving(false);
     }
@@ -147,7 +155,7 @@ function EditCoordinatorModal({
       variant="premium"
       onClose={onClose}
       title="Edit Coordinator"
-      subtitle="Reassign their section or update contact details"
+      subtitle="Update coordinator details, section, branch scope or phone"
       icon={Pencil}
       size="md"
       footer={
@@ -159,7 +167,7 @@ function EditCoordinatorModal({
             type="submit"
             form="edit-coordinator-form"
             isLoading={saving}
-            disabled={!section}
+            disabled={!section || !name.trim()}
             leftIcon={<Save className="h-4 w-4" />}
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -177,6 +185,26 @@ function EditCoordinatorModal({
       </div>
 
       <form id="edit-coordinator-form" onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="ec-name" className={hpLabel}>Name *</label>
+            <input id="ec-name" required value={name} onChange={(e) => setName(e.target.value)} className={hpInput} />
+          </div>
+          <div>
+            <label htmlFor="ec-email" className={hpLabel}>
+              Email {activated ? "(locked)" : "*"}
+            </label>
+            <input
+              id="ec-email"
+              type="email"
+              required
+              disabled={activated}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className={cn(hpInput, activated && "opacity-60")}
+            />
+          </div>
+        </div>
         <div>
           <label htmlFor="ec-section" className={hpLabel}>
             Section *
@@ -264,6 +292,42 @@ export default function SectionCoordinatorsPage() {
       triggerToast(`${coordinator.name} ${res.coordinator.is_blocked ? "blocked" : "unblocked"}.`);
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to update this coordinator.", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleResendLogin = async (coordinator: Coordinator) => {
+    if (!(await confirmDialog({
+      title: `Send a fresh login to ${coordinator.name}?`,
+      message: `A new one-time password will be emailed to ${coordinator.email} and existing sessions will be signed out.`,
+      confirmLabel: "Send login",
+    }))) return;
+    setBusyId(coordinator.id);
+    try {
+      const res = await api.post<{ message: string }>(`/tpo/coordinators/${coordinator.id}/send-login`, {});
+      triggerToast(res.message);
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Could not resend login.", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (coordinator: Coordinator) => {
+    if (!(await confirmDialog({
+      title: `Remove ${coordinator.name}?`,
+      message: "This coordinator has never signed in, so removing them permanently deletes the unused account.",
+      tone: "danger",
+      confirmLabel: "Delete account",
+    }))) return;
+    setBusyId(coordinator.id);
+    try {
+      const res = await api.delete<{ message: string }>(`/tpo/coordinators/${coordinator.id}`);
+      triggerToast(res.message);
+      await load();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Could not delete this coordinator.", "error");
     } finally {
       setBusyId(null);
     }
@@ -431,6 +495,8 @@ export default function SectionCoordinatorsPage() {
                             coordinator={c}
                             busy={busyId === c.id}
                             onEdit={() => setEditing(c)}
+                            onResendLogin={() => void handleResendLogin(c)}
+                            onDelete={() => void handleDelete(c)}
                             onToggleBlock={() => handleToggleBlock(c)}
                           />
                         </ScReveal>
@@ -564,11 +630,15 @@ function CoordinatorCard({
   coordinator: c,
   busy,
   onEdit,
+  onResendLogin,
+  onDelete,
   onToggleBlock,
 }: {
   coordinator: Coordinator;
   busy: boolean;
   onEdit: () => void;
+  onResendLogin: () => void;
+  onDelete: () => void;
   onToggleBlock: () => void;
 }) {
   return (
@@ -607,7 +677,13 @@ function CoordinatorCard({
           <ScMeta icon={Phone}>
             {c.phone ? <span className="tabular">{c.phone}</span> : <span className="italic">No phone on file</span>}
           </ScMeta>
-          <ScMeta icon={CalendarDays}>Added {new Date(c.created_at).toLocaleDateString("en-IN", ADDED_ON)}</ScMeta>
+          <ScMeta icon={CalendarDays}>
+            {c.activated
+              ? c.last_seen_at
+                ? `Active · seen ${new Date(c.last_seen_at).toLocaleDateString("en-IN", ADDED_ON)}`
+                : "Activated"
+              : "Pending first login"}
+          </ScMeta>
         </div>
       </div>
 
@@ -615,6 +691,29 @@ function CoordinatorCard({
         <HpButton variant="secondary" size="sm" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={onEdit} aria-label={`Edit ${c.name}`}>
           Edit
         </HpButton>
+        <HpButton
+          variant="ghost"
+          size="sm"
+          isLoading={busy}
+          disabled={c.is_blocked}
+          leftIcon={<KeyRound className="h-3.5 w-3.5" />}
+          onClick={onResendLogin}
+          title="Send new one-time login credentials"
+        >
+          Resend login
+        </HpButton>
+        {!c.activated && (
+          <HpButton
+            variant="ghost"
+            size="sm"
+            isLoading={busy}
+            leftIcon={<Trash2 className="h-3.5 w-3.5 text-status-danger" />}
+            onClick={onDelete}
+            title="Remove unused coordinator account"
+          >
+            Delete
+          </HpButton>
+        )}
         <div className="ml-auto">
           {c.is_blocked ? (
             <HpButton

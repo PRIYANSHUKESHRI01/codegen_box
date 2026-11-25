@@ -1,17 +1,21 @@
-@include('emails.partials.header', ['category' => 'Announcement', 'preheader' => $user->college ? 'An update from your placement cell at '.$user->college->name.'.' : 'An update from the AptRun team.'])
+@include('emails.partials.header', ['category' => 'Announcement', 'preheader' => $customSubject ?: ($user->college ? 'An update from your placement cell at '.$user->college->name.'.' : 'An update from the AptRun team.')])
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:#E0E7FF; color:#3730A3; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; padding:5px 12px; border-radius:999px; margin-bottom:4px;">
                                 Notification
                             </span>
                             @if ($user->college)
-                                <h1 class="em-h" style="font-size:24px; line-height:1.28; font-weight:800; letter-spacing:-0.02em; margin:14px 0 10px 0; color:#0F172A;">An update from your Placement Cell</h1>
+                                <h1 class="em-h" style="font-size:24px; line-height:1.28; font-weight:800; letter-spacing:-0.02em; margin:14px 0 10px 0; color:#0F172A;">
+                                    {{ $customSubject ?: 'An update from your Placement Cell' }}
+                                </h1>
                                 <p class="em-p" style="font-size:15px; line-height:1.7; color:#475569; margin:0 0 20px 0;">
                                     Hi {{ $user->name }}, your Training &amp; Placement Officer at {{ $user->college->name }}
                                     sent you a notification through AptRun.
                                 </p>
                             @else
-                                <h1 class="em-h" style="font-size:24px; line-height:1.28; font-weight:800; letter-spacing:-0.02em; margin:14px 0 10px 0; color:#0F172A;">An update from the AptRun team</h1>
+                                <h1 class="em-h" style="font-size:24px; line-height:1.28; font-weight:800; letter-spacing:-0.02em; margin:14px 0 10px 0; color:#0F172A;">
+                                    {{ $customSubject ?: 'An update from the AptRun team' }}
+                                </h1>
                                 <p class="em-p" style="font-size:15px; line-height:1.7; color:#475569; margin:0 0 20px 0;">
                                     Hi {{ $user->name }}, the AptRun team sent you a notification.
                                 </p>
@@ -23,11 +27,17 @@
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="em-box em-rule" style="background-color:#F6F8FC; border-radius:12px; border:1px solid #E3E7EF;">
                                 <tr>
                                     <td style="padding:16px 20px;">
-                                        <p class="em-p" style="font-size:13px; color:#374151; margin:0; line-height:1.6;">
-                                            Sign in to your AptRun dashboard for the details, or contact
-                                            @if ($user->college) your placement office @else AptRun support at {{ config('brand.support_email') }} @endif
-                                            directly for anything time-sensitive.
-                                        </p>
+                                        @if (!empty($customMessage))
+                                            <div class="em-p" style="font-size:14px; color:#1E293B; margin:0; line-height:1.65;">
+                                                {!! nl2br(e($customMessage)) !!}
+                                            </div>
+                                        @else
+                                            <p class="em-p" style="font-size:13px; color:#374151; margin:0; line-height:1.6;">
+                                                Sign in to your AptRun dashboard for the details, or contact
+                                                @if ($user->college) your placement office @else AptRun support at {{ config('brand.support_email') }} @endif
+                                                directly for anything time-sensitive.
+                                            </p>
+                                        @endif
                                     </td>
                                 </tr>
                             </table>

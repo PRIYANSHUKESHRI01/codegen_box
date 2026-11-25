@@ -181,6 +181,24 @@ class User extends Authenticatable
      */
     public ?string $departmentHint = null;
 
+    public const PLACEMENT_STATUS_SEEKING = 'seeking';
+
+    public const PLACEMENT_STATUS_PLACED = 'placed';
+
+    public const PLACEMENT_STATUS_HIGHER_STUDIES = 'higher_studies';
+
+    public const PLACEMENT_STATUS_ENTREPRENEURSHIP = 'entrepreneurship';
+
+    public const PLACEMENT_STATUS_OPTED_OUT = 'opted_out';
+
+    public const PLACEMENT_STATUSES = [
+        self::PLACEMENT_STATUS_SEEKING,
+        self::PLACEMENT_STATUS_PLACED,
+        self::PLACEMENT_STATUS_HIGHER_STUDIES,
+        self::PLACEMENT_STATUS_ENTREPRENEURSHIP,
+        self::PLACEMENT_STATUS_OPTED_OUT,
+    ];
+
     /**
      * The attributes that are mass assignable.
      *
@@ -202,6 +220,8 @@ class User extends Authenticatable
         'branch',
         'section',
         'cgpa',
+        'tenth_percentage',
+        'twelfth_percentage',
         'backlogs',
         'phone',
         'parent_phone',
@@ -261,6 +281,9 @@ class User extends Authenticatable
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',
             'cgpa' => 'decimal:2',
+            'tenth_percentage' => 'decimal:2',
+            'twelfth_percentage' => 'decimal:2',
+            'academics_locked_at' => 'datetime',
             'backlogs' => 'integer',
             'credentials_email_sent_at' => 'datetime',
             // Cast but deliberately NOT in $fillable, same as is_blocked —

@@ -187,12 +187,16 @@ class InterviewController extends Controller
      */
     public function transcribeAudio(Request $request, AudioTranscriptionService $transcriptionService)
     {
-        $request->validate([
+        $validated = $request->validate([
             'audio' => ['required', 'file', 'mimes:webm,weba,ogg,oga,wav,mp3,m4a,mp4', 'max:25600'],
+            'question_text' => ['nullable', 'string', 'max:1000'],
         ]);
 
         $file = $request->file('audio');
-        $transcript = $transcriptionService->transcribeUploadedFile($file);
+        $transcript = $transcriptionService->transcribeUploadedFile(
+            $file,
+            $validated['question_text'] ?? null
+        );
 
         return response()->json([
             'success' => true,
@@ -259,24 +263,40 @@ class InterviewController extends Controller
             'audio_duration_seconds' => ['nullable', 'integer', 'min:0'],
         ]);
 
+        $questionContext = InterviewQuestion::with('questionBank:id,question_text')
+            ->where('id', (int) $validated['interview_question_id'])
+            ->where('interview_id', $interview->id)
+            ->first()?->questionBank?->question_text;
+
         $rawTranscript = trim((string) ($validated['transcript_text'] ?? ''));
-        if ($rawTranscript === '' || $rawTranscript === '(Audio response submitted)') {
-            if ($request->hasFile('audio')) {
-                // If browser SpeechRecognition failed, dropped text on pause, or was blocked by firewall,
-                // automatically transcribe candidate audio with the AI audio transcription service.
-                try {
-                    $aiTranscript = app(AudioTranscriptionService::class)->transcribeUploadedFile($request->file('audio'));
-                    $rawTranscript = !empty(trim($aiTranscript)) ? trim($aiTranscript) : '(Audio response submitted)';
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('[InterviewAnswer] AI audio transcription fallback failed', [
-                        'session_id' => $session->id,
-                        'error' => $e->getMessage(),
-                    ]);
+        $durationSec = (int) ($validated['audio_duration_seconds'] ?? 0);
+        $wordCount = $rawTranscript !== '' ? str_word_count($rawTranscript) : 0;
+        $hasBadScript = AudioTranscriptionService::containsDisallowedScript($rawTranscript);
+        $missingOrPlaceholder = $rawTranscript === '' || $rawTranscript === '(Audio response submitted)';
+        // Catch partial browser transcripts (e.g. candidate spoke 5 words, paused 15s, then answered for 60s after browser STT dropped)
+        $suspiciouslySparseForDuration = $durationSec >= 15 && $wordCount < max(6, (int) floor($durationSec * 0.35));
+
+        if ($request->hasFile('audio') && ($missingOrPlaceholder || $hasBadScript || $suspiciouslySparseForDuration)) {
+            try {
+                $aiTranscript = trim(app(AudioTranscriptionService::class)->transcribeUploadedFile($request->file('audio'), $questionContext));
+                if ($aiTranscript !== '') {
+                    if ($missingOrPlaceholder || $hasBadScript || str_word_count($aiTranscript) > $wordCount) {
+                        $rawTranscript = $aiTranscript;
+                    }
+                } elseif ($missingOrPlaceholder || $hasBadScript) {
                     $rawTranscript = '(Audio response submitted)';
                 }
-            } else {
-                $rawTranscript = '(No answer recorded)';
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[InterviewAnswer] AI audio transcription fallback failed', [
+                    'session_id' => $session->id,
+                    'error' => $e->getMessage(),
+                ]);
+                if ($missingOrPlaceholder || $hasBadScript) {
+                    $rawTranscript = '(Audio response submitted)';
+                }
             }
+        } elseif ($missingOrPlaceholder || $hasBadScript) {
+            $rawTranscript = '(No answer recorded)';
         }
 
         $audioPath = null;

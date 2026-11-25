@@ -34,6 +34,8 @@ import {
   LifeBuoy,
   CalendarRange,
   Pencil,
+  Lock,
+  ShieldCheck,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { StudentProfileDrawer } from "@/components/dashboard/tpo/StudentProfileDrawer";
@@ -420,6 +422,36 @@ export default function StudentCohortPage() {
     setShowSetSection(false);
     setSelectedIds(new Set());
     triggerToast(res.message);
+  };
+
+  const handleBulkPlacementStatus = async (placementStatus: "seeking" | "placed" | "higher_studies" | "entrepreneurship" | "opted_out") => {
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await api.post<{ message: string }>("/tpo/students/placement-status", {
+        user_ids: ids,
+        placement_status: placementStatus,
+      });
+      patchStudents(ids, { placement_status: placementStatus });
+      setSelectedIds(new Set());
+      triggerToast(res.message);
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update placement status.");
+    }
+  };
+
+  const handleBulkAcademicsLock = async (locked: boolean) => {
+    const ids = Array.from(selectedIds);
+    try {
+      const res = await api.post<{ message: string }>("/tpo/students/academics-lock", {
+        user_ids: ids,
+        locked,
+      });
+      patchStudents(ids, { academics_locked: locked });
+      setSelectedIds(new Set());
+      triggerToast(res.message);
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update academic lock.");
+    }
   };
 
   /** One student edited in the modal: the server sent back their refreshed row. */
@@ -1327,7 +1359,11 @@ export default function StudentCohortPage() {
               </div>
             </HpCard>
 
-            <BulkImportStudentsPanel collegeName={user?.college?.name ?? "your college"} variant="premium" />
+            <BulkImportStudentsPanel
+              collegeName={user?.college?.name ?? "your college"}
+              variant="premium"
+              onCompleted={() => void loadStudents(true)}
+            />
           </section>
         </HpItem>
 
@@ -1346,13 +1382,13 @@ export default function StudentCohortPage() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 24, scale: 0.97 }}
               transition={{ duration: 0.28, ease: hpEase }}
-              className="pointer-events-auto flex w-full max-w-lg items-center gap-2 rounded-2xl border border-border-strong bg-[rgb(var(--bg-surface-rgb))]/95 p-2 pl-3 shadow-[0_18px_50px_-12px_rgba(39,47,92,0.45)] backdrop-blur-xl"
+              className="pointer-events-auto flex w-full max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-border-strong bg-[rgb(var(--bg-surface-rgb))]/95 p-2 pl-3 shadow-[0_18px_50px_-12px_rgba(39,47,92,0.45)] backdrop-blur-xl"
             >
               <span className="tabular flex h-8 min-w-8 items-center justify-center rounded-[10px] bg-gradient-to-b from-indigo-500 to-violet-600 px-2 text-xs font-extrabold text-white shadow-[0_6px_14px_-6px_rgba(99,102,241,0.8)]">
                 {selectedIds.size}
               </span>
               <span className="min-w-0 truncate text-13 font-semibold text-primary">selected</span>
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              <div className="ml-auto flex flex-wrap shrink-0 items-center gap-1.5">
                 <HpButton variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
                   Clear
                 </HpButton>
@@ -1361,6 +1397,25 @@ export default function StudentCohortPage() {
                 </HpButton>
                 <HpButton variant="secondary" size="sm" onClick={() => setShowSetSection(true)} leftIcon={<LayoutGrid className="h-3.5 w-3.5" />}>
                   Set section
+                </HpButton>
+                <select
+                  aria-label="Mark placement status for selected students"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const v = e.target.value as "seeking" | "placed" | "higher_studies" | "entrepreneurship" | "opted_out" | "";
+                    if (v) void handleBulkPlacementStatus(v);
+                    e.currentTarget.value = "";
+                  }}
+                  className="h-8 rounded-xl border border-border-subtle bg-elevated px-2 text-2xs font-bold text-primary outline-none focus:border-indigo-500"
+                >
+                  <option value="">Placement status…</option>
+                  <option value="seeking">Mark Seeking</option>
+                  <option value="higher_studies">Mark Higher Studies</option>
+                  <option value="entrepreneurship">Mark Entrepreneurship</option>
+                  <option value="opted_out">Mark Opted Out</option>
+                </select>
+                <HpButton variant="secondary" size="sm" onClick={() => void handleBulkAcademicsLock(true)} leftIcon={<Lock className="h-3.5 w-3.5" />}>
+                  Lock GPA
                 </HpButton>
                 <HpButton
                   size="sm"

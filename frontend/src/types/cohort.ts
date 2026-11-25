@@ -60,7 +60,12 @@ export interface CohortStudent {
   phone: string | null;
   parent_phone: string | null;
   cgpa: string | null;
+  tenth_percentage?: string | number | null;
+  twelfth_percentage?: string | number | null;
   backlogs: number | null;
+  placement_status?: "seeking" | "placed" | "higher_studies" | "entrepreneurship" | "opted_out" | null;
+  academics_locked?: boolean;
+  has_resume?: boolean;
   is_blocked: boolean;
   /** Why and by whom the account was blocked; null while it is active. `by_coordinator`: a Section Coordinator did it (not Mellow staff). */
   blocked?: { reason: string | null; at: string | null; by_coordinator: boolean } | null;

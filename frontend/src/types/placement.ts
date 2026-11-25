@@ -119,6 +119,8 @@ export interface DriveApplication {
   stage: DriveApplicationStage;
   stage_updated_at: string;
   ctc_offered: string | null;
+  joining_status?: "pending" | "joined" | "deferred" | "reneged" | null;
+  joined_at?: string | null;
   notes: string | null;
   user: {
     id: number;
@@ -127,18 +129,32 @@ export interface DriveApplication {
     roll_number: string | null;
     branch: string | null;
     parent_phone: string | null;
+    has_resume?: boolean;
+    cgpa?: number | string | null;
+    tenth_percentage?: number | string | null;
+    twelfth_percentage?: number | string | null;
+    placement_status?: "seeking" | "placed" | "higher_studies" | "entrepreneurship" | "opted_out" | null;
     /** A candidate's own contact number (never set for a student row — see parent_phone above instead). Only ever populated by the company hiring endpoints. */
     phone?: string | null;
   };
 }
 
+export interface PlacementPolicy {
+  max_offers_per_student: number | null;
+  dream_offer_multiplier: number | null;
+  dream_offer_min_ctc: number | null;
+  block_placed_from_lower_ctc: boolean;
+}
+
 export interface PlacementFunnel {
   batch_enrolled: number;
+  seeking_placement?: number;
   registered: number;
   shortlisted: number;
   interviewed: number;
   offered: number;
   accepted: number;
+  unique_placed?: number;
 }
 
 export interface RecentPlacement {
@@ -148,12 +164,21 @@ export interface RecentPlacement {
   company: string;
   role_title: string;
   ctc_offered: string;
+  joining_status?: string | null;
   placed_at: string;
 }
 
 export interface PackageBracket {
   bracket: string;
   count: number;
+}
+
+export interface PackageStats {
+  count: number;
+  min_ctc: number | null;
+  avg_ctc: number | null;
+  median_ctc: number | null;
+  max_ctc: number | null;
 }
 
 export interface CompanyPlacementSummary {
@@ -180,10 +205,15 @@ export interface PlacementTarget {
 export interface PlacementActionItem {
   type: string;
   message: string;
+  drive_id?: number;
 }
 
 export interface PlacementReportData {
+  study_year?: number | null;
+  available_years?: { year: number; count: number }[];
   funnel: PlacementFunnel;
+  package_stats?: PackageStats;
+  placement_status_breakdown?: Record<string, number>;
   recent_placements: RecentPlacement[];
   package_distribution: PackageBracket[];
   company_summary: CompanyPlacementSummary[];

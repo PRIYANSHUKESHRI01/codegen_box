@@ -31,11 +31,21 @@ import {
   SearchX,
   ArrowRight,
   Check,
+  Pencil,
+  Upload,
+  Archive,
+  FileText,
+  ShieldCheck,
+  Search,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DrivePipelineBar, DRIVE_STAGE_TONE, type PipelineStageCount } from "@/components/dashboard/tpo/DrivePipelineBar";
 import { CreateDriveModal } from "@/components/dashboard/tpo/CreateDriveModal";
+import { EditDriveModal, type EditableDrive } from "@/components/dashboard/tpo/EditDriveModal";
+import { ShortlistImportModal } from "@/components/dashboard/tpo/ShortlistImportModal";
+import { PlacementPolicyModal } from "@/components/dashboard/tpo/PlacementPolicyModal";
 import { AddApplicantModal } from "@/components/dashboard/tpo/AddApplicantModal";
 import { BulkNotifyModal, type BulkNotifyTarget } from "@/components/dashboard/tpo/BulkNotifyModal";
 import {
@@ -91,16 +101,25 @@ interface ApiDrive {
   drive_date: string;
   duration_minutes: number | null;
   min_cgpa: string | null;
+  min_tenth_percentage?: string | number | null;
+  min_twelfth_percentage?: string | number | null;
   max_backlogs: number | null;
   eligible_branches: string[] | null;
+  eligible_years?: number[] | null;
+  drive_tier?: "standard" | "dream" | "super_dream";
+  terms_and_conditions?: string | null;
+  source?: string;
   status: "draft" | "published" | "completed" | "cancelled";
   company: ApiCompanySummary;
 }
 
 interface ApiMapping {
   min_cgpa_override: string | null;
+  min_tenth_override?: string | number | null;
+  min_twelfth_override?: string | number | null;
   max_backlogs_override: number | null;
   eligible_branches_override: string[] | null;
+  eligible_years_override?: number[] | null;
   placement_drive: ApiDrive;
 }
 
@@ -110,26 +129,29 @@ interface ApiPendingMapping extends ApiMapping {
   mapped_by: { id: number; name: string } | null;
 }
 
-interface DriveRow {
-  driveId: number;
-  companyName: string;
+interface DriveRow extends EditableDrive {
   logo: string;
-  role: string;
-  ctcRange: string;
-  driveDateIso: string;
-  durationMinutes: number | null;
-  minCgpa: number | null;
-  maxBacklogs: number | null;
-  eligibleBranches: string[] | null;
+  status: ApiDrive["status"];
   isPast: boolean;
 }
 
 /** toRow's stand-in when a company has no logo — the card shows a monogram instead. */
 const NO_LOGO = "🏢";
 
-function toRow(drive: ApiDrive, override?: Pick<ApiMapping, "min_cgpa_override" | "max_backlogs_override" | "eligible_branches_override">): DriveRow {
+function toRow(
+  drive: ApiDrive,
+  override?: Pick<
+    ApiMapping,
+    "min_cgpa_override" | "min_tenth_override" | "min_twelfth_override" | "max_backlogs_override" | "eligible_branches_override" | "eligible_years_override"
+  >
+): DriveRow {
+  const minTenthVal = override?.min_tenth_override ?? drive.min_tenth_percentage;
+  const minTwelfthVal = override?.min_twelfth_override ?? drive.min_twelfth_percentage;
   return {
     driveId: drive.id,
+    source: drive.source,
+    status: drive.status,
+    title: drive.title,
     companyName: drive.company.name,
     logo: drive.company.logo ?? NO_LOGO,
     role: drive.role_title,
@@ -137,9 +159,14 @@ function toRow(drive: ApiDrive, override?: Pick<ApiMapping, "min_cgpa_override" 
     driveDateIso: drive.drive_date,
     durationMinutes: drive.duration_minutes,
     minCgpa: (override?.min_cgpa_override ?? drive.min_cgpa) !== null ? Number(override?.min_cgpa_override ?? drive.min_cgpa) : null,
+    minTenth: minTenthVal != null ? Number(minTenthVal) : null,
+    minTwelfth: minTwelfthVal != null ? Number(minTwelfthVal) : null,
     maxBacklogs: override?.max_backlogs_override ?? drive.max_backlogs,
     eligibleBranches: override?.eligible_branches_override ?? drive.eligible_branches,
-    isPast: new Date(drive.drive_date).getTime() < Date.now(),
+    eligibleYears: override?.eligible_years_override ?? drive.eligible_years ?? null,
+    driveTier: drive.drive_tier,
+    termsAndConditions: drive.terms_and_conditions,
+    isPast: new Date(drive.drive_date).getTime() < Date.now() || drive.status === "cancelled",
   };
 }
 
@@ -197,13 +224,18 @@ export default function CampusDrivesPage() {
   const [respondingMappingId, setRespondingMappingId] = useState<number | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  // Deep link from the proposal email's CTA (?tab=pending) — read via plain
-  // window.location rather than next/navigation's useSearchParams(), which
-  // requires a Suspense boundary around the whole page to statically build.
+  // Deep link from proposal email (?tab=pending) or Command Center attention item (?driveId=...).
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (new URLSearchParams(window.location.search).get("tab") === "pending") {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.get("tab") === "pending") {
       setActiveTab("pending");
+    }
+    const driveIdParam = qs.get("driveId");
+    if (driveIdParam && /^\d+$/.test(driveIdParam)) {
+      const targetId = Number(driveIdParam);
+      setActiveTab("mapped");
+      setExpandedId(targetId);
     }
   }, []);
 
@@ -212,6 +244,9 @@ export default function CampusDrivesPage() {
   const [loadingApplications, setLoadingApplications] = useState<Set<number>>(new Set());
   const [registeringDriveId, setRegisteringDriveId] = useState<number | null>(null);
   const [addApplicantFor, setAddApplicantFor] = useState<DriveRow | null>(null);
+  const [editingDrive, setEditingDrive] = useState<DriveRow | null>(null);
+  const [importShortlistFor, setImportShortlistFor] = useState<DriveRow | null>(null);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [notifyTarget, setNotifyTarget] = useState<BulkNotifyTarget | null>(null);
   const [movingAppId, setMovingAppId] = useState<number | null>(null);
   const [ctcPrompt, setCtcPrompt] = useState<CtcPrompt | null>(null);
@@ -242,6 +277,13 @@ export default function CampusDrivesPage() {
   useEffect(() => {
     if (status === "ready") loadDrives();
   }, [status, loadDrives]);
+
+  useEffect(() => {
+    if (status === "ready" && expandedId !== null && !applicationsByDrive[expandedId]) {
+      loadApplications(expandedId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, expandedId]);
 
   const loadApplications = useCallback(async (driveId: number) => {
     setLoadingApplications((prev) => new Set(prev).add(driveId));
@@ -380,6 +422,73 @@ export default function CampusDrivesPage() {
     }
   };
 
+  const handleBulkStage = async (driveId: number, ids: number[], newStage: DriveApplicationStage, ctcOffered?: number) => {
+    const res = await api.post<{ message: string; applications: DriveApplication[] }>(
+      `/tpo/drives/${driveId}/applications/bulk-stage`,
+      {
+        application_ids: ids,
+        stage: newStage,
+        ...(ctcOffered !== undefined ? { ctc_offered: ctcOffered } : {}),
+      }
+    );
+    const updatedMap = new Map(res.applications.map((a) => [a.id, a]));
+    setApplicationsByDrive((prev) => ({
+      ...prev,
+      [driveId]: (prev[driveId] ?? []).map((a) => updatedMap.get(a.id) ?? a),
+    }));
+    triggerToast(res.message);
+  };
+
+  const handleJoiningStatusChange = async (app: DriveApplication, joiningStatus: "pending" | "joined" | "deferred" | "reneged") => {
+    setMovingAppId(app.id);
+    try {
+      const res = await api.post<{ application: DriveApplication }>(
+        `/tpo/drives/${app.placement_drive_id}/applications/${app.id}/joining-status`,
+        { joining_status: joiningStatus }
+      );
+      replaceApplication(res.application);
+      triggerToast(`Updated joining status to ${joiningStatus}.`);
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to update joining status.", "error");
+    } finally {
+      setMovingAppId(null);
+    }
+  };
+
+  const handleCancelDrive = async (drive: DriveRow) => {
+    if (!(await confirmDialog({ title: `Cancel ${drive.companyName}'s drive?`, message: "This marks the campus drive as cancelled for all students.", tone: "danger", confirmLabel: "Cancel drive" }))) {
+      return;
+    }
+    setPendingDriveId(drive.driveId);
+    try {
+      await api.post(`/tpo/drives/${drive.driveId}/cancel`, {});
+      triggerToast(`${drive.companyName}'s drive cancelled.`);
+      await loadDrives();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to cancel drive.", "error");
+    } finally {
+      setPendingDriveId(null);
+    }
+  };
+
+  const handleExportResumesZip = async (drive: DriveRow, stageFilter?: string) => {
+    try {
+      const url = stageFilter && stageFilter !== "ALL"
+        ? `/tpo/drives/${drive.driveId}/resumes.zip?stage=${encodeURIComponent(stageFilter)}`
+        : `/tpo/drives/${drive.driveId}/resumes.zip`;
+      const blob = await api.getFile(url);
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `${drive.companyName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-resumes.zip`;
+      a.click();
+      URL.revokeObjectURL(href);
+      triggerToast("Downloaded applicant resume bundle (.zip).");
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Could not export resumes ZIP.", "error");
+    }
+  };
+
   const handleStageSelect = async (app: DriveApplication, newStage: DriveApplicationStage) => {
     if (newStage === app.stage) return;
 
@@ -453,15 +562,13 @@ export default function CampusDrivesPage() {
   const completedMapped = filteredMapped.filter((d) => d.isPast);
 
   const tabItems: DriveFilterItem[] = [
-    { id: "mapped", label: "Mapped", count: initialLoading ? undefined : mappedDrives.length, icon: Link2 },
-    { id: "available", label: "Available to Map", count: initialLoading ? undefined : availableDrives.length, icon: Compass },
-    {
-      id: "pending",
-      label: "Pending Approvals",
-      count: initialLoading ? undefined : pendingMappings.length,
-      icon: Inbox,
-      attention: pendingMappings.length > 0,
-    },
+    { id: "mapped", label: "Campus Drives", count: initialLoading ? undefined : mappedDrives.length, icon: Briefcase },
+    ...(availableDrives.length > 0
+      ? [{ id: "available" as const, label: "Catalog Drives", count: availableDrives.length, icon: Compass }]
+      : []),
+    ...(pendingMappings.length > 0
+      ? [{ id: "pending" as const, label: "Pending Approvals", count: pendingMappings.length, icon: Inbox, attention: true }]
+      : []),
   ];
 
   const renderMappedCard = (drv: DriveRow, idx: number) => {
@@ -498,10 +605,16 @@ export default function CampusDrivesPage() {
           onCtcPromptChange={setCtcPrompt}
           onConfirmCtc={confirmCtcPrompt}
           onStageSelect={handleStageSelect}
+          onBulkStage={(ids, stage, ctc) => handleBulkStage(drv.driveId, ids, stage, ctc)}
+          onJoiningStatusChange={handleJoiningStatusChange}
           onRegisterEligible={() => handleRegisterEligible(drv)}
           onAddApplicant={() => setAddApplicantFor(drv)}
+          onImportShortlist={() => setImportShortlistFor(drv)}
           onNotify={() => openNotifyApplicants(drv)}
           onExport={() => handleExportApplicants(drv)}
+          onExportResumes={(stageFilter) => void handleExportResumesZip(drv, stageFilter)}
+          onEdit={() => setEditingDrive(drv)}
+          onCancel={() => void handleCancelDrive(drv)}
           onUnmap={() => handleUnmap(drv)}
         />
       </motion.div>
@@ -513,11 +626,11 @@ export default function CampusDrivesPage() {
       role="admin_tpo"
       currentTpoView="tpo"
       title="Campus Drives"
-      subtitle={`Map published drives into ${collegeName}'s catalog so your students can see and prepare for them.`}
+      subtitle={`Post and manage ${collegeName}'s personal campus placement drives, eligibility, shortlists, and offers.`}
       actionButton={{
-        label: "Map a Drive",
+        label: "Post Campus Drive",
         icon: Plus,
-        onClick: () => setActiveTab("available"),
+        onClick: () => setShowCreateModal(true),
       }}
     >
       <HpStagger className="space-y-6">
@@ -525,12 +638,12 @@ export default function CampusDrivesPage() {
           <HpItem>
             <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
               <HpStatCard
-                label="Mapped drives"
+                label="Campus drives"
                 value={mappedDrives.length}
-                icon={Link2}
+                icon={Briefcase}
                 tone="sky"
                 loading={initialLoading}
-                hint={initialLoading ? undefined : completedCount > 0 ? `${completedCount} completed` : "live in your catalog"}
+                hint={initialLoading ? undefined : completedCount > 0 ? `${completedCount} completed` : "active on your campus"}
               />
               <HpStatCard
                 label="Upcoming"
@@ -549,12 +662,12 @@ export default function CampusDrivesPage() {
                 hint={initialLoading ? undefined : pendingMappings.length > 0 ? "awaiting your review" : "all caught up"}
               />
               <HpStatCard
-                label="Available to map"
-                value={availableDrives.length}
-                icon={Compass}
+                label="Campus-posted drives"
+                value={mappedDrives.filter((d) => d.source === "tpo_created").length}
+                icon={Building2}
                 tone="violet"
                 loading={initialLoading}
-                hint="in Mellow's catalog"
+                hint="created by your placement cell"
               />
             </div>
           </HpItem>
@@ -601,8 +714,11 @@ export default function CampusDrivesPage() {
                 aria-label="Search drives by company or role"
                 wrapperClassName="w-full sm:w-64 lg:w-72"
               />
-              <HpButton variant="secondary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreateModal(true)} className="shrink-0">
-                New Company&apos;s Drive
+              <HpButton variant="secondary" leftIcon={<ShieldCheck className="h-4 w-4" />} onClick={() => setShowPolicyModal(true)} className="shrink-0">
+                Policy
+              </HpButton>
+              <HpButton leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreateModal(true)} className="shrink-0">
+                Post Campus Drive
               </HpButton>
             </div>
           </div>
@@ -634,21 +750,16 @@ export default function CampusDrivesPage() {
                       <HpEmptyState
                         icon={Building2}
                         tone="sky"
-                        title="No drives mapped yet"
-                        description={`No drives are mapped to ${collegeName} yet. Switch to "Available to Map" for drives Mellow already curates, or use "New Company's Drive" for one that's only visiting your campus.`}
+                        title="No campus drives posted yet"
+                        description={`Post ${collegeName}'s own campus placement drives here to define eligibility criteria, register your batch, import shortlists, and track student offers.`}
                         action={
-                          <>
-                            <HpButton leftIcon={<Compass className="h-4 w-4" />} onClick={() => setActiveTab("available")}>
-                              Browse the catalog
-                            </HpButton>
-                            <HpButton variant="secondary" leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreateModal(true)}>
-                              Add a campus-only drive
-                            </HpButton>
-                          </>
+                          <HpButton leftIcon={<Plus className="h-4 w-4" />} onClick={() => setShowCreateModal(true)}>
+                            Post Campus Drive
+                          </HpButton>
                         }
                       />
                     ) : (
-                      <NoMatches message="No mapped drives match your search." onClear={() => setSearch("")} />
+                      <NoMatches message="No campus drives match your search." onClear={() => setSearch("")} />
                     )
                   ) : (
                     <div className="space-y-8">
@@ -764,6 +875,30 @@ export default function CampusDrivesPage() {
             setNotifyTarget(null);
           }}
         />
+      )}
+
+      {editingDrive && (
+        <EditDriveModal
+          drive={editingDrive}
+          onClose={() => setEditingDrive(null)}
+          onSaved={() => void loadDrives()}
+        />
+      )}
+
+      {importShortlistFor && (
+        <ShortlistImportModal
+          driveId={importShortlistFor.driveId}
+          driveTitle={`${importShortlistFor.companyName} — ${importShortlistFor.role}`}
+          onClose={() => setImportShortlistFor(null)}
+          onImported={(_apps, message) => {
+            triggerToast(message);
+            void loadApplications(importShortlistFor.driveId);
+          }}
+        />
+      )}
+
+      {showPolicyModal && (
+        <PlacementPolicyModal onClose={() => setShowPolicyModal(false)} />
       )}
     </DashboardShell>
   );
@@ -884,6 +1019,11 @@ function BranchList({ branches }: { branches: string[] | null }) {
 
 /** Package / cutoff / backlogs / branches — the four eligibility facts every drive card carries. */
 function EligibilityFacts({ drive, className }: { drive: DriveRow; className?: string }) {
+  const tierLabel = drive.driveTier === "super_dream" ? "Super Dream" : drive.driveTier === "dream" ? "Dream" : null;
+  const cuts: string[] = [];
+  if (drive.minCgpa !== null) cuts.push(`${drive.minCgpa}+ CGPA`);
+  if (drive.minTenth != null) cuts.push(`${drive.minTenth}%+ 10th`);
+  if (drive.minTwelfth != null) cuts.push(`${drive.minTwelfth}%+ 12th`);
   return (
     <dl
       className={cn(
@@ -892,10 +1032,13 @@ function EligibilityFacts({ drive, className }: { drive: DriveRow; className?: s
       )}
     >
       <Fact icon={Wallet} label="Package">
-        {drive.ctcRange === "Not disclosed" ? <span className="font-medium text-text-muted">Not disclosed</span> : drive.ctcRange}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {drive.ctcRange === "Not disclosed" ? <span className="font-medium text-text-muted">Not disclosed</span> : drive.ctcRange}
+          {tierLabel && <HpPill tone="indigo" size="sm">{tierLabel}</HpPill>}
+        </div>
       </Fact>
       <Fact icon={GraduationCap} label="Eligibility">
-        {drive.minCgpa !== null ? `${drive.minCgpa}+ CGPA` : <span className="font-medium text-text-muted">No CGPA cutoff</span>}
+        {cuts.length > 0 ? cuts.join(" · ") : <span className="font-medium text-text-muted">No score cutoff</span>}
       </Fact>
       <Fact icon={ListChecks} label="Max backlogs">
         {drive.maxBacklogs ?? <span className="font-medium text-text-muted">No limit</span>}
@@ -975,10 +1118,16 @@ interface MappedDriveCardProps {
   onCtcPromptChange: (next: CtcPrompt | null) => void;
   onConfirmCtc: () => void;
   onStageSelect: (app: DriveApplication, stage: DriveApplicationStage) => void;
+  onBulkStage: (ids: number[], stage: DriveApplicationStage, ctcOffered?: number) => Promise<void>;
+  onJoiningStatusChange: (app: DriveApplication, status: "pending" | "joined" | "deferred" | "reneged") => void;
   onRegisterEligible: () => void;
   onAddApplicant: () => void;
+  onImportShortlist: () => void;
   onNotify: () => void;
   onExport: () => void;
+  onExportResumes: (stageFilter?: string) => void;
+  onEdit: () => void;
+  onCancel: () => void;
   onUnmap: () => void;
 }
 
@@ -999,10 +1148,16 @@ function MappedDriveCard({
   onCtcPromptChange,
   onConfirmCtc,
   onStageSelect,
+  onBulkStage,
+  onJoiningStatusChange,
   onRegisterEligible,
   onAddApplicant,
+  onImportShortlist,
   onNotify,
   onExport,
+  onExportResumes,
+  onEdit,
+  onCancel,
   onUnmap,
 }: MappedDriveCardProps) {
   const panelId = `drive-pipeline-${drv.driveId}`;
@@ -1010,6 +1165,55 @@ function MappedDriveCard({
   const soon = !drv.isPast && date.getTime() - Date.now() < SOON_MS;
   const activeCount = applications.filter((a) => !DRIVE_APPLICATION_TERMINAL_STAGES.includes(a.stage)).length;
   const placedCount = applications.filter((a) => a.stage === "offer_accepted").length;
+
+  const [appSearch, setAppSearch] = useState("");
+  const [stageFilter, setStageFilter] = useState<string>("ALL");
+  const [selectedAppIds, setSelectedAppIds] = useState<Set<number>>(new Set());
+  const [bulkStage, setBulkStage] = useState<DriveApplicationStage | "">("");
+  const [bulkCtc, setBulkCtc] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const filteredApps = applications.filter((app) => {
+    if (stageFilter !== "ALL" && app.stage !== stageFilter) return false;
+    if (!appSearch.trim()) return true;
+    const q = appSearch.toLowerCase();
+    return (
+      app.user.name.toLowerCase().includes(q) ||
+      (app.user.roll_number ?? "").toLowerCase().includes(q) ||
+      (app.user.branch ?? "").toLowerCase().includes(q) ||
+      app.user.email.toLowerCase().includes(q)
+    );
+  });
+
+  const resumeCount = filteredApps.filter((a) => a.user.has_resume).length;
+  const visibleIds = filteredApps.map((a) => a.id);
+  const allVisibleChecked = visibleIds.length > 0 && visibleIds.every((id) => selectedAppIds.has(id));
+
+  const toggleApp = (id: number) => {
+    setSelectedAppIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const applyBulk = async () => {
+    if (!bulkStage || selectedAppIds.size === 0) return;
+    setBulkBusy(true);
+    try {
+      await onBulkStage(
+        Array.from(selectedAppIds),
+        bulkStage,
+        bulkCtc.trim() !== "" ? Number(bulkCtc) : undefined
+      );
+      setSelectedAppIds(new Set());
+      setBulkStage("");
+      setBulkCtc("");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   return (
     <HpCard
@@ -1140,7 +1344,7 @@ function MappedDriveCard({
                 <HpButton
                   size="sm"
                   onClick={onRegisterEligible}
-                  disabled={registering}
+                  disabled={registering || drv.status === "cancelled"}
                   isLoading={registering}
                   leftIcon={<Users2 className="h-3.5 w-3.5" />}
                 >
@@ -1149,12 +1353,28 @@ function MappedDriveCard({
                 <HpButton size="sm" variant="secondary" onClick={onAddApplicant} leftIcon={<UserPlus className="h-3.5 w-3.5" />}>
                   Add Applicant
                 </HpButton>
+                <HpButton size="sm" variant="secondary" onClick={onImportShortlist} leftIcon={<Upload className="h-3.5 w-3.5" />}>
+                  Import Shortlist
+                </HpButton>
                 <HpButton size="sm" variant="secondary" onClick={onNotify} leftIcon={<Mail className="h-3.5 w-3.5" />}>
                   Notify Applicants
                 </HpButton>
                 <HpButton size="sm" variant="secondary" onClick={onExport} leftIcon={<Download className="h-3.5 w-3.5" />}>
-                  Export Applicants
+                  Export Sheet
                 </HpButton>
+                {resumeCount > 0 && (
+                  <HpButton size="sm" variant="secondary" onClick={() => onExportResumes(stageFilter)} leftIcon={<Archive className="h-3.5 w-3.5" />}>
+                    Resumes ZIP ({resumeCount})
+                  </HpButton>
+                )}
+                <HpButton size="sm" variant="ghost" onClick={onEdit} leftIcon={<Pencil className="h-3.5 w-3.5" />}>
+                  {drv.source === "tpo_created" ? "Edit Drive" : "Edit Eligibility"}
+                </HpButton>
+                {drv.source === "tpo_created" && drv.status !== "cancelled" && (
+                  <HpButton size="sm" variant="danger" onClick={onCancel} disabled={unmapping} leftIcon={<XCircle className="h-3.5 w-3.5" />}>
+                    Cancel Drive
+                  </HpButton>
+                )}
                 <HpButton
                   size="sm"
                   variant="danger"
@@ -1170,24 +1390,107 @@ function MappedDriveCard({
               </div>
 
               {applications.length > 0 && (
-                <section aria-label="Applicants">
-                  <div className="mb-3 flex items-center gap-2">
-                    <h4 className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Applicants</h4>
-                    <span className="tabular rounded-full bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
-                      {applications.length}
-                    </span>
+                <section aria-label="Applicants" className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Applicants</h4>
+                      <span className="tabular rounded-full bg-elevated px-1.5 py-px text-3xs font-bold text-text-secondary ring-1 ring-inset ring-border-subtle">
+                        {filteredApps.length} / {applications.length}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted" />
+                        <input
+                          type="text"
+                          value={appSearch}
+                          onChange={(e) => setAppSearch(e.target.value)}
+                          placeholder="Search name / roll / branch…"
+                          className="h-8 w-48 rounded-xl border border-border-subtle bg-elevated/60 pl-8 pr-2.5 text-2xs text-primary placeholder:text-text-muted focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+                      <select
+                        aria-label="Filter applicants by stage"
+                        value={stageFilter}
+                        onChange={(e) => {
+                          setStageFilter(e.target.value);
+                          setSelectedAppIds(new Set());
+                        }}
+                        className="h-8 rounded-xl border border-border-subtle bg-elevated/60 px-2.5 text-2xs font-semibold text-primary outline-none focus:border-indigo-500"
+                      >
+                        <option value="ALL">All stages ({applications.length})</option>
+                        {DRIVE_APPLICATION_STAGES.map((st) => (
+                          <option key={st} value={st}>
+                            {DRIVE_APPLICATION_STAGE_LABELS[st]} ({applications.filter((a) => a.stage === st).length})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+
+                  {selectedAppIds.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-indigo-500/30 bg-indigo-500/[0.06] px-3.5 py-2.5">
+                      <span className="text-2xs font-bold text-primary">{selectedAppIds.size} checked</span>
+                      <select
+                        value={bulkStage}
+                        onChange={(e) => setBulkStage(e.target.value as DriveApplicationStage | "")}
+                        className="h-8 rounded-lg border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] px-2.5 text-2xs font-semibold text-primary outline-none"
+                      >
+                        <option value="">Bulk move stage…</option>
+                        {DRIVE_APPLICATION_STAGES.map((st) => (
+                          <option key={st} value={st}>
+                            {DRIVE_APPLICATION_STAGE_LABELS[st]}
+                          </option>
+                        ))}
+                      </select>
+                      {(bulkStage === "offer_extended" || bulkStage === "offer_accepted") && (
+                        <input
+                          type="number"
+                          step="0.1"
+                          min={0}
+                          placeholder="CTC (LPA)"
+                          value={bulkCtc}
+                          onChange={(e) => setBulkCtc(e.target.value)}
+                          className="h-8 w-28 rounded-lg border border-border-subtle bg-[rgb(var(--bg-surface-rgb))] px-2.5 text-2xs text-primary outline-none"
+                        />
+                      )}
+                      <HpButton size="sm" disabled={!bulkStage || bulkBusy} isLoading={bulkBusy} onClick={() => void applyBulk()}>
+                        Apply to {selectedAppIds.size}
+                      </HpButton>
+                      <HpButton size="sm" variant="ghost" onClick={() => setSelectedAppIds(new Set())}>
+                        Clear
+                      </HpButton>
+                    </div>
+                  )}
+
                   <ul className="max-h-[420px] divide-y divide-border-subtle overflow-y-auto rounded-2xl border border-border-subtle">
-                    {applications.map((app, idx) => (
+                    {filteredApps.length > 0 && (
+                      <li className="flex items-center gap-2 bg-elevated/40 px-4 py-2 text-3xs font-bold uppercase tracking-wider text-text-muted">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleChecked}
+                          onChange={() =>
+                            setSelectedAppIds(allVisibleChecked ? new Set() : new Set(visibleIds))
+                          }
+                          aria-label="Select all visible applicants"
+                          className="h-3.5 w-3.5 rounded border-border-strong text-indigo-600"
+                        />
+                        <span>Select all shown ({filteredApps.length})</span>
+                      </li>
+                    )}
+                    {filteredApps.map((app, idx) => (
                       <ApplicantRow
                         key={app.id}
                         app={app}
                         index={idx}
+                        checked={selectedAppIds.has(app.id)}
+                        onToggleCheck={() => toggleApp(app.id)}
                         moving={movingAppId === app.id}
                         ctcPrompt={ctcPrompt?.app.id === app.id ? ctcPrompt : null}
                         onCtcPromptChange={onCtcPromptChange}
                         onConfirmCtc={onConfirmCtc}
                         onStageSelect={onStageSelect}
+                        onJoiningStatusChange={onJoiningStatusChange}
                       />
                     ))}
                   </ul>
@@ -1204,20 +1507,26 @@ function MappedDriveCard({
 function ApplicantRow({
   app,
   index,
+  checked,
+  onToggleCheck,
   moving,
   ctcPrompt,
   onCtcPromptChange,
   onConfirmCtc,
   onStageSelect,
+  onJoiningStatusChange,
 }: {
   app: DriveApplication;
   index: number;
+  checked: boolean;
+  onToggleCheck: () => void;
   moving: boolean;
   /** This row's open CTC prompt, or null. */
   ctcPrompt: CtcPrompt | null;
   onCtcPromptChange: (next: CtcPrompt | null) => void;
   onConfirmCtc: () => void;
   onStageSelect: (app: DriveApplication, stage: DriveApplicationStage) => void;
+  onJoiningStatusChange: (app: DriveApplication, status: "pending" | "joined" | "deferred" | "reneged") => void;
 }) {
   const isTerminal = DRIVE_APPLICATION_TERMINAL_STAGES.includes(app.stage);
   const isPromptingThisRow = ctcPrompt !== null;
@@ -1230,19 +1539,48 @@ function ApplicantRow({
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: hpEase, delay: Math.min(index * 0.02, 0.2) }}
-      className={cn("transition-colors duration-200", isPromptingThisRow ? "bg-amber-500/[0.04]" : "hover:bg-indigo-500/[0.03]")}
+      className={cn("transition-colors duration-200", isPromptingThisRow ? "bg-amber-500/[0.04]" : checked ? "bg-indigo-500/[0.04]" : "hover:bg-indigo-500/[0.03]")}
     >
       <div className="flex flex-col gap-2.5 px-4 py-3 sm:flex-row sm:items-center sm:gap-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
+          {!isTerminal ? (
+            <input
+              type="checkbox"
+              checked={checked}
+              onChange={onToggleCheck}
+              aria-label={`Select ${app.user.name}`}
+              className="h-3.5 w-3.5 shrink-0 rounded border-border-strong text-indigo-600"
+            />
+          ) : (
+            <span className="w-3.5 shrink-0" aria-hidden />
+          )}
           <HpAvatar name={app.user.name} size="sm" />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
               <p className="truncate text-13 font-bold text-primary">{app.user.name}</p>
+              {app.user.cgpa != null && (
+                <span className="tabular rounded-md bg-elevated px-1.5 py-0.5 text-3xs font-bold text-text-secondary">
+                  {app.user.cgpa} CGPA
+                </span>
+              )}
               {app.ctc_offered && (
                 <span className="tabular inline-flex items-center gap-1 font-mono text-2xs font-bold text-emerald-700 dark:text-emerald-300">
                   <Wallet className="h-3 w-3" aria-hidden />
                   {app.ctc_offered} LPA
                 </span>
+              )}
+              {app.user.has_resume && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const blob = await api.getFile(`/tpo/students/${app.user_id}/resume`);
+                    window.open(URL.createObjectURL(blob), "_blank", "noopener");
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md bg-sky-500/10 px-1.5 py-0.5 text-3xs font-bold text-sky-700 hover:bg-sky-500/20 dark:text-sky-300"
+                >
+                  <FileText className="h-2.5 w-2.5" />
+                  Resume
+                </button>
               )}
             </div>
             <p className="mt-0.5 truncate text-2xs text-text-muted">
@@ -1257,9 +1595,28 @@ function ApplicantRow({
               Awaiting CTC
             </HpPill>
           ) : isTerminal ? (
-            <HpPill tone={app.stage === "offer_accepted" ? "emerald" : "slate"} icon={Lock}>
-              {DRIVE_APPLICATION_STAGE_LABELS[app.stage]}
-            </HpPill>
+            <>
+              <HpPill tone={app.stage === "offer_accepted" ? "emerald" : "slate"} icon={Lock}>
+                {DRIVE_APPLICATION_STAGE_LABELS[app.stage]}
+              </HpPill>
+              {app.stage === "offer_accepted" && (
+                <HpSelect
+                  inputSize="sm"
+                  value={app.joining_status ?? "pending"}
+                  disabled={moving}
+                  aria-label={`Joining status for ${app.user.name}`}
+                  onChange={(e) =>
+                    onJoiningStatusChange(app, e.target.value as "pending" | "joined" | "deferred" | "reneged")
+                  }
+                  wrapperClassName="w-[118px]"
+                >
+                  <option value="pending">Pending Join</option>
+                  <option value="joined">Joined</option>
+                  <option value="deferred">Deferred</option>
+                  <option value="reneged">Reneged</option>
+                </HpSelect>
+              )}
+            </>
           ) : (
             <>
               <HpPill tone={DRIVE_STAGE_TONE[app.stage]} dot>

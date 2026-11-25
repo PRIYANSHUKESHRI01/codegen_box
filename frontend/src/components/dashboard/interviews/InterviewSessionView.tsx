@@ -258,8 +258,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const engineRef = useRef<VoiceEngine>(new BrowserVoiceEngine());
   const listenStartedAtRef = useRef<number>(0);
+  const transcribeGenRef = useRef(0);
+  const questionTextRef = useRef<string>("");
+  questionTextRef.current = question?.question_text ?? "";
   const ttsSupported = hasSpeechSynthesis();
-  const sttSupported = hasSpeechRecognition() && hasMediaRecorder();
+  const sttSupported = hasMediaRecorder() || hasSpeechRecognition();
 
   // What the orb and the mic meter follow, and how much of the question has been spoken (for the transcript).
   const signal = useRoomSignal();
@@ -358,6 +361,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const presentQuestion = useCallback(
     async (q: TakeQuestionPayload) => {
+      transcribeGenRef.current += 1;
       setQuestion(q);
       setTranscriptDraft("");
       setAudioBlob(null);
@@ -536,6 +540,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   }, [phase, handleBegin]);
 
   const handleStartAnswering = useCallback(async () => {
+    transcribeGenRef.current += 1;
     stopGuardRef.current = false;
     setTimedOut(false);
     setMicErrorMessage(null);
@@ -562,8 +567,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       const cause = err instanceof Error ? (err.cause as VoiceListenError | undefined) : undefined;
       setMicErrorMessage(
         cause === "permission_denied"
-          ? "We couldn't access your microphone — switching to typed answers. Enable mic access in your browser's site settings to use voice next time."
-          : "Voice capture isn't available right now — switching to typed answers."
+          ? "Microphone access is required for this interview. Enable mic access in your browser's site settings, then retry."
+          : "Voice capture could not start right now. Check your microphone and retry."
       );
       setPhase("text_fallback");
     }
@@ -575,8 +580,13 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     stopGuardRef.current = true;
 
     if (fromTimeout) setTimedOut(true);
-    const { transcript, audioBlob: blob } = await engineRef.current.stopListening();
-    setTranscriptDraft(transcript);
+    const { transcript, audioBlob: blob, hasSpeechGap } = await engineRef.current.stopListening();
+    const trimmed = transcript.trim();
+    const words = trimmed ? trimmed.split(/\s+/).length : 0;
+    const hasBadScript = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F]/.test(trimmed);
+    const hasRecordedAudio = Boolean(blob && blob.size > 1500);
+
+    setTranscriptDraft(hasBadScript && hasRecordedAudio ? "" : transcript);
     setInterim({ text: "", committed: "" });
     setListenHint(null);
     signal.level = 0;
@@ -586,36 +596,44 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     }
     setPhase("reviewing_answer");
 
-    // Real-time AI transcription fallback:
-    // If the browser SpeechRecognition dropped out on silence, was blocked by institutional firewalls,
-    // or returned empty while audio was voiced, immediately transcribe via Gemini Flash Audio!
-    if ((!transcript || transcript.trim().length < 5) && blob && blob.size > 1500) {
+    // Authoritative industry-standard STT reconciliation:
+    // Web Speech API gives instant live captions while speaking, then on Stop & review we run
+    // context-biased AI audio transcription (Gemini Flash Audio / Whisper-1 with question context)
+    // over the full recording — accurately resolving pauses and technical homophones (e.g. DOM vs Tom).
+    if (hasRecordedAudio && blob) {
+      const myGen = ++transcribeGenRef.current;
       setIsTranscribing(true);
       const fd = new FormData();
       fd.append("audio", blob, "answer.webm");
+      if (questionTextRef.current) {
+        fd.append("question_text", questionTextRef.current);
+      }
       api
         .postFormData<{ transcript?: string }>("/interviews/transcribe", fd)
         .then((res) => {
-          if (res?.transcript && res.transcript.trim()) {
-            setTranscriptDraft(res.transcript.trim());
+          if (transcribeGenRef.current !== myGen) return;
+          const aiTranscript = res?.transcript?.trim() ?? "";
+          if (!aiTranscript) return;
+          const aiWords = aiTranscript.split(/\s+/).length;
+          if (hasBadScript || trimmed.length < 12 || Boolean(hasSpeechGap) || aiWords >= Math.max(1, Math.floor(words * 0.6))) {
+            setTranscriptDraft(aiTranscript);
           }
         })
         .catch((err) => {
           console.warn("[VoiceTranscription] Client fallback transcription error", err);
         })
         .finally(() => {
-          setIsTranscribing(false);
+          if (transcribeGenRef.current === myGen) {
+            setIsTranscribing(false);
+          }
         });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleTextFallbackContinue = useCallback((fromTimeout = false) => {
-    if (fromTimeout) setTimedOut(true);
-    setPhase((current) => (current === "text_fallback" ? "reviewing_answer" : current));
-  }, []);
-
   const handleReRecord = () => {
+    transcribeGenRef.current += 1;
+    setIsTranscribing(false);
     setErrorMessage(null);
     setMicErrorMessage(null);
     setTimedOut(false);
@@ -630,7 +648,6 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const responseSeconds = question?.expected_duration_seconds ?? DEFAULT_ANSWER_SECONDS;
   const prepSecondsLeft = useCountdown(PREP_SECONDS, phase === "prep", handleStartAnswering);
   const listeningSecondsLeft = useCountdown(responseSeconds, phase === "listening", () => handleStopAnswering(true));
-  const typingSecondsLeft = useCountdown(responseSeconds, phase === "text_fallback", () => handleTextFallbackContinue(true));
 
   const handleSubmitAnswer = async () => {
     if (!question || (!transcriptDraft.trim() && !audioBlob) || phase === "submitting" || isTranscribing) return;
@@ -844,12 +861,10 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         list.push({
           id: youId,
           role: "you",
-          text: transcriptDraft,
+          text: "",
+          placeholder: "Enable microphone access and click Retry microphone to speak your answer.",
           active: true,
           settled: false,
-          editor: (
-            <AnswerEditor label="Type your answer" autoFocus value={transcriptDraft} onChange={setTranscriptDraft} placeholder="Write your answer here..." />
-          ),
         });
       } else if (phase === "reviewing_answer" || phase === "submitting") {
         list.push({
@@ -860,9 +875,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
           settled: false,
           editor: (
             <AnswerEditor
-              label="Review your answer (edit if needed)"
+              label="Your spoken answer"
               value={transcriptDraft}
-              onChange={setTranscriptDraft}
               onSubmit={handleSubmitAnswer}
               disabled={phase === "submitting"}
               audioUrl={audioUrl}
@@ -877,9 +891,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     }
 
     return list;
-    // handleSubmitAnswer is re-created on every render; the editor only calls it on a keystroke, by which time `transcriptDraft` is current.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intro, introSpeaking, answered, question, phase, stillSpeaking, reveal.revealedWords, interim, transcriptDraft, audioUrl]);
+  }, [intro, introSpeaking, answered, question, phase, stillSpeaking, reveal.revealedWords, interim, transcriptDraft, audioUrl, isTranscribing]);
 
   const steps = useMemo<RoomStep[]>(() => {
     const firstTracked = answeredCount - answered.length;
@@ -934,22 +947,26 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         return {
           key: "listening",
           title: "Listening…",
-          detail: interim.text ? "Take your time — stop whenever you're done." : "Start speaking whenever you're ready.",
+          detail:
+            responseSeconds > 20 && listeningSecondsLeft <= 15
+              ? "Wrapping up soon — finish your final thought."
+              : interim.text
+                ? "Take your time — stop whenever you're done."
+                : "Start speaking whenever you're ready.",
           countdown: { secondsLeft: listeningSecondsLeft, totalSeconds: responseSeconds, label: "left to answer" },
           tone: "listening",
         };
       case "text_fallback":
         return {
-          key: "typing",
-          title: "Type your answer",
-          detail: typingOnly ? "Voice isn't available, so you'll answer in writing." : undefined,
-          countdown: { secondsLeft: typingSecondsLeft, totalSeconds: responseSeconds, label: "left to answer" },
+          key: "mic_required",
+          title: "Microphone required",
+          detail: typingOnly ? "Voice answers are required for this interview. Enable your microphone to continue." : undefined,
         };
       case "reviewing_answer":
         return {
           key: "reviewing",
           title: timedOut ? "Time's up" : "Review your answer",
-          detail: timedOut ? "Here's what was captured. Review and submit, or re-record." : "Fix anything the transcript got wrong, then submit.",
+          detail: timedOut ? "Here is your recorded spoken transcript. Submit your answer, or re-record." : "Review your spoken transcript below, then submit your answer.",
         };
       case "submitting":
         return { key: "submitting", title: "Sending your answer…", tone: "busy" };
@@ -994,8 +1011,9 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         );
       case "text_fallback":
         return (
-          <motion.button whileTap={{ scale: 0.96 }} onClick={() => handleTextFallbackContinue(false)} disabled={!transcriptDraft.trim()} className={PRIMARY_BUTTON}>
-            Continue
+          <motion.button whileTap={{ scale: 0.96 }} onClick={() => void handleStartAnswering()} className={PRIMARY_BUTTON}>
+            <RotateCcw className="h-4 w-4" aria-hidden />
+            Retry microphone
           </motion.button>
         );
       case "feedback":

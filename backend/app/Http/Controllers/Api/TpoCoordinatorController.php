@@ -70,12 +70,14 @@ class TpoCoordinatorController extends Controller
         ], 201);
     }
 
-    /** Reassign which section a coordinator covers, or fix their phone number. */
+    /** Reassign a coordinator's name/email (before activation), section, branch scope, or phone number. */
     public function update(Request $request, User $user)
     {
         $this->authorizeCoordinator($request, $user);
 
         $validated = $request->validate([
+            'name' => ['sometimes', 'string', 'max:120'],
+            'email' => ['sometimes', 'email', 'max:255'],
             'section' => ['required', 'string', 'max:20'],
             'phone' => ['nullable', 'string', 'max:20'],
             ...BranchAudience::rules('branch_scope'),
@@ -84,6 +86,44 @@ class TpoCoordinatorController extends Controller
         $coordinator = $this->coordinators->updateSection($user, $validated, $request->user());
 
         return response()->json(['coordinator' => $this->coordinators->payload($coordinator, $coordinator->college_id)]);
+    }
+
+    public function sendLogin(Request $request, User $user)
+    {
+        $this->authorizeCoordinator($request, $user);
+        abort_if($user->is_blocked, 422, 'This coordinator is blocked. Unblock them before sending a new login.');
+
+        $emailed = $this->coordinators->resendLogin($user, $request->user());
+
+        return response()->json([
+            'emailed' => $emailed,
+            'message' => $emailed
+                ? "Sent a fresh one-time password to {$user->email}."
+                : 'New login created, but the e-mail could not be delivered right now.',
+        ]);
+    }
+
+    public function destroy(Request $request, User $user, \App\Services\UserPurgeService $purge)
+    {
+        $this->authorizeCoordinator($request, $user);
+
+        if (! $user->must_change_password || $user->last_seen_at !== null) {
+            return response()->json([
+                'message' => 'This coordinator has already signed in and is part of your records. Block them instead of deleting.',
+            ], 422);
+        }
+
+        if (\App\Models\CoordinatorNote::where('author_id', $user->id)->exists()) {
+            return response()->json([
+                'message' => 'This coordinator has written advisor notes. Block them instead of deleting.',
+            ], 422);
+        }
+
+        $name = $user->name;
+        $purge->purge($user);
+        \App\Services\ActivityLog::record($request->user(), 'Removed an unused Section Coordinator', 'User', $name, ['user_id' => $user->id]);
+
+        return response()->json(['message' => "{$name} was removed from your college."]);
     }
 
     public function toggleBlock(Request $request, User $user)

@@ -100,7 +100,7 @@ async function answerOne(first = false) {
   fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
   await screen.findByText("Listening…");
   fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
-  await screen.findByLabelText("Review your answer (edit if needed)");
+  await screen.findByLabelText("Your spoken answer");
   fireEvent.click(screen.getByRole("button", { name: /Submit answer/i }));
 }
 

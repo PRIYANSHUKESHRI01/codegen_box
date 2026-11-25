@@ -38,6 +38,8 @@ interface BulkImportStudentsPanelProps {
    * gets premium; Mellow staff (PartnerCollegesPanel) keep the original look.
    */
   variant?: "default" | "premium";
+  /** Fires automatically when an active import finishes so the caller's student roster refreshes. */
+  onCompleted?: () => void;
 }
 
 const PREMIUM_STATUS: Record<ImportStatus, { tone: HpTone }> = {
@@ -102,7 +104,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: BulkImportStudentsPanelProps) {
+export function BulkImportStudentsPanel({ collegeId, collegeName, variant, onCompleted }: BulkImportStudentsPanelProps) {
   const { user } = useAuth();
   const catalog = useBranchCatalog();
   const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
@@ -153,6 +155,9 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
       if (current && (current.status === "completed" || current.status === "completed_with_errors" || current.status === "failed")) {
         if (pollRef.current) clearInterval(pollRef.current);
         setActiveImportId(null);
+        if (current.status !== "failed") {
+          onCompleted?.();
+        }
       }
     };
 
@@ -160,7 +165,7 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant }: Bul
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [activeImportId, loadImports]);
+  }, [activeImportId, loadImports, onCompleted]);
 
   // Excel is the default: its template has a Branches sheet and a drop-down on the branch column, which
   // prevents the most common roster error (one branch typed six different ways) at the source.

@@ -163,6 +163,11 @@ class SectionCoordinatorService
      *
      * @param  array{section: string, phone?: ?string, branch_scope?: ?array}  $data
      */
+    /**
+     * Reassign a coordinator's section, branch scope, contact number, or name/email (before activation).
+     *
+     * @param  array{name?: string, email?: string, section: string, phone?: ?string, branch_scope?: ?array}  $data
+     */
     public function updateSection(User $coordinator, array $data, ?User $actor = null): User
     {
         $scope = array_key_exists('branch_scope', $data) ? BranchAudience::normalize($data['branch_scope']) : BranchAudience::normalize($coordinator->coordinator_scope);
@@ -171,17 +176,63 @@ class SectionCoordinatorService
             $this->ensureScopeFree($coordinator->college_id, $data['section'], $scope, excludingUserId: $coordinator->id);
         }
 
-        $coordinator->forceFill([
+        $updates = [
             'section' => $data['section'],
             'phone' => $data['phone'] ?? null,
             'coordinator_scope' => $scope,
-        ])->save();
+        ];
+        if (! empty($data['name'])) {
+            $updates['name'] = $data['name'];
+        }
+        $emailChanged = false;
+        if (! empty($data['email']) && strcasecmp($data['email'], $coordinator->email) !== 0) {
+            if (! $coordinator->must_change_password || $coordinator->last_seen_at !== null) {
+                throw ValidationException::withMessages([
+                    'email' => ['This coordinator has already signed in, so their email cannot be changed directly.'],
+                ]);
+            }
+            if (User::where('email', $data['email'])->where('id', '!=', $coordinator->id)->exists()) {
+                throw ValidationException::withMessages([
+                    'email' => ['An account with this email already exists.'],
+                ]);
+            }
+            $updates['email'] = $data['email'];
+            $emailChanged = true;
+        }
+
+        $coordinator->forceFill($updates)->save();
+
+        if ($emailChanged) {
+            $this->resendLogin($coordinator, $actor);
+        }
 
         if ($actor !== null) {
-            ActivityLog::record($actor, 'Changed a Section Coordinator\'s scope', 'User', $coordinator->name, ['section' => $coordinator->section, 'branches' => BranchAudience::label($scope)]);
+            ActivityLog::record($actor, 'Updated Section Coordinator', 'User', $coordinator->name, ['section' => $coordinator->section, 'branches' => BranchAudience::label($scope)]);
         }
 
         return $coordinator->fresh();
+    }
+
+    public function resendLogin(User $coordinator, ?User $actor = null): bool
+    {
+        $plainPassword = Str::password(12);
+
+        $coordinator->forceFill([
+            'password' => Hash::make($plainPassword),
+            'must_change_password' => true,
+            'credentials_email_sent_at' => null,
+        ])->save();
+
+        $coordinator->tokens()->delete();
+        app(IssuedCredentialVault::class)->keep($coordinator, $plainPassword, 'reset', $actor);
+
+        $emailed = \App\Support\SingleMail::now(new SendAccountCredentialsEmail($coordinator->id, $plainPassword));
+
+        if ($actor !== null) {
+            ActivityLog::record($actor, 'Sent Section Coordinator a new login', 'User', $coordinator->name, ['user_id' => $coordinator->id, 'emailed' => $emailed]);
+        }
+
+        return $emailed;
     }
 
     public function payload(User $coordinator, ?int $collegeId): array
@@ -197,6 +248,8 @@ class SectionCoordinatorService
             'branch_scope' => $scope,
             'scope_label' => BranchAudience::label($scope),
             'is_blocked' => $coordinator->is_blocked,
+            'activated' => ! $coordinator->must_change_password || $coordinator->last_seen_at !== null,
+            'last_seen_at' => $coordinator->last_seen_at?->toIso8601String(),
             'managed_student_count' => $collegeId ? $this->studentsOf($coordinator)->count() : 0,
             'avatar_url' => $coordinator->avatar_url,
             'created_at' => $coordinator->created_at,

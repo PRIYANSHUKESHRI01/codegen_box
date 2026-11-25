@@ -97,6 +97,8 @@ export function InterviewLobby(props: InterviewLobbyProps) {
 
   const integrity = ui.policy !== null;
   const ready = !integrity || checksPass(ui.checks);
+  const photoCaptured = Boolean(verifiedPhoto);
+  const canStart = ready && photoCaptured;
   const missing = ui.checks.filter((c) => c.required && c.status !== "ok" && c.status !== "skipped").map((c) => c.label);
   const firstName = useMemo(() => candidateName.trim().split(/\s+/)[0] || "", [candidateName]);
 
@@ -146,19 +148,20 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   };
 
   const handleConsentClick = () => {
-    let finalPhoto = verifiedPhoto;
-    let finalDescriptor = verifiedDescriptor;
-    if (!finalPhoto && previewVideoRef.current) {
-      finalPhoto = captureVideoStill(previewVideoRef.current);
+    if (!verifiedPhoto) {
+      setPhotoError("Please capture your verification photo before starting the interview.");
+      return;
     }
-    onConsent(finalPhoto, finalDescriptor);
+    onConsent(verifiedPhoto, verifiedDescriptor);
   };
 
   const status = !devicePreviewReady
     ? { tone: "idle" as const, text: "First, allow your camera and microphone so we can check your setup." }
-    : !ready
-      ? { tone: "todo" as const, text: missing.length > 0 ? `Still needed: ${missing.join(" · ")}` : "A few checks are still running…" }
-      : { tone: "done" as const, text: "Everything checks out. Start when you are ready." };
+    : !photoCaptured
+      ? { tone: "todo" as const, text: "Click 'Take Verification Photo' first — required before you can start the interview." }
+      : !ready
+        ? { tone: "todo" as const, text: missing.length > 0 ? `Still needed: ${missing.join(" · ")}` : "A few checks are still running…" }
+        : { tone: "done" as const, text: "Everything checks out. Start when you are ready." };
 
   const enter = (delay: number) =>
     reduceMotion ? {} : { initial: { opacity: 0, y: 18 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const, delay } };
@@ -306,7 +309,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
                         type="button"
                         onClick={handleCapturePhoto}
                         disabled={capturingPhoto}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-accent-primary/30 bg-accent-primary/10 py-2.5 text-xs font-bold text-accent-primary hover:bg-accent-primary/15 transition-colors"
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-primary py-2.5 text-xs font-bold text-white shadow-md shadow-accent-primary/25 hover:bg-accent-primary-hover transition-colors disabled:opacity-60"
                       >
                         {capturingPhoto ? (
                           <>
@@ -379,25 +382,37 @@ export function InterviewLobby(props: InterviewLobbyProps) {
         )}
         <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <p
+            <div
               aria-live="polite"
               className={cn(
-                "flex items-center gap-2 text-xs font-semibold",
+                "flex flex-wrap items-center gap-2 text-xs font-semibold",
                 status.tone === "done" ? "text-status-success" : status.tone === "todo" ? "text-text-secondary" : "text-text-muted"
               )}
             >
               <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", status.tone === "done" ? "bg-status-success" : status.tone === "todo" ? "animate-pulse bg-status-warning" : "bg-text-muted/50")} />
               <span className="truncate">{status.text}</span>
-            </p>
+              {devicePreviewReady && !photoCaptured && (
+                <button
+                  type="button"
+                  onClick={handleCapturePhoto}
+                  disabled={capturingPhoto}
+                  className="shrink-0 rounded-full bg-accent-primary/15 px-2.5 py-0.5 text-3xs font-bold text-accent-primary hover:bg-accent-primary/25 transition-colors"
+                >
+                  {capturingPhoto ? "Capturing..." : "Capture now"}
+                </button>
+              )}
+            </div>
             <p className="mt-1 text-3xs leading-snug text-text-muted">{footer}</p>
           </div>
 
           {devicePreviewReady ? (
-            <button type="button" onClick={handleConsentClick} disabled={!ready || starting} className={cn(PRIMARY, "whitespace-nowrap sm:min-w-[19rem]")}>
+            <button type="button" onClick={handleConsentClick} disabled={!canStart || starting} className={cn(PRIMARY, "whitespace-nowrap sm:min-w-[19rem]")}>
               {starting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Starting...
                 </>
+              ) : !photoCaptured ? (
+                "Take verification photo to start"
               ) : ready ? (
                 startLabel
               ) : (

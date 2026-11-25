@@ -167,7 +167,11 @@ class StudentDriveController extends Controller
             'drive_date' => $drive->drive_date,
             'duration_minutes' => $drive->duration_minutes,
             'eligibility' => $eligibility,
-            'student_eligibility' => EligibilityService::evaluate($user, $eligibility),
+            'student_eligibility' => EligibilityService::evaluate($user, $eligibility, [
+                'college' => $user->college,
+                'accepted_offers' => DriveApplication::where('user_id', $user->id)->where('stage', DriveApplication::STAGE_OFFER_ACCEPTED)->count(),
+                'best_ctc' => (float) (DriveApplication::where('user_id', $user->id)->where('stage', DriveApplication::STAGE_OFFER_ACCEPTED)->max('ctc_offered') ?? 0),
+            ]),
             // Real, TPO-driven application status — null until a TPO actually
             // registers this student into the pipeline (see DriveApplication).
             'my_application' => $application ? [
@@ -213,9 +217,13 @@ class StudentDriveController extends Controller
             return response()->json(['message' => 'This placement drive is not available for your college.'], 404);
         }
 
-        // Academic eligibility verification
+        // Academic + placement policy eligibility verification
         $eligibility = $mapping->effectiveEligibility();
-        $evaluation = EligibilityService::evaluate($user, $eligibility);
+        $evaluation = EligibilityService::evaluate($user, $eligibility, [
+            'college' => $user->college,
+            'accepted_offers' => DriveApplication::where('user_id', $user->id)->where('stage', DriveApplication::STAGE_OFFER_ACCEPTED)->count(),
+            'best_ctc' => (float) (DriveApplication::where('user_id', $user->id)->where('stage', DriveApplication::STAGE_OFFER_ACCEPTED)->max('ctc_offered') ?? 0),
+        ]);
 
         if ($evaluation['status'] === 'not_eligible') {
             return response()->json([

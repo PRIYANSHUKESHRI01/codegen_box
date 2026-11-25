@@ -180,4 +180,36 @@ describe("BrowserVoiceEngine live captions", () => {
     expect(seen[seen.length - 1]).toEqual({ text: "tell me about your projects", parts: { final: "tell me about", interim: "your projects" } });
     await engine.stopListening();
   });
+
+  it("spawns a fresh recognizer after a no-speech pause error, preserves pre/post-pause speech, and flags hasSpeechGap", async () => {
+    const engine = new BrowserVoiceEngine();
+    await engine.startListening();
+
+    const first = FakeRecognition.instances[0];
+    first.emit("In my final year", true);
+    first.onerror?.({ error: "no-speech" });
+    first.onend?.(null);
+
+    await new Promise((r) => setTimeout(r, 400));
+
+    expect(FakeRecognition.instances.length).toBe(2);
+    const second = FakeRecognition.instances[1];
+    expect(second.startCalls).toBe(1);
+
+    second.emit("we built an analytics engine", true);
+    const result = await engine.stopListening();
+
+    expect(result.transcript).toBe("In my final year we built an analytics engine");
+    expect(result.hasSpeechGap).toBe(true);
+  });
+
+  it("flags hasSpeechGap when browser STT outputs non-Latin Urdu or Devanagari script", async () => {
+    const engine = new BrowserVoiceEngine();
+    await engine.startListening();
+
+    FakeRecognition.instances[0].emit("میں نے پروجیکٹ بنایا", true);
+    const result = await engine.stopListening();
+
+    expect(result.hasSpeechGap).toBe(true);
+  });
 });

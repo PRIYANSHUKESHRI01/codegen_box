@@ -6,7 +6,7 @@ import { BookOpenCheck, Clock3, Mic, PencilLine, ShieldAlert, type LucideIcon } 
 const POINTS: Array<{ icon: LucideIcon; title: string; body: string }> = [
   { icon: Mic, title: "Speak naturally", body: "Your words appear right here, live, as you talk." },
   { icon: Clock3, title: "You get time to think", body: "After each question there's a short pause before recording starts — or start sooner yourself." },
-  { icon: PencilLine, title: "Check before you send", body: "Fix anything the transcript got wrong. Nothing is submitted until you press Submit." },
+  { icon: PencilLine, title: "Review before you send", body: "Check your spoken transcript and re-record if needed. Nothing is submitted until you press Submit." },
   { icon: ShieldAlert, title: "Stay in this window", body: "Leaving fullscreen or switching tabs counts as a strike." },
 ];
 

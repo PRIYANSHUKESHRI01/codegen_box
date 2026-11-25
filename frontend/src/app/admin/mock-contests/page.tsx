@@ -23,6 +23,9 @@ import {
   ClipboardCheck,
   GraduationCap,
   ShieldCheck,
+  Pencil,
+  Copy,
+  BellRing,
   type LucideIcon,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -30,7 +33,8 @@ import { ContestParticipantsModal } from "@/components/dashboard/ContestParticip
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { localDatetimeInputToUtcIso } from "@/lib/datetime";
+import { localDatetimeInputToUtcIso, utcIsoToLocalDatetimeInput } from "@/lib/datetime";
+import { confirmDialog } from "@/lib/dialogs";
 import type { ProblemSummary } from "@/types/problem";
 import { Modal } from "@/components/ui/Modal";
 import {
@@ -50,6 +54,7 @@ import {
   hpLabel,
   type HpTone,
 } from "@/components/portal/kit";
+import { HpFormError } from "@/components/portal/pipeline-kit";
 import {
   ScDateTile,
   ScIconButton,
@@ -135,6 +140,7 @@ export default function MockContestsPage() {
   const [contests, setContests] = useState<TpoContest[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editingContest, setEditingContest] = useState<TpoContest | null>(null);
   const [managingContest, setManagingContest] = useState<TpoContest | null>(null);
   const [viewingParticipantsOf, setViewingParticipantsOf] = useState<TpoContest | null>(null);
   // View-only list controls (client-side filtering of the already-loaded list).
@@ -184,6 +190,47 @@ export default function MockContestsPage() {
       loadContests();
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "Failed to publish.", "error");
+    }
+  };
+
+  const handleCancel = async (contest: TpoContest) => {
+    if (!(await confirmDialog({ title: `Cancel "${contest.title}"?`, message: "Students will no longer be able to take this contest.", tone: "danger", confirmLabel: "Cancel Contest" }))) return;
+    try {
+      await api.post(`/tpo/contests/${contest.slug}`, { status: "cancelled" });
+      triggerToast(`"${contest.title}" cancelled.`);
+      loadContests();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to cancel contest.", "error");
+    }
+  };
+
+  const handleDelete = async (contest: TpoContest) => {
+    if (!(await confirmDialog({ title: `Delete "${contest.title}"?`, message: "This permanently removes the draft contest.", tone: "danger", confirmLabel: "Delete" }))) return;
+    try {
+      await api.delete(`/tpo/contests/${contest.slug}`);
+      triggerToast(`"${contest.title}" deleted.`);
+      loadContests();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to delete contest.", "error");
+    }
+  };
+
+  const handleDuplicate = async (contest: TpoContest) => {
+    try {
+      await api.post(`/tpo/contests/${contest.slug}/duplicate`, {});
+      triggerToast(`Duplicated "${contest.title}" as a new draft.`);
+      loadContests();
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to duplicate contest.", "error");
+    }
+  };
+
+  const handleAnnounce = async (contest: TpoContest) => {
+    try {
+      const res = await api.post<{ message: string }>(`/tpo/contests/${contest.slug}/announce`, {});
+      triggerToast(res.message);
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to announce contest.", "error");
     }
   };
 
@@ -309,8 +356,13 @@ export default function MockContestsPage() {
                       now={now}
                       onParticipants={() => setViewingParticipantsOf(contest)}
                       onManage={() => setManagingContest(contest)}
+                      onEdit={() => setEditingContest(contest)}
                       onPublish={() => handlePublish(contest)}
                       onFinalize={() => handleFinalize(contest)}
+                      onCancel={() => void handleCancel(contest)}
+                      onDelete={() => void handleDelete(contest)}
+                      onDuplicate={() => void handleDuplicate(contest)}
+                      onAnnounce={() => void handleAnnounce(contest)}
                     />
                   </ScReveal>
                 ))}
@@ -325,6 +377,17 @@ export default function MockContestsPage() {
           onClose={() => setShowCreate(false)}
           onCreated={() => {
             setShowCreate(false);
+            loadContests();
+          }}
+        />
+      )}
+
+      {editingContest && (
+        <EditMockContestModal
+          contest={editingContest}
+          onClose={() => setEditingContest(null)}
+          onSaved={() => {
+            setEditingContest(null);
             loadContests();
           }}
         />
@@ -358,16 +421,26 @@ function MockContestCard({
   now,
   onParticipants,
   onManage,
+  onEdit,
   onPublish,
   onFinalize,
+  onCancel,
+  onDelete,
+  onDuplicate,
+  onAnnounce,
 }: {
   contest: TpoContest;
   phase: Phase;
   now: Date;
   onParticipants: () => void;
   onManage: () => void;
+  onEdit: () => void;
   onPublish: () => void;
   onFinalize: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
+  onDuplicate: () => void;
+  onAnnounce: () => void;
 }) {
   const meta = PHASE_META[phase];
   const start = new Date(contest.start_at);
@@ -485,24 +558,121 @@ function MockContestCard({
           Participants
         </HpButton>
         <HpButton variant="ghost" size="sm" leftIcon={<ListChecks className="h-3.5 w-3.5" />} onClick={onManage}>
-          Manage Problems
+          Problems
         </HpButton>
-        {(contest.status === "draft" || canFinalize) && (
-          <div className="ml-auto flex items-center gap-2">
-            {contest.status === "draft" && (
+        <HpButton variant="ghost" size="sm" leftIcon={<Pencil className="h-3.5 w-3.5" />} onClick={onEdit}>
+          Edit
+        </HpButton>
+        <HpButton variant="ghost" size="sm" leftIcon={<Copy className="h-3.5 w-3.5" />} onClick={onDuplicate} title="Duplicate as draft">
+          Copy
+        </HpButton>
+        {contest.status === "published" && !hasEnded && (
+          <HpButton variant="ghost" size="sm" leftIcon={<BellRing className="h-3.5 w-3.5" />} onClick={onAnnounce}>
+            Notify
+          </HpButton>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          {contest.status === "draft" && (
+            <>
+              <HpButton variant="danger" size="sm" leftIcon={<Trash2 className="h-3.5 w-3.5" />} onClick={onDelete}>
+                Delete
+              </HpButton>
               <HpButton size="sm" leftIcon={<Rocket className="h-3.5 w-3.5" />} onClick={onPublish}>
                 Publish
               </HpButton>
-            )}
-            {canFinalize && (
-              <HpButton variant="success" size="sm" leftIcon={<Flag className="h-3.5 w-3.5" />} onClick={onFinalize}>
-                Finalize
-              </HpButton>
-            )}
-          </div>
-        )}
+            </>
+          )}
+          {contest.status === "published" && !hasEnded && (
+            <HpButton variant="danger" size="sm" leftIcon={<Ban className="h-3.5 w-3.5" />} onClick={onCancel}>
+              Cancel
+            </HpButton>
+          )}
+          {canFinalize && (
+            <HpButton variant="success" size="sm" leftIcon={<Flag className="h-3.5 w-3.5" />} onClick={onFinalize}>
+              Finalize
+            </HpButton>
+          )}
+        </div>
       </div>
     </HpCard>
+  );
+}
+
+function EditMockContestModal({
+  contest,
+  onClose,
+  onSaved,
+}: {
+  contest: TpoContest;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState(contest.title);
+  const [description, setDescription] = useState(contest.description ?? "");
+  const [startAt, setStartAt] = useState(utcIsoToLocalDatetimeInput(contest.start_at));
+  const [endAt, setEndAt] = useState(utcIsoToLocalDatetimeInput(contest.end_at));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api.post(`/tpo/contests/${contest.slug}`, {
+        title: title.trim(),
+        description: description.trim() || null,
+        start_at: localDatetimeInputToUtcIso(startAt),
+        end_at: localDatetimeInputToUtcIso(endAt),
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to update mock contest.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal
+      variant="premium"
+      onClose={onClose}
+      title="Edit Mock Contest"
+      subtitle={contest.title}
+      icon={Pencil}
+      size="lg"
+      footer={
+        <>
+          <HpButton type="button" variant="secondary" onClick={onClose} disabled={saving}>
+            Cancel
+          </HpButton>
+          <HpButton type="submit" form="edit-mock-contest-form" isLoading={saving}>
+            Save Changes
+          </HpButton>
+        </>
+      }
+    >
+      <form id="edit-mock-contest-form" onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label htmlFor="emc-title" className={hpLabel}>Title *</label>
+          <input id="emc-title" required value={title} onChange={(e) => setTitle(e.target.value)} className={hpInput} />
+        </div>
+        <div>
+          <label htmlFor="emc-desc" className={hpLabel}>Description</label>
+          <textarea id="emc-desc" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className={hpInput} />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label htmlFor="emc-start" className={hpLabel}>Start *</label>
+            <input id="emc-start" type="datetime-local" required value={startAt} onChange={(e) => setStartAt(e.target.value)} className={hpInput} />
+          </div>
+          <div>
+            <label htmlFor="emc-end" className={hpLabel}>End *</label>
+            <input id="emc-end" type="datetime-local" required value={endAt} onChange={(e) => setEndAt(e.target.value)} className={hpInput} />
+          </div>
+        </div>
+        {error && <HpFormError>{error}</HpFormError>}
+      </form>
+    </Modal>
   );
 }
 

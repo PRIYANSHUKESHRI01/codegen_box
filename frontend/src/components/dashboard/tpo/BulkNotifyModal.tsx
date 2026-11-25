@@ -11,7 +11,7 @@ import { HpCallout } from "@/components/portal/pipeline-kit";
 import { HpOverlayPortal } from "@/components/portal/cohortKit";
 
 type NotifyChannel = "email" | "whatsapp" | "in_app";
-type NotifyTemplate = "generic" | "termination";
+type NotifyTemplate = "generic" | "termination" | "custom";
 type NotifyRecipient = "student" | "parent";
 
 export interface BulkNotifyTarget {
@@ -47,14 +47,18 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
   const { user } = useAuth();
   const premium = (variant ?? (user?.role === "admin_tpo" ? "premium" : "default")) === "premium";
   const [notifyChannel, setNotifyChannel] = useState<NotifyChannel>("email");
-  const [notifyTemplate, setNotifyTemplate] = useState<NotifyTemplate>("generic");
+  const [notifyTemplate, setNotifyTemplate] = useState<NotifyTemplate>("custom");
   const [notifyRecipient, setNotifyRecipient] = useState<NotifyRecipient>("student");
   const [sendingNotify, setSendingNotify] = useState(false);
-  // The in-app channel is the one with free text: it lands in each student's notification bell, instantly, at no cost.
+  // Used for in-app bell announcements and custom Email / WhatsApp copy.
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
   const inApp = notifyChannel === "in_app";
-  const canSend = !sendingNotify && (!inApp || (title.trim().length > 0 && message.trim().length > 0));
+  const isCustomTemplate = notifyTemplate === "custom";
+  const canSend =
+    !sendingNotify &&
+    (!inApp || (title.trim().length > 0 && message.trim().length > 0)) &&
+    (inApp || !isCustomTemplate || (message.trim().length > 0 && (notifyChannel !== "email" || title.trim().length > 0)));
 
   const handleConfirm = async () => {
     setSendingNotify(true);
@@ -68,6 +72,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
               channel: notifyChannel,
               template: notifyTemplate,
               recipient: notifyRecipient,
+              ...(isCustomTemplate ? { subject: title.trim(), message: message.trim() } : {}),
             }
       );
       onSent(res.message);
@@ -213,33 +218,81 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
 
             {/* Template */}
             {!inApp && (
-            <fieldset>
-              <legend className="mb-2 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Template</legend>
-              <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2">
+            <fieldset className="space-y-3">
+              <legend className="mb-2 text-3xs font-bold uppercase tracking-[0.1em] text-text-muted">Message Format</legend>
+              <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-3">
                 <OptionCard
+                  compact
+                  icon={Send}
+                  title="Custom Message"
+                  description="Write your own copy"
+                  active={notifyTemplate === "custom"}
+                  onClick={() => setNotifyTemplate("custom")}
+                />
+                <OptionCard
+                  compact
                   icon={MessageSquareText}
                   title="Generic Check-in"
-                  description="General-purpose check-in message"
+                  description="Preset check-in"
                   active={notifyTemplate === "generic"}
                   onClick={() => setNotifyTemplate("generic")}
                 />
                 <OptionCard
+                  compact
                   icon={Siren}
-                  title="Termination Notice"
-                  description="Formal notice — review before sending"
+                  title="Termination"
+                  description="Formal notice"
                   danger
                   active={notifyTemplate === "termination"}
                   onClick={() => setNotifyTemplate("termination")}
                 />
               </div>
+
+              {isCustomTemplate && (
+                <div className="space-y-2.5 pt-1">
+                  {notifyChannel === "email" && (
+                    <div>
+                      <label htmlFor="custom-notify-subject" className="mb-1 block text-2xs font-semibold text-text-secondary">
+                        Email Subject
+                      </label>
+                      <input
+                        id="custom-notify-subject"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        maxLength={140}
+                        placeholder="e.g. Accenture Campus Drive — Shortlist & Reporting Time"
+                        className="w-full rounded-xl border border-border-subtle bg-elevated px-3 py-2 text-13 text-primary outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
+                  <div>
+                    <label htmlFor="custom-notify-message" className="mb-1 block text-2xs font-semibold text-text-secondary">
+                      Message Body <span className="font-normal text-text-muted">({message.length}/1500)</span>
+                    </label>
+                    <textarea
+                      id="custom-notify-message"
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      maxLength={1500}
+                      rows={4}
+                      placeholder={
+                        notifyChannel === "email"
+                          ? "Dear student, please report to the Main Auditorium by 9:30 AM in formals with 2 copies of your resume."
+                          : "Reminder: Placement Drive pre-talk starts tomorrow at 9:30 AM in the Main Auditorium."
+                      }
+                      className="w-full resize-none rounded-xl border border-border-subtle bg-elevated px-3 py-2 text-13 text-primary outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              )}
             </fieldset>
             )}
 
-            {!inApp && (
+            {!inApp && (!isCustomTemplate || notifyChannel === "whatsapp") && (
             <HpCallout icon={AlertTriangle} tone="amber">
-              Both templates are placeholders for now — swap them for real copy once that&apos;s ready.
+              {!isCustomTemplate && "Preset templates use default platform wording — pick Custom Message to write your own text."}
               {notifyChannel === "whatsapp" &&
-                " WhatsApp messages log to the server instead of sending until a real WhatsApp Business account is configured."}
+                " WhatsApp sends via your configured provider (or logs locally when no WhatsApp Business gateway is attached)."}
             </HpCallout>
             )}
           </div>
@@ -404,9 +457,20 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
 
         {/* Template */}
         {!inApp && (
-        <div>
-          <label className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">Template</label>
-          <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-3">
+          <label className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1.5">Message Format</label>
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={() => setNotifyTemplate("custom")}
+              className={cn(
+                "py-2 rounded-control text-xs font-bold border transition-colors",
+                notifyTemplate === "custom"
+                  ? "bg-accent-primary text-white border-accent-primary"
+                  : "bg-elevated text-text-secondary border-border-subtle"
+              )}
+            >
+              Custom
+            </button>
             <button
               onClick={() => setNotifyTemplate("generic")}
               className={cn(
@@ -416,7 +480,7 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
                   : "bg-elevated text-text-secondary border-border-subtle"
               )}
             >
-              Generic Check-in
+              Generic
             </button>
             <button
               onClick={() => setNotifyTemplate("termination")}
@@ -427,19 +491,52 @@ export function BulkNotifyModal({ target, onClose, onSent, endpoint = "/tpo/stud
                   : "bg-elevated text-text-secondary border-border-subtle"
               )}
             >
-              Termination Notice
+              Termination
             </button>
           </div>
+          {isCustomTemplate && (
+            <div className="space-y-2.5">
+              {notifyChannel === "email" && (
+                <div>
+                  <label htmlFor="default-custom-subject" className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1">
+                    Subject
+                  </label>
+                  <input
+                    id="default-custom-subject"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    maxLength={140}
+                    placeholder="Subject line"
+                    className="w-full rounded-control border border-border-subtle bg-elevated px-3 py-2 text-xs text-primary outline-none focus:border-accent-primary"
+                  />
+                </div>
+              )}
+              <div>
+                <label htmlFor="default-custom-message" className="block text-2xs font-bold uppercase tracking-wider text-text-muted mb-1">
+                  Message ({message.length}/1500)
+                </label>
+                <textarea
+                  id="default-custom-message"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  maxLength={1500}
+                  rows={4}
+                  placeholder="Write your custom message…"
+                  className="w-full resize-none rounded-control border border-border-subtle bg-elevated px-3 py-2 text-xs text-primary outline-none focus:border-accent-primary"
+                />
+              </div>
+            </div>
+          )}
         </div>
         )}
 
-        {!inApp && (
+        {!inApp && (!isCustomTemplate || notifyChannel === "whatsapp") && (
         <div className="p-3 rounded-control bg-elevated border border-dashed border-border-strong text-2xs text-text-muted flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-status-warning shrink-0 mt-0.5" />
           <span>
-            Both templates are placeholders for now — swap them for real copy once that&apos;s ready.
+            {!isCustomTemplate && "Preset templates use default wording — switch to Custom to write your own copy."}
             {notifyChannel === "whatsapp" &&
-              " WhatsApp messages log to the server instead of sending until a real WhatsApp Business account is configured."}
+              " WhatsApp logs locally unless a WhatsApp Business gateway is configured."}
           </span>
         </div>
         )}

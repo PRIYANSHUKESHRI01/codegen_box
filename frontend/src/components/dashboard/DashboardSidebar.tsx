@@ -52,6 +52,7 @@ import {
   Layers,
   Star,
   Anchor,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -580,6 +581,11 @@ export function DashboardSidebar({
               label: "Campus Drives",
               href: "/admin/drives",
               icon: Briefcase,
+            },
+            {
+              label: "Placement Calendar",
+              href: "/admin/calendar",
+              icon: CalendarDays,
             },
             {
               label: "Student Cohort",

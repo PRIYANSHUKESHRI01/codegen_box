@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import ExcelJS from "exceljs";
 import { pdfSafe } from "@/lib/pdfTextSafe";
-import type { PlacementReportData } from "@/types/placement";
+import type { PlacementPolicy, PlacementReportData } from "@/types/placement";
 import type { CohortStudent } from "@/types/cohort";
 import { api } from "@/lib/api";
 import type { CoreProficiencyResponse } from "@/types/core";
@@ -25,8 +25,14 @@ export interface TpoReportStudent {
   /** Core Prep standing — null unless the student's branch has Core Prep live. */
   core?: CohortStudent["core"];
   section: string | null;
+  study_year?: number | null;
+  year_label?: string | null;
   cgpa: string | null;
+  tenth_percentage?: string | number | null;
+  twelfth_percentage?: string | number | null;
   backlogs: number | null;
+  placement_status?: string | null;
+  has_resume?: boolean;
   readiness_score: number;
   readiness_tier: "Placement Ready" | "In Progress" | "Needs Training";
   practice_score: number;
@@ -52,7 +58,7 @@ export interface TpoReportDrive {
 }
 
 export interface TpoReportsData {
-  college: { name: string; city: string | null; state: string | null; tier: string };
+  college: { name: string; city: string | null; state: string | null; tier: string; policy?: PlacementPolicy };
   students: TpoReportStudent[];
   drives: TpoReportDrive[];
   /** Real placement pipeline data (see PlacementReportService) — added alongside the pre-existing academic/eligibility data above. */
@@ -277,15 +283,20 @@ export function cohortRows(data: TpoReportsData, sectionFilter: string | null = 
   const students = sectionFilter ? data.students.filter((s) => sectionLabel(s.section) === sectionFilter) : data.students;
 
   return {
-    headers: ["Name", "Email", "Roll Number", "Branch", "Section", "CGPA", "Backlogs", "Readiness Score", "Readiness Tier", "7-Day Practice Score"],
+    headers: ["Name", "Email", "Roll Number", "Branch", "Section", "Year", "10th %", "12th %", "CGPA", "Backlogs", "Placement Status", "Resume", "Readiness Score", "Readiness Tier", "7-Day Practice Score"],
     rows: students.map((s) => [
       s.name,
       s.email,
       s.roll_number ?? "—",
       s.branch ?? "—",
       s.section ?? "—",
+      s.year_label ?? "—",
+      s.tenth_percentage ?? "—",
+      s.twelfth_percentage ?? "—",
       s.cgpa ?? "—",
       s.backlogs ?? "—",
+      (s.placement_status ?? "seeking").replace(/_/g, " "),
+      s.has_resume ? "Uploaded" : "Missing",
       s.readiness_score,
       s.readiness_tier,
       s.practice_score,
@@ -741,4 +752,87 @@ export function generateManagementDeck(data: TpoReportsData): GeneratedReport {
 
   reportFooter(doc);
   return { blob: doc.output("blob"), filename: `${fileSafe(data.college.name)}-management-readiness-deck.pdf` };
+}
+
+// ---------------------------------------------------------------------------
+// 8. NAAC / NIRF Accreditation & CTC Summary (Preview + PDF)
+// ---------------------------------------------------------------------------
+export function accreditationRows(data: TpoReportsData): ReportPreview {
+  const { placements } = data;
+  const f = placements.funnel;
+  const ps = placements.package_stats;
+  const seeking = f.seeking_placement ?? f.batch_enrolled;
+  const uniquePlaced = f.unique_placed ?? f.accepted;
+  const sb = placements.placement_status_breakdown ?? {};
+
+  const rows: (string | number)[][] = [
+    ["Total Batch / Enrolled Students", f.batch_enrolled, "Full active college cohort"],
+    ["Seeking Placement (NIRF / Eligible Pool)", seeking, "Excludes higher studies & opted-out"],
+    ["Opted for Higher Studies", sb.higher_studies ?? 0, "Marked as higher_studies"],
+    ["Opted Out of Placements", sb.opted_out ?? 0, "Marked as opted_out"],
+    ["Unique Students Placed", uniquePlaced, `${placements.target.current_percent}% of seeking pool`],
+    ["Total Job Offers Accepted", f.accepted, `${f.offered} total offers extended`],
+    ["Highest CTC Offered (LPA)", ps?.max_ctc ?? "—", "Maximum accepted package"],
+    ["Median CTC Offered (LPA)", ps?.median_ctc ?? "—", "NIRF statutory median metric"],
+    ["Average CTC Offered (LPA)", ps?.avg_ctc ?? "—", "Mean across accepted offers with CTC"],
+    ["Minimum CTC Offered (LPA)", ps?.min_ctc ?? "—", "Minimum accepted package"],
+  ];
+
+  return {
+    headers: ["Accreditation Metric (NAAC / NIRF)", "Value", "Audit Notes"],
+    rows,
+  };
+}
+
+export async function generateAccreditationPdf(data: TpoReportsData): Promise<GeneratedReport> {
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  const margin = 40;
+  let y = reportHeader(doc, "NAAC / NIRF Placement & CTC Audit Summary", data.college);
+
+  const preview = accreditationRows(data);
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(17, 24, 39);
+  doc.text(pdfSafe(`Placement & Compensation Summary${data.placements.study_year ? ` (Year ${data.placements.study_year})` : ""}`), margin, y);
+  y += 10;
+
+  autoTable(doc, {
+    startY: y,
+    margin: { left: margin, right: margin },
+    head: [preview.headers],
+    body: preview.rows.map((r) => r.map((c) => pdfSafe(String(c)))),
+    headStyles: { fillColor: ACCENT, fontSize: 8.5 },
+    bodyStyles: { fontSize: 9 },
+    theme: "grid",
+  });
+
+  // @ts-expect-error jspdf-autotable augments doc with lastAutoTable at runtime
+  y = doc.lastAutoTable.finalY + 22;
+
+  if (data.placements.company_summary.length > 0) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(17, 24, 39);
+    doc.text("Recruiting Partners & Package Distribution", margin, y);
+    y += 10;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["Recruiting Company", "Offers Accepted", "Avg CTC (LPA)", "Max CTC (LPA)"]],
+      body: data.placements.company_summary.map((c) => [
+        pdfSafe(c.company),
+        String(c.offers_accepted),
+        c.avg_ctc ?? "—",
+        c.max_ctc ?? "—",
+      ]),
+      headStyles: { fillColor: ACCENT, fontSize: 8.5 },
+      bodyStyles: { fontSize: 9 },
+      theme: "grid",
+    });
+  }
+
+  reportFooter(doc);
+  return { blob: doc.output("blob"), filename: `${fileSafe(data.college.name)}-naac-nirf-accreditation-report.pdf` };
 }

@@ -16,7 +16,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -64,6 +66,12 @@ class TpoStudentManageController extends Controller
                 'created_at' => $student->created_at?->toIso8601String(),
                 'last_seen_at' => $student->last_seen_at?->toIso8601String(),
                 'sessions' => $student->tokens()->count(),
+                'has_resume' => (bool) $student->resume_path,
+                'resume_uploaded_at' => $student->resume_uploaded_at?->toIso8601String(),
+                'tenth_percentage' => $student->tenth_percentage,
+                'twelfth_percentage' => $student->twelfth_percentage,
+                'placement_status' => $student->placement_status ?? User::PLACEMENT_STATUS_SEEKING,
+                'academics_locked' => $student->academics_locked_at !== null,
                 'is_blocked' => (bool) $student->is_blocked,
                 'blocked' => $student->is_blocked ? [
                     'reason' => $student->blocked_reason,
@@ -103,7 +111,11 @@ class TpoStudentManageController extends Controller
             'roll_number' => ['sometimes', 'nullable', 'string', 'max:50'],
             'branch' => ['sometimes', 'nullable', 'string', 'max:100'],
             'cgpa' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:10'],
+            'tenth_percentage' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'twelfth_percentage' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
             'backlogs' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99'],
+            'placement_status' => ['sometimes', 'string', Rule::in(User::PLACEMENT_STATUSES)],
+            'academics_locked' => ['sometimes', 'boolean'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'parent_phone' => ['sometimes', 'nullable', 'string', 'max:20'],
         ]);
@@ -111,8 +123,6 @@ class TpoStudentManageController extends Controller
         $emailChanged = array_key_exists('email', $validated) && mb_strtolower($validated['email']) !== mb_strtolower($student->email);
 
         if ($emailChanged) {
-            // The login is the student's identity. While the account is still on its one-time password nobody has relied on it, so a typo
-            // from the import can be fixed (and the new address gets the login); once they have signed in it is theirs to change.
             if (! $student->must_change_password) {
                 throw ValidationException::withMessages(['email' => ['This student has already signed in, so their login e-mail can only be changed by them (or by Mellow Vault support).']]);
             }
@@ -126,9 +136,26 @@ class TpoStudentManageController extends Controller
             throw ValidationException::withMessages(['branch' => [$conflict]]);
         }
 
+        $lockToggle = array_key_exists('academics_locked', $validated) ? $validated['academics_locked'] : null;
+        $statusUpdate = array_key_exists('placement_status', $validated) ? $validated['placement_status'] : null;
+        unset($validated['academics_locked'], $validated['placement_status']);
+
         $before = $student->only(array_keys($validated));
         $student->fill($validated);
         $changed = array_keys(array_filter($validated, fn ($v, $k) => ($before[$k] ?? null) != $v, ARRAY_FILTER_USE_BOTH));
+
+        if ($statusUpdate !== null && $statusUpdate !== ($student->placement_status ?? User::PLACEMENT_STATUS_SEEKING)) {
+            $student->forceFill(['placement_status' => $statusUpdate]);
+            $changed[] = 'placement_status';
+        }
+
+        if ($lockToggle !== null) {
+            $wasLocked = $student->academics_locked_at !== null;
+            if ($lockToggle !== $wasLocked) {
+                $student->forceFill(['academics_locked_at' => $lockToggle ? now() : null]);
+                $changed[] = 'academics_locked';
+            }
+        }
 
         if ($changed === []) {
             return response()->json(['student' => $this->row($student), 'message' => 'Nothing changed.']);
@@ -147,6 +174,17 @@ class TpoStudentManageController extends Controller
             'student' => $this->row($student->refresh()),
             'message' => $emailed === null ? 'Details saved.' : ($emailed ? 'Details saved and a new login was e-mailed to the new address.' : 'Details saved. The e-mail could not be sent right now; use "Send a new login" to try again.'),
         ]);
+    }
+
+    /** GET /tpo/students/{student}/resume — stream the student's private PDF resume to their college's TPO. */
+    public function resume(Request $request, User $student)
+    {
+        $this->authorizeOwn($request, $student);
+        abort_unless($student->resume_path && Storage::disk('local')->exists($student->resume_path), 404, 'No resume uploaded yet.');
+
+        $filename = $student->resume_original_name ?: Str::slug($student->roll_number ?: $student->name).'-resume.pdf';
+
+        return Storage::disk('local')->response($student->resume_path, $filename);
     }
 
     /** POST /tpo/students/{student}/block {reason} */

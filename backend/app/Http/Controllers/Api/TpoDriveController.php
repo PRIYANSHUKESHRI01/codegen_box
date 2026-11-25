@@ -167,8 +167,13 @@ class TpoDriveController extends Controller
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
             'min_cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'max_backlogs' => ['nullable', 'integer', 'min:0'],
+            'min_tenth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'min_twelfth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'eligible_branches' => ['nullable', 'array'],
             'eligible_branches.*' => ['string', 'max:50'],
+            'eligible_years' => ['nullable', 'array'],
+            'eligible_years.*' => ['integer', 'min:1', 'max:6'],
+            'drive_tier' => ['nullable', 'string', Rule::in(['standard', 'dream', 'super_dream'])],
             'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
         ]);
 
@@ -209,10 +214,14 @@ class TpoDriveController extends Controller
                 'duration_minutes' => $validated['duration_minutes'] ?? null,
                 'min_cgpa' => $validated['min_cgpa'] ?? null,
                 'max_backlogs' => $validated['max_backlogs'] ?? null,
+                'min_tenth_percentage' => $validated['min_tenth_percentage'] ?? null,
+                'min_twelfth_percentage' => $validated['min_twelfth_percentage'] ?? null,
                 'eligible_branches' => $validated['eligible_branches'] ?? null,
+                'eligible_years' => $validated['eligible_years'] ?? null,
                 'terms_and_conditions' => $validated['terms_and_conditions'] ?? null,
                 'status' => PlacementDrive::STATUS_PUBLISHED,
                 'source' => PlacementDrive::SOURCE_TPO_CREATED,
+                'drive_tier' => $validated['drive_tier'] ?? 'standard',
                 'owning_college_id' => $collegeId,
                 'created_by' => $request->user()->id,
             ]);
@@ -284,6 +293,66 @@ class TpoDriveController extends Controller
         return response()->json(['mapping' => $mapping->fresh('placementDrive.company')]);
     }
 
+    /**
+     * Edit a campus drive that this college's TPO created (SOURCE_TPO_CREATED).
+     * Shared catalog / company-direct drives stay immutable here (use updateMapping() overrides instead).
+     */
+    public function update(Request $request, PlacementDrive $placementDrive)
+    {
+        $collegeId = $request->user()->college_id;
+        abort_unless(
+            $placementDrive->source === PlacementDrive::SOURCE_TPO_CREATED
+                && (int) $placementDrive->owning_college_id === (int) $collegeId,
+            403,
+            'Only campus drives created by your college can be edited directly. Use eligibility overrides for catalog drives.'
+        );
+
+        $validated = $request->validate([
+            'title' => ['sometimes', 'string', 'max:255'],
+            'role_title' => ['sometimes', 'string', 'max:255'],
+            'ctc_range' => ['nullable', 'string', 'max:255'],
+            'drive_date' => ['sometimes', 'date'],
+            'duration_minutes' => ['nullable', 'integer', 'min:1'],
+            'min_cgpa' => ['nullable', 'numeric', 'min:0', 'max:10'],
+            'max_backlogs' => ['nullable', 'integer', 'min:0'],
+            'min_tenth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'min_twelfth_percentage' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'eligible_branches' => ['nullable', 'array'],
+            'eligible_branches.*' => ['string', 'max:50'],
+            'eligible_years' => ['nullable', 'array'],
+            'eligible_years.*' => ['integer', 'min:1', 'max:6'],
+            'drive_tier' => ['nullable', 'string', Rule::in(['standard', 'dream', 'super_dream'])],
+            'terms_and_conditions' => ['nullable', 'string', 'max:20000'],
+        ]);
+
+        $placementDrive->update($validated);
+        ActivityLog::record($request->user(), 'Updated campus placement drive', 'PlacementDrive', $placementDrive->title);
+
+        return response()->json(['drive' => $placementDrive->fresh('company')]);
+    }
+
+    public function cancel(Request $request, PlacementDrive $placementDrive)
+    {
+        $collegeId = $request->user()->college_id;
+        abort_unless(
+            $placementDrive->source === PlacementDrive::SOURCE_TPO_CREATED
+                && (int) $placementDrive->owning_college_id === (int) $collegeId,
+            403,
+            'Only campus drives created by your college can be cancelled here.'
+        );
+
+        DB::transaction(function () use ($placementDrive, $collegeId) {
+            $placementDrive->update(['status' => PlacementDrive::STATUS_CANCELLED]);
+            DriveCollegeMapping::where('placement_drive_id', $placementDrive->id)
+                ->where('college_id', $collegeId)
+                ->update(['is_active' => false, 'unmapped_at' => now()]);
+        });
+
+        ActivityLog::record($request->user(), 'Cancelled campus placement drive', 'PlacementDrive', $placementDrive->title);
+
+        return response()->json(['message' => 'Drive cancelled and removed from student view.']);
+    }
+
     public function unmap(Request $request, PlacementDrive $placementDrive)
     {
         $mapping = $this->findActiveMapping($request, $placementDrive);
@@ -310,8 +379,12 @@ class TpoDriveController extends Controller
         return $request->validate([
             'min_cgpa_override' => ['nullable', 'numeric', 'min:0', 'max:10'],
             'max_backlogs_override' => ['nullable', 'integer', 'min:0'],
+            'min_tenth_override' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'min_twelfth_override' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'eligible_branches_override' => ['nullable', 'array'],
             'eligible_branches_override.*' => ['string', 'max:50'],
+            'eligible_years_override' => ['nullable', 'array'],
+            'eligible_years_override.*' => ['integer', 'min:1', 'max:6'],
         ]);
     }
 }

@@ -13,14 +13,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Support\Facades\Mail;
 
-/**
- * One queued job per recipient for a TPO's "Send Email" bulk action on the
- * Student Cohort page — same fan-out shape as SendAccountCredentialsEmail
- * (per-recipient retry isolation, horizontal scaling, shared rate limit)
- * since this can target an entire filtered cohort at once. No
- * ShouldBeEncrypted here — unlike the credentials email, the payload is
- * just a user id, nothing sensitive sits in the queue backend.
- */
 class SendStudentBulkNotification implements ShouldQueue
 {
     use Batchable, Dispatchable, InteractsWithQueue, Queueable;
@@ -31,9 +23,13 @@ class SendStudentBulkNotification implements ShouldQueue
 
     public const TEMPLATE_TERMINATION = 'termination';
 
+    public const TEMPLATE_CUSTOM = 'custom';
+
     public function __construct(
         public int $userId,
         public string $template = self::TEMPLATE_GENERIC,
+        public ?string $customSubject = null,
+        public ?string $customMessage = null,
     ) {}
 
     public function backoff(): array
@@ -60,7 +56,7 @@ class SendStudentBulkNotification implements ShouldQueue
 
         $mailable = $this->template === self::TEMPLATE_TERMINATION
             ? new PlacementDriveTerminationMail($user)
-            : new StudentBulkNotificationMail($user);
+            : new StudentBulkNotificationMail($user, $this->customSubject, $this->customMessage);
 
         Mail::to($user->email)->send($mailable);
     }

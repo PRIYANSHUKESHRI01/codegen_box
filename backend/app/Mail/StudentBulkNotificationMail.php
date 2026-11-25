@@ -8,24 +8,28 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Placeholder body for the TPO's "Send Email" bulk-notification feature on
- * the Student Cohort page. Deliberately generic/dummy content — the TPO is
- * meant to swap this for a real template (a future feature: subject/body
- * composed per-send, or a saved library of templates), but the send
- * pipeline (recipient targeting, queueing, rate limiting) needed to be real
- * today rather than waiting on that.
+ * Email sent by a TPO / Coordinator via Bulk Notify. Supports both the legacy
+ * preset notice and custom composed subject + message text.
  */
 class StudentBulkNotificationMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public User $user) {}
+    public function __construct(
+        public User $user,
+        public ?string $customSubject = null,
+        public ?string $customMessage = null,
+    ) {}
 
     public function build(): self
     {
-        $subject = $this->user->college
-            ? 'An update from your Placement Cell — '.$this->user->college->name
-            : 'An update from the AptRun team';
+        if ($this->customSubject !== null && trim($this->customSubject) !== '') {
+            $subject = trim($this->customSubject);
+        } else {
+            $subject = $this->user->college
+                ? 'An update from your Placement Cell — '.$this->user->college->name
+                : 'An update from the AptRun team';
+        }
 
         return $this->subject($subject)->view('emails.student-bulk-notification');
     }

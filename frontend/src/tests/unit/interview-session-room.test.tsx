@@ -146,7 +146,7 @@ describe("the live interview room", () => {
     expect(screen.getByRole("button", { name: /Start now/i })).toBeTruthy();
   });
 
-  it("writes the candidate's answer into the transcript live, then lets them edit it before submitting", async () => {
+  it("writes the candidate's answer into the transcript live, then shows a read-only spoken transcript for review before submitting", async () => {
     const speech = controlSpeech();
     render(<InterviewSessionView variant="mock" />);
     await begin();
@@ -164,13 +164,90 @@ describe("the live interview room", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
 
-    const editor = (await screen.findByLabelText("Review your answer (edit if needed)")) as HTMLTextAreaElement;
-    expect(editor.value).toBe("I built a chat app");
+    const reviewCard = await screen.findByLabelText("Your spoken answer");
+    expect(within(reviewCard).getByText("I built a chat app")).toBeTruthy();
+    expect(document.querySelector("textarea")).toBeNull();
     expect(await screen.findByText("Review your answer")).toBeTruthy();
     expect(screen.getByRole("button", { name: /Re-record/i })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Submit answer/i })).toBeTruthy();
+  });
 
-    fireEvent.change(editor, { target: { value: "I built a chat app with Laravel" } });
-    expect(editor.value).toBe("I built a chat app with Laravel");
+  it("runs authoritative context-biased AI audio reconciliation on Stop & review to fix homophones like tom vs DOM", async () => {
+    const speech = controlSpeech();
+    voice.stopListening.mockResolvedValue({
+      transcript: "I updated the React Virtual tom tree for performance",
+      audioBlob: new Blob([new Uint8Array(2048)]),
+      voicedMs: 4000,
+    });
+    net.postFormData.mockImplementation(async (url: string) => {
+      if (url === "/interviews/transcribe") {
+        return { transcript: "I updated the React Virtual DOM tree for performance" };
+      }
+      return { complete: true };
+    });
+
+    render(<InterviewSessionView variant="mock" />);
+    await begin();
+    await waitFor(() => expect(voice.speak).toHaveBeenCalled());
+    speech.finish();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
+    await screen.findByText("Listening…");
+    fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
+
+    const reviewCard = await screen.findByLabelText("Your spoken answer");
+    await waitFor(() => {
+      expect(within(reviewCard).getByText("I updated the React Virtual DOM tree for performance")).toBeTruthy();
+    });
+    const transcribeCall = net.postFormData.mock.calls.find(([path]) => path === "/interviews/transcribe");
+    expect(transcribeCall).toBeTruthy();
+    expect((transcribeCall![1] as FormData).get("question_text")).toBe(q1.question_text);
+  });
+
+  it("ignores stale AI transcription responses if the candidate clicks Re-record mid-flight", async () => {
+    const speech = controlSpeech();
+    let resolveStaleTranscribe: (value: { transcript: string }) => void = () => undefined;
+    voice.stopListening
+      .mockResolvedValueOnce({
+        transcript: "First attempt draft",
+        audioBlob: new Blob([new Uint8Array(2048)]),
+        voicedMs: 2500,
+      })
+      .mockResolvedValueOnce({
+        transcript: "Second clean answer",
+        audioBlob: new Blob(["x"]),
+        voicedMs: 3000,
+      });
+
+    net.postFormData.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStaleTranscribe = resolve;
+        })
+    );
+
+    render(<InterviewSessionView variant="mock" />);
+    await begin();
+    await waitFor(() => expect(voice.speak).toHaveBeenCalled());
+    speech.finish();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
+    await screen.findByText("Listening…");
+    fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
+
+    // Re-record while the first AI transcription request is still in flight
+    fireEvent.click(await screen.findByRole("button", { name: /Re-record/i }));
+    expect(await screen.findByText("Listening…")).toBeTruthy();
+
+    // First stale AI response finishes late — must NOT hijack the new attempt
+    await act(async () => {
+      resolveStaleTranscribe({ transcript: "Stale first attempt text" });
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
+    const reviewCard = await screen.findByLabelText("Your spoken answer");
+    expect(within(reviewCard).getByText("Second clean answer")).toBeTruthy();
+    expect(within(reviewCard).queryByText("Stale first attempt text")).toBeNull();
   });
 
   it("submits the answer, files it into the transcript history and moves on to the next question", async () => {
@@ -184,7 +261,7 @@ describe("the live interview room", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
     await screen.findByText("Listening…");
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
-    await screen.findByLabelText("Review your answer (edit if needed)");
+    await screen.findByLabelText("Your spoken answer");
 
     // The next question is asked as soon as the answer is accepted.
     voice.speak.mockClear();
@@ -219,14 +296,14 @@ describe("the live interview room", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
     await screen.findByText("Listening…");
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
-    await screen.findByLabelText("Review your answer (edit if needed)");
+    await screen.findByLabelText("Your spoken answer");
     fireEvent.click(screen.getByRole("button", { name: /Submit answer/i }));
 
     expect(await screen.findByText("Interview complete")).toBeTruthy();
     expect(proctor.endSession).toHaveBeenCalledTimes(1);
   });
 
-  it("falls back to a typed answer, in the same transcript, when the microphone can't be used", async () => {
+  it("requires microphone retry instead of manual typing when the microphone can't be used", async () => {
     const speech = controlSpeech();
     voice.startListening.mockRejectedValue(new Error("Microphone access failed", { cause: "permission_denied" }));
     render(<InterviewSessionView variant="mock" />);
@@ -236,14 +313,10 @@ describe("the live interview room", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
 
-    const typed = (await screen.findByLabelText("Type your answer")) as HTMLTextAreaElement;
-    expect(await screen.findByText("Type your answer")).toBeTruthy();
-    expect(screen.getByText(/couldn't access your microphone/i)).toBeTruthy();
-    const next = screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement;
-    expect(next.disabled).toBe(true);
-
-    fireEvent.change(typed, { target: { value: "I led the team" } });
-    expect(next.disabled).toBe(false);
+    expect(await screen.findByText("Microphone required")).toBeTruthy();
+    expect(screen.getByText(/Microphone access is required/i)).toBeTruthy();
+    expect(document.querySelector("textarea")).toBeNull();
+    expect(screen.getByRole("button", { name: /Retry microphone/i })).toBeTruthy();
   });
 
   it("never draws the dashboard (sidebar, header) around the interview — not at setup, not live, not on the result", async () => {
@@ -265,7 +338,7 @@ describe("the live interview room", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Start now/i }));
     await screen.findByText("Listening…");
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
-    await screen.findByLabelText("Review your answer (edit if needed)");
+    await screen.findByLabelText("Your spoken answer");
     fireEvent.click(screen.getByRole("button", { name: /Submit answer/i }));
 
     // The result is on the room's own backdrop too — the way out is its own buttons, not the dashboard's sidebar.

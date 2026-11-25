@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
 
 const TIPS: Array<{ title: string; body: string }> = [
   { title: "Can't hear the question?", body: "Turn your volume up. Every question is also written out in the live transcript as it's asked." },
-  { title: "Mic bars not moving when you speak?", body: "Check the microphone permission for this site in the address bar and close any other app using the mic. If voice isn't available, the interview switches to typed answers by itself." },
-  { title: "Transcript got a word wrong?", body: "After you stop, you can edit the transcript or re-record before you submit — nothing is sent until you press Submit." },
+  { title: "Mic bars not moving when you speak?", body: "Check microphone permission for this site in your browser bar and close any other app using the mic, then click Retry microphone." },
+  { title: "Thinking pause mid-answer?", body: "Pausing silently for 10–60 seconds won't lose your words — your full audio stays recorded continuously." },
+  { title: "Transcript got a word wrong?", body: "When you press Stop & review, AI automatically refines your transcript from your recorded audio. You can also Re-record before clicking Submit." },
   { title: "Stay in this window", body: "Leaving fullscreen or switching tabs counts as a strike, and the third strike ends the attempt." },
 ];
 

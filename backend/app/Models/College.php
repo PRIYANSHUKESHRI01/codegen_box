@@ -23,6 +23,10 @@ class College extends Model
         'placement_target_percent',
         'placement_target_deadline',
         'exam_networks',
+        'max_offers_per_student',
+        'dream_offer_multiplier',
+        'dream_offer_min_ctc',
+        'block_placed_from_lower_ctc',
     ];
 
     /** The relation is exposed through the `departments` codes below, never as raw rows. */
@@ -39,6 +43,10 @@ class College extends Model
             'placement_target_percent' => 'decimal:2',
             'placement_target_deadline' => 'date',
             'exam_networks' => 'array',
+            'max_offers_per_student' => 'integer',
+            'dream_offer_multiplier' => 'decimal:2',
+            'dream_offer_min_ctc' => 'decimal:2',
+            'block_placed_from_lower_ctc' => 'boolean',
         ];
     }
 

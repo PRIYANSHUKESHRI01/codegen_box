@@ -35,9 +35,64 @@ class GeminiKeyRotationService
     public const DEFAULT_RPM_PER_KEY = 15;
     public const DEFAULT_RPD_PER_KEY = 1500;
 
+    public const DEFAULT_MODEL = 'gemini-3.6-flash';
+
+    /** @var list<string> */
+    public const DEFAULT_FALLBACK_MODELS = [
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3-flash-preview',
+        'gemini-3.1-flash-lite',
+        'gemini-3.8-flash',
+        'gemini-3.1-pro-preview',
+        'gemini-2.5-flash',
+        'gemini-2.5-pro',
+        'gemini-2.5-flash-lite',
+    ];
+
+    /**
+     * Resolves the ordered Gemini model cascade (Gemini 3 -> Gemini 2.5),
+     * filtering out any deprecated <2.0 models (such as gemini-1.5-*) and >3.x models.
+     *
+     * @return list<string>
+     */
+    public static function modelChain(?string $primaryOverride = null): array
+    {
+        $primary = trim((string) ($primaryOverride ?: config('services.gemini.model', self::DEFAULT_MODEL)));
+        $configured = config('services.gemini.fallback_models');
+        $fallbacks = is_array($configured) && $configured !== [] ? $configured : self::DEFAULT_FALLBACK_MODELS;
+
+        $candidates = array_values(array_unique(array_filter(array_map('trim', [$primary, ...$fallbacks, ...self::DEFAULT_FALLBACK_MODELS]))));
+
+        $allowed = array_values(array_filter($candidates, static function (string $model): bool {
+            if (preg_match('/^gemini-(\d+)(?:\.\d+)?/i', $model, $m) === 1) {
+                $major = (int) $m[1];
+
+                return $major >= 2 && $major <= 3;
+            }
+
+            return false;
+        }));
+
+        return $allowed !== [] ? $allowed : self::DEFAULT_FALLBACK_MODELS;
+    }
+
     public function getTimezone(): string
     {
         return (string) config('activity.timezone', 'Asia/Kolkata');
+    }
+
+    protected function isInvalidApiKeyResponse(Response $response): bool
+    {
+        if ($response->status() !== 400) {
+            return false;
+        }
+
+        $msg = strtolower((string) ($this->extractErrorMessage($response) ?? $response->body()));
+
+        return str_contains($msg, 'api key not valid')
+            || str_contains($msg, 'api_key_invalid')
+            || str_contains($msg, 'api key expired');
     }
 
     /**
@@ -157,9 +212,9 @@ class GeminiKeyRotationService
                     continue; // Seamlessly try next key in pool
                 }
 
-                // If response is a 403 API key error (invalid or unauthorized key)
-                if ($result instanceof Response && $result->status() === 403) {
-                    $errorMsg = $this->extractErrorMessage($result) ?? 'Invalid or unauthorized API key (403)';
+                // If response is an invalid/unauthorized API key error (403, or 400 API_KEY_INVALID / expired)
+                if ($result instanceof Response && ($result->status() === 403 || $this->isInvalidApiKeyResponse($result))) {
+                    $errorMsg = $this->extractErrorMessage($result) ?? 'Invalid or unauthorized API key (' . $result->status() . ')';
                     if ($dbModel) {
                         $dbModel->update([
                             'is_exhausted' => true,
@@ -170,7 +225,7 @@ class GeminiKeyRotationService
                             'total_requests' => $dbModel->total_requests + 1,
                         ]);
                     }
-                    Log::warning("[GeminiPool] Key '{$candidate['label']}' unauthorized (403). Failing over...", ['error' => $errorMsg]);
+                    Log::warning("[GeminiPool] Key '{$candidate['label']}' rejected ({$result->status()}). Failing over...", ['error' => $errorMsg]);
                     $lastError = new RuntimeException($errorMsg);
                     continue;
                 }
@@ -421,13 +476,7 @@ class GeminiKeyRotationService
             ];
         }
 
-        $primaryModel = (string) config('services.gemini.model', 'gemini-2.5-flash');
-        $models = array_values(array_unique(array_filter([
-            $primaryModel,
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'gemini-1.5-flash',
-        ])));
+        $models = self::modelChain();
 
         $startTime = microtime(true);
         $lastResponse = null;

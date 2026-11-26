@@ -24,8 +24,10 @@ class IntegritySession extends Model
 
     public const SURFACE_STUDY = 'study';
 
+    public const SURFACE_VOICE_VERIFICATION = 'voice_verification';
+
     public const SURFACES = [
-        self::SURFACE_CONTEST, self::SURFACE_INTERVIEW, self::SURFACE_SOFT_SKILL, self::SURFACE_CORE_TEST, self::SURFACE_STUDY,
+        self::SURFACE_CONTEST, self::SURFACE_INTERVIEW, self::SURFACE_SOFT_SKILL, self::SURFACE_CORE_TEST, self::SURFACE_STUDY, self::SURFACE_VOICE_VERIFICATION,
     ];
 
     public const STATUS_ACTIVE = 'active';

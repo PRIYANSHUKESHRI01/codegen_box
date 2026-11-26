@@ -26,35 +26,16 @@ class GeminiInterviewScoringService
     private const CATEGORY_GUIDANCE = 'Score based on correctness/depth for technical questions, structure and specificity (STAR-style) for behavioral/situational questions, and genuine motivation/fit for HR/aptitude questions.';
 
     /**
-     * Resolves the tiered model hierarchy in priority order:
-     * 1. Primary configured model (e.g. gemini-2.5-flash, or gemini-3.* if explicitly set)
-     * 2. gemini-2.5-flash
-     * 3. gemini-2.0-flash
-     * 4. gemini-1.5-flash
-     * 5. gemini-2.0-flash-lite
-     * 6. gemini-1.5-pro
+     * Resolves the tiered model hierarchy in priority order (Gemini 3 -> Gemini 2.5):
+     * gemini-3.6-flash -> gemini-3.5-flash -> gemini-3-flash-preview ->
+     * gemini-3.1-flash-lite -> gemini-3.8-flash -> gemini-3.1-pro-preview ->
+     * gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.5-flash-lite.
      *
      * @return string[]
      */
     public function getModelHierarchy(): array
     {
-        $primary = (string) config('services.gemini.model', 'gemini-2.5-flash');
-        $configuredFallbacks = config('services.gemini.fallback_models');
-
-        if (! is_array($configuredFallbacks) || empty($configuredFallbacks)) {
-            $configuredFallbacks = [
-                'gemini-2.5-flash',
-                'gemini-2.0-flash',
-                'gemini-1.5-flash',
-                'gemini-2.0-flash-lite',
-                'gemini-1.5-pro',
-            ];
-        }
-
-        // Deduplicate and preserve priority cascade
-        $chain = array_values(array_unique(array_filter([$primary, ...$configuredFallbacks])));
-
-        return ! empty($chain) ? $chain : ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        return GeminiKeyRotationService::modelChain();
     }
 
     /**
@@ -116,8 +97,8 @@ class GeminiInterviewScoringService
 
         $lastException = null;
 
-        // Multi-tier model fallback: cascades through primary (e.g. gemini-3.* or gemini-2.5-flash)
-        // to gemini-2.0-flash, gemini-1.5-flash, etc. if any model endpoint is unavailable, 404, or fails.
+        // Multi-tier model fallback: cascades through Gemini 3 -> Gemini 2.5
+        // if any model endpoint is unavailable, 404, 429, or 503.
         foreach ($models as $model) {
             try {
                 $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt, $model) {

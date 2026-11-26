@@ -1110,7 +1110,7 @@ export class IntegrityEngine {
         message = "No face detected in camera view. Please face the camera directly.";
       } else if (analysis.faces > 1) {
         violationType = "multiple_faces";
-        message = "Multiple faces detected. Only the registered candidate may be present during the interview.";
+        message = `Multiple people detected (${analysis.faces} faces in camera). Only 1 candidate is allowed — ask everyone else to leave the frame within 5 seconds or your interview will be blocked.`;
       } else if (this.baselineDescriptor && faceSimilarity !== null && faceSimilarity < FACE_MATCH_THRESHOLD) {
         violationType = "face_mismatch";
         message = "Face mismatch detected. The person in view does not match the verified candidate photo.";
@@ -1123,9 +1123,9 @@ export class IntegrityEngine {
     }
 
     const now = Date.now();
-    // Looking away allows 5 full seconds before auto-lock so natural head movement/thinking
-    // isn't penalized immediately; higher-severity violations (phone, multiple faces, etc.) lock at 2s.
-    const graceSeconds = violationType === "face_away" ? 5 : 2;
+    // Looking away and multiple-people detection both give a clear 5-second reminder before blocking;
+    // phone, absent face, and face mismatch lock at 2s.
+    const graceSeconds = violationType === "face_away" || violationType === "multiple_faces" ? 5 : 2;
 
     if (violationType) {
       if (!this.activeGraceViolation || this.activeGraceViolation.type !== violationType) {
@@ -1150,7 +1150,7 @@ export class IntegrityEngine {
 
       if (secondsRemaining <= 0) {
         const type = violation.type;
-        const elapsedGrace = type === "face_away" ? 5 : 2;
+        const elapsedGrace = type === "face_away" || type === "multiple_faces" ? 5 : 2;
         const reason =
           type === "phone_detected"
             ? "A prohibited mobile phone was detected in front of the camera and was not removed within 2 seconds."
@@ -1159,15 +1159,24 @@ export class IntegrityEngine {
             : type === "no_face"
             ? "Candidate left the camera view and was not detected for more than 2 seconds."
             : type === "multiple_faces"
-            ? "Multiple people were detected in the camera frame for more than 2 seconds (unauthorized person present beside candidate)."
+            ? `Multiple people (${analysis.faces} faces) remained in the camera view for more than 5 seconds. Only one person is permitted in an interview.`
             : type === "face_away"
             ? "Candidate looked away / turned head sideways towards an off-screen person for more than 5 seconds."
             : "Prohibited side conversation detected while interviewer was speaking or during preparation time.";
 
-        this.emit(type === "speech_prohibited" ? "speech_detected" : type, {
+        const eventType = type === "speech_prohibited" ? "speech_detected" : type;
+        const eventData = {
           grace_period_exceeded: true,
           duration_seconds: elapsedGrace,
-        });
+          ...(type === "multiple_faces" ? { faces: analysis.faces } : {}),
+        };
+        if (this.transport) {
+          this.transport.flushLockEvent(eventType, eventData);
+        } else if (this.mode === "legacy" && type === "multiple_faces") {
+          void api.post(`${this.o.basePath}/proctoring/violations`, { type: "multiple_faces", meta: eventData }, { keepalive: true }).catch(() => undefined);
+        } else {
+          this.emit(eventType, eventData);
+        }
         void this.still("webcam", { flagged: true, reason: type });
         this.activeGraceViolation = null;
         setIntegrityUi({ graceWarning: null });

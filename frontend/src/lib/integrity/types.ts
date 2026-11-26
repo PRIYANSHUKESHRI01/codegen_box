@@ -1,8 +1,8 @@
 // Shapes shared by the browser-side integrity engine. The server owns the policy and the event catalogue
 // (backend/app/Services/Integrity/EventCatalog.php + Profiles.php); this file mirrors only what the browser needs.
 
-/** The five proctored surfaces. The server decides which profile each runs under. */
-export type IntegritySurface = "contest" | "interview" | "soft_skill" | "core_test" | "study";
+/** The proctored surfaces. The server decides which profile each runs under. */
+export type IntegritySurface = "contest" | "interview" | "soft_skill" | "core_test" | "study" | "voice_verification";
 
 /** Events the BROWSER may report. Server- and Guardian-only types are rejected (and punished) by the server. */
 export type WebEventType =

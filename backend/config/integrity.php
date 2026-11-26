@@ -33,6 +33,7 @@ return [
         'core_test' => env('INTEGRITY_PROFILE_CORE_TEST', 'strict'),
         'soft_skill' => env('INTEGRITY_PROFILE_SOFT_SKILL', 'standard'),
         'interview' => env('INTEGRITY_PROFILE_INTERVIEW', 'standard'),
+        'voice_verification' => env('INTEGRITY_PROFILE_VOICE_VERIFICATION', 'standard'),
         'study' => env('INTEGRITY_PROFILE_STUDY', 'practice'),
     ],
 

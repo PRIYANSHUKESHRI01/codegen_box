@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertCircle, ArrowLeft, Ban, HelpCircle, ShieldAlert } from "lucide-react";
+import { AlertCircle, ArrowLeft, Ban, HelpCircle, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
 import { RoomBackdrop } from "@/components/dashboard/interviews/room/RoomBackdrop";
 import type { ProctoringSessionState } from "@/lib/proctoring/types";
@@ -18,11 +18,18 @@ export function InterviewProctoringLockedScreen({
   onBack,
   reason: propReason,
   sessionId,
+  retryAction,
 }: {
   session: ProctoringSessionState | null;
   onBack: () => void;
   reason?: string;
   sessionId?: number | string;
+  retryAction?: {
+    label: string;
+    hint?: string;
+    busy?: boolean;
+    onRetry: () => void;
+  };
 }) {
   const reduce = useReducedMotion() ?? false;
   const [storedReason, setStoredReason] = useState<string | null>(propReason ?? null);
@@ -76,34 +83,66 @@ export function InterviewProctoringLockedScreen({
           </p>
         )}
 
-        <div className="w-full rounded-2xl border border-border-subtle bg-surface/90 p-4 text-left shadow-card">
-          <div className="flex items-start gap-3">
-            <HelpCircle className="h-5 w-5 shrink-0 text-accent-primary mt-0.5" />
-            <div className="space-y-1.5 text-xs">
-              <p className="font-bold text-primary">
-                If this happened by mistake, please contact your administrator for support.
-              </p>
-              <p className="text-text-muted leading-relaxed">
-                Administrators can review your session telemetry, verify evidence stills, and reinstate your attempt or re-grant access from the SuperAdmin dashboard.
-              </p>
-              {(sessionId || (session as unknown as { id?: number | string })?.id) && (
-                <div className="pt-2 mt-2 border-t border-border-subtle flex items-center justify-between text-3xs font-mono text-text-muted">
-                  <span>Reference Session: #{sessionId || (session as unknown as { id?: number | string })?.id}</span>
-                  <span>Status: Locked</span>
-                </div>
-              )}
+        {retryAction ? (
+          <div className="w-full rounded-2xl border border-amber-500/35 bg-amber-500/[0.08] p-4 text-left shadow-card">
+            <div className="flex items-start gap-3">
+              <RotateCcw className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+              <div className="space-y-1.5 text-xs">
+                <p className="font-bold text-primary">You still have attempts remaining to complete this step</p>
+                <p className="leading-relaxed text-text-secondary">
+                  {retryAction.hint ||
+                    "Make sure you are alone in a well-lit room, close extra tabs, and keep fullscreen enabled before starting your next attempt."}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="w-full rounded-2xl border border-border-subtle bg-surface/90 p-4 text-left shadow-card">
+            <div className="flex items-start gap-3">
+              <HelpCircle className="h-5 w-5 shrink-0 text-accent-primary mt-0.5" />
+              <div className="space-y-1.5 text-xs">
+                <p className="font-bold text-primary">
+                  If this happened by mistake, please contact your administrator for support.
+                </p>
+                <p className="text-text-muted leading-relaxed">
+                  Administrators can review your session telemetry, verify evidence stills, and reinstate your attempt or re-grant access from the SuperAdmin dashboard.
+                </p>
+                {(sessionId || (session as unknown as { id?: number | string })?.id) && (
+                  <div className="pt-2 mt-2 border-t border-border-subtle flex items-center justify-between text-3xs font-mono text-text-muted">
+                    <span>Reference Session: #{sessionId || (session as unknown as { id?: number | string })?.id}</span>
+                    <span>Status: Locked</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface/90 px-6 py-3 text-sm font-bold text-primary shadow-sm transition-colors hover:bg-surface-hover"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden />
-          Back to Interviews
-        </button>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {retryAction && (
+            <button
+              type="button"
+              disabled={retryAction.busy}
+              onClick={retryAction.onRetry}
+              className="inline-flex items-center gap-2 rounded-full bg-accent-primary px-6 py-3 text-sm font-extrabold text-white shadow-lg shadow-accent-primary/25 transition-colors hover:bg-accent-primary-hover disabled:opacity-60"
+            >
+              {retryAction.busy ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <RotateCcw className="h-4 w-4" aria-hidden />
+              )}
+              {retryAction.label}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex items-center gap-2 rounded-full border border-border-strong bg-surface/90 px-6 py-3 text-sm font-bold text-primary shadow-sm transition-colors hover:bg-surface-hover"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden />
+            Back to Interviews
+          </button>
+        </div>
       </motion.div>
     </div>
   );

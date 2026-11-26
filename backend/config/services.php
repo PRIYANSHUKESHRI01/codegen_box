@@ -37,13 +37,15 @@ return [
 
     /*
     | AI Interview question generation and scoring (see App\Services\GeminiQuestionGeneratorService & GeminiInterviewScoringService).
-    | Multi-tier fallback hierarchy: if primary model fails (404/429/503/etc.),
-    | smoothly cascades through gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash -> gemini-2.0-flash-lite -> gemini-1.5-pro.
+    | Multi-tier fallback hierarchy (Gemini 3 -> Gemini 2.5, never <2.0 or >3.x):
+    | cascades through gemini-3.6-flash -> gemini-3.5-flash -> gemini-3-flash-preview ->
+    | gemini-3.1-flash-lite -> gemini-3.8-flash -> gemini-3.1-pro-preview ->
+    | gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.5-flash-lite.
     */
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY_1') ?: env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
-        'fallback_models' => array_filter(array_map('trim', explode(',', env('GEMINI_FALLBACK_MODELS', 'gemini-2.5-flash,gemini-2.0-flash,gemini-1.5-flash,gemini-2.0-flash-lite,gemini-1.5-pro')))),
+        'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
+        'fallback_models' => array_filter(array_map('trim', explode(',', env('GEMINI_FALLBACK_MODELS', 'gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview,gemini-3.1-flash-lite,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-flash,gemini-2.5-pro,gemini-2.5-flash-lite')))),
         // Second, informational "worth a second listen" call per speaking attempt; turn off on a tight quota.
         'speaking_pronunciation_notes' => env('GEMINI_SPEAKING_PRONUNCIATION_NOTES', true),
     ],

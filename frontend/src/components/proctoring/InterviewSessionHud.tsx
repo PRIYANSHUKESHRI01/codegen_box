@@ -116,7 +116,7 @@ export function InterviewSessionHud({
           ProctoringOverlay shows and keeps just the security-relevant count. */}
       {!embedded && session && <StrikePill session={session} className="fixed top-4 right-4 z-50" />}
 
-      {/* Active 15-second grace countdown warning for phone / face mismatch / absent face */}
+      {/* Active grace countdown warning for multiple people / phone / face mismatch / absent face */}
       {graceWarning && (
         <div
           role="alert"

@@ -364,6 +364,7 @@ export function AptBotWidget() {
   const { user } = useAuth();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const [categories, setCategories] = useState<AptBotCategory[]>(DEFAULT_CATEGORIES);
   const [selectedCategoryKey, setSelectedCategoryKey] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -414,7 +415,7 @@ export function AptBotWidget() {
     }
   }, [isOpen, messages.length, user]);
 
-  // Find all FAQs in a flat map for quick related lookups (kept above early return so hook order never changes on navigation)
+  // Keep all hooks above early returns so hook order never changes across navigation.
   const allFaqsMap = React.useMemo(() => {
     const map = new Map<string, AptBotFaqItem>();
     categories.forEach((cat) => {
@@ -425,9 +426,38 @@ export function AptBotWidget() {
     return map;
   }, [categories]);
 
-  // If in an active proctored assessment session, do NOT show the chatbot
-  const isProctoredSession = pathname?.includes("/session") || pathname?.includes("/exam/");
-  if (isProctoredSession) {
+  // Close on Escape key for snappy keyboard UX.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isOpen]);
+
+  // Only show AptBot after login for student users, and hide it on proctored assessments,
+  // coding workbenches, admin/staff consoles, and auth pages so it never distracts or blocks UI controls.
+  const isStudentUser = Boolean(user && user.role === "user");
+  const p = pathname ?? "";
+  const isHiddenRoute =
+    p === "/" ||
+    p.startsWith("/login") ||
+    p.startsWith("/signup") ||
+    p.startsWith("/mellow-internal") ||
+    p.startsWith("/admin") ||
+    p.startsWith("/superadmin") ||
+    p.startsWith("/coordinator") ||
+    p.startsWith("/marketing") ||
+    p.includes("/session") ||
+    p.includes("/exam/") ||
+    p.startsWith("/dashboard/voice-verification") ||
+    p.startsWith("/dashboard/practice/view") ||
+    p.startsWith("/dashboard/contests/problem") ||
+    p.startsWith("/dashboard/contests/view") ||
+    p.startsWith("/dashboard/projects/workspace");
+
+  if (!isStudentUser || isHiddenRoute) {
     return null;
   }
 
@@ -611,55 +641,76 @@ export function AptBotWidget() {
 
   return (
     <>
-      {/* ── FLOATING LAUNCHER BUTTON ─────────────────────────────────── */}
-      <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5">
+      {/* ── RIGHT-EDGE DOCKED BLUE CIRCLE LAUNCHER (EXPANDS "Ask aptBot" ON HOVER) ── */}
+      <AnimatePresence>
         {!isOpen && (
           <motion.div
-            initial={{ opacity: 0, x: 12, scale: 0.95 }}
-            animate={{ opacity: 1, x: 0, scale: 1 }}
-            transition={{ duration: 0.25 }}
-            onClick={() => setIsOpen(true)}
-            className="hidden sm:flex items-center gap-2 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-medium px-3.5 py-2 rounded-full shadow-lg shadow-indigo-950/10 border border-slate-200/90 dark:border-slate-800 cursor-pointer hover:border-indigo-400 dark:hover:border-indigo-600 transition-all select-none group"
+            key="aptbot-dock-launcher"
+            initial={{ opacity: 0, x: 40, scale: 0.75 }}
+            animate={{ opacity: 1, x: isHovered ? -16 : 14, scale: 1 }}
+            exit={{ opacity: 0, x: 40, scale: 0.7 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+            className="fixed bottom-7 right-0 z-40 flex items-center gap-2.5"
           >
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-            <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-200">
-              <span>Ask</span>
-              <AptBotBrand className="text-xs" />
-            </span>
+            <AnimatePresence>
+              {isHovered && (
+                <motion.button
+                  key="aptbot-hover-pill"
+                  type="button"
+                  initial={{ opacity: 0, x: 16, scale: 0.85 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 14, scale: 0.85 }}
+                  transition={{ type: "spring", stiffness: 420, damping: 28 }}
+                  onClick={() => {
+                    setIsHovered(false);
+                    setIsOpen(true);
+                  }}
+                  className="flex items-center gap-2 rounded-full border border-slate-200/90 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 shadow-lg shadow-indigo-950/15 transition-colors hover:border-[#3E9DEF] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100"
+                >
+                  <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-emerald-500" />
+                  <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-200">
+                    <span>Ask</span>
+                    <AptBotBrand className="text-xs" />
+                  </span>
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.06 }}
+              whileTap={{ scale: 0.94 }}
+              onFocus={() => setIsHovered(true)}
+              onBlur={() => setIsHovered(false)}
+              onClick={() => {
+                setIsHovered(false);
+                setIsOpen(true);
+              }}
+              title="Open aptBot Assistant"
+              aria-label="Open AptBot Instant Assistant"
+              data-testid="aptbot-docked-circle"
+              className="relative flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-tr from-[#2563EB] via-[#3E9DEF] to-indigo-600 text-white shadow-xl shadow-[#3E9DEF]/35 ring-2 ring-white/80 transition-shadow hover:shadow-2xl hover:shadow-[#3E9DEF]/50 focus:outline-none focus:ring-4 focus:ring-[#3E9DEF]/40 dark:ring-slate-900/90"
+            >
+              <Bot className="h-5 w-5 drop-shadow-sm" aria-hidden />
+              <span className="absolute left-0.5 top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400 dark:border-slate-900" />
+            </motion.button>
           </motion.div>
         )}
+      </AnimatePresence>
 
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.94 }}
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label={isOpen ? "Close AptBot" : "Open AptBot Instant Assistant"}
-          className={`relative p-3.5 rounded-full shadow-xl transition-all duration-300 flex items-center justify-center focus:outline-none focus:ring-4 focus:ring-indigo-500/30 ${
-            isOpen
-              ? "bg-slate-800 text-slate-200 rotate-90 border border-slate-700 shadow-slate-900/30"
-              : "bg-gradient-to-tr from-indigo-600 via-indigo-600 to-violet-600 text-white shadow-indigo-500/25 ring-2 ring-white/60 dark:ring-slate-900/60"
-          }`}
-        >
-          {isOpen ? (
-            <X className="w-5 h-5" />
-          ) : (
-            <>
-              <Bot className="w-5 h-5" />
-              <span className="absolute -top-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white dark:border-slate-900 rounded-full" />
-            </>
-          )}
-        </motion.button>
-      </div>
-
-      {/* ── EXPANDED CHAT PANEL ───────────────────────────────────────── */}
+      {/* ── EXPANDED CHAT PANEL (SLIDES OUT FROM RIGHT, SHRINKS BACK ON CLOSE) ── */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 24, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            key="aptbot-panel"
+            initial={{ opacity: 0, x: 72, scale: 0.86 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: 84, scale: 0.78 }}
             transition={{ type: "spring", damping: 26, stiffness: 340 }}
-            className="fixed bottom-20 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[430px] max-h-[82vh] h-[650px] bg-white dark:bg-[#0E1117] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl shadow-indigo-950/20 flex flex-col overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans"
+            style={{ transformOrigin: "bottom right" }}
+            className="fixed bottom-6 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[430px] max-h-[82vh] h-[640px] bg-white dark:bg-[#0E1117] border border-slate-200/90 dark:border-slate-800 rounded-2xl shadow-2xl shadow-indigo-950/25 flex flex-col overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans"
           >
             {/* ── Sleek Modern Header ── */}
             <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 via-indigo-600 to-violet-600 text-white flex items-center justify-between shrink-0 shadow-sm">

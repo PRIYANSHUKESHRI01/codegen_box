@@ -7,6 +7,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CuratedSetsExplorer } from "@/components/dashboard/interviews/CuratedSetsExplorer";
 import { VaultAiLockedPanel } from "@/components/dashboard/vaultAi/VaultAiLockedPanel";
 import { VaultAiResultsCard } from "@/components/dashboard/vaultAi/VaultAiResultsCard";
+import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
 import { Reveal, ScoreRing, VaSkeleton } from "@/components/dashboard/vaultAi/vaultKit";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { cn } from "@/lib/utils";
@@ -138,7 +139,9 @@ export default function VaultInterviewsPage() {
         {/* The final average of the three sets (best series), the attempts behind it, and the PDF report — once a series has been completed. */}
         <VaultAiResultsCard />
         <Suspense fallback={<VaSkeleton className="h-64" />}>
-          <CuratedSetsExplorer />
+          <VoiceVerificationGate surfaceLabel="Vault AI Interview" returnTo="/dashboard/vault-interviews">
+            <CuratedSetsExplorer />
+          </VoiceVerificationGate>
         </Suspense>
       </div>
     </DashboardShell>

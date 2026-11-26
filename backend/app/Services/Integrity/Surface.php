@@ -10,11 +10,13 @@ use App\Models\IntegritySession;
 use App\Models\ProctoringSession;
 use App\Models\SoftSkillProctoringSession;
 use App\Models\StudySitting;
+use App\Models\VoiceVerificationProfile;
 use App\Services\Core\CoreTestProctoringService;
 use App\Services\InterviewProctoringService;
 use App\Services\ProctoringService;
 use App\Services\SoftSkillProctoringService;
 use App\Services\StudySittingService;
+use App\Services\Voice\VoiceVerificationProctoringService;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
@@ -49,6 +51,7 @@ final class Surface
             'soft_skill' => SoftSkillProctoringSession::class,
             'core_test' => CoreTestProctoringSession::class,
             'study' => StudySitting::class,
+            'voice_verification' => VoiceVerificationProfile::class,
         };
     }
 
@@ -65,11 +68,16 @@ final class Surface
             'soft_skill' => (int) $record->softSkillSession->user_id,
             'core_test' => (int) $record->testSession->user_id,
             'study' => (int) $record->user_id,
+            'voice_verification' => (int) $record->user_id,
         };
     }
 
     public function isLocked(Model $record): bool
     {
+        if ($record instanceof VoiceVerificationProfile) {
+            return $record->isProctoringLocked();
+        }
+
         return $record->status === 'locked';
     }
 
@@ -82,6 +90,7 @@ final class Surface
             'soft_skill' => (bool) $record->softSkillSession->isCompleted(),
             'core_test' => (bool) $record->testSession->isCompleted(),
             'study' => $record->isCompleted(),
+            'voice_verification' => $record->isVerified(),
         };
     }
 
@@ -121,6 +130,10 @@ final class Surface
                 $result = app(CoreTestProctoringService::class)->recordViolation($record, $type, $ip, $meta, $strikes);
                 break;
 
+            case 'voice_verification':
+                $result = app(VoiceVerificationProctoringService::class)->recordViolation($record, $type, $ip, $meta, $strikes);
+                break;
+
             default:
                 $result = app(StudySittingService::class)->recordViolation($record, $type, $ip, $meta, $strikes);
                 $result['session'] = $result['sitting'];
@@ -144,6 +157,15 @@ final class Surface
     /** The JSON every surface's start/violations endpoints already return (frontend ProctoringSessionState). */
     public function payload(Model $record): array
     {
+        if ($record instanceof VoiceVerificationProfile) {
+            return [
+                'status' => $record->isProctoringLocked() ? 'locked' : ($record->isVerified() ? 'completed' : 'active'),
+                'violation_count' => (int) $record->proctoring_violation_count,
+                'max_violations' => (int) config('proctoring.max_violations_before_lock', 3),
+                'locked_at' => $record->proctoring_locked_at,
+            ];
+        }
+
         return [
             'status' => $record->status,
             'violation_count' => (int) $record->violation_count,

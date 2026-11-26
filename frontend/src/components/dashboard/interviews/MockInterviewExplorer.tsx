@@ -622,6 +622,10 @@ export function MockInterviewExplorer({
       const res = await api.post<MockStartResponse>(`/mock-interviews/rounds/${encodeURIComponent(round.id)}/start`);
       router.push(`/dashboard/interviews/view?slug=${encodeURIComponent(res.interview.slug)}${launchFrom ? `&from=${encodeURIComponent(launchFrom)}` : ""}`);
     } catch (err) {
+      if (err instanceof ApiError && err.code === "voice_verification_required") {
+        router.push(`/dashboard/voice-verification?returnTo=${encodeURIComponent(launchFrom === "merchant-navy" ? "/dashboard/merchant-navy" : "/dashboard/interviews")}`);
+        return;
+      }
       setActionError({ message: err instanceof ApiError ? err.message : "Something went wrong starting this interview. Please try again.", upgrade: err instanceof ApiError && err.status === 402 });
       setStartingId(null);
     }

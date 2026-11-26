@@ -1299,6 +1299,10 @@ class SuperAdminController extends Controller
                     'last_incident_at' => null,
                 ]);
 
+            if ($user->voiceVerificationProfile && ($user->voiceVerificationProfile->isBlocked() || $user->voiceVerificationProfile->isProctoringLocked())) {
+                app(\App\Services\Voice\VoiceVerificationService::class)->unblockUser($user, $admin);
+            }
+
             $qualifications = VaultInterviewQualification::where('user_id', $user->id)->get();
             foreach ($qualifications as $qual) {
                 if ($qual->status === VaultInterviewQualification::STATUS_COOLING_DOWN || $qual->cooldown_until !== null) {

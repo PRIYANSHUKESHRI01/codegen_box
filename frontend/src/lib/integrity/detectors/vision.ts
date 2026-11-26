@@ -42,7 +42,10 @@ export async function loadVision(base = "/integrity", delegate: Delegate = "CPU"
   const faces = await vision.FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: `${base}/models/face_landmarker.task`, delegate },
     runningMode: "VIDEO",
-    numFaces: 3,
+    numFaces: 4,
+    minFaceDetectionConfidence: 0.55,
+    minFacePresenceConfidence: 0.55,
+    minTrackingConfidence: 0.5,
   });
 
   let objects: Awaited<ReturnType<typeof vision.ObjectDetector.createFromOptions>> | null = null;

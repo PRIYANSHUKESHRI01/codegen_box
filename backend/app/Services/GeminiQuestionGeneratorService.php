@@ -60,13 +60,7 @@ class GeminiQuestionGeneratorService
 
         $perCategoryCounts = $this->splitCountAcrossCategories($count, $categories);
         $prompt = $this->buildPrompt($role, $difficulty, $perCategoryCounts, $skills, $avoidQuestionTexts, $discipline);
-        $primaryModel = (string) config('services.gemini.model', 'gemini-2.5-flash');
-        $models = array_values(array_unique(array_filter([
-            $primaryModel,
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'gemini-1.5-flash',
-        ])));
+        $models = GeminiKeyRotationService::modelChain();
 
         $lastException = null;
 

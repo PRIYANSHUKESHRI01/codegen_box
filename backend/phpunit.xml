@@ -33,6 +33,7 @@
         <env name="PROCTORING_STUDY" value="false"/>
         <env name="PRACTICE_BUILDER_ENABLED" value="true"/>
         <env name="INTEGRITY_ENABLED" value="false"/>
+        <env name="VOICE_VERIFICATION_REQUIRED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>

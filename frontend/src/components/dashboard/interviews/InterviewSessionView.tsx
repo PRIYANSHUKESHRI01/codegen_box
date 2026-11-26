@@ -20,6 +20,7 @@ import { api, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { BrowserVoiceEngine } from "@/lib/voice/browserVoiceEngine";
+import { extractAcousticSignature } from "@/lib/voice/acousticSignature";
 import { hasMediaRecorder, hasSpeechRecognition, hasSpeechSynthesis, type VoiceEngine, type VoiceListenError } from "@/lib/voice/VoiceEngine";
 import { useSpokenReveal } from "@/lib/voice/spokenReveal";
 import { SpeechAudioCache } from "@/lib/voice/speechAudio";
@@ -34,7 +35,9 @@ import { InterviewComplete, InterviewError } from "./room/InterviewComplete";
 import { InterviewRoom, type RoomStatus, type RoomStep } from "./room/InterviewRoom";
 import type { Speaker, TranscriptTurn } from "./room/LiveTranscript";
 import { CountdownDigit } from "./room/CountdownDigit";
+import { DesktopRequiredScreen } from "./room/DesktopRequiredScreen";
 import { ReadyBrief } from "./room/ReadyBrief";
+import { useMobilePhoneGuard } from "@/lib/device/largerScreen";
 import { StudyFeedbackPanel } from "./room/StudyFeedbackPanel";
 import { CardFigure } from "./room/CardFigure";
 import { useRoomSignal } from "./room/roomSignal";
@@ -171,6 +174,31 @@ export function InterviewSessionView({ variant = "mock" }: { variant?: Interview
 function InterviewSessionViewSlugWrapper({ variant }: { variant: InterviewSessionVariant }) {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
+  const from = searchParams.get("from");
+  const { checked, isMobilePhone } = useMobilePhoneGuard();
+
+  if (!checked) return <InterviewBoot />;
+
+  if (isMobilePhone) {
+    const backHref =
+      variant === "vault"
+        ? "/dashboard/vault-interviews"
+        : from === "merchant-navy"
+          ? "/dashboard/merchant-navy"
+          : "/dashboard/interviews";
+
+    return (
+      <DashboardShell
+        role="user"
+        title={variant === "vault" ? "Vault AI Interview" : "Mock AI Interview"}
+        fullBleed
+        hideChrome
+      >
+        <DesktopRequiredScreen variant={variant} backHref={backHref} />
+      </DashboardShell>
+    );
+  }
+
   return <InterviewSessionViewContent key={slug} variant={variant} />;
 }
 
@@ -198,6 +226,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [transcriptDraft, setTranscriptDraft] = useState("");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recordedDurationSec, setRecordedDurationSec] = useState<number>(0);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
@@ -374,6 +403,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         URL.revokeObjectURL(audioUrl);
         setAudioUrl(null);
       }
+      setRecordedDurationSec(0);
 
       // The interviewer's real voice, if there is one: a clip made ahead of time on the server. The words wait for it, so they never run
       // ahead of the sound. No clip in time (or no real voice at all) means the browser's own voice reads it, exactly as before.
@@ -493,6 +523,11 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         setPhase("loading");
       }
     } catch (err) {
+      if (err instanceof ApiError && err.code === "voice_verification_required") {
+        const returnTo = typeof window !== "undefined" ? window.location.pathname + window.location.search : home;
+        router.replace(`/dashboard/voice-verification?returnTo=${encodeURIComponent(returnTo)}`);
+        return;
+      }
       setErrorMessage(err instanceof ApiError ? err.message : "Couldn't start this interview.");
       setPhase("error");
     } finally {
@@ -590,6 +625,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     setInterim({ text: "", committed: "" });
     setListenHint(null);
     signal.level = 0;
+    const elapsedRec = listenStartedAtRef.current > 0 ? Math.max(1, Math.round((Date.now() - listenStartedAtRef.current) / 1000)) : 0;
+    setRecordedDurationSec(elapsedRec);
     if (blob) {
       setAudioBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
@@ -661,10 +698,17 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       const durationSeconds = Math.max(1, Math.round((Date.now() - listenStartedAtRef.current) / 1000));
       formData.append("audio", audioBlob, "answer.webm");
       formData.append("audio_duration_seconds", String(durationSeconds));
+      const sig = await extractAcousticSignature(audioBlob);
+      if (sig) {
+        formData.append("acoustic_features", JSON.stringify(sig));
+      }
     }
 
     try {
-      const res = await api.postFormData<AnswerInterviewResponse>(`${basePath}/answer`, formData);
+      const res = await api.postFormData<AnswerInterviewResponse & { voice_warning?: string }>(`${basePath}/answer`, formData);
+      if (res.voice_warning) {
+        toast.error(res.voice_warning);
+      }
 
       // Study mode: nothing moves on yet. The answer is kept on screen with the model answer and the match; the candidate goes on when they
       // have read it (handleNext), which is also when this question moves up into the transcript and the count goes up.
@@ -691,6 +735,10 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
         presentQuestion(res.next_question);
       }
     } catch (err) {
+      if (err instanceof ApiError && (err.code === "voice_mismatch_blocked" || err.code === "voice_verification_blocked")) {
+        proctoring.lockSession(err.message);
+        return;
+      }
       const msg = err instanceof ApiError ? err.message : String(err ?? "");
 
       // If the interview is already complete or no more questions remain, advance to complete
@@ -880,6 +928,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
               onSubmit={handleSubmitAnswer}
               disabled={phase === "submitting"}
               audioUrl={audioUrl}
+              recordedSeconds={recordedDurationSec}
               isTranscribing={isTranscribing}
             />
           ),

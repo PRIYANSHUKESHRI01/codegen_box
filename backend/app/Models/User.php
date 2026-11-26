@@ -1314,4 +1314,14 @@ class User extends Authenticatable
     {
         return $this->readinessBreakdown()['tier'];
     }
+
+    public function voiceVerificationProfile(): HasOne
+    {
+        return $this->hasOne(VoiceVerificationProfile::class);
+    }
+
+    public function voiceVerificationLogs(): HasMany
+    {
+        return $this->hasMany(VoiceVerificationLog::class)->latest('checked_at');
+    }
 }

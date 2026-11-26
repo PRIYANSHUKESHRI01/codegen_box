@@ -215,6 +215,8 @@ class VaultInterviewQualificationService
      */
     public function startSet(User $user, string $stackKey, int $setNumber): Interview
     {
+        app(\App\Services\Voice\VoiceVerificationService::class)->assertEligible($user);
+
         $found = $this->catalog->stack($stackKey);
 
         if ($found === null) {

@@ -142,6 +142,7 @@ export function surfaceFromBasePath(basePath: string): IntegritySurface {
   if (basePath.startsWith("/soft-skills/")) return "soft_skill";
   if (basePath.startsWith("/core/")) return "core_test";
   if (basePath.startsWith("/me/sittings/")) return "study";
+  if (basePath.startsWith("/voice-verification")) return "voice_verification";
 
   return "interview";
 }

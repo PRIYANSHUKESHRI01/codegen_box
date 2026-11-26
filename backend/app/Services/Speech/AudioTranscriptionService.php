@@ -127,18 +127,13 @@ PROMPT;
 
     /**
      * Transcribe using Google Gemini Multimodal Audio via GeminiKeyRotationService.
-     * Cascades through the model hierarchy: gemini-2.5-flash -> gemini-2.0-flash -> gemini-1.5-flash.
+     * Cascades through the Gemini 3 -> Gemini 2.5 model hierarchy.
      */
     protected function transcribeWithGemini(string $audioBytes, string $mimeType, ?string $questionContext = null): string
     {
         $base64Audio = base64_encode($audioBytes);
-        $configuredPrimary = env('GEMINI_TRANSCRIPTION_MODEL', config('services.gemini.model', 'gemini-2.5-flash'));
-        $models = array_values(array_unique(array_filter([
-            $configuredPrimary,
-            'gemini-2.5-flash',
-            'gemini-2.0-flash',
-            'gemini-1.5-flash',
-        ])));
+        $configuredPrimary = env('GEMINI_TRANSCRIPTION_MODEL');
+        $models = GeminiKeyRotationService::modelChain(is_string($configuredPrimary) ? $configuredPrimary : null);
         $prompt = $this->buildPrompt($questionContext);
 
         foreach ($models as $model) {

@@ -14,6 +14,7 @@ use App\Services\PlanGate;
 use App\Services\Speech\AudioTranscriptionService;
 use App\Services\Speech\InterviewSpeech;
 use App\Services\StudentReportService;
+use App\Services\Voice\VoiceVerificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -32,6 +33,24 @@ class InterviewController extends Controller
 {
     /** Flat prep-countdown allowance added per question when estimating an interview's total time on interviewSummary() — mirrors the frontend's own PREP_SECONDS constant. */
     private const PREP_SECONDS_PER_QUESTION = 10;
+
+    public static function isMobilePhoneUserAgent(string $ua): bool
+    {
+        if ($ua === '' || preg_match('/\b(iPad|Tablet|PlayBook|Silk)\b/i', $ua)) {
+            return false;
+        }
+
+        return preg_match('/\b(iPhone|iPod|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile|Mobile Safari)\b/i', $ua) === 1
+            || (preg_match('/Android/i', $ua) === 1 && preg_match('/Mobile/i', $ua) === 1);
+    }
+
+    public static function desktopRequiredResponse()
+    {
+        return response()->json([
+            'message' => 'Mock AI Interviews and Vault AI Interviews must be attempted on a laptop, desktop, or iPad/tablet. Mobile phones are not supported for proctored interviews.',
+            'code' => 'desktop_required',
+        ], 403);
+    }
 
     public function index(Request $request)
     {
@@ -149,6 +168,10 @@ class InterviewController extends Controller
         // called again out-of-band) must never block re-viewing the
         // already-finished resume state on a legitimate revisit.
         if ($existingSession?->status !== InterviewSession::STATUS_COMPLETED) {
+            if (self::isMobilePhoneUserAgent((string) $request->userAgent())) {
+                return self::desktopRequiredResponse();
+            }
+            app(VoiceVerificationService::class)->assertEligible($request->user());
             $this->assertNotLocked($existingSession);
         }
 
@@ -261,6 +284,7 @@ class InterviewController extends Controller
             'transcript_text' => ['nullable', 'string'],
             'audio' => ['nullable', 'file', 'mimes:webm,weba,ogg,oga,wav,mp3,m4a,mp4', 'max:25600'],
             'audio_duration_seconds' => ['nullable', 'integer', 'min:0'],
+            'acoustic_features' => ['nullable', 'string'],
         ]);
 
         $questionContext = InterviewQuestion::with('questionBank:id,question_text')
@@ -308,6 +332,40 @@ class InterviewController extends Controller
                     'session_id' => $session->id,
                     'error' => $e->getMessage(),
                 ]);
+            }
+        }
+
+        // Continuous speaker verification against the user's one-time 5-minute Voice Baseline.
+        $voiceWarning = null;
+        if ($audioPath !== null) {
+            $liveFeatures = null;
+            if (! empty($validated['acoustic_features'])) {
+                $decodedFeatures = json_decode($validated['acoustic_features'], true);
+                if (is_array($decodedFeatures)) {
+                    $liveFeatures = $decodedFeatures;
+                }
+            }
+
+            $voiceCheck = app(VoiceVerificationService::class)->verifyAnswerVoice(
+                $request->user(),
+                $interview,
+                $session,
+                null,
+                $audioPath,
+                $durationSec,
+                $liveFeatures
+            );
+
+            if ($voiceCheck['blocked']) {
+                return response()->json([
+                    'message' => $voiceCheck['reason'],
+                    'code' => 'voice_mismatch_blocked',
+                    'similarity_score' => $voiceCheck['similarity_score'],
+                ], 403);
+            }
+
+            if (! empty($voiceCheck['warning'])) {
+                $voiceWarning = $voiceCheck['reason'];
             }
         }
 
@@ -419,7 +477,9 @@ class InterviewController extends Controller
                 ScoreInterviewSessionJob::dispatch($session->id)->afterResponse();
             }
 
-            return response()->json(['complete' => true] + ($feedback !== null ? ['feedback' => $feedback] : []));
+            return response()->json(['complete' => true]
+                + ($feedback !== null ? ['feedback' => $feedback] : [])
+                + ($voiceWarning !== null ? ['voice_warning' => $voiceWarning] : []));
         }
 
         $nextQuestion = $result['next_question'];
@@ -431,7 +491,9 @@ class InterviewController extends Controller
         return response()->json([
             'complete' => false,
             'next_question' => $this->questionPayload($nextQuestion, $nextOrder, $questions->count()),
-        ] + ($feedback !== null ? ['feedback' => $feedback] : []));
+        ]
+            + ($feedback !== null ? ['feedback' => $feedback] : [])
+            + ($voiceWarning !== null ? ['voice_warning' => $voiceWarning] : []));
     }
 
     /**
@@ -584,6 +646,8 @@ class InterviewController extends Controller
             ->firstOrFail();
 
         abort_unless($session->status === InterviewSession::STATUS_COMPLETED, 422, 'Only completed interviews can be re-attempted.');
+
+        app(VoiceVerificationService::class)->assertEligible($request->user());
 
         // A section the superadmin has switched off (Merchant Navy) cannot be sat again; a sitting already under way is left to finish.
         if (($blockedBy = app(\App\Services\PlatformModules::class)->moduleBlocking($interview)) !== null) {

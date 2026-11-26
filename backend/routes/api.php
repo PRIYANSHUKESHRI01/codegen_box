@@ -58,6 +58,7 @@ use App\Http\Controllers\Api\PracticeInterviewController;
 use App\Http\Controllers\Api\CuratedInterviewSetController;
 use App\Http\Controllers\Api\MockInterviewController;
 use App\Http\Controllers\Api\VaultInterviewQualificationController;
+use App\Http\Controllers\Api\VoiceVerificationController;
 use App\Http\Controllers\Api\InterviewQuestionGenerationController;
 use App\Http\Controllers\Api\InterviewTrackController;
 use App\Http\Controllers\Api\InternalCustomerController;
@@ -523,6 +524,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::post('/interviews/{interview}/sessions/{interviewSession}/reinstate', [AdminInterviewController::class, 'reinstateProctoring']);
                 Route::post('/interviews/{interview}/responses/{interviewResponse}/score', [AdminInterviewController::class, 'scoreResponse']);
                 Route::post('/interviews/{interview}/sessions/{interviewSession}/finalize', [AdminInterviewController::class, 'finalizeSession']);
+                Route::post('/voice-verification/{user}/unblock', [VoiceVerificationController::class, 'unblock']);
 
                 // Reusable role definitions (e.g. "Backend Developer —
                 // Laravel & Next.js") driving consistent AI question
@@ -759,6 +761,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/users/{user}/toggle-block', [SuperAdminController::class, 'toggleBlock']);
             Route::post('/users/{user}/reinstate-proctoring', [SuperAdminController::class, 'reinstateProctoring'])
                 ->middleware('throttle:superadmin-subscriptions');
+            Route::get('/voice-verification', [VoiceVerificationController::class, 'adminIndex']);
+            Route::post('/voice-verification/{user}/unblock', [VoiceVerificationController::class, 'unblock']);
+            Route::post('/voice-verification/{user}/reset', [VoiceVerificationController::class, 'adminReset']);
+            Route::post('/voice-verification/{user}/block', [VoiceVerificationController::class, 'adminBlock']);
             Route::post('/users/{user}/permissions', [SuperAdminController::class, 'updatePermissions']);
             // Both re-check the caller's own password, so they share a tight per-user limiter (see AppServiceProvider).
             Route::post('/users/{user}/reset-password', [SuperAdminController::class, 'resetPassword'])
@@ -1185,6 +1191,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/interviews/{interview}/sessions/{interviewSession}/reinstate', [TpoInterviewController::class, 'reinstateProctoring']);
             Route::post('/interviews/{interview}/responses/{interviewResponse}/score', [TpoInterviewController::class, 'scoreResponse']);
             Route::post('/interviews/{interview}/sessions/{interviewSession}/finalize', [TpoInterviewController::class, 'finalizeSession']);
+            Route::post('/voice-verification/{user}/unblock', [VoiceVerificationController::class, 'unblock']);
 
             // Telling students again, copying an interview, drawing questions from the AptRun library, and the results with their PDF reports.
             Route::post('/interviews/{interview}/announce', [TpoInterviewReportController::class, 'announce'])->middleware('throttle:report-generate');
@@ -1533,6 +1540,15 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/curated-interview-sets', [CuratedInterviewSetController::class, 'index'])->middleware('capability:ai_interviews');
             Route::get('/curated-interview-sets/{setId}', [CuratedInterviewSetController::class, 'show'])->middleware('capability:ai_interviews');
             Route::post('/curated-interview-sets/{setId}/start', [CuratedInterviewSetController::class, 'start'])->middleware('capability:ai_interviews');
+            // One-time 5-minute Voice Baseline Verification (required before Vault AI and Mock AI interviews).
+            Route::get('/voice-verification/status', [VoiceVerificationController::class, 'status']);
+            Route::post('/voice-verification/start', [VoiceVerificationController::class, 'start']);
+            Route::post('/voice-verification/retry', [VoiceVerificationController::class, 'retry']);
+            Route::post('/voice-verification/sample', [VoiceVerificationController::class, 'submitSample'])->middleware('throttle:30,1');
+            Route::post('/voice-verification/complete', [VoiceVerificationController::class, 'complete']);
+            Route::post('/voice-verification/proctoring/start', [VoiceVerificationController::class, 'proctoringStart']);
+            Route::post('/voice-verification/proctoring/violations', [VoiceVerificationController::class, 'reportProctoringViolation'])->middleware('throttle:proctoring-event');
+
             Route::get('/vault-qualification/access', [VaultInterviewQualificationController::class, 'access'])->middleware('capability:ai_interviews');
             Route::get('/vault-qualification/status', [VaultInterviewQualificationController::class, 'status'])->middleware('capability:ai_interviews');
             Route::post('/vault-qualification/start-set', [VaultInterviewQualificationController::class, 'startSet'])->middleware('capability:ai_interviews');

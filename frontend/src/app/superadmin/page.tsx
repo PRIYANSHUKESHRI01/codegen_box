@@ -3,7 +3,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog, Gift, Activity, Users, Rocket, Sparkles, BarChart3, ShieldCheck, Briefcase } from "lucide-react";
+import { LayoutDashboard, GraduationCap, UserSearch, Building2, Users2, Cpu, ShieldAlert, Megaphone, KeyRound, Wallet, CreditCard, BadgeCheck, Layers, Anchor, UserCog, Gift, Activity, Users, Rocket, Sparkles, BarChart3, ShieldCheck, Briefcase, Mic } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { cn } from "@/lib/utils";
@@ -46,15 +46,17 @@ import { PlatformUsageTimelineGraph } from "@/components/admin/superadmin/Platfo
 import { TrafficPulseBar } from "@/components/admin/superadmin/TrafficPulseBar";
 import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList";
 import { SuperAdminDrivesPanel } from "@/components/admin/superadmin/SuperAdminDrivesPanel";
+import { VoiceVerificationPanel } from "@/components/admin/superadmin/VoiceVerificationPanel";
 import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "voice_verification" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "platform_usage", label: "Platform Usage", icon: BarChart3 },
   { id: "activity", label: "Live Activity", icon: Activity },
   { id: "gemini_keys", label: "Gemini Keys", icon: Sparkles },
+  { id: "voice_verification", label: "Voice Verification", icon: Mic },
   { id: "drives", label: "Placement Drives", icon: Briefcase },
   { id: "hackathons", label: "Hackathons", icon: Rocket },
   { id: "vault_ai", label: "Vault AI Results", icon: ShieldCheck },
@@ -167,6 +169,7 @@ function SuperAdminPageContent() {
       )}
       {activeTab === "activity" && <ActivityPanel key={collegeParam ?? "all"} initialCollegeId={collegeParam} />}
       {activeTab === "gemini_keys" && <GeminiKeysPanel triggerToast={triggerToast} />}
+      {activeTab === "voice_verification" && <VoiceVerificationPanel triggerToast={triggerToast} />}
       {activeTab === "drives" && <SuperAdminDrivesPanel />}
       {activeTab === "hackathons" && <SuperAdminHackathonsPanel triggerToast={triggerToast} />}
       {activeTab === "vault_ai" && (

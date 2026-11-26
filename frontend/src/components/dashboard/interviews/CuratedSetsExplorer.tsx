@@ -662,6 +662,10 @@ export function CuratedSetsExplorer({ className, initialStack }: { className?: s
       });
       router.push(`/dashboard/vault-interviews/view?slug=${encodeURIComponent(res.interview.slug)}`);
     } catch (err) {
+      if (err instanceof ApiError && err.code === "voice_verification_required") {
+        router.push("/dashboard/voice-verification?returnTo=%2Fdashboard%2Fvault-interviews");
+        return;
+      }
       setActionError({ message: err instanceof ApiError ? err.message : "Could not launch interview. Please try again." });
       setStartingSetNumber(null);
     }

@@ -32,6 +32,10 @@ class InterviewProctoringController extends Controller
 
         $session = $this->session($request, $interview);
 
+        if (InterviewController::isMobilePhoneUserAgent((string) $request->userAgent())) {
+            return InterviewController::desktopRequiredResponse();
+        }
+
         $validated = $request->validate([
             'device_info' => ['nullable', 'array'],
             'integrity' => ['nullable', 'array'],

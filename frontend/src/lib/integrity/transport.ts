@@ -18,6 +18,7 @@ import type { BatchAck, IntegrityEvent, WebEventType } from "./types";
 export const URGENT_EVENTS: ReadonlySet<WebEventType> = new Set<WebEventType>([
   "fullscreen_exit", "tab_switch", "devtools_detected", "focus_lost", "tamper_detected", "automation_detected", "multi_monitor",
   "screen_share_stopped", "screen_share_changed", "camera_lost", "camera_blocked", "virtual_camera", "mic_lost", "synthetic_input",
+  "multiple_faces", "face_mismatch", "phone_detected", "no_face", "face_away",
 ]);
 
 /** Dropped first when the queue is full: they add nothing a reviewer needs once the strike-class events are kept. */
@@ -172,6 +173,30 @@ export class IntegrityTransport {
     if (extra) this.queue.push(extra);
     if (this.inflight) return; // its answer is lost with the page; the server records the silence
     const body = this.pending?.body ?? this.build();
+    void this.o.api.post(`/integrity/${this.o.id}/events`, body, { keepalive: true }).catch(() => undefined);
+  }
+
+  /**
+   * Used right before local session lock (e.g. multiple people / grace period exceeded) so the lock-triggering
+   * event reaches the server immediately even if a routine heartbeat batch is currently in flight.
+   */
+  flushLockEvent(type: WebEventType, data?: Record<string, unknown>): void {
+    if (this.stopped) return;
+    const event: IntegrityEvent = { type, t: this.now(), ...(data && Object.keys(data).length ? { data } : {}) };
+    if (!this.inflight) {
+      this.queue.push(event);
+      const body = this.pending?.body ?? this.build();
+      void this.o.api.post(`/integrity/${this.o.id}/events`, body, { keepalive: true }).catch(() => undefined);
+      return;
+    }
+    const body: Record<string, unknown> = {
+      batch_id: this.nextBatchId + 1,
+      nonce: this.nonce,
+      instance: this.o.instance,
+      t: this.now(),
+      state: this.o.getState(),
+      events: [event],
+    };
     void this.o.api.post(`/integrity/${this.o.id}/events`, body, { keepalive: true }).catch(() => undefined);
   }
 

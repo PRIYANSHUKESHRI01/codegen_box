@@ -273,5 +273,6 @@ class DatabaseSeeder extends Seeder
         $this->call(GeminiApiKeySeeder::class);
         $this->call(AptBotFaqSeeder::class);
         $this->call(TpoEnterpriseBackfillSeeder::class);
+        $this->call(VoiceVerificationSeeder::class);
     }
 }

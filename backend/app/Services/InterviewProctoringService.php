@@ -73,6 +73,9 @@ class InterviewProctoringService
         }
 
         // `$strikes` is set only by the integrity layer; null = the original rule.
+        if ($strikes === null && $type === InterviewProctoringViolation::TYPE_MULTIPLE_FACES && ! empty($meta['grace_period_exceeded'])) {
+            $strikes = \App\Services\Integrity\EventCatalog::STRIKE_LOCK;
+        }
         $isStrike = $strikes === null ? InterviewProctoringViolation::isStrikeType($type) : $strikes > 0;
 
         return DB::transaction(function () use ($session, $type, $question, $ip, $meta, $isStrike, $strikes) {

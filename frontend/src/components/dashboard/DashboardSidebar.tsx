@@ -558,6 +558,11 @@ export function DashboardSidebar({
               badge: "6 Keys",
               badgeTone: "ok",
             },
+            {
+              label: "Voice Verification",
+              href: "/superadmin?tab=voice_verification",
+              icon: Mic,
+            },
           ],
         },
         ...platformOpsForSuperadmin,

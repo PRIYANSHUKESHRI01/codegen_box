@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { Mic, CheckCircle2, Loader2, PlayCircle, Layers, ArrowDown, CalendarClock } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { MockInterviewExplorer } from "@/components/dashboard/interviews/MockInterviewExplorer";
+import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
@@ -98,13 +99,17 @@ function InterviewsListContent() {
       <FreeTrialBanner feature="mock_interview" />
 
       {/* Practise by domain, then tech stack, then a mock interview — the same path as the Vault AI Interview, without the qualification. */}
-      <div className="mt-4 space-y-3">
-        {!focused && !loading && assignedCount > 0 && (
-          <a href="#from-your-college" className="inline-flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/[0.07] px-3 py-1.5 text-2xs font-bold text-accent-primary transition-colors hover:bg-accent-primary/10">
-            <ArrowDown className="h-3 w-3" aria-hidden /> {assignedCount} {assignedCount === 1 ? "interview" : "interviews"} waiting from your college
-          </a>
-        )}
-        <MockInterviewExplorer />
+      <div className="mt-4 space-y-5">
+        <VoiceVerificationGate surfaceLabel="Mock AI Interview" returnTo="/dashboard/interviews">
+          <div className="space-y-3">
+            {!focused && !loading && assignedCount > 0 && (
+              <a href="#from-your-college" className="inline-flex items-center gap-1.5 rounded-full border border-accent-primary/30 bg-accent-primary/[0.07] px-3 py-1.5 text-2xs font-bold text-accent-primary transition-colors hover:bg-accent-primary/10">
+                <ArrowDown className="h-3 w-3" aria-hidden /> {assignedCount} {assignedCount === 1 ? "interview" : "interviews"} waiting from your college
+              </a>
+            )}
+            <MockInterviewExplorer />
+          </div>
+        </VoiceVerificationGate>
       </div>
 
       {focused ? null : loading ? (

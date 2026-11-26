@@ -8,7 +8,7 @@ namespace App\Services\Integrity;
  */
 final class Profiles
 {
-    public const SURFACE_KEYS = ['contest', 'interview', 'soft_skill', 'core_test', 'study'];
+    public const SURFACE_KEYS = ['contest', 'interview', 'soft_skill', 'core_test', 'study', 'voice_verification'];
 
     /** Whether the whole layer applies to this surface (master switch, plus the surface's own proctoring switch). */
     public static function enabledFor(string $surface): bool

@@ -26,12 +26,17 @@ class InterviewProctoringViolation extends Model
 
     public const TYPE_FACE_MISMATCH = 'face_mismatch';
 
+    public const TYPE_MULTIPLE_FACES = 'multiple_faces';
+
+    public const TYPE_VOICE_MISMATCH = 'voice_mismatch';
+
     public const STRIKE_TYPES = [
         self::TYPE_FULLSCREEN_EXIT,
         self::TYPE_TAB_SWITCH,
         self::TYPE_DEVTOOLS_DETECTED,
         self::TYPE_PHONE_DETECTED,
         self::TYPE_FACE_MISMATCH,
+        self::TYPE_VOICE_MISMATCH,
     ];
 
     public const TYPES = [
@@ -44,6 +49,8 @@ class InterviewProctoringViolation extends Model
         self::TYPE_TAB_CLOSE_ATTEMPT,
         self::TYPE_PHONE_DETECTED,
         self::TYPE_FACE_MISMATCH,
+        self::TYPE_MULTIPLE_FACES,
+        self::TYPE_VOICE_MISMATCH,
     ];
 
     protected $fillable = [

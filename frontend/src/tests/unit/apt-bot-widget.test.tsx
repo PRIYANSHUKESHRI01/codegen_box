@@ -8,7 +8,7 @@ let mockUser: { id: number; name: string; email: string; role: string } | null =
   id: 101,
   name: "Alex Chen",
   email: "alex@example.com",
-  role: "student",
+  role: "user",
 };
 
 const mockPush = vi.fn();
@@ -38,7 +38,7 @@ describe("<AptBotWidget />", () => {
       id: 101,
       name: "Alex Chen",
       email: "alex@example.com",
-      role: "student",
+      role: "user",
     };
     mockPush.mockReset();
     vi.restoreAllMocks();
@@ -48,16 +48,56 @@ describe("<AptBotWidget />", () => {
     cleanup();
   });
 
-  it("renders the floating launcher button on standard routes", () => {
+  it("renders only the right-edge blue circle launcher after student login, expands Ask aptBot on hover, and shrinks back on leave", async () => {
     render(<AptBotWidget />);
-    expect(screen.getByLabelText(/Open AptBot Instant Assistant/i)).toBeTruthy();
-    expect(screen.getByText(/Ask/i)).toBeTruthy();
+    const circle = screen.getByTestId("aptbot-docked-circle");
+    expect(circle).toBeTruthy();
+    expect(screen.queryByText(/^Ask$/i)).toBeNull();
+
+    // Hovering expands out with the "Ask aptBot" pill
+    fireEvent.mouseEnter(circle.parentElement!);
+    expect(screen.getByText(/^Ask$/i)).toBeTruthy();
+    expect(screen.getByLabelText("aptBot")).toBeTruthy();
+
+    // Removing cursor shrinks it back to just the blue circle
+    fireEvent.mouseLeave(circle.parentElement!);
+    await waitFor(() => {
+      expect(screen.queryByText(/^Ask$/i)).toBeNull();
+    });
   });
 
-  it("does not render when user is on a proctored assessment route (/session)", () => {
+  it("does not render before login or on proctored/coding/admin routes", () => {
     mockPathname = "/dashboard/soft-skills/session";
-    const { container } = render(<AptBotWidget />);
+    const { container, rerender } = render(<AptBotWidget />);
     expect(container.firstChild).toBeNull();
+
+    mockPathname = "/dashboard/voice-verification";
+    rerender(<AptBotWidget />);
+    expect(container.firstChild).toBeNull();
+
+    mockPathname = "/dashboard/practice/view";
+    rerender(<AptBotWidget />);
+    expect(container.firstChild).toBeNull();
+
+    mockPathname = "/admin/students";
+    rerender(<AptBotWidget />);
+    expect(container.firstChild).toBeNull();
+
+    mockPathname = "/dashboard";
+    mockUser = null;
+    rerender(<AptBotWidget />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("opens on click and shrinks back to the right-side blue circle when closed", async () => {
+    render(<AptBotWidget />);
+    fireEvent.click(screen.getByLabelText(/Open AptBot Instant Assistant/i));
+    expect(screen.getByText(/Instant AI/i)).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText(/Close AptBot/i));
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Open AptBot Instant Assistant/i)).toBeTruthy();
+    });
   });
 
   it("opens the chat panel when clicking the launcher button", async () => {
@@ -161,15 +201,10 @@ describe("<AptBotWidget />", () => {
     });
   });
 
-  it("redirects unauthenticated users to /login when attempting to write a query", async () => {
+  it("does not render when user is unauthenticated on /login", () => {
     mockUser = null;
-    render(<AptBotWidget />);
-    const trigger = screen.getByLabelText(/Open AptBot Instant Assistant/i);
-    fireEvent.click(trigger);
-
-    const writeQueryBtn = screen.getByRole("button", { name: /Write your query/i });
-    fireEvent.click(writeQueryBtn);
-
-    expect(mockPush).toHaveBeenCalledWith("/login?redirect=%2Fdashboard");
+    mockPathname = "/login";
+    const { container } = render(<AptBotWidget />);
+    expect(container.firstChild).toBeNull();
   });
 });

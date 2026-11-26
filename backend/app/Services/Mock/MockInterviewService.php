@@ -9,6 +9,7 @@ use App\Services\CuratedInterviewSetService;
 use App\Services\Interviews\StudyHistory;
 use App\Services\PlanGate;
 use App\Services\PlatformModules;
+use App\Services\Voice\VoiceVerificationService;
 use App\Support\InterviewDiscipline;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -182,6 +183,8 @@ class MockInterviewService
      */
     public function start(User $user, string $roundId): Interview
     {
+        app(VoiceVerificationService::class)->assertEligible($user);
+
         $target = $this->catalog->round($roundId);
 
         if ($target === null) {

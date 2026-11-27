@@ -103,7 +103,9 @@ use App\Http\Controllers\Api\RazorpayWebhookController;
 use App\Http\Controllers\Api\SoftSkillController;
 use App\Http\Controllers\Api\SoftSkillProctoringController;
 use App\Http\Controllers\Api\SpeakingPracticeController;
+use App\Http\Controllers\Api\StudentCollegeAssessmentController;
 use App\Http\Controllers\Api\StudentDriveController;
+use App\Http\Controllers\Api\StudentLaunchpadProgramController;
 use App\Http\Controllers\Api\StudentImportController;
 use App\Http\Controllers\Api\StudentPreferencesController;
 use App\Http\Controllers\Api\StudentProfileController;
@@ -112,7 +114,9 @@ use App\Http\Controllers\Api\StudentVaultController;
 use App\Http\Controllers\Api\SubmissionController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\SuperAdminAccountController;
+use App\Http\Controllers\Api\SuperAdminCollegeAssessmentController;
 use App\Http\Controllers\Api\SuperAdminCollegeController;
+use App\Http\Controllers\Api\SuperAdminLaunchpadProgramController;
 use App\Http\Controllers\Api\SuperAdminController;
 use App\Http\Controllers\Api\SuperAdminMarketingTeamController;
 use App\Http\Controllers\Api\SuperAdminPlatformModuleController;
@@ -150,6 +154,7 @@ use App\Http\Controllers\Api\TpoStudentManageController;
 use App\Http\Controllers\Api\TpoInterviewReportController;
 use App\Http\Controllers\Api\StudentInterviewReportController;
 use App\Http\Controllers\Api\VaultIntegrationController;
+use App\Http\Controllers\Api\VaultProfileSyncController;
 use App\Http\Controllers\Api\VocabularyController;
 use App\Http\Controllers\Api\VocabularyProgressController;
 use App\Http\Controllers\Api\SSOController;
@@ -161,6 +166,10 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:lo
 
 // MellowVault 1-Click Single Sign-On (SSO)
 Route::get('/sso/login', [SSOController::class, 'handleSSOLogin'])->name('sso.login')->middleware('throttle:sso-login');
+// 1-click signed email invite landing straight into the developer's Vault AI Interview stack
+Route::get('/vault/interview-open/{user}', [VaultProfileSyncController::class, 'openFromEmail'])
+    ->name('vault.interview.open')
+    ->middleware(['signed', 'throttle:30,1']);
 
 // The AptRun Guardian (the Windows desktop agent that watches the operating system during a proctored attempt). It is a
 // separate program with its own credentials, so these sit outside the student login: pairing redeems a one-time code, and
@@ -248,6 +257,7 @@ Route::prefix('vault/sync')->group(function () {
     Route::post('/user/{user}', [MellowVaultSyncApiController::class, 'syncUser']);
     Route::get('/user/{user}/status', [MellowVaultSyncApiController::class, 'userStatus']);
     Route::post('/batch', [MellowVaultSyncApiController::class, 'syncBatch']);
+    Route::post('/profile-completion', [VaultProfileSyncController::class, 'pushFromMellowVault'])->middleware('throttle:60,1');
 });
 
 // Mellow Vault score transfer API (transfer Vault AI Interview scores >= 60% with qualification message)
@@ -688,6 +698,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 Route::post('/vault/profiles/{profile}/resync', [AdminVaultController::class, 'resync']);
                 Route::get('/vault/sync-events', [AdminVaultController::class, 'syncEvents']);
                 Route::post('/vault/sync-events/retry', [AdminVaultController::class, 'retrySync']);
+                Route::get('/mellow-vault/profile-invites', [VaultProfileSyncController::class, 'adminIndex']);
+                Route::post('/mellow-vault/sync-profiles', [VaultProfileSyncController::class, 'adminSync']);
 
                 // The Vault AI Interview question bank: which stacks are open to students and which are empty, and the tools
                 // to fill them (one question at a time, or a spreadsheet). See CuratedQuestionAdmin.
@@ -916,6 +928,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-subscriptions');
             Route::post('/vault-ai/students/{user}/reinstate-proctoring', [SuperAdminVaultAiController::class, 'reinstateProctoring'])
                 ->middleware('throttle:superadmin-subscriptions');
+            Route::post('/mellow-vault/sync-profiles', [VaultProfileSyncController::class, 'adminSync']);
 
             // Readiness: every student's score, and the hand tool to set it. A hand-set score replaces the calculated one everywhere.
             Route::get('/readiness/{user}', [SuperAdminReadinessController::class, 'show']);
@@ -946,6 +959,32 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
                 ->middleware('throttle:superadmin-sensitive');
             Route::post('/gemini-keys/sync-to-env', [SuperAdminGeminiKeyController::class, 'syncToEnv'])
                 ->middleware('throttle:superadmin-sensitive');
+
+            // SuperAdmin College Assessments (Soft Skills + Coding + AI Interview mapped college/branch/student-wise)
+            Route::get('/college-assessments', [SuperAdminCollegeAssessmentController::class, 'index']);
+            Route::get('/college-assessments/builder-options', [SuperAdminCollegeAssessmentController::class, 'builderOptions']);
+            Route::get('/college-assessments/students', [SuperAdminCollegeAssessmentController::class, 'students']);
+            Route::post('/college-assessments', [SuperAdminCollegeAssessmentController::class, 'store']);
+            Route::get('/college-assessments/{collegeAssessment}', [SuperAdminCollegeAssessmentController::class, 'show']);
+            Route::put('/college-assessments/{collegeAssessment}', [SuperAdminCollegeAssessmentController::class, 'update']);
+            Route::post('/college-assessments/{collegeAssessment}/publish', [SuperAdminCollegeAssessmentController::class, 'publish']);
+            Route::post('/college-assessments/{collegeAssessment}/unpublish', [SuperAdminCollegeAssessmentController::class, 'unpublish']);
+            Route::post('/college-assessments/{collegeAssessment}/close', [SuperAdminCollegeAssessmentController::class, 'close']);
+            Route::post('/college-assessments/{collegeAssessment}/assignments', [SuperAdminCollegeAssessmentController::class, 'syncAssignments']);
+            Route::delete('/college-assessments/{collegeAssessment}', [SuperAdminCollegeAssessmentController::class, 'destroy']);
+            Route::get('/college-assessments/{collegeAssessment}/export', [SuperAdminCollegeAssessmentController::class, 'exportCsv']);
+
+            // Mellow Vault Launchpad 2026 Multi-Assessment Campaigns (Tech 21d & Non-Tech 5d with Set 1-3 Rotation)
+            Route::get('/launchpad-programs', [SuperAdminLaunchpadProgramController::class, 'index']);
+            Route::post('/launchpad-programs', [SuperAdminLaunchpadProgramController::class, 'store']);
+            Route::get('/launchpad-programs/{launchpadProgram}', [SuperAdminLaunchpadProgramController::class, 'show']);
+            Route::post('/launchpad-programs/{launchpadProgram}/publish', [SuperAdminLaunchpadProgramController::class, 'publish']);
+            Route::post('/launchpad-programs/{launchpadProgram}/unpublish', [SuperAdminLaunchpadProgramController::class, 'unpublish']);
+            Route::post('/launchpad-programs/{launchpadProgram}/close', [SuperAdminLaunchpadProgramController::class, 'close']);
+            Route::post('/launchpad-programs/{launchpadProgram}/remind', [SuperAdminLaunchpadProgramController::class, 'remind']);
+            Route::post('/launchpad-programs/{launchpadProgram}/assignments', [SuperAdminLaunchpadProgramController::class, 'syncAssignments']);
+            Route::delete('/launchpad-programs/{launchpadProgram}', [SuperAdminLaunchpadProgramController::class, 'destroy']);
+            Route::get('/launchpad-programs/{launchpadProgram}/export', [SuperAdminLaunchpadProgramController::class, 'exportCsv']);
         });
 
     // Compatibility aliases for gemini-keys without the /superadmin prefix
@@ -1498,6 +1537,14 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/drives/{placementDrive}/register', [StudentDriveController::class, 'register']);
             Route::post('/drives/{placementDrive}/withdraw', [StudentDriveController::class, 'withdraw']);
 
+            // SuperAdmin-mapped College Assessments & Launchpad 2026 Campaigns
+            Route::get('/assessments', [StudentCollegeAssessmentController::class, 'index']);
+            Route::get('/assessments/campaigns', [StudentLaunchpadProgramController::class, 'campaigns']);
+            Route::get('/assessments/{collegeAssessment}', [StudentCollegeAssessmentController::class, 'show']);
+            Route::post('/assessments/{collegeAssessment}/start-soft-skill', [StudentCollegeAssessmentController::class, 'startSoftSkill']);
+            Route::post('/assessments/{collegeAssessment}/start-coding', [StudentCollegeAssessmentController::class, 'startCoding']);
+            Route::post('/assessments/{collegeAssessment}/start-interview', [StudentCollegeAssessmentController::class, 'startInterview']);
+
             Route::get('/problems/{problem}', [ProblemController::class, 'show'])->middleware('capability:coding_practice');
             // Run/Submit only enqueue (202 + token) — the verdict is collected
             // from /judge/{token} below. Per-user throttles, never per-IP.
@@ -1549,6 +1596,9 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/voice-verification/proctoring/start', [VoiceVerificationController::class, 'proctoringStart']);
             Route::post('/voice-verification/proctoring/violations', [VoiceVerificationController::class, 'reportProctoringViolation'])->middleware('throttle:proctoring-event');
 
+            Route::get('/vault/profile-sync/status', [VaultProfileSyncController::class, 'myStatus']);
+            Route::get('/vault/sso-url', [SSOController::class, 'generateMellowVaultSso'])->middleware('throttle:30,1');
+            Route::get('/sso/mellow-vault', [SSOController::class, 'redirectToMellowVault'])->middleware('throttle:30,1');
             Route::get('/vault-qualification/access', [VaultInterviewQualificationController::class, 'access'])->middleware('capability:ai_interviews');
             Route::get('/vault-qualification/status', [VaultInterviewQualificationController::class, 'status'])->middleware('capability:ai_interviews');
             Route::post('/vault-qualification/start-set', [VaultInterviewQualificationController::class, 'startSet'])->middleware('capability:ai_interviews');

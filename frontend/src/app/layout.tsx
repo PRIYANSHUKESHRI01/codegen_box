@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import dynamic from "next/dynamic";
 import localFont from "next/font/local";
 import NextTopLoader from "nextjs-toploader";
 import { AuthProvider } from "@/lib/AuthContext";
@@ -6,10 +7,16 @@ import { ImpersonationBanner } from "@/components/auth/ImpersonationBanner";
 import { NotificationRuntime } from "@/components/notifications/NotificationRuntime";
 import { ActivityRuntime } from "@/components/system/ActivityRuntime";
 import { RouteSyncGuard } from "@/components/navigation/RouteSyncGuard";
-import { AptBotWidget } from "@/components/chat/AptBotWidget";
 import { Toaster } from "@/components/ui/Toaster";
 import { DialogHost } from "@/components/ui/DialogHost";
 import "./globals.css";
+
+// Lazy-load the floating AptBot FAQ & support drawer so it does not inflate the
+// initial JS payload or block hydration on landing, login, and proctoring pages.
+const AptBotWidget = dynamic(
+  () => import("@/components/chat/AptBotWidget").then((m) => m.AptBotWidget),
+  { ssr: false }
+);
 
 // Inter + JetBrains Mono are self-hosted (the latin-subset variable woff2
 // files in ./fonts, the same files next/font/google used to fetch) instead of

@@ -1,8 +1,10 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Info, Layers, Mic, ShieldCheck, Target, Trophy } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { ArrowRight, Check, Info, Layers, Mic, ShieldCheck, Sparkles, Target, Trophy } from "lucide-react";
+import { api } from "@/lib/api";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { CuratedSetsExplorer } from "@/components/dashboard/interviews/CuratedSetsExplorer";
 import { VaultAiLockedPanel } from "@/components/dashboard/vaultAi/VaultAiLockedPanel";
@@ -111,6 +113,84 @@ function Intro({ access }: { access: VaultAiAccess | null }) {
   );
 }
 
+interface MellowVaultProfileSyncStatus {
+  profile_percent: number;
+  threshold: number;
+  hit_90: boolean;
+  pro_id: number | null;
+  stack_key: string | null;
+  stack_name: string | null;
+  direct_url: string;
+}
+
+function VaultExplorerWithParams() {
+  const searchParams = useSearchParams();
+  const stackParam = searchParams.get("stack") ?? undefined;
+  const returnTo = stackParam
+    ? `/dashboard/vault-interviews?stack=${encodeURIComponent(stackParam)}`
+    : "/dashboard/vault-interviews";
+
+  const [mvStatus, setMvStatus] = useState<MellowVaultProfileSyncStatus | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .get<MellowVaultProfileSyncStatus>("/vault/profile-sync/status")
+      .then((res) => {
+        if (active) setMvStatus(res);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const showProfileBanner = mvStatus && mvStatus.profile_percent > 0 && mvStatus.hit_90;
+  const alreadyOnMatchedStack =
+    !!stackParam && !!mvStatus?.stack_key && stackParam.toLowerCase() === mvStatus.stack_key.toLowerCase();
+
+  return (
+    <div className="space-y-5">
+      {showProfileBanner && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-500/[0.08] via-violet-500/[0.04] to-transparent px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+              <Sparkles className="h-4 w-4" aria-hidden />
+            </span>
+            <div className="space-y-0.5">
+              <p className="text-xs font-extrabold text-primary">
+                Mellow Vault Profile {mvStatus.profile_percent}% Complete
+                {mvStatus.stack_name ? ` · ${mvStatus.stack_name}` : ""}
+              </p>
+              <p className="text-[11px] text-text-secondary">
+                {alreadyOnMatchedStack
+                  ? "Your matched technical track is pre-loaded below — start Round 1 whenever you are ready."
+                  : mvStatus.stack_name
+                  ? `Your profile stack is ${mvStatus.stack_name}. Jump straight to your pre-matched qualification rounds.`
+                  : "You reached 90%+ on Mellow Vault. Pick your track below to begin your Vault AI Interview."}
+              </p>
+            </div>
+          </div>
+
+          {!alreadyOnMatchedStack && mvStatus.stack_key && (
+            <Link
+              href={mvStatus.direct_url}
+              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 sm:self-center"
+            >
+              Open {mvStatus.stack_name ?? "Matched"} Track
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
+          )}
+        </div>
+      )}
+
+      <VoiceVerificationGate surfaceLabel="Vault AI Interview" returnTo={returnTo}>
+        <CuratedSetsExplorer initialStack={stackParam} />
+      </VoiceVerificationGate>
+    </div>
+  );
+}
+
 export default function VaultInterviewsPage() {
   const { status } = useAuthGuard(["user"]);
   const { access, loading } = useVaultAiAccess(status === "ready");
@@ -139,9 +219,7 @@ export default function VaultInterviewsPage() {
         {/* The final average of the three sets (best series), the attempts behind it, and the PDF report — once a series has been completed. */}
         <VaultAiResultsCard />
         <Suspense fallback={<VaSkeleton className="h-64" />}>
-          <VoiceVerificationGate surfaceLabel="Vault AI Interview" returnTo="/dashboard/vault-interviews">
-            <CuratedSetsExplorer />
-          </VoiceVerificationGate>
+          <VaultExplorerWithParams />
         </Suspense>
       </div>
     </DashboardShell>

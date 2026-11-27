@@ -101,13 +101,13 @@ class StudentImportController extends Controller
             ]);
         }
 
-        $csv = "name,email,roll_number,branch,section,cgpa,backlogs,phone,parent_phone,year\n"
+        $csv = "name,email,roll_number,branch,section,cgpa,backlogs,phone,parent_phone,year,tenth_percentage,twelfth_percentage\n"
             .($ownSample
-                ? 'Alex Chen,alex.chen@student.example.edu,24'.strtoupper(substr($first['code'], 0, 3)).'1042,"'.$first['name'].'",A,8.4,0,+91-9876543210,+91-9876500000,3rd year'."\n"
-                : "Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000,3rd year\n");
+                ? 'Alex Chen,alex.chen@student.example.edu,24'.strtoupper(substr($first['code'], 0, 3)).'1042,"'.$first['name'].'",A,8.4,0,+91-9876543210,+91-9876500000,3rd year,91.2,88.5'."\n"
+                : "Alex Chen,alex.chen@student.example.edu,21CS1042,CSE,A,8.4,0,+91-9876543210,+91-9876500000,3rd year,91.2,88.5\n");
 
         return response($csv, 200, [
-            'Content-Type' => 'text/csv',
+            'Content-Type' => 'text/csv; charset=UTF-8',
             'Content-Disposition' => "attachment; filename=\"student-import-template{$suffix}.csv\"",
         ]);
     }

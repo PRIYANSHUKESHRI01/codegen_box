@@ -50,9 +50,8 @@ class GeminiSpeakingPassageService
     public function generate(string $topic, string $difficulty, string $purpose): array
     {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI passage generation is not configured yet.');
         }
 
@@ -64,13 +63,14 @@ class GeminiSpeakingPassageService
         $purpose = array_key_exists($purpose, self::PURPOSES) ? $purpose : 'interview';
         $difficulty = array_key_exists($difficulty, self::LEVELS) ? $difficulty : SpeakingPrompt::DIFFICULTY_INTERMEDIATE;
         [$minWords, $maxWords, $style] = self::LEVELS[$difficulty];
+        $model = GeminiKeyRotationService::modelChain()[0];
 
         try {
-            $response = $rotationService->runWithFallback(function (string $currentKey) use ($topic, $purpose, $difficulty, $minWords, $maxWords, $style) {
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($topic, $purpose, $difficulty, $minWords, $maxWords, $style, $model) {
                 return Http::withHeaders(['x-goog-api-key' => $currentKey])
                     ->timeout(25)
                     ->post(
-                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
                         [
                             'contents' => [['parts' => [['text' => $this->buildPrompt($topic, $purpose, $difficulty, $minWords, $maxWords, $style)]]]],
                             'generationConfig' => [

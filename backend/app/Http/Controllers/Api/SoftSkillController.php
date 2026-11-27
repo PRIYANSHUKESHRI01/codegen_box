@@ -133,6 +133,7 @@ class SoftSkillController extends Controller
     private function assigned(User $user): Collection
     {
         return SoftSkillAssessment::notQuestionSets()
+            ->where('assessment_type', '!=', SoftSkillAssessment::TYPE_COLLEGE_ASSESSMENT)
             ->where('status', SoftSkillAssessment::STATUS_PUBLISHED)
             ->with('owningCompany:id,name,logo')
             ->get()
@@ -144,6 +145,7 @@ class SoftSkillController extends Controller
     private function assignedAndLibrary(User $user): Collection
     {
         return SoftSkillAssessment::where('status', SoftSkillAssessment::STATUS_PUBLISHED)
+            ->where('assessment_type', '!=', SoftSkillAssessment::TYPE_COLLEGE_ASSESSMENT)
             ->with('owningCompany:id,name,logo')
             ->orderByRaw('question_set_number is null')
             ->orderBy('question_set_number')

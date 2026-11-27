@@ -476,5 +476,21 @@ class AppServiceProvider extends ServiceProvider
                 }
             }
         });
+
+        // Sanctum writes `last_used_at` on EVERY authenticated API call by default, causing row-lock
+        // contention on `personal_access_tokens` when a dashboard load fires 6+ concurrent GETs.
+        // Throttle sub-2-minute last_used_at-only touches while keeping initial stamps and >2m updates.
+        \Laravel\Sanctum\PersonalAccessToken::saving(function (\Laravel\Sanctum\PersonalAccessToken $token) {
+            if (! $token->exists || array_diff(array_keys($token->getDirty()), ['last_used_at', 'updated_at']) !== []) {
+                return true;
+            }
+
+            $origLastUsed = $token->getOriginal('last_used_at');
+            if ($origLastUsed !== null && \Illuminate\Support\Carbon::parse($origLastUsed)->gt(now()->subMinutes(2))) {
+                return false;
+            }
+
+            return true;
+        });
     }
 }

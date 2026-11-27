@@ -21,7 +21,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
  */
 final class StudentImportSheets
 {
-    public const HEADER = ['name', 'email', 'roll_number', 'branch', 'section', 'cgpa', 'backlogs', 'phone', 'parent_phone', 'year'];
+    public const HEADER = ['name', 'email', 'roll_number', 'branch', 'section', 'cgpa', 'backlogs', 'phone', 'parent_phone', 'year', 'tenth_percentage', 'twelfth_percentage'];
 
     /** What the year column's drop-down offers: the way a person writes it, which AcademicYear::parse() reads back. */
     private const YEAR_CHOICES = '1st year,2nd year,3rd year,4th year';
@@ -89,11 +89,11 @@ final class StudentImportSheets
         $students = $book->getActiveSheet()->setTitle('Students');
         $students->fromArray([
             self::HEADER,
-            ['Alex Chen', 'alex.chen@student.example.edu', $sampleRoll, $sampleBranch, 'A', 8.4, 0, '+91-9876543210', '+91-9876500000', '3rd year'],
+            ['Alex Chen', 'alex.chen@student.example.edu', $sampleRoll, $sampleBranch, 'A', 8.4, 0, '+91-9876543210', '+91-9876500000', '3rd year', 91.2, 88.5],
         ], null, 'A1');
 
-        $students->getStyle('A1:J1')->getFont()->setBold(true);
-        foreach (range('A', 'J') as $col) {
+        $students->getStyle('A1:L1')->getFont()->setBold(true);
+        foreach (range('A', 'L') as $col) {
             $students->getColumnDimension($col)->setAutoSize(true);
         }
         // Roll numbers and phones are text: Excel must not turn 0123 into 123 or 9876543210 into 9.87E+9.

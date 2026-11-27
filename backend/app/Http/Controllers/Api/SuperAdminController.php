@@ -128,6 +128,14 @@ class SuperAdminController extends Controller
             }
         }
 
+        if ($mvSource = $request->query('mv_source')) {
+            if ($mvSource === 'mellow_vault') {
+                $query->where(fn ($q) => $q->whereNotNull('mellow_vault_dev_id')->orWhereNotNull('mellow_vault_profile_synced_at'));
+            } elseif ($mvSource === 'aptrun_only') {
+                $query->whereNull('mellow_vault_dev_id')->whereNull('mellow_vault_profile_synced_at');
+            }
+        }
+
         $page = $query->latest()->paginate(50);
 
         // Whether a superadmin could look up the temporary password this account was issued — a presence check on one
@@ -160,6 +168,11 @@ class SuperAdminController extends Controller
                 $user->readiness_tier = $user->readinessTier();
                 $user->readiness_score = $user->readinessScore();
                 app(ScoreLedger::class)->readiness($user->id, $user->readiness_score);
+                \App\Services\Vault\MellowVaultProfileSyncService::attachOriginAttributes($user);
+            } else {
+                $user->setAttribute('is_mellow_vault_user', false);
+                $user->setAttribute('account_origin', 'aptrun');
+                $user->setAttribute('mellow_vault_profile_percent', 0);
             }
 
             return $user;
@@ -420,6 +433,7 @@ class SuperAdminController extends Controller
                     'source' => $coverage['source'],
                     'days_remaining' => $coverage['days_remaining'],
                 ] : null,
+                ...\App\Services\Vault\MellowVaultProfileSyncService::decorateOriginFields($user),
             ],
             'stats' => [
                 'solved_by_difficulty' => $stats->solvedByDifficulty($user),
@@ -1827,7 +1841,7 @@ class SuperAdminController extends Controller
         $submissionsLastHour = Submission::where('created_at', '>=', $oneHourAgo)->count();
 
         $rotationService = app(\App\Services\GeminiKeyRotationService::class);
-        $activeKeyInfo = $rotationService->getActiveKey();
+        $activeKeyInfo = $rotationService->peekActiveKey();
 
         $transfersToday = \App\Models\VaultScoreTransfer::where('created_at', '>=', $now->copy()->startOfDay())->count();
         $transfersDelivered = \App\Models\VaultScoreTransfer::where('created_at', '>=', $now->copy()->startOfDay())
@@ -1841,9 +1855,9 @@ class SuperAdminController extends Controller
             'pending_ai_scoring' => $pendingScoring,
             'submissions_last_hour' => $submissionsLastHour,
             'gemini_key' => [
-                'index' => $activeKeyInfo['key_index'] ?? 1,
-                'name' => $activeKeyInfo['key_name'] ?? 'GEMINI_API_KEY_1',
-                'hour_slot' => $activeKeyInfo['slot_hours'] ?? '00:00 - 04:00',
+                'index' => $activeKeyInfo?->order_index ?? 1,
+                'name' => $activeKeyInfo?->label ?? 'GEMINI_API_KEY_1',
+                'hour_slot' => sprintf('%02d:00 - %02d:00', ((max(1, (int) ($activeKeyInfo?->order_index ?? 1)) - 1) * 4) % 24, (max(1, (int) ($activeKeyInfo?->order_index ?? 1)) * 4) % 24),
             ],
             'mellow_vault_transfers_today' => [
                 'total' => $transfersToday,

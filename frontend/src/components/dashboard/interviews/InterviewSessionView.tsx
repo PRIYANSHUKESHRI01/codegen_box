@@ -227,7 +227,6 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [recordedDurationSec, setRecordedDurationSec] = useState<number>(0);
-  const [isTranscribing, setIsTranscribing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -287,9 +286,6 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const engineRef = useRef<VoiceEngine>(new BrowserVoiceEngine());
   const listenStartedAtRef = useRef<number>(0);
-  const transcribeGenRef = useRef(0);
-  const questionTextRef = useRef<string>("");
-  questionTextRef.current = question?.question_text ?? "";
   const ttsSupported = hasSpeechSynthesis();
   const sttSupported = hasMediaRecorder() || hasSpeechRecognition();
 
@@ -390,7 +386,6 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   const presentQuestion = useCallback(
     async (q: TakeQuestionPayload) => {
-      transcribeGenRef.current += 1;
       setQuestion(q);
       setTranscriptDraft("");
       setAudioBlob(null);
@@ -575,12 +570,10 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   }, [phase, handleBegin]);
 
   const handleStartAnswering = useCallback(async () => {
-    transcribeGenRef.current += 1;
     stopGuardRef.current = false;
     setTimedOut(false);
     setMicErrorMessage(null);
     setListenHint(null);
-    setIsTranscribing(false);
     setInterim({ text: "", committed: "" });
     signal.level = 0;
     setPhase("listening");
@@ -615,9 +608,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     stopGuardRef.current = true;
 
     if (fromTimeout) setTimedOut(true);
-    const { transcript, audioBlob: blob, hasSpeechGap } = await engineRef.current.stopListening();
+    const { transcript, audioBlob: blob } = await engineRef.current.stopListening();
     const trimmed = transcript.trim();
-    const words = trimmed ? trimmed.split(/\s+/).length : 0;
     const hasBadScript = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F]/.test(trimmed);
     const hasRecordedAudio = Boolean(blob && blob.size > 1500);
 
@@ -627,57 +619,34 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     signal.level = 0;
     const elapsedRec = listenStartedAtRef.current > 0 ? Math.max(1, Math.round((Date.now() - listenStartedAtRef.current) / 1000)) : 0;
     setRecordedDurationSec(elapsedRec);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
     if (blob) {
       setAudioBlob(blob);
       setAudioUrl(URL.createObjectURL(blob));
+    } else {
+      setAudioBlob(null);
     }
     setPhase("reviewing_answer");
-
-    // Authoritative industry-standard STT reconciliation:
-    // Web Speech API gives instant live captions while speaking, then on Stop & review we run
-    // context-biased AI audio transcription (Gemini Flash Audio / Whisper-1 with question context)
-    // over the full recording — accurately resolving pauses and technical homophones (e.g. DOM vs Tom).
-    if (hasRecordedAudio && blob) {
-      const myGen = ++transcribeGenRef.current;
-      setIsTranscribing(true);
-      const fd = new FormData();
-      fd.append("audio", blob, "answer.webm");
-      if (questionTextRef.current) {
-        fd.append("question_text", questionTextRef.current);
-      }
-      api
-        .postFormData<{ transcript?: string }>("/interviews/transcribe", fd)
-        .then((res) => {
-          if (transcribeGenRef.current !== myGen) return;
-          const aiTranscript = res?.transcript?.trim() ?? "";
-          if (!aiTranscript) return;
-          const aiWords = aiTranscript.split(/\s+/).length;
-          if (hasBadScript || trimmed.length < 12 || Boolean(hasSpeechGap) || aiWords >= Math.max(1, Math.floor(words * 0.6))) {
-            setTranscriptDraft(aiTranscript);
-          }
-        })
-        .catch((err) => {
-          console.warn("[VoiceTranscription] Client fallback transcription error", err);
-        })
-        .finally(() => {
-          if (transcribeGenRef.current === myGen) {
-            setIsTranscribing(false);
-          }
-        });
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [audioUrl]);
 
   const handleReRecord = () => {
-    transcribeGenRef.current += 1;
-    setIsTranscribing(false);
     setErrorMessage(null);
     setMicErrorMessage(null);
     setTimedOut(false);
+    setTranscriptDraft("");
+    setAudioBlob(null);
+    setRecordedDurationSec(0);
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
     if (sttSupported) {
       handleStartAnswering();
     } else {
-      setTranscriptDraft("");
       setPhase("text_fallback");
     }
   };
@@ -687,7 +656,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const listeningSecondsLeft = useCountdown(responseSeconds, phase === "listening", () => handleStopAnswering(true));
 
   const handleSubmitAnswer = async () => {
-    if (!question || (!transcriptDraft.trim() && !audioBlob) || phase === "submitting" || isTranscribing) return;
+    if (!question || (!transcriptDraft.trim() && !audioBlob) || phase === "submitting") return;
     setPhase("submitting");
     setErrorMessage(null);
 
@@ -929,7 +898,6 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
               disabled={phase === "submitting"}
               audioUrl={audioUrl}
               recordedSeconds={recordedDurationSec}
-              isTranscribing={isTranscribing}
             />
           ),
         });
@@ -941,7 +909,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [intro, introSpeaking, answered, question, phase, stillSpeaking, reveal.revealedWords, interim, transcriptDraft, audioUrl, isTranscribing]);
+  }, [intro, introSpeaking, answered, question, phase, stillSpeaking, reveal.revealedWords, interim, transcriptDraft, audioUrl]);
 
   const steps = useMemo<RoomStep[]>(() => {
     const firstTracked = answeredCount - answered.length;
@@ -1083,15 +1051,10 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
             <motion.button
               whileTap={{ scale: 0.96 }}
               onClick={handleSubmitAnswer}
-              disabled={phase === "submitting" || isTranscribing || (!transcriptDraft.trim() && !audioBlob)}
+              disabled={phase === "submitting" || (!transcriptDraft.trim() && !audioBlob)}
               className={PRIMARY_BUTTON}
             >
-              {isTranscribing ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Transcribing...
-                </>
-              ) : phase === "submitting" ? (
+              {phase === "submitting" ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                   Submitting...

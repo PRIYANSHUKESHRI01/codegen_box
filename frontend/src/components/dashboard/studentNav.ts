@@ -1,4 +1,4 @@
-import { Anchor, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, FileText, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Trophy, Zap } from "lucide-react";
+import { Anchor, Award, BookOpen, Brain, Briefcase, Building2, CircuitBoard, ClipboardCheck, FileText, FlaskConical, LayoutDashboard, LineChart, Mic, ShieldCheck, Sparkles, Swords, Trophy, Zap } from "lucide-react";
 import { DEFAULT_CAPABILITIES, type CapabilityMap } from "@/lib/departments";
 import { sidebarChip, sidebarTitle } from "@/lib/vaultAi";
 import type { VaultAiAccess } from "@/types/vaultAi";
@@ -29,6 +29,8 @@ export interface StudentNavOptions {
    * "locked" keeps the item in the rail with a lock and the days left; "unavailable" (1st / 2nd year) takes it out of the rail.
    */
   vaultAi?: Pick<VaultAiAccess, "state" | "reasons" | "days_remaining" | "readiness"> | null;
+  /** Mapped SuperAdmin Campus Assessments assigned to this student (optional; defaults to 0). */
+  assessmentsCount?: number;
 }
 
 /**
@@ -44,6 +46,7 @@ export function buildStudentNav({
   capabilities = null,
   domainPrepLabel = "Core Prep",
   vaultAi = null,
+  assessmentsCount = 0,
 }: StudentNavOptions): NavSection[] {
   const caps: CapabilityMap = { ...DEFAULT_CAPABILITIES, ...(capabilities ?? {}) };
   // A rail built without capabilities (an older cached user, a test) is the engineering rail: the server's word that Core Prep is
@@ -89,6 +92,18 @@ export function buildStudentNav({
   }
 
   const placements: NavItem[] = [
+    ...(assessmentsCount > 0
+      ? [
+          {
+            label: "Campus Assessments",
+            href: "/dashboard/assessments",
+            icon: ClipboardCheck,
+            matchPrefix: true,
+            badge: `${assessmentsCount}`,
+            badgeTone: "priority" as const,
+          },
+        ]
+      : []),
     // Its own page now (the list of the college's drives); a single drive, /dashboard/drives?driveId=…, keeps this item lit.
     { label: "Upcoming Drives", href: "/dashboard/drives", icon: Briefcase, matchPrefix: true },
     // The final qualification interview - second, straight under the drives: it is the first thing to do, not the fourth. A college student who has not earned it yet sees it locked (with the days left); a year that

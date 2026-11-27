@@ -35,6 +35,8 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/articles": { title: "Articles", parent: "/dashboard/learning-centre", backLabel: "Learning Centre" },
   "/dashboard/articles/topic": { title: "Article topic", parent: "/dashboard/articles", backLabel: "All Topics" },
   "/dashboard/articles/view": { title: "Article", parent: "/dashboard/articles" },
+  "/dashboard/assessments": { title: "Campus Assessments", parent: "/dashboard" },
+  "/dashboard/assessments/view": { title: "Assessment", parent: "/dashboard/assessments", backLabel: "Campus Assessments" },
   "/dashboard/billing": { title: "Plans & Billing", parent: "/dashboard" },
   "/dashboard/company-prep": { title: "Company PYQs", parent: "/dashboard" },
   "/dashboard/company-prep/view": { title: "Company Prep", parent: "/dashboard/company-prep", backLabel: "All Companies" },
@@ -81,6 +83,7 @@ export const ROUTE_TREE: Record<string, RouteNode> = {
   "/dashboard/vault-interviews": { title: "Vault AI Interview", parent: "/dashboard" },
   "/dashboard/vault-interviews/view": { title: "Qualification set", parent: "/dashboard/vault-interviews" },
   "/dashboard/vault-interviews/session": { title: "Qualification set", parent: "/dashboard/vault-interviews" },
+  "/dashboard/voice-verification": { title: "Voice Verification", parent: "/dashboard" },
 
   // ── Shared by every role: their parent is whichever portal root the signed-in role has (resolved in resolveBack) ──
   "/settings": { title: "Settings", parent: "@portal" },

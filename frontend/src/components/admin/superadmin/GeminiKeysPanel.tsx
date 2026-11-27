@@ -23,7 +23,6 @@ import {
   EyeOff,
   Zap,
   Radio,
-  FileCode,
   Gauge,
   Flame,
   Info,
@@ -346,22 +345,6 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
     }
   };
 
-  const handleSyncToEnv = async () => {
-    setSyncingEnv(true);
-    try {
-      const res = await api.post<{ message: string; schedule: PoolDetailsResponse }>(
-        "/superadmin/gemini-keys/sync-to-env",
-        {}
-      );
-      setData(res.schedule);
-      triggerToast(res.message, "success");
-    } catch (err) {
-      triggerToast(err instanceof ApiError ? err.message : "Failed to sync to .env", "error");
-    } finally {
-      setSyncingEnv(false);
-    }
-  };
-
   const handleImportFromEnv = async () => {
     setSyncingEnv(true);
     try {
@@ -451,25 +434,14 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
               <RefreshCw className={cn("w-4 h-4", refreshing && "animate-spin")} />
             </button>
 
-            {/* Sync to .env */}
-            <button
-              onClick={handleSyncToEnv}
-              disabled={syncingEnv}
-              className="px-3.5 py-2 rounded-2xl bg-surface hover:bg-elevated border border-border-subtle text-xs font-bold text-text-primary transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-              title="Write current keys to backend/.env file"
-            >
-              <FileCode className={cn("w-3.5 h-3.5 text-accent-primary", syncingEnv && "animate-spin")} />
-              <span>Sync to .env</span>
-            </button>
-
-            {/* Import from .env */}
+            {/* Import from .env (read-only) */}
             <button
               onClick={handleImportFromEnv}
               disabled={syncingEnv}
               className="px-3.5 py-2 rounded-2xl bg-surface hover:bg-elevated border border-border-subtle text-xs font-bold text-text-secondary hover:text-text-primary transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-              title="Import GEMINI_API_KEY_* lines from .env into rotation pool"
+              title="Import existing GEMINI_API_KEY_* values from .env into the database pool (read-only)"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className={cn("w-3.5 h-3.5", syncingEnv && "animate-spin")} />
               <span>Import .env</span>
             </button>
 
@@ -731,7 +703,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
               </h3>
             </div>
             <p className="text-xs text-text-secondary mt-0.5">
-              Add as many keys as needed (6, 10, 20+). All changes sync directly to backend <code className="text-2xs bg-elevated px-1 py-0.5 rounded">.env</code>.
+              Add as many keys as needed (6, 10, 20+). All keys are stored securely in the database rotation pool without modifying <code className="text-2xs bg-elevated px-1 py-0.5 rounded">.env</code>.
             </p>
           </div>
 
@@ -1027,7 +999,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
               )}
 
               <div className="p-3 rounded-2xl bg-accent-primary/5 border border-accent-primary/20 text-2xs text-text-secondary leading-relaxed">
-                💡 <strong>Auto .env Sync:</strong> This new key will be written directly to <code className="font-mono text-3xs bg-elevated px-1 py-0.5 rounded">backend/.env</code> and immediately join the active round-robin pool.
+                💡 <strong>Database Pool Storage:</strong> This key is saved directly in the database rotation pool and joins round-robin load balancing immediately without touching <code className="font-mono text-3xs bg-elevated px-1 py-0.5 rounded">.env</code>.
               </div>
             </div>
 
@@ -1064,7 +1036,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
                 </div>
                 <div>
                   <h3 className="text-base font-black text-text-primary">Edit Gemini Key Slot</h3>
-                  <p className="text-xs text-text-secondary">Updates slot parameters and syncs to .env.</p>
+                  <p className="text-xs text-text-secondary">Updates slot parameters in the database rotation pool.</p>
                 </div>
               </div>
               <button
@@ -1172,7 +1144,7 @@ export function GeminiKeysPanel({ triggerToast }: { triggerToast: ToastTrigger }
             </div>
 
             <p className="text-xs text-text-secondary leading-relaxed">
-              This will permanently remove <strong>{deletingKey.label}</strong> from the round-robin pool and remove it from backend <code className="font-mono text-3xs bg-elevated px-1 py-0.5 rounded">.env</code>.
+              This will permanently remove <strong>{deletingKey.label}</strong> from the database round-robin pool.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">

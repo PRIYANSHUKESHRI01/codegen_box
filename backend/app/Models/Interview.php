@@ -63,12 +63,16 @@ class Interview extends Model
      */
     public const INTERVIEW_TYPE_PRACTICE = 'practice';
 
+    /** Provisioned as the AI Interview stage of a SuperAdmin CollegeAssessment — visible only to assigned students. */
+    public const INTERVIEW_TYPE_COLLEGE_ASSESSMENT = 'college_assessment';
+
     public const INTERVIEW_TYPES = [
         self::INTERVIEW_TYPE_GENERAL,
         self::INTERVIEW_TYPE_COMPANY,
         self::INTERVIEW_TYPE_TPO_MOCK,
         self::INTERVIEW_TYPE_COMPANY_HIRING,
         self::INTERVIEW_TYPE_TALENT_POOL,
+        self::INTERVIEW_TYPE_COLLEGE_ASSESSMENT,
     ];
 
     public const AUDIENCE_SCOPE_ALL = 'all';
@@ -332,7 +336,7 @@ class Interview extends Model
         return match ($this->interview_type) {
             self::INTERVIEW_TYPE_TPO_MOCK => $collegeId !== null && $this->owning_college_id === $collegeId,
             self::INTERVIEW_TYPE_COMPANY => $collegeId !== null && $this->placement_drive_id !== null
-                && $this->colleges()->where('colleges.id', $collegeId)->exists()
+                && ($this->relationLoaded('colleges') ? $this->colleges->contains('id', $collegeId) : $this->colleges()->where('colleges.id', $collegeId)->exists())
                 && DriveCollegeMapping::query()
                     ->where('placement_drive_id', $this->placement_drive_id)
                     ->where('college_id', $collegeId)
@@ -342,7 +346,7 @@ class Interview extends Model
             // Mirrors Contest::isVisibleToCollege()'s talent_pool arm — see
             // that method's docblock.
             self::INTERVIEW_TYPE_TALENT_POOL => match ($this->audience_scope) {
-                self::AUDIENCE_SCOPE_COLLEGE => $collegeId !== null && $this->colleges()->where('colleges.id', $collegeId)->exists(),
+                self::AUDIENCE_SCOPE_COLLEGE => $collegeId !== null && ($this->relationLoaded('colleges') ? $this->colleges->contains('id', $collegeId) : $this->colleges()->where('colleges.id', $collegeId)->exists()),
                 self::AUDIENCE_SCOPE_DIRECT => $collegeId === null,
                 default => true,
             },
@@ -383,6 +387,13 @@ class Interview extends Model
      */
     public function isVisibleToUser(User $user): bool
     {
+        if ($this->interview_type === self::INTERVIEW_TYPE_COLLEGE_ASSESSMENT) {
+            return CollegeAssessmentAssignment::query()
+                ->where('user_id', $user->id)
+                ->whereHas('assessment', fn (Builder $q) => $q->where('interview_id', $this->id)->where('status', '!=', CollegeAssessment::STATUS_DRAFT))
+                ->exists();
+        }
+
         // A student's own practice interview is theirs alone.
         if ($this->interview_type === self::INTERVIEW_TYPE_PRACTICE) {
             return $this->created_by === $user->id;

@@ -50,7 +50,7 @@ class MockInterviewService
 
         $modules = app(PlatformModules::class);
 
-        foreach ($this->catalog->roles() as $role) {
+        foreach ($this->catalog->summaryRoles() as $role) {
             // A domain whose module the superadmin has switched off does not exist for students: no card, no stacks, no counts.
             if ($modules->hidesMockDomain((string) $role['key'])) {
                 continue;
@@ -64,7 +64,7 @@ class MockInterviewService
                 $rounds = [];
 
                 foreach ($stack['rounds'] as $round) {
-                    $count = count($round['questions']);
+                    $count = $this->catalog->roundQuestionCount($round);
                     $stats['total_questions'] += $count;
 
                     $rounds[] = [
@@ -90,7 +90,7 @@ class MockInterviewService
                         $setInProgress = false;
 
                         foreach ($pset['rounds'] as $pround) {
-                            $pCount = count($pround['questions']);
+                            $pCount = $this->catalog->roundQuestionCount($pround);
                             $pMy = $mine[$pround['id']] ?? self::EMPTY_PROGRESS;
 
                             if ($pMy['attempts'] > 0) {

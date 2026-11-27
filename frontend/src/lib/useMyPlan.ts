@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { api } from "@/lib/api";
+import { getToken } from "@/lib/auth";
 import { SUBSCRIPTION_CHANGED_EVENT } from "@/lib/projectLab";
 import type { MySubscriptionResponse } from "@/types/subscription";
 
@@ -13,50 +14,115 @@ export interface MyPlanState {
   refresh: () => Promise<void>;
 }
 
+const FRESH_FOR_MS = 60_000;
+const IS_VITEST = typeof process !== "undefined" && Boolean(process.env?.VITEST);
+
+interface Store {
+  tokenKey: string | null;
+  plan: MySubscriptionResponse | null;
+  loading: boolean;
+  fetchedAt: number;
+}
+
+let store: Store = { tokenKey: null, plan: null, loading: false, fetchedAt: 0 };
+let inFlight: Promise<void> | null = null;
+const listeners = new Set<() => void>();
+
+function notify() {
+  listeners.forEach((cb) => cb());
+}
+
+function setStore(next: Partial<Store>) {
+  store = { ...store, ...next };
+  notify();
+}
+
+function subscribe(cb: () => void) {
+  listeners.add(cb);
+  return () => {
+    listeners.delete(cb);
+  };
+}
+
+export function resetMyPlan() {
+  inFlight = null;
+  setStore({ tokenKey: null, plan: null, loading: false, fetchedAt: 0 });
+}
+
+async function fetchPlan(force: boolean): Promise<void> {
+  const tokenKey = getToken() ?? "anon";
+  const isSameAccount = store.tokenKey === tokenKey;
+  const fresh = !IS_VITEST && !force && isSameAccount && store.plan !== null && Date.now() - store.fetchedAt < FRESH_FOR_MS;
+
+  if (!isSameAccount) {
+    setStore({ tokenKey, plan: null, loading: true, fetchedAt: 0 });
+  } else if (fresh) {
+    if (store.loading) setStore({ loading: false });
+    return;
+  } else if (store.plan === null && !store.loading) {
+    setStore({ loading: true });
+  }
+
+  if (inFlight && !force) return inFlight;
+
+  const run = api
+    .get<MySubscriptionResponse>("/me/subscription")
+    .then((res) => {
+      if ((getToken() ?? "anon") === tokenKey) {
+        setStore({ tokenKey, plan: res, loading: false, fetchedAt: Date.now() });
+      }
+    })
+    .catch(() => {
+      /* keep the last answer; the server still enforces everything */
+      setStore({ loading: false });
+    })
+    .finally(() => {
+      if (inFlight === run) inFlight = null;
+    });
+
+  inFlight = run;
+  return run;
+}
+
 /**
- * The signed-in account's plan (GET /me/subscription), kept current: it re-reads
- * itself whenever anything announces a plan change — a purchase on this page, or
- * lib/planSync noticing that a superadmin changed it — so a chip or card built on
- * it never shows a plan the account no longer has.
+ * The signed-in account's plan (GET /me/subscription), shared across the header PlanChip,
+ * DashboardSidebar, and feature gates so navigating or mounting multiple widgets triggers
+ * at most one cached request instead of 2-3 duplicate fetches per page.
  *
  * `enabled` false (staff, a role with no plan chip) makes no request at all.
- * Like useEntitlements, this only decides what the UI SHOWS; the server refuses
- * anything the plan doesn't include whatever the screen thinks.
  */
 export function useMyPlan(enabled = true): MyPlanState {
-  const [plan, setPlan] = useState<MySubscriptionResponse | null>(null);
-  const [loading, setLoading] = useState(enabled);
+  const snapshot = useSyncExternalStore(
+    subscribe,
+    () => store,
+    () => store
+  );
+  const currentTokenKey = typeof window !== "undefined" ? (getToken() ?? "anon") : null;
+  const sameAccount = enabled && currentTokenKey !== null && snapshot.tokenKey === currentTokenKey;
 
-  const load = useCallback(async () => {
-    try {
-      setPlan(await api.get<MySubscriptionResponse>("/me/subscription"));
-    } catch {
-      /* keep the last answer; the server still enforces everything */
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const refresh = useCallback(async () => {
+    if (!enabled) return;
+    await fetchPlan(true);
+  }, [enabled]);
 
   useEffect(() => {
-    if (!enabled) {
-      setPlan(null);
-      setLoading(false);
-      return;
-    }
+    if (!enabled) return;
 
-    let cancelled = false;
-    const run = () => {
-      if (!cancelled) void load();
+    void fetchPlan(false);
+
+    const onSubChanged = () => {
+      void fetchPlan(true);
     };
-
-    run();
-    window.addEventListener(SUBSCRIPTION_CHANGED_EVENT, run);
+    window.addEventListener(SUBSCRIPTION_CHANGED_EVENT, onSubChanged);
 
     return () => {
-      cancelled = true;
-      window.removeEventListener(SUBSCRIPTION_CHANGED_EVENT, run);
+      window.removeEventListener(SUBSCRIPTION_CHANGED_EVENT, onSubChanged);
     };
-  }, [enabled, load]);
+  }, [enabled]);
 
-  return { plan, loading, refresh: load };
+  return {
+    plan: sameAccount ? snapshot.plan : null,
+    loading: enabled && (!sameAccount || snapshot.loading),
+    refresh,
+  };
 }

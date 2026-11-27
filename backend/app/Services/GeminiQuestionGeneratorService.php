@@ -52,9 +52,8 @@ class GeminiQuestionGeneratorService
         ?string $discipline = null,
     ): array {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI question generation is not configured yet — add questions from the bank instead.');
         }
 

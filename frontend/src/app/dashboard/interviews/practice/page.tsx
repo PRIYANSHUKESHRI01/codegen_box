@@ -10,10 +10,10 @@ import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { api, ApiError } from "@/lib/api";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useEntitlements } from "@/lib/useEntitlements";
 import { cn } from "@/lib/utils";
 import { getStoredUser } from "@/lib/auth";
 import { domainPrepCopy } from "@/lib/departments";
-import type { MySubscriptionResponse } from "@/types/subscription";
 import type { PracticeDifficulty, PracticeInterviewCreated, PracticeOptions, PracticeRole } from "@/types/practiceInterview";
 
 const DIFFICULTY_LABEL: Record<PracticeDifficulty, { label: string; blurb: string }> = {
@@ -41,7 +41,7 @@ export default function PracticeInterviewStudioPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   // The studio is switched off on the server (config practice_interviews.student_builder_enabled): say so kindly instead of showing an error.
   const [paused, setPaused] = useState(false);
-  const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
+  const entitlements = useEntitlements(status === "ready");
 
   const [role, setRole] = useState<string | null>(null);
   const [kind, setKind] = useState("technical");
@@ -71,10 +71,6 @@ export default function PracticeInterviewStudioPage() {
         if (err instanceof ApiError && err.code === "practice_builder_paused") setPaused(true);
         else setLoadError(err instanceof ApiError ? err.message : "Couldn't open the practice studio.");
       });
-    api
-      .get<MySubscriptionResponse>("/me/subscription")
-      .then((res) => live && setEntitlements(res.entitlements))
-      .catch(() => undefined);
     return () => {
       live = false;
     };

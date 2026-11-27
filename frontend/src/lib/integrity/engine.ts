@@ -136,6 +136,8 @@ export class IntegrityEngine {
   private guardianPollFailures = 0;
   private baselinePhoto: string | null = null;
   private baselineDescriptor: number[] | null = null;
+  private lastPhoneReading: { at: number; score: number } | null = null;
+  private poseBaseline: { samples: { yaw: number; pitch: number }[]; yaw: number; pitch: number } = { samples: [], yaw: 0, pitch: 0 };
   private activeGraceViolation: {
     type: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited";
     deadlineAt: number;
@@ -1102,7 +1104,37 @@ export class IntegrityEngine {
     let message = "";
 
     if (!violationType) {
-      if (analysis.phone !== undefined && analysis.phone >= 0.45) {
+      if (analysis.phone !== undefined) {
+        if (analysis.phone >= 0.45) {
+          this.lastPhoneReading = { at: Date.now(), score: analysis.phone };
+        } else {
+          this.lastPhoneReading = null;
+        }
+      }
+
+      const activePhoneDetected =
+        (analysis.phone !== undefined && analysis.phone >= 0.45) ||
+        (this.lastPhoneReading !== null && Date.now() - this.lastPhoneReading.at < 3500);
+
+      // Track personal resting head pose baseline across the first 6 neutral single-face frames
+      let yawDelta = analysis.yaw !== null ? Math.abs(analysis.yaw) : 0;
+      let pitchDelta = 0;
+      if (analysis.faces === 1 && analysis.yaw !== null && analysis.pitch !== null) {
+        if (this.poseBaseline.samples.length < 6) {
+          this.poseBaseline.samples.push({ yaw: analysis.yaw, pitch: analysis.pitch });
+          if (this.poseBaseline.samples.length === 6) {
+            const ys = [...this.poseBaseline.samples].map((s) => s.yaw).sort((a, b) => a - b);
+            const ps = [...this.poseBaseline.samples].map((s) => s.pitch).sort((a, b) => a - b);
+            this.poseBaseline.yaw = ys[3];
+            this.poseBaseline.pitch = ps[3];
+          }
+        } else {
+          yawDelta = Math.abs(analysis.yaw - this.poseBaseline.yaw);
+          pitchDelta = Math.abs(analysis.pitch - this.poseBaseline.pitch);
+        }
+      }
+
+      if (activePhoneDetected) {
         violationType = "phone_detected";
         message = "Prohibited mobile phone detected. Remove it immediately or your interview will be terminated.";
       } else if (analysis.faces === 0) {
@@ -1114,12 +1146,12 @@ export class IntegrityEngine {
       } else if (this.baselineDescriptor && faceSimilarity !== null && faceSimilarity < FACE_MATCH_THRESHOLD) {
         violationType = "face_mismatch";
         message = "Face mismatch detected. The person in view does not match the verified candidate photo.";
-      } else if (analysis.faces === 1 && analysis.yaw !== null && Math.abs(analysis.yaw) > 0.18) {
+      } else if (analysis.faces === 1 && (yawDelta > 0.2 || pitchDelta > 0.22)) {
         violationType = "face_away";
         message = "Looking away from screen detected. Please face the interview camera directly.";
       }
     } else if (violationType === "speech_prohibited") {
-      message = "Prohibited speech / conversation detected while interviewer is speaking or during preparation.";
+      message = "Sustained side conversation detected during preparation.";
     }
 
     const now = Date.now();
@@ -1203,20 +1235,41 @@ export class IntegrityEngine {
 
       const gate = new SpeechGate();
       const buf = new Float32Array(analyser.fftSize);
+      let suppressSpeechUntil = 0;
       this.every(100, () => {
+        if (this.o.surface === "interview") {
+          const context = this.o.getContext?.(false);
+          const phase = (context as { phase?: string })?.phase;
+          const now = Date.now();
+          // While the AI interviewer speaks, on ready/countdown/listening/review/complete screens,
+          // reset the noise-floor gate and add a 1.5s post-TTS cooldown so laptop speaker echo
+          // or candidate speech never triggers a false violation.
+          if (phase !== "prep") {
+            gate.reset();
+            if (phase === "greeting" || phase === "speaking") {
+              suppressSpeechUntil = now + 1500;
+            }
+            if (this.activeGraceViolation?.type === "speech_prohibited") {
+              this.activeGraceViolation = null;
+              setIntegrityUi({ graceWarning: null });
+            }
+            return;
+          }
+          if (now < suppressSpeechUntil) {
+            gate.reset();
+            return;
+          }
+        }
+
         analyser.getFloatTimeDomainData(buf);
         const seconds = gate.feed(levelDb(buf), Date.now());
         if (seconds !== null) {
           if (this.o.surface === "interview") {
             const context = this.o.getContext?.(false);
             const phase = (context as { phase?: string })?.phase;
-            const prohibitedPhase = phase === "prep" || phase === "speaking" || phase === "greeting" || phase === "ready" || phase === "feedback";
-            if (prohibitedPhase) {
-              this.emit("speech_detected", { seconds, phase, prohibited: true });
+            this.emit("speech_detected", { seconds, phase, prohibited: phase === "prep" });
+            if (phase === "prep") {
               void this.still("webcam", { flagged: true, reason: "speech_detected", meta: { phase, seconds } });
-              this.evaluateGraceGuard({ faces: 1, yaw: null, pitch: null }, null, "speech_prohibited");
-            } else {
-              this.emit("speech_detected", { seconds, phase });
             }
           } else {
             this.emit("speech_detected", { seconds });

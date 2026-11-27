@@ -36,6 +36,25 @@ async function throwForFailedResponse(res: Response, hadToken = false): Promise<
   throw new ApiError(message, res.status, data?.errors, code);
 }
 
+const MUTATION_PROGRESS_PREFIXES = [
+  "/submissions",
+  "/problems/",
+  "/me/drills",
+  "/interviews",
+  "/curated-interview-sets",
+  "/mock-interviews",
+  "/vault-qualification",
+  "/articles/",
+  "/core/",
+];
+
+function maybeNotifyStatsChanged(path: string, method?: string) {
+  if (typeof window === "undefined" || !method || method === "GET") return;
+  if (MUTATION_PROGRESS_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    window.dispatchEvent(new Event("aptrun:stats-changed"));
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
 
@@ -50,6 +69,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   });
 
   if (!res.ok) return throwForFailedResponse(res, !!token);
+
+  maybeNotifyStatsChanged(path, options.method);
 
   return (await res.json().catch(() => null)) as T;
 }

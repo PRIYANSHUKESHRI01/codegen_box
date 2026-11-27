@@ -8,6 +8,7 @@ import { downloadApiFile } from "@/lib/download";
 import { UserManageDrawer } from "./UserManageDrawer";
 import { ReadinessReportModal } from "./ReadinessReportModal";
 import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
+import { MvProfileBadge } from "./MvProfileBadge";
 import { UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
 import { departmentShort, useBranchCatalog } from "@/lib/branches";
 import { type ToastTrigger } from "@/lib/toast";
@@ -51,6 +52,8 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
   const catalog = useBranchCatalog();
   const [department, setDepartment] = useState("");
   const [readinessFilter, setReadinessFilter] = useState<string>("");
+  const [mvSource, setMvSource] = useState<"" | "mellow_vault" | "aptrun_only">("");
+  const [syncingMv, setSyncingMv] = useState(false);
   const [showReadinessModal, setShowReadinessModal] = useState(false);
 
   useEffect(() => {
@@ -79,8 +82,9 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
     else if (readinessFilter === "placement_ready") params.set("readiness_tier", "Placement Ready");
     else if (readinessFilter === "in_progress") params.set("readiness_tier", "In Progress");
     else if (readinessFilter === "needs_training") params.set("readiness_tier", "Needs Training");
+    if (mvSource) params.set("mv_source", mvSource);
     return params;
-  }, [affiliation, searchDebounced, collegeId, department, readinessFilter]);
+  }, [affiliation, searchDebounced, collegeId, department, readinessFilter, mvSource]);
 
   const handleDownloadReport = async () => {
     setDownloading(true);
@@ -102,7 +106,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
 
   const load = useCallback(() => {
     const ticket = ++latest.current;
-    const askedFiltered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter);
+    const askedFiltered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter || mvSource);
     setFetching(true);
     setError(null);
 
@@ -158,7 +162,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
       .finally(() => setLoadingMore(false));
   };
 
-  const filtered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter);
+  const filtered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter || mvSource);
   const clearFilters = () => {
     setSearch("");
     setSearchDebounced("");
@@ -166,6 +170,27 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
     setDepartment("");
     setAffiliation("all");
     setReadinessFilter("");
+    setMvSource("");
+  };
+
+  const handleSyncMvProfiles = async () => {
+    setSyncingMv(true);
+    try {
+      const res = await api.post<{ configured: boolean; matched_users: number; updated_users: number; eligible_90: number }>(
+        "/superadmin/mellow-vault/sync-profiles",
+        { max_emails: 0 }
+      );
+      if (!res.configured) {
+        triggerToast("Mellow Vault database is not configured.", "error");
+      } else {
+        triggerToast(`Synced ${res.matched_users} Mellow Vault user(s) (${res.eligible_90} at 90%+).`);
+        load();
+      }
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to sync Mellow Vault percentages.", "error");
+    } finally {
+      setSyncingMv(false);
+    }
   };
 
   const departmentCount = (code: string): number | null => (facets?.departments ? facets.departments[code] ?? 0 : null);
@@ -289,6 +314,26 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
             <option value="in_progress">In Progress (45–74%)</option>
             <option value="needs_training">Needs Training (&lt;45%)</option>
           </select>
+          <select
+            aria-label="Filter by account origin"
+            value={mvSource}
+            onChange={(e) => setMvSource(e.target.value as "" | "mellow_vault" | "aptrun_only")}
+            className="rounded-control border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-primary outline-none focus:border-accent-primary"
+          >
+            <option value="">All Sources</option>
+            <option value="mellow_vault">Mellow Vault Synced</option>
+            <option value="aptrun_only">AptRun Only (0%)</option>
+          </select>
+          <button
+            type="button"
+            onClick={handleSyncMvProfiles}
+            disabled={syncingMv}
+            title="Fetch latest profile completion % from Mellow Vault for all matching users"
+            className="inline-flex items-center gap-1.5 rounded-control border border-indigo-500/35 bg-indigo-500/10 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-subtle hover:bg-indigo-500/20 disabled:opacity-50"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", syncingMv && "animate-spin")} />
+            <span>{syncingMv ? "Syncing MV..." : "Sync MV %"}</span>
+          </button>
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
@@ -377,6 +422,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
                   <th className="px-4 py-3">College</th>
                   <th className="px-4 py-3">Department · Branch</th>
                   <th className="px-4 py-3">Plan</th>
+                  <th className="px-4 py-3">MV Profile %</th>
                   <th className="px-4 py-3">Readiness</th>
                   <th className="px-4 py-3">Joined</th>
                   <th className="px-4 py-3">Status</th>
@@ -427,6 +473,9 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
                       ) : (
                         s.subscription_plan_name ?? "—"
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <MvProfileBadge user={s} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1 items-start">

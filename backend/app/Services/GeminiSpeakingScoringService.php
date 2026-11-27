@@ -84,9 +84,8 @@ class GeminiSpeakingScoringService
         int $targetWpmMax = 160,
     ): array {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI speech scoring is not configured yet.');
         }
 
@@ -109,7 +108,9 @@ class GeminiSpeakingScoringService
         // a 400 (this exact recording is unusable) and a 429 (Gemini says to wait ~40s, so retrying now is pointless).
         if ($call['result'] === null && $call['retryable']) {
             try {
-                $retry = Http::withHeaders(['x-goog-api-key' => $apiKey])->timeout(45)->post($this->endpoint(), $scoreBody);
+                $retry = $rotationService->runWithFallback(
+                    fn (string $retryKey) => Http::withHeaders(['x-goog-api-key' => $retryKey])->timeout(45)->post($this->endpoint(), $scoreBody)
+                );
             } catch (\Throwable $e) {
                 $retry = null;
             }
@@ -229,7 +230,7 @@ class GeminiSpeakingScoringService
 
     private function endpoint(): string
     {
-        return 'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent';
+        return 'https://generativelanguage.googleapis.com/v1beta/models/'.GeminiKeyRotationService::modelChain()[0].':generateContent';
     }
 
     private function requestBody(string $prompt, string $audioBase64, string $audioMimeType, array $schema, int $maxTokens, float $temperature): array

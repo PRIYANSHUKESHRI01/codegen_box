@@ -172,19 +172,14 @@ describe("the live interview room", () => {
     expect(screen.getByRole("button", { name: /Submit answer/i })).toBeTruthy();
   });
 
-  it("runs authoritative context-biased AI audio reconciliation on Stop & review to fix homophones like tom vs DOM", async () => {
+  it("opens Stop & review immediately with captured transcript without blocking on Gemini audio re-transcription", async () => {
     const speech = controlSpeech();
     voice.stopListening.mockResolvedValue({
-      transcript: "I updated the React Virtual tom tree for performance",
+      transcript: "I updated the React Virtual DOM tree for performance",
       audioBlob: new Blob([new Uint8Array(2048)]),
       voicedMs: 4000,
     });
-    net.postFormData.mockImplementation(async (url: string) => {
-      if (url === "/interviews/transcribe") {
-        return { transcript: "I updated the React Virtual DOM tree for performance" };
-      }
-      return { complete: true };
-    });
+    net.postFormData.mockResolvedValue({ complete: true });
 
     render(<InterviewSessionView variant="mock" />);
     await begin();
@@ -196,17 +191,13 @@ describe("the live interview room", () => {
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
 
     const reviewCard = await screen.findByLabelText("Your spoken answer");
-    await waitFor(() => {
-      expect(within(reviewCard).getByText("I updated the React Virtual DOM tree for performance")).toBeTruthy();
-    });
-    const transcribeCall = net.postFormData.mock.calls.find(([path]) => path === "/interviews/transcribe");
-    expect(transcribeCall).toBeTruthy();
-    expect((transcribeCall![1] as FormData).get("question_text")).toBe(q1.question_text);
+    expect(within(reviewCard).getByText("I updated the React Virtual DOM tree for performance")).toBeTruthy();
+    expect(net.postFormData.mock.calls.some(([path]) => path === "/interviews/transcribe")).toBe(false);
+    expect((screen.getByRole("button", { name: /Submit answer/i }) as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("ignores stale AI transcription responses if the candidate clicks Re-record mid-flight", async () => {
+  it("clears the prior attempt and lets the candidate Re-record immediately", async () => {
     const speech = controlSpeech();
-    let resolveStaleTranscribe: (value: { transcript: string }) => void = () => undefined;
     voice.stopListening
       .mockResolvedValueOnce({
         transcript: "First attempt draft",
@@ -219,13 +210,6 @@ describe("the live interview room", () => {
         voicedMs: 3000,
       });
 
-    net.postFormData.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          resolveStaleTranscribe = resolve;
-        })
-    );
-
     render(<InterviewSessionView variant="mock" />);
     await begin();
     await waitFor(() => expect(voice.speak).toHaveBeenCalled());
@@ -235,19 +219,13 @@ describe("the live interview room", () => {
     await screen.findByText("Listening…");
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
 
-    // Re-record while the first AI transcription request is still in flight
     fireEvent.click(await screen.findByRole("button", { name: /Re-record/i }));
     expect(await screen.findByText("Listening…")).toBeTruthy();
-
-    // First stale AI response finishes late — must NOT hijack the new attempt
-    await act(async () => {
-      resolveStaleTranscribe({ transcript: "Stale first attempt text" });
-    });
 
     fireEvent.click(screen.getByRole("button", { name: /Stop & review/i }));
     const reviewCard = await screen.findByLabelText("Your spoken answer");
     expect(within(reviewCard).getByText("Second clean answer")).toBeTruthy();
-    expect(within(reviewCard).queryByText("Stale first attempt text")).toBeNull();
+    expect(within(reviewCard).queryByText("First attempt draft")).toBeNull();
   });
 
   it("submits the answer, files it into the transcript history and moves on to the next question", async () => {

@@ -2,6 +2,8 @@
 
 namespace App\Services\Speech;
 
+use App\Services\GeminiKeyRotationService;
+
 /**
  * Gemini text-to-speech: a prebuilt voice, no extra account (it uses the key AI interview scoring already has).
  *
@@ -10,29 +12,39 @@ namespace App\Services\Speech;
  */
 class GeminiSpeechSynthesizer extends HttpSpeechSynthesizer
 {
+    private const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-tts';
+
     public function name(): string
     {
         return 'gemini';
     }
 
+    private function resolvedModel(): string
+    {
+        $configured = trim((string) ($this->config['model'] ?? ''));
+
+        return GeminiKeyRotationService::isAllowedModel($configured) ? $configured : self::DEFAULT_TTS_MODEL;
+    }
+
     public function voiceKey(): string
     {
-        return $this->config['model'].':'.$this->config['voice'];
+        return $this->resolvedModel().':'.$this->config['voice'];
     }
 
     protected function apiKey(): string
     {
-        $rotationKey = app(\App\Services\GeminiKeyRotationService::class)->getActiveApiKeyString();
+        $rotationKey = app(GeminiKeyRotationService::class)->getActiveApiKeyString();
 
         return ! empty($rotationKey) ? $rotationKey : parent::apiKey();
     }
 
     public function synthesize(string $text): SynthesizedSpeech
     {
-        $rotationService = app(\App\Services\GeminiKeyRotationService::class);
-        $response = $rotationService->runWithFallback(function (string $currentKey) use ($text) {
+        $rotationService = app(GeminiKeyRotationService::class);
+        $model = $this->resolvedModel();
+        $response = $rotationService->runWithFallback(function (string $currentKey) use ($text, $model) {
             return $this->send(fn ($http) => $http->withHeaders(['x-goog-api-key' => $currentKey])->post(
-                'https://generativelanguage.googleapis.com/v1beta/models/'.$this->config['model'].':generateContent',
+                'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent',
                 [
                     'contents' => [['parts' => [['text' => $text]]]],
                     'generationConfig' => [

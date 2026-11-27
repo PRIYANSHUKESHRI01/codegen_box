@@ -121,7 +121,7 @@ export function InterviewSessionHud({
         <div
           role="alert"
           aria-live="assertive"
-          className="fixed top-3 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[70] max-w-lg w-full rounded-2xl border-2 border-status-danger bg-status-danger/95 text-white p-4 shadow-2xl backdrop-blur-md animate-pulse"
+          className="fixed top-16 sm:top-20 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[70] max-w-lg w-full rounded-2xl border-2 border-status-danger bg-status-danger/95 text-white p-4 shadow-2xl backdrop-blur-md"
         >
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">

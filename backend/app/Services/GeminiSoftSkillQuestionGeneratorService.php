@@ -30,20 +30,20 @@ class GeminiSoftSkillQuestionGeneratorService
     public function generate(string $category, string $difficulty, int $count): array
     {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI question generation is not configured yet — add questions manually instead.');
         }
 
         $prompt = $this->buildPrompt($category, $difficulty, $count);
+        $model = GeminiKeyRotationService::modelChain()[0];
 
         try {
-            $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt) {
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($prompt, $model) {
                 return Http::withHeaders(['x-goog-api-key' => $currentKey])
                     ->timeout(25)
                     ->post(
-                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
                         [
                             'contents' => [['parts' => [['text' => $prompt]]]],
                             'generationConfig' => [

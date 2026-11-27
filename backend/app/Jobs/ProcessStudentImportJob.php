@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Services\CollegeDepartmentService;
 use App\Services\IssuedCredentialVault;
+use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\AcademicYear;
 use App\Support\BranchCatalog;
 use App\Models\College;
@@ -63,7 +64,12 @@ class ProcessStudentImportJob implements ShouldQueue
         $path = Storage::disk('local')->path("student-imports/{$import->id}.csv");
         $handle = fopen($path, 'r');
 
-        $header = array_map(fn ($h) => strtolower(trim((string) $h)), fgetcsv($handle) ?: []);
+        $header = array_map(function ($h) {
+            $clean = preg_replace('/^\xEF\xBB\xBF/', '', (string) $h) ?? (string) $h;
+            $clean = preg_replace('/[\s-]+/', '_', strtolower(trim($clean))) ?? strtolower(trim($clean));
+
+            return trim($clean, '_');
+        }, fgetcsv($handle) ?: []);
 
         if (! in_array('name', $header, true) || ! in_array('email', $header, true)) {
             fclose($handle);
@@ -127,7 +133,7 @@ class ProcessStudentImportJob implements ShouldQueue
 
             $data = array_combine($header, array_pad($row, count($header), null));
             $name = trim((string) ($data['name'] ?? ''));
-            $email = trim((string) ($data['email'] ?? ''));
+            $email = Str::lower(trim((string) ($data['email'] ?? '')));
 
             if ($name === '' || $email === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 $errors[] = ['row' => $rowNumber, 'email' => $email ?: null, 'error' => 'Missing or invalid name/email.'];
@@ -265,6 +271,12 @@ class ProcessStudentImportJob implements ShouldQueue
                 $user->save();
 
                 app(IssuedCredentialVault::class)->keep($user, $plainPassword, 'import');
+
+                try {
+                    app(MellowVaultUserSyncService::class)->syncUser($user, $plainPassword);
+                } catch (Throwable) {
+                    // Fail soft: Mellow Vault sync never aborts a roster import row.
+                }
 
                 $emailJobs[] = new SendAccountCredentialsEmail($user->id, $plainPassword);
                 $successCount++;

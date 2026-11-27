@@ -7,6 +7,7 @@ use App\Models\Article;
 use App\Models\ArticleRead;
 use App\Models\ArticleTopic;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Student-facing (role: user) — read-only access to whatever Mellow Ops has
@@ -20,29 +21,36 @@ class ArticleController extends Controller
     public function topics(Request $request)
     {
         $userId = $request->user()->id;
+        $published = fn ($q) => $q->where('status', Article::STATUS_PUBLISHED);
 
         // Topics with at least one published article. whereHas rather than HAVING on the count alias: HAVING without a GROUP BY works on
         // MySQL but is rejected by SQLite (the test database), which hid this endpoint from every automated check.
-        $topics = ArticleTopic::withCount(['articles' => fn ($q) => $q->where('status', Article::STATUS_PUBLISHED)])
-            ->whereHas('articles', fn ($q) => $q->where('status', Article::STATUS_PUBLISHED))
+        $topics = ArticleTopic::withCount(['articles' => $published])
+            ->withSum(['articles as total_reading_minutes' => $published], 'reading_time_minutes')
+            ->whereHas('articles', $published)
             ->orderBy('display_order')
             ->get();
 
+        $topicIds = $topics->pluck('id')->all();
+        $readsByTopic = $topicIds === []
+            ? []
+            : DB::table('article_reads')
+                ->join('articles', 'articles.id', '=', 'article_reads.article_id')
+                ->where('article_reads.user_id', $userId)
+                ->where('articles.status', Article::STATUS_PUBLISHED)
+                ->whereIn('articles.article_topic_id', $topicIds)
+                ->groupBy('articles.article_topic_id')
+                ->selectRaw('articles.article_topic_id as topic_id, COUNT(*) as read_count')
+                ->pluck('read_count', 'topic_id')
+                ->all();
+
         return response()->json([
-            'topics' => $topics->map(function (ArticleTopic $topic) use ($userId) {
-                $readCount = ArticleRead::where('user_id', $userId)
-                    ->whereIn('article_id', $topic->articles()->where('status', Article::STATUS_PUBLISHED)->pluck('id'))
-                    ->count();
-
-                $totalMinutes = $topic->articles()->where('status', Article::STATUS_PUBLISHED)->sum('reading_time_minutes');
-
-                return [
-                    ...$topic->toArray(),
-                    'published_articles_count' => $topic->articles_count,
-                    'read_count' => $readCount,
-                    'total_reading_minutes' => (int) $totalMinutes,
-                ];
-            }),
+            'topics' => $topics->map(fn (ArticleTopic $topic) => [
+                ...$topic->toArray(),
+                'published_articles_count' => $topic->articles_count,
+                'read_count' => (int) ($readsByTopic[$topic->id] ?? 0),
+                'total_reading_minutes' => (int) ($topic->total_reading_minutes ?? 0),
+            ]),
         ]);
     }
 

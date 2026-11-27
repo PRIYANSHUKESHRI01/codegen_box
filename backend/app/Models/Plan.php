@@ -282,4 +282,11 @@ class Plan extends Model
             && ! $this->isContactOnly()
             && $this->listPrice() > 0;
     }
+
+    protected static function booted(): void
+    {
+        $bump = static fn () => Subscription::bumpMemoVersion();
+        static::saved($bump);
+        static::deleted($bump);
+    }
 }

@@ -1,11 +1,19 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { getToken, type AuthUser } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
-import { BranchConfirmModal } from "./BranchConfirmModal";
-import { StudentOnboardingModal } from "./StudentOnboardingModal";
+
+const BranchConfirmModal = dynamic(
+  () => import("./BranchConfirmModal").then((m) => m.BranchConfirmModal),
+  { ssr: false }
+);
+const StudentOnboardingModal = dynamic(
+  () => import("./StudentOnboardingModal").then((m) => m.StudentOnboardingModal),
+  { ssr: false }
+);
 
 /**
  * How long to wait after the page appears before asking. The signed-in user is

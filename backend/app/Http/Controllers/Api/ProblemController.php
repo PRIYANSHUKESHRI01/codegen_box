@@ -24,26 +24,13 @@ class ProblemController extends Controller
 {
     public function index(Request $request)
     {
-        $problems = Problem::orderBy('display_order')
-            ->orderBy('id')
-            ->get(['id', 'slug', 'title', 'difficulty', 'tags', 'companies', 'acceptance_rate', 'total_submissions', 'display_order']);
+        $solvedSet = $this->solvedProblemIds($request)->flip()->all();
+        $problems = Problem::indexCatalog();
 
-        // Not $problems->each(fn ($p) => $p->solved = ...) — Collection::each()
-        // stops iterating the moment a callback returns exactly `false`, and
-        // that assignment's value *is* the callback's return value. For the
-        // first not-yet-solved problem that's `false`, which silently
-        // truncated every later problem's `solved` field until this fix.
-        $solvedProblemIds = $this->solvedProblemIds($request);
-        foreach ($problems as $p) {
-            $p->solved = $solvedProblemIds->contains($p->id);
-            // The LeetCode-style "101. Two Sum" display number — stable
-            // because display_order itself never changes once assigned
-            // (each seed batch only ever appends). Offset by 100 per
-            // product decision, not a technical constraint. `display_order`
-            // itself is an internal sequencing detail, not a public field.
-            $p->serial_number = $p->display_order + 100;
+        foreach ($problems as &$p) {
+            $p['solved'] = isset($solvedSet[$p['id']]);
         }
-        $problems->makeHidden('display_order');
+        unset($p);
 
         return response()->json(['problems' => $problems]);
     }

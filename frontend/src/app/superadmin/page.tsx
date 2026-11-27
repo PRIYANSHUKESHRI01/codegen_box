@@ -47,9 +47,10 @@ import { TrafficPulseBar } from "@/components/admin/superadmin/TrafficPulseBar";
 import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList";
 import { SuperAdminDrivesPanel } from "@/components/admin/superadmin/SuperAdminDrivesPanel";
 import { VoiceVerificationPanel } from "@/components/admin/superadmin/VoiceVerificationPanel";
+import { CollegeAssessmentsPanel } from "@/components/admin/superadmin/CollegeAssessmentsPanel";
 import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "voice_verification" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "voice_verification" | "assessments" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -57,6 +58,7 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "activity", label: "Live Activity", icon: Activity },
   { id: "gemini_keys", label: "Gemini Keys", icon: Sparkles },
   { id: "voice_verification", label: "Voice Verification", icon: Mic },
+  { id: "assessments", label: "College Assessments", icon: ShieldCheck },
   { id: "drives", label: "Placement Drives", icon: Briefcase },
   { id: "hackathons", label: "Hackathons", icon: Rocket },
   { id: "vault_ai", label: "Vault AI Results", icon: ShieldCheck },
@@ -170,6 +172,7 @@ function SuperAdminPageContent() {
       {activeTab === "activity" && <ActivityPanel key={collegeParam ?? "all"} initialCollegeId={collegeParam} />}
       {activeTab === "gemini_keys" && <GeminiKeysPanel triggerToast={triggerToast} />}
       {activeTab === "voice_verification" && <VoiceVerificationPanel triggerToast={triggerToast} />}
+      {activeTab === "assessments" && <CollegeAssessmentsPanel triggerToast={triggerToast} />}
       {activeTab === "drives" && <SuperAdminDrivesPanel />}
       {activeTab === "hackathons" && <SuperAdminHackathonsPanel triggerToast={triggerToast} />}
       {activeTab === "vault_ai" && (

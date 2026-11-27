@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useState, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft, Camera, CheckCircle2, Loader2, ShieldCheck, Sparkles, UserCheck, type LucideIcon } from "lucide-react";
 import { Wordmark } from "@/components/brand/Logo";
@@ -8,6 +8,7 @@ import { IntegrityChecklist } from "@/components/proctoring/IntegrityChecklist";
 import { StrikeMeter } from "@/components/proctoring/ConsentScreen";
 import { checksPass, useIntegrityUi } from "@/lib/integrity/store";
 import { captureVideoStill } from "@/lib/integrity/detectors/faceIdentity";
+import { loadVision } from "@/lib/integrity/detectors/vision";
 import { cn } from "@/lib/utils";
 import { AptRunOrb } from "./AptRunOrb";
 import { MicStrip } from "./MicStrip";
@@ -94,6 +95,14 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   const [verifiedDescriptor, setVerifiedDescriptor] = useState<number[] | null>(null);
   const [photoError, setPhotoError] = useState<string | null>(null);
   const [capturingPhoto, setCapturingPhoto] = useState(false);
+  const [slowPhotoNotice, setSlowPhotoNotice] = useState(false);
+
+  // Preload ONLY the lightweight FaceLandmarker singleton as soon as camera preview opens,
+  // so clicking "Take Verification Photo" is near-instant (<150ms) even on AWS.
+  useEffect(() => {
+    if (!devicePreviewReady) return;
+    void loadVision("/integrity", "CPU", { includeObjects: false }).catch(() => undefined);
+  }, [devicePreviewReady]);
 
   const integrity = ui.policy !== null;
   const ready = !integrity || checksPass(ui.checks);
@@ -109,6 +118,8 @@ export function InterviewLobby(props: InterviewLobbyProps) {
       return;
     }
     setCapturingPhoto(true);
+    setSlowPhotoNotice(false);
+    const slowTimer = window.setTimeout(() => setSlowPhotoNotice(true), 1200);
     try {
       const still = captureVideoStill(previewVideoRef.current);
       if (!still) {
@@ -118,10 +129,15 @@ export function InterviewLobby(props: InterviewLobbyProps) {
       }
       let descriptor: number[] | null = null;
       try {
-        const { loadVision } = await import("@/lib/integrity/detectors/vision");
-        const vision = await loadVision("/integrity", "CPU");
-        const analysis = vision.analyse(previewVideoRef.current, false);
-        vision.close();
+        const videoEl = previewVideoRef.current;
+        const detectTask = (async () => {
+          const vision = await loadVision("/integrity", "CPU", { includeObjects: false });
+          const res = vision.analyse(videoEl, false);
+          vision.close();
+          return res;
+        })();
+        const timeoutTask = new Promise<null>((resolve) => window.setTimeout(() => resolve(null), 5000));
+        const analysis = await Promise.race([detectTask, timeoutTask]);
         if (analysis) {
           if (analysis.faces === 0) {
             setPhotoError("No face detected. Please face the camera directly in good lighting.");
@@ -143,6 +159,8 @@ export function InterviewLobby(props: InterviewLobbyProps) {
     } catch {
       setPhotoError("Failed to capture verification photo. Please try again.");
     } finally {
+      window.clearTimeout(slowTimer);
+      setSlowPhotoNotice(false);
       setCapturingPhoto(false);
     }
   };
@@ -305,22 +323,29 @@ export function InterviewLobby(props: InterviewLobbyProps) {
                         </button>
                       </div>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={handleCapturePhoto}
-                        disabled={capturingPhoto}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-primary py-2.5 text-xs font-bold text-white shadow-md shadow-accent-primary/25 hover:bg-accent-primary-hover transition-colors disabled:opacity-60"
-                      >
-                        {capturingPhoto ? (
-                          <>
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" /> Verifying Face...
-                          </>
-                        ) : (
-                          <>
-                            <Camera className="h-3.5 w-3.5" /> Take Verification Photo
-                          </>
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleCapturePhoto}
+                          disabled={capturingPhoto}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent-primary py-2.5 text-xs font-bold text-white shadow-md shadow-accent-primary/25 hover:bg-accent-primary-hover transition-colors disabled:opacity-60"
+                        >
+                          {capturingPhoto ? (
+                            <>
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" /> {slowPhotoNotice ? "Still verifying face…" : "Verifying Face…"}
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="h-3.5 w-3.5" /> Take Verification Photo
+                            </>
+                          )}
+                        </button>
+                        {capturingPhoto && slowPhotoNotice && (
+                          <p role="status" className="text-center text-3xs font-medium text-text-muted leading-relaxed">
+                            First-time face model initialization on slower connections may take a few seconds — hang tight.
+                          </p>
                         )}
-                      </button>
+                      </>
                     )}
                   </div>
                 </>

@@ -4,6 +4,7 @@ namespace App\Services\Vault;
 
 use App\Models\CuratedSetQuestion;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -28,18 +29,48 @@ class CuratedCatalog
 
     public const SETS_PER_SERIES = 3;
 
+    private const CACHE_SET_SUMMARY = 'curated-catalog:set-summary:v1';
+
+    private const CATALOG_CACHE_TTL = 3600;
+
     /** @var array<string, array<string, mixed>>|null */
     private ?array $roles = null;
+
+    /** @var array<string, array<string, mixed>>|null */
+    private ?array $summary = null;
 
     /** @return array<string, array<string, mixed>> role key => role (with `stacks` keyed by stack key) */
     public function roles(): array
     {
-        return $this->roles ??= $this->build();
+        return $this->roles ??= $this->build($this->customQuestions());
+    }
+
+    /**
+     * Lightweight role tree with set counts & up to 3 preview texts per set (tiny cached query,
+     * avoids serializing thousands of full rubric notes when browsing catalogs).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function summaryRoles(): array
+    {
+        if ($this->roles !== null) {
+            return $this->roles;
+        }
+
+        return $this->summary ??= $this->build($this->customSummary(), countsOnly: true);
     }
 
     public function flush(): void
     {
         $this->roles = null;
+        $this->summary = null;
+        self::flushCache();
+    }
+
+    public static function flushCache(): void
+    {
+        Cache::forget(self::CACHE_SET_SUMMARY);
+        \App\Services\Mock\MockInterviewCatalog::flushCache();
     }
 
     public function minQuestions(): int
@@ -49,7 +80,9 @@ class CuratedCatalog
 
     public function isSetReady(array $set): bool
     {
-        return count($set['questions'] ?? []) >= $this->minQuestions();
+        $count = $set['question_count'] ?? count($set['questions'] ?? []);
+
+        return $count >= $this->minQuestions();
     }
 
     /**
@@ -89,7 +122,7 @@ class CuratedCatalog
                 $missing[] = [
                     'series' => (int) ($set['series_number'] ?? 1),
                     'set' => (int) ($set['set_number'] ?? 1),
-                    'have' => count($set['questions'] ?? []),
+                    'have' => (int) ($set['question_count'] ?? count($set['questions'] ?? [])),
                     'need' => $this->minQuestions(),
                 ];
             }
@@ -100,9 +133,13 @@ class CuratedCatalog
 
     public function isLive(string $stackKey): bool
     {
-        $found = $this->stack($stackKey);
+        foreach ($this->summaryRoles() as $role) {
+            if (isset($role['stacks'][$stackKey])) {
+                return $this->progress($role['stacks'][$stackKey])['live'];
+            }
+        }
 
-        return $found !== null && $this->progress($found['stack'])['live'];
+        return false;
     }
 
     /** @return array<string, bool> stack key => live, for every stack (used to see which stacks a change just opened) */
@@ -110,7 +147,7 @@ class CuratedCatalog
     {
         $map = [];
 
-        foreach ($this->roles() as $role) {
+        foreach ($this->summaryRoles() as $role) {
             foreach ($role['stacks'] as $key => $stack) {
                 $map[(string) $key] = $this->progress($stack)['live'];
             }
@@ -136,7 +173,7 @@ class CuratedCatalog
     // ───────────────────────────── assembly ─────────────────────────────
 
     /** @return array<string, array<string, mixed>> */
-    private function build(): array
+    private function build(array $custom, bool $countsOnly = false): array
     {
         $roles = (array) config('curated_interview_sets.roles', []);
         $domains = (array) config('curated_interview_domains.roles', []);
@@ -162,7 +199,6 @@ class CuratedCatalog
             }
         }
 
-        $custom = $this->customQuestions();
         $aliases = (array) config('curated_interview_domains.domains', []);
 
         foreach ($roles as $roleKey => &$role) {
@@ -175,17 +211,48 @@ class CuratedCatalog
                     foreach ($series['sets'] as &$set) {
                         $builtin = array_map(fn (array $q) => $q + ['source' => 'builtin'], $set['questions'] ?? []);
                         $set['builtin_count'] = count($builtin);
-                        
-                        $seenTexts = [];
-                        $merged = [];
-                        foreach (array_merge($builtin, $custom[$set['id']] ?? []) as $q) {
-                            $textKey = trim($q['text'] ?? '');
-                            if ($textKey !== '' && ! isset($seenTexts[$textKey])) {
-                                $seenTexts[$textKey] = true;
-                                $merged[] = $q;
+
+                        if ($countsOnly) {
+                            $seenTexts = [];
+                            $previews = [];
+                            $count = 0;
+
+                            foreach ($builtin as $q) {
+                                $textKey = trim($q['text'] ?? '');
+                                if ($textKey !== '' && ! isset($seenTexts[$textKey])) {
+                                    $seenTexts[$textKey] = true;
+                                    $count++;
+                                    if (count($previews) < 3) {
+                                        $previews[] = $textKey;
+                                    }
+                                }
                             }
+
+                            foreach ($custom[$set['id']] ?? [] as $textKey) {
+                                if ($textKey !== '' && ! isset($seenTexts[$textKey])) {
+                                    $seenTexts[$textKey] = true;
+                                    $count++;
+                                    if (count($previews) < 3) {
+                                        $previews[] = $textKey;
+                                    }
+                                }
+                            }
+
+                            $set['question_count'] = $count;
+                            $set['preview_questions'] = $previews;
+                            unset($set['questions']);
+                        } else {
+                            $seenTexts = [];
+                            $merged = [];
+                            foreach (array_merge($builtin, $custom[$set['id']] ?? []) as $q) {
+                                $textKey = trim($q['text'] ?? '');
+                                if ($textKey !== '' && ! isset($seenTexts[$textKey])) {
+                                    $seenTexts[$textKey] = true;
+                                    $merged[] = $q;
+                                }
+                            }
+                            $set['questions'] = $merged;
                         }
-                        $set['questions'] = $merged;
                     }
                     unset($set);
                 }
@@ -239,6 +306,41 @@ class CuratedCatalog
             'tags' => $tags,
             'series' => $series,
         ];
+    }
+
+    /**
+     * Questions staff added, by set id. A missing table (the migration has not run on this server yet) must not take the
+     * whole catalog down with it: it simply has no staff questions.
+     *
+     * @return array<string, list<array<string, mixed>>>
+     */
+    /**
+     * Compact custom-question text list per set (cached for catalog summary cards without hydrating full rubrics).
+     *
+     * @return array<string, list<string>>
+     */
+    private function customSummary(): array
+    {
+        try {
+            return Cache::remember(self::CACHE_SET_SUMMARY, self::CATALOG_CACHE_TTL, function () {
+                $out = [];
+                foreach (
+                    CuratedSetQuestion::query()
+                        ->orderBy('set_id')
+                        ->orderBy('position')
+                        ->orderBy('id')
+                        ->get(['set_id', 'text']) as $row
+                ) {
+                    $out[$row->set_id][] = trim((string) $row->text);
+                }
+
+                return $out;
+            });
+        } catch (QueryException $e) {
+            report($e);
+
+            return [];
+        }
     }
 
     /**

@@ -34,18 +34,19 @@ class GeminiCoreQuestionDraftService
     public function draft(string $discipline, string $subject, ?string $topic, string $difficulty, string $type, int $count, array $avoidStems = []): array
     {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI drafting is not configured yet — write the questions by hand or import them.');
         }
 
+        $model = GeminiKeyRotationService::modelChain()[0];
+
         try {
-            $response = $rotationService->runWithFallback(function (string $currentKey) use ($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems) {
+            $response = $rotationService->runWithFallback(function (string $currentKey) use ($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems, $model) {
                 return Http::withHeaders(['x-goog-api-key' => $currentKey])
                     ->timeout(40)
                     ->post(
-                        'https://generativelanguage.googleapis.com/v1beta/models/'.config('services.gemini.model').':generateContent',
+                        "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent",
                         [
                             'contents' => [['parts' => [['text' => $this->prompt($discipline, $subject, $topic, $difficulty, $type, $count, $avoidStems)]]]],
                             'generationConfig' => ['temperature' => 0.6, 'maxOutputTokens' => 8192, 'responseMimeType' => 'application/json', 'responseSchema' => $this->schema()],

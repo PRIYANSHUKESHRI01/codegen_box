@@ -45,6 +45,13 @@ export interface ApiPlatformUser {
   credentials_email_sent_at?: string | null;
   /** Whether the temporary password this account was issued can be looked up — never the password itself. */
   credential_state?: CredentialState;
+  /** Distinguish Mellow Vault synced accounts from AptRun-only users (whose MV % stays 0 until synced). */
+  is_mellow_vault_user?: boolean;
+  account_origin?: "mellow_vault" | "aptrun";
+  mellow_vault_profile_percent?: number;
+  mellow_vault_stack_key?: string | null;
+  mellow_vault_stack_name?: string | null;
+  vault_ai_invite_sent_at?: string | null;
 }
 
 /**

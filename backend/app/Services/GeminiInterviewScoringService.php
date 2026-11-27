@@ -81,9 +81,8 @@ class GeminiInterviewScoringService
     public function score(array $items, string $role, ?string $discipline = null): array
     {
         $rotationService = app(GeminiKeyRotationService::class);
-        $apiKey = $rotationService->getActiveApiKeyString();
 
-        if (! $apiKey) {
+        if (! $rotationService->hasAvailableKeys()) {
             throw new RuntimeException('AI interview scoring is not configured yet.');
         }
 

@@ -462,14 +462,25 @@ export function BulkImportStudentsPanel({ collegeId, collegeName, variant, onCom
             Add {collegeName}&apos;s whole batch at once — each new student gets an emailed login the moment their row is created.
           </p>
         </div>
-        <button
-          onClick={() => handleDownloadTemplate("xlsx")}
-          disabled={downloadingTemplate}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
-        >
-          {downloadingTemplate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-          <span>Download Excel Template</span>
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleDownloadTemplate("xlsx")}
+            disabled={downloadingTemplate}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
+          >
+            {downloadingTemplate ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span>Excel Template</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => handleDownloadTemplate("csv")}
+            disabled={downloadingTemplate}
+            className="px-2.5 py-1.5 rounded-control bg-elevated hover:bg-surface-hover border border-border-subtle text-2xs font-semibold text-text-secondary hover:text-primary transition-colors disabled:opacity-50 shrink-0"
+          >
+            CSV
+          </button>
+        </div>
       </div>
 
       <DepartmentPicker options={departments} value={department} onChange={setChosenDepartment} label="Which department is this roster for?" />

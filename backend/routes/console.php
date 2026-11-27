@@ -35,6 +35,9 @@ Schedule::command('vault:sync')->everyMinute()->withoutOverlapping(5);
 // Every five minutes: when Mellow Vault books a student AptRun delivered (VAULT_SYNC_DRIVER=database only; a no-op otherwise), mark them hired here.
 Schedule::command('vault:pull-outcomes')->everyFiveMinutes()->withoutOverlapping(5);
 
+// Every five minutes: sync developer profile completion % & pro_id stack from mellow_vault.developer_details_tb and invite >=90% users to Vault AI Interview.
+Schedule::command('mellow-vault:sync-profile-completion')->everyFiveMinutes()->withoutOverlapping(10);
+
 // Daily: drop delivered Vault outbox events past their retention.
 Schedule::command('vault:prune')->daily();
 
@@ -44,6 +47,9 @@ Schedule::command('interview:score-pending')->everyMinute()->withoutOverlapping(
 
 // Every ten minutes: the "starting soon" / "closing soon" reminders for college mock AI interviews that have a window (sent once each).
 Schedule::command('interviews:remind')->everyTenMinutes()->withoutOverlapping(10);
+
+// Hourly: deadline & 60% readiness reminders for active Launchpad 2026 campaigns (Tech 21d / Non-Tech 5d).
+Schedule::command('launchpad:remind')->hourly()->withoutOverlapping(10);
 
 // Daily: remove practice interviews a student built but never took (kept once they have a session).
 Schedule::command('interview:prune-practice')->dailyAt('03:50');

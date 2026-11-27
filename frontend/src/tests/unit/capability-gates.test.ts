@@ -23,7 +23,7 @@ const GATED: Record<string, string[]> = {
 };
 
 /** Sections every student has, whatever their programme: they decide for themselves what to show (or are the module's own shell). */
-const FOR_EVERYONE = new Set(["billing", "core", "drives", "reports", "vault", "talent-pool"]);
+const FOR_EVERYONE = new Set(["assessments", "billing", "core", "drives", "reports", "vault", "talent-pool"]);
 
 describe("student sections that depend on a module are gated by it", () => {
   it.each(Object.entries(GATED))("%s is wrapped in a CapabilityGate for %j", (section, capabilities) => {

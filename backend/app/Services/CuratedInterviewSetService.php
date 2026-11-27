@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VaultStackInterest;
 use App\Services\Vault\CuratedCatalog;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
@@ -39,14 +40,13 @@ class CuratedInterviewSetService
     public function catalog(?User $viewer = null): array
     {
         $interested = $this->interestsOf($viewer);
-
         $roles = [];
         $totalStacks = 0;
         $liveStacks = 0;
         $totalSets = 0;
         $totalQuestions = 0;
 
-        foreach ($this->catalog->roles() as $roleKey => $roleData) {
+        foreach ($this->catalog->summaryRoles() as $roleKey => $roleData) {
             $stacks = [];
             $roleSetsCount = 0;
             $roleLive = 0;
@@ -60,7 +60,7 @@ class CuratedInterviewSetService
                     $seriesSets = [];
 
                     foreach ($sData['sets'] ?? [] as $setData) {
-                        $questionCount = count($setData['questions'] ?? []);
+                        $questionCount = (int) ($setData['question_count'] ?? count($setData['questions'] ?? []));
                         $totalQuestions += $questionCount;
                         $roleSetsCount++;
                         $totalSets++;
@@ -75,7 +75,7 @@ class CuratedInterviewSetService
                             'tags' => $setData['tags'] ?? [],
                             'question_count' => $questionCount,
                             'ready' => $this->catalog->isSetReady($setData),
-                            'preview_questions' => array_slice(array_column($setData['questions'] ?? [], 'text'), 0, 3),
+                            'preview_questions' => $setData['preview_questions'] ?? array_slice(array_column($setData['questions'] ?? [], 'text'), 0, 3),
                         ];
 
                         $seriesSets[] = $formattedSet;

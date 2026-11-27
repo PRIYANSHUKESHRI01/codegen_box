@@ -11,12 +11,12 @@ import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerific
 import { UsageLimitBanner } from "@/components/billing/UsageLimitBanner";
 import { FreeTrialBanner } from "@/components/billing/FreeTrialBanner";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useEntitlements } from "@/lib/useEntitlements";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { canStartNow, scheduleNote } from "@/lib/interviewSchedule";
 import type { StudentInterviewSummary } from "@/types/interview";
 import type { StudentInterviewTrackSummary } from "@/types/interviewTrack";
-import type { MySubscriptionResponse } from "@/types/subscription";
 
 const TYPE_BADGE: Record<string, { label: string; className: string }> = {
   tpo_mock: { label: "Mock", className: "bg-cyan-500/10 text-cyan-400 border-cyan-500/25" },
@@ -42,19 +42,17 @@ function InterviewsListContent() {
   const [interviews, setInterviews] = useState<StudentInterviewSummary[]>([]);
   const [tracks, setTracks] = useState<StudentInterviewTrackSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
+  const entitlements = useEntitlements(status === "ready");
 
   useEffect(() => {
     if (status !== "ready") return;
     Promise.all([
       api.get<{ interviews: StudentInterviewSummary[] }>("/interviews").catch(() => ({ interviews: [] })),
       api.get<{ tracks: StudentInterviewTrackSummary[] }>("/interview-tracks").catch(() => ({ tracks: [] })),
-      api.get<MySubscriptionResponse>("/me/subscription").catch(() => ({ scope: "individual" as const, coverage: null, entitlements: undefined })),
     ])
-      .then(([interviewsRes, tracksRes, subscriptionRes]) => {
+      .then(([interviewsRes, tracksRes]) => {
         setInterviews(interviewsRes.interviews);
         setTracks(tracksRes.tracks);
-        setEntitlements(subscriptionRes.entitlements);
       })
       .finally(() => setLoading(false));
   }, [status]);

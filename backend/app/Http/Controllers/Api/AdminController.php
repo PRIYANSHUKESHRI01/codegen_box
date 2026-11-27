@@ -15,6 +15,7 @@ use App\Models\PlacementDrive;
 use App\Models\Plan;
 use App\Models\Problem;
 use App\Models\Submission;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\CollegeDepartmentService;
 use App\Services\SectionCoordinatorService;
@@ -23,6 +24,7 @@ use App\Services\SubscriptionService;
 use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\SingleMail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -50,33 +52,47 @@ class AdminController extends Controller
      */
     public function overview()
     {
-        return response()->json([
-            'segments' => [
-                'colleges' => College::count(),
-                'platform_users' => User::where('role', User::ROLE_USER)->count(),
-                'companies' => Company::count(),
-                'contests' => Contest::count(),
-                'interviews' => Interview::excludingPractice()->count(),
-                'placement_drives' => PlacementDrive::count(),
-                'problems' => Problem::count(),
-                'articles' => Article::count(),
-            ],
-            'submissions_today' => Submission::where('submitted_on', now()->toDateString())->count(),
-            'signups_last_7_days' => User::where('role', User::ROLE_USER)->where('created_at', '>=', now()->subDays(7))->count(),
-            // Colleges whose institutional plan lapses within 2 weeks — a
-            // real, actionable renewal-risk list, not a decorative count.
-            'colleges_renewing_soon' => College::all()
-                ->map(function (College $college) {
-                    $subscription = $college->activeSubscription();
+        return response()->json(Cache::remember('admin:overview:v1', 30, function () {
+            $colleges = College::all(['id', 'name']);
 
-                    return $subscription?->isActive()
-                        ? ['id' => $college->id, 'name' => $college->name, 'days_remaining' => $subscription->daysRemaining()]
-                        : null;
-                })
-                ->filter(fn (?array $c) => $c !== null && $c['days_remaining'] <= 14)
-                ->sortBy('days_remaining')
-                ->values(),
-        ]);
+            // One batched query for all college base subscriptions rather than N+1 per college.
+            $activeBaseByCollege = Subscription::where('subscriber_type', College::class)
+                ->where('status', Subscription::STATUS_ACTIVE)
+                ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_BASE))
+                ->orderByDesc('started_at')
+                ->orderByDesc('id')
+                ->get(['id', 'subscriber_id', 'status', 'current_period_end', 'started_at'])
+                ->unique('subscriber_id')
+                ->keyBy('subscriber_id');
+
+            return [
+                'segments' => [
+                    'colleges' => $colleges->count(),
+                    'platform_users' => User::where('role', User::ROLE_USER)->count(),
+                    'companies' => Company::count(),
+                    'contests' => Contest::count(),
+                    'interviews' => Interview::excludingPractice()->count(),
+                    'placement_drives' => PlacementDrive::count(),
+                    'problems' => Problem::count(),
+                    'articles' => Article::count(),
+                ],
+                'submissions_today' => Submission::where('submitted_on', now()->toDateString())->count(),
+                'signups_last_7_days' => User::where('role', User::ROLE_USER)->where('created_at', '>=', now()->subDays(7))->count(),
+                // Colleges whose institutional plan lapses within 2 weeks — a
+                // real, actionable renewal-risk list, not a decorative count.
+                'colleges_renewing_soon' => $colleges
+                    ->map(function (College $college) use ($activeBaseByCollege) {
+                        $subscription = $activeBaseByCollege->get($college->id);
+
+                        return $subscription?->isActive()
+                            ? ['id' => $college->id, 'name' => $college->name, 'days_remaining' => $subscription->daysRemaining()]
+                            : null;
+                    })
+                    ->filter(fn (?array $c) => $c !== null && $c['days_remaining'] <= 14)
+                    ->sortBy('days_remaining')
+                    ->values(),
+            ];
+        }));
     }
 
     /**
@@ -504,7 +520,18 @@ class AdminController extends Controller
             }
         }
 
-        return $query->latest()->paginate(50);
+        if ($mvSource = $request->query('mv_source')) {
+            if ($mvSource === 'mellow_vault') {
+                $query->where(fn ($q) => $q->whereNotNull('mellow_vault_dev_id')->orWhereNotNull('mellow_vault_profile_synced_at'));
+            } elseif ($mvSource === 'aptrun_only') {
+                $query->whereNull('mellow_vault_dev_id')->whereNull('mellow_vault_profile_synced_at');
+            }
+        }
+
+        $page = $query->latest()->paginate(50);
+        $page->getCollection()->transform(fn (User $u) => \App\Services\Vault\MellowVaultProfileSyncService::attachOriginAttributes($u));
+
+        return $page;
     }
 
     /**

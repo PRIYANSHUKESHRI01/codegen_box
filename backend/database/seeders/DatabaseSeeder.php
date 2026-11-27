@@ -274,5 +274,8 @@ class DatabaseSeeder extends Seeder
         $this->call(AptBotFaqSeeder::class);
         $this->call(TpoEnterpriseBackfillSeeder::class);
         $this->call(VoiceVerificationSeeder::class);
+        $this->call(CollegeAssessmentSeeder::class);
+        $this->call(LaunchpadProgramSeeder::class);
+        $this->call(MellowVaultStackMappingSeeder::class);
     }
 }

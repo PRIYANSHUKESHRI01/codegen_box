@@ -7,6 +7,7 @@ import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { HackArenaBanner } from "@/components/arena/HackArenaBanner";
 import { WeeklyRewardsBanner } from "@/components/leaderboard/WeeklyRewardsBanner";
+import { LaunchpadProgramBanner } from "@/components/dashboard/home/LaunchpadProgramBanner";
 import { MellowVaultInterviewBanner } from "@/components/dashboard/home/MellowVaultInterviewBanner";
 import { PracticeShelf } from "@/components/dashboard/home/PracticeShelf";
 import { UpNextCard } from "@/components/dashboard/home/UpNextCard";
@@ -142,6 +143,9 @@ export function SoftwareHome({ layout = "software", coreHome = null }: { layout?
       {caps.hackathons && (
         <HackArenaBanner />
       )}
+
+      {/* 2c. Mellow Vault Launchpad 2026 compact overview banner */}
+      <LaunchpadProgramBanner variant="compact" />
 
       {/* 3. How am I doing - a handful of numbers, each leading to the page that owns it. */}
       <OverviewStats stats={statTiles} />

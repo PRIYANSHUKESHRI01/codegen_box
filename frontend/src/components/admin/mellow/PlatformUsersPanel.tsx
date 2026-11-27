@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { credentialsEmailNote } from "@/lib/credentialsEmail";
 import { type ToastTrigger } from "@/lib/toast";
+import { MvProfileBadge } from "../superadmin/MvProfileBadge";
 
 interface ApiUser {
   id: number;
@@ -16,6 +17,11 @@ interface ApiUser {
   is_blocked: boolean;
   created_at: string;
   college: { id: number; name: string } | null;
+  is_mellow_vault_user?: boolean;
+  account_origin?: "mellow_vault" | "aptrun";
+  mellow_vault_profile_percent?: number;
+  mellow_vault_stack_name?: string | null;
+  vault_ai_invite_sent_at?: string | null;
 }
 
 interface ApiPage<T> {
@@ -215,6 +221,7 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: ToastTrigge
                   <th className="px-4 py-3">User</th>
                   <th className="px-4 py-3">Handle</th>
                   <th className="px-4 py-3">College</th>
+                  <th className="px-4 py-3">MV Profile %</th>
                   <th className="px-4 py-3">Joined</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3 text-right">Actions</th>
@@ -241,6 +248,9 @@ export function PlatformUsersPanel({ triggerToast }: { triggerToast: ToastTrigge
                       ) : (
                         <span className="text-3xs px-1.5 py-0.5 rounded bg-elevated border border-border-subtle text-text-muted">Individual</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <MvProfileBadge user={u} />
                     </td>
                     <td className="px-4 py-3 text-text-muted">
                       {new Date(u.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

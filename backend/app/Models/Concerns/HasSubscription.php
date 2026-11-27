@@ -22,9 +22,29 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
  */
 trait HasSubscription
 {
+    private ?int $subscriptionMemoVersion = null;
+
+    private bool $hasCachedActiveSubscription = false;
+
+    private ?Subscription $cachedActiveSubscription = null;
+
+    /** @var Collection<int, Subscription>|null */
+    private ?Collection $cachedActiveAddons = null;
+
     public function subscriptions(): MorphMany
     {
         return $this->morphMany(Subscription::class, 'subscriber');
+    }
+
+    private function resetSubscriptionMemoIfStale(): void
+    {
+        $version = Subscription::memoVersion();
+        if ($this->subscriptionMemoVersion !== $version) {
+            $this->subscriptionMemoVersion = $version;
+            $this->hasCachedActiveSubscription = false;
+            $this->cachedActiveSubscription = null;
+            $this->cachedActiveAddons = null;
+        }
     }
 
     /**
@@ -35,13 +55,20 @@ trait HasSubscription
      */
     public function activeSubscription(): ?Subscription
     {
-        return $this->subscriptions()
-            ->where('status', Subscription::STATUS_ACTIVE)
-            ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_BASE))
-            ->latest('started_at')
-            ->latest('id')
-            ->with('plan')
-            ->first();
+        $this->resetSubscriptionMemoIfStale();
+
+        if (! $this->hasCachedActiveSubscription) {
+            $this->cachedActiveSubscription = $this->subscriptions()
+                ->where('status', Subscription::STATUS_ACTIVE)
+                ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_BASE))
+                ->latest('started_at')
+                ->latest('id')
+                ->with('plan')
+                ->first();
+            $this->hasCachedActiveSubscription = true;
+        }
+
+        return $this->cachedActiveSubscription;
     }
 
     /**
@@ -54,15 +81,21 @@ trait HasSubscription
      */
     public function activeAddonSubscriptions(): Collection
     {
-        return $this->subscriptions()
-            ->where('status', Subscription::STATUS_ACTIVE)
-            ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_ADDON))
-            ->latest('started_at')
-            ->latest('id')
-            ->with('plan')
-            ->get()
-            ->filter(fn (Subscription $s) => $s->isActive())
-            ->values();
+        $this->resetSubscriptionMemoIfStale();
+
+        if ($this->cachedActiveAddons === null) {
+            $this->cachedActiveAddons = $this->subscriptions()
+                ->where('status', Subscription::STATUS_ACTIVE)
+                ->whereHas('plan', fn ($q) => $q->where('kind', Plan::KIND_ADDON))
+                ->latest('started_at')
+                ->latest('id')
+                ->with('plan')
+                ->get()
+                ->filter(fn (Subscription $s) => $s->isActive())
+                ->values();
+        }
+
+        return $this->cachedActiveAddons;
     }
 
     public function activeAddonSubscription(string $planCode): ?Subscription

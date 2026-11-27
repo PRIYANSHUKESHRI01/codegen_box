@@ -66,7 +66,8 @@ import { getRatingTier } from "@/lib/rating";
 import { isTopPlan } from "@/lib/pricing";
 import { SUBSCRIPTION_CHANGED_EVENT } from "@/lib/projectLab";
 import { useMyStats } from "@/lib/useMyStats";
-import type { MySubscriptionResponse, SubscriptionCoverage } from "@/types/subscription";
+import { useMyPlan } from "@/lib/useMyPlan";
+import type { SubscriptionCoverage } from "@/types/subscription";
 import { useAdminOverviewCounts } from "@/lib/useAdminOverviewCounts";
 import { LogoBadge, Wordmark } from "@/components/brand/Logo";
 import { LogoutConfirmModal } from "@/components/dashboard/LogoutConfirmModal";
@@ -214,20 +215,28 @@ export function DashboardSidebar({
   // (coverage.source === "institution" hides the Upgrade link below — same
   // "only Mellow staff can change it" rule as Settings' Billing tab). No
   // other role has a plan concept at all, so this never fetches for them.
-  const [coverage, setCoverage] = useState<SubscriptionCoverage | null>(null);
-  // null = not known yet (or not applicable): the Project Lab and Vault items then show no lock, so an
-  // entitled student never sees a lock flash while the request is in flight.
-  // A paid plan whose days have run out: the server already treats the student as free, so say so.
+  const { plan: myPlanRes } = useMyPlan(currentRole === "user" || currentRole === "admin_tpo");
+  const coverage: SubscriptionCoverage | null = myPlanRes?.coverage ?? null;
   const planEnded =
     coverage?.source === "individual" && !!coverage.plan && coverage.plan.code !== "coder" && coverage.days_remaining !== null && coverage.days_remaining <= 0;
-  const [projectLabEnabled, setProjectLabEnabled] = useState<boolean | null>(null);
-  const [vaultEnabled, setVaultEnabled] = useState<boolean | null>(null);
-  // The Vault AI Interview's lock (a college student who has not earned it yet) and its countdown; null until the server has answered.
+  const projectLabEnabled: boolean | null = myPlanRes?.project_lab ? myPlanRes.project_lab.enabled : null;
+  const vaultEnabled: boolean | null = myPlanRes?.entitlements ? myPlanRes.entitlements.vault_access : null;
   const { access: vaultAi } = useVaultAiAccess(currentRole === "user" && capabilitiesOf(storedUser).ai_interviews);
-  // Core Prep (branch technical practice) is in the rail only when the server says it exists for this student.
-  const [coreAvailable, setCoreAvailable] = useState(false);
-  // A TPO sees "Core Tests" (or "Domain Tests" for a college with other departments) only once Mellow has switched at least one
-  // branch family of THEIR departments live — never an empty console.
+  const coreAvailable = !!myPlanRes?.entitlements?.core_prep?.available;
+  const [assessmentsCount, setAssessmentsCount] = useState(0);
+  useEffect(() => {
+    if (currentRole !== "user") return;
+    let cancelled = false;
+    api
+      .get<{ assessments: unknown[] }>("/assessments")
+      .then((res) => {
+        if (!cancelled) setAssessmentsCount(Array.isArray(res?.assessments) ? res.assessments.length : 0);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [currentRole]);
   const [tpoCoreLive, setTpoCoreLive] = useState(false);
   const tpoDepartments = (storedUser?.college?.departments ?? null) as string[] | null;
   const tpoRunsOnlyEngineering = !tpoDepartments || (tpoDepartments.length === 1 && tpoDepartments[0] === "engineering");
@@ -247,33 +256,6 @@ export function DashboardSidebar({
       .catch(() => undefined);
     return () => {
       cancelled = true;
-    };
-  }, [currentRole]);
-  useEffect(() => {
-    if (currentRole !== "user" && currentRole !== "admin_tpo") return;
-    let cancelled = false;
-
-    const fetchPlan = () =>
-      api
-        .get<MySubscriptionResponse>("/me/subscription")
-        .then((res) => {
-          if (cancelled) return;
-          setCoverage(res.coverage);
-          setProjectLabEnabled(res.project_lab ? res.project_lab.enabled : null);
-          setVaultEnabled(res.entitlements ? res.entitlements.vault_access : null);
-          setCoreAvailable(!!res.entitlements?.core_prep?.available);
-        })
-        .catch(() => {});
-
-    fetchPlan();
-
-    // A purchase made on this same page (the unlock panel, Your Plan) should
-    // lift the lock immediately rather than on the next navigation.
-    window.addEventListener(SUBSCRIPTION_CHANGED_EVENT, fetchPlan);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener(SUBSCRIPTION_CHANGED_EVENT, fetchPlan);
     };
   }, [currentRole]);
 
@@ -516,6 +498,7 @@ export function DashboardSidebar({
             { label: "Overview & KPI", href: "/superadmin?tab=overview", icon: LayoutDashboard },
             { label: "Platform Usage", href: "/superadmin?tab=platform_usage", icon: BarChart3, badge: "Live", badgeTone: "live" },
             { label: "Live Activity", href: "/superadmin?tab=activity", icon: Activity, badge: "Live", badgeTone: "live" },
+            { label: "College Assessments", href: "/superadmin?tab=assessments", icon: CheckCircle2, badge: "New", badgeTone: "new" },
             { label: "Hackathons", href: "/superadmin?tab=hackathons", icon: Rocket, badge: "Live", badgeTone: "live" },
             { label: "Partner Universities", href: "/superadmin?tab=colleges", icon: Building2 },
             { label: "Contest Rewards", href: "/superadmin?tab=weekly_rewards", icon: Gift },
@@ -720,6 +703,7 @@ export function DashboardSidebar({
       capabilities: getStoredUser()?.capabilities ?? null,
       domainPrepLabel,
       vaultAi,
+      assessmentsCount,
     });
   };
 

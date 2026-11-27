@@ -1,5 +1,5 @@
 import { createRef } from "react";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("framer-motion", async (importOriginal) => ({
@@ -90,6 +90,61 @@ describe("InterviewLobby mandatory photo verification", () => {
 
     fireEvent.click(startReadyBtn);
     await waitFor(() => expect(onConsent).toHaveBeenCalledWith("data:image/jpeg;base64,fake-photo", [0.1, 0.2, 0.3]));
+  });
+
+  it("shows helpful notice if face model takes >1.2s and skips loading ObjectDetector during photo check", async () => {
+    const visionMod = await import("@/lib/integrity/detectors/vision");
+    const spy = vi.mocked(visionMod.loadVision);
+    spy.mockClear();
+
+    // Verify preload passes includeObjects: false so the 7.25 MB phone detector isn't fetched in the lobby
+    vi.useFakeTimers();
+    let resolveVision: ((v: { analyse: () => { faces: number; yaw: number; pitch: number; faceDescriptor: number[] }; close: () => void }) => void) | null = null;
+
+    const previewRef = createRef<HTMLVideoElement>();
+    await act(async () => {
+      render(
+        <div>
+          <video ref={previewRef} />
+          <InterviewLobby
+            sessionLabel="Vault AI Interview"
+            candidateName="Asha Rao"
+            previewVideoRef={previewRef}
+            cameraStream={null}
+            devicePreviewReady={true}
+            onEnableDevices={vi.fn()}
+            onConsent={vi.fn()}
+            starting={false}
+            blocked={false}
+            startLabel="Start Proctored Interview"
+            consentError={null}
+            rules={[]}
+            disclosure={null}
+            footer="By continuing you consent."
+          />
+        </div>
+      );
+    });
+
+    expect(spy).toHaveBeenCalledWith("/integrity", "CPU", { includeObjects: false });
+
+    spy.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveVision = resolve;
+        })
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /^Take Verification Photo$/ }));
+    await act(async () => {
+      vi.advanceTimersByTime(1300);
+    });
+
+    expect(screen.getByText(/First-time face model initialization on slower connections may take a few seconds/i)).toBeTruthy();
+
+    await act(async () => {
+      resolveVision?.({ analyse: () => ({ faces: 1, yaw: 0, pitch: 0, faceDescriptor: [0.1, 0.2] }), close: vi.fn() });
+    });
   });
 });
 

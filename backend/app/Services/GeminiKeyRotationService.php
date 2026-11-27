@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\GeminiApiKey;
+use App\Services\Speech\SpeechRateLimitedException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
@@ -35,6 +36,9 @@ class GeminiKeyRotationService
     public const DEFAULT_RPM_PER_KEY = 15;
     public const DEFAULT_RPD_PER_KEY = 1500;
 
+    /** Ensures .env / config('services.gemini.api_keys') keys are synced to DB once per request without extra DB writes. */
+    protected bool $configKeysSynced = false;
+
     public const DEFAULT_MODEL = 'gemini-3.6-flash';
 
     /** @var list<string> */
@@ -51,8 +55,28 @@ class GeminiKeyRotationService
     ];
 
     /**
+     * Returns whether a Gemini model identifier meets AptRun's policy:
+     * Gemini >= 2.5 and <= 3.x (rejects deprecated gemini-1.5-* and gemini-2.0-*).
+     */
+    public static function isAllowedModel(string $model): bool
+    {
+        if (preg_match('/^gemini-(\d+)(?:\.(\d+))?/i', trim($model), $m) !== 1) {
+            return false;
+        }
+
+        $major = (int) $m[1];
+        $minor = isset($m[2]) ? (int) $m[2] : 0;
+
+        if ($major < 2 || $major > 3) {
+            return false;
+        }
+
+        return $major > 2 || $minor >= 5;
+    }
+
+    /**
      * Resolves the ordered Gemini model cascade (Gemini 3 -> Gemini 2.5),
-     * filtering out any deprecated <2.0 models (such as gemini-1.5-*) and >3.x models.
+     * filtering out any deprecated <2.5 models (such as gemini-1.5-* and gemini-2.0-*) and >3.x models.
      *
      * @return list<string>
      */
@@ -64,15 +88,7 @@ class GeminiKeyRotationService
 
         $candidates = array_values(array_unique(array_filter(array_map('trim', [$primary, ...$fallbacks, ...self::DEFAULT_FALLBACK_MODELS]))));
 
-        $allowed = array_values(array_filter($candidates, static function (string $model): bool {
-            if (preg_match('/^gemini-(\d+)(?:\.\d+)?/i', $model, $m) === 1) {
-                $major = (int) $m[1];
-
-                return $major >= 2 && $major <= 3;
-            }
-
-            return false;
-        }));
+        $allowed = array_values(array_filter($candidates, static fn (string $model): bool => self::isAllowedModel($model)));
 
         return $allowed !== [] ? $allowed : self::DEFAULT_FALLBACK_MODELS;
     }
@@ -96,6 +112,87 @@ class GeminiKeyRotationService
     }
 
     /**
+     * Automatically ensures any keys added in AWS/.env (`GEMINI_API_KEY_2..N`, `GEMINI_API_KEYS`)
+     * exist in the active DB pool even if `.env` was edited after initial migrations ran.
+     */
+    protected function ensureConfigKeysSynced(): void
+    {
+        if ($this->configKeysSynced) {
+            return;
+        }
+        $this->configKeysSynced = true;
+
+        $configuredKeys = [];
+        $fromConfig = config('services.gemini.api_keys', []);
+        if (is_array($fromConfig)) {
+            foreach ($fromConfig as $slot => $v) {
+                $trimmed = trim((string) $v);
+                if ($trimmed !== '' && ! in_array($trimmed, $configuredKeys, true)) {
+                    if (is_int($slot) && $slot >= 1) {
+                        $configuredKeys[$slot] = $trimmed;
+                    } else {
+                        $configuredKeys[] = $trimmed;
+                    }
+                }
+            }
+        }
+        for ($i = 1; $i <= 50; $i++) {
+            $v = trim((string) env("GEMINI_API_KEY_{$i}", ''));
+            if ($v !== '' && ! in_array($v, $configuredKeys, true)) {
+                $configuredKeys[$i] = $v;
+            }
+        }
+        $rawCombined = trim((string) env('GEMINI_API_KEYS', ''));
+        if ($rawCombined !== '') {
+            foreach (array_filter(array_map('trim', explode(',', $rawCombined))) as $v) {
+                if ($v !== '' && ! in_array($v, $configuredKeys, true)) {
+                    $configuredKeys[] = $v;
+                }
+            }
+        }
+
+        if ($configuredKeys === []) {
+            return;
+        }
+
+        $existingTokens = GeminiApiKey::whereNotNull('api_key')
+            ->pluck('api_key')
+            ->map(fn ($k) => trim((string) $k))
+            ->filter()
+            ->all();
+
+        foreach ($configuredKeys as $slot => $token) {
+            if (in_array($token, $existingTokens, true)) {
+                continue;
+            }
+            // Prefer filling an existing empty/inactive slot with the same order_index before inserting a new row
+            $emptySlot = GeminiApiKey::where('order_index', $slot)
+                ->where(function ($q) {
+                    $q->whereNull('api_key')->orWhere('api_key', '');
+                })
+                ->first();
+
+            if ($emptySlot) {
+                $emptySlot->update([
+                    'api_key' => $token,
+                    'is_active' => true,
+                    'is_exhausted' => false,
+                    'exhausted_until' => null,
+                ]);
+            } else {
+                GeminiApiKey::create([
+                    'label' => "Gemini Key {$slot}",
+                    'api_key' => $token,
+                    'order_index' => $slot,
+                    'duration_hours' => 4.00,
+                    'is_active' => true,
+                ]);
+            }
+            $existingTokens[] = $token;
+        }
+    }
+
+    /**
      * Resolves all active keys configured with a non-empty API token,
      * automatically recovering any keys whose cooldown window has expired.
      *
@@ -103,6 +200,8 @@ class GeminiKeyRotationService
      */
     public function getAvailablePoolKeys()
     {
+        $this->ensureConfigKeysSynced();
+
         $keys = GeminiApiKey::where('is_active', true)
             ->whereNotNull('api_key')
             ->where('api_key', '!=', '')
@@ -132,18 +231,73 @@ class GeminiKeyRotationService
     }
 
     /**
-     * Returns the next healthy GeminiApiKey model using atomic round-robin distribution.
-     * If all active keys are currently in cooldown, falls back to the key closest to recovery.
+     * Returns whether any active or fallback Gemini API key is configured (without advancing round-robin).
      */
-    public function getActiveKey(): ?GeminiApiKey
+    public function hasAvailableKeys(): bool
+    {
+        if ($this->getAvailablePoolKeys()->isNotEmpty()) {
+            return true;
+        }
+
+        if (GeminiApiKey::where('is_active', true)->whereNotNull('api_key')->where('api_key', '!=', '')->exists()) {
+            return true;
+        }
+
+        return (string) (config('services.gemini.api_key') ?: env('GEMINI_API_KEY', '')) !== '';
+    }
+
+    /**
+     * Non-mutating peek at the next healthy key (for dashboards/metrics without skewing round-robin).
+     */
+    public function peekActiveKey(): ?GeminiApiKey
+    {
+        return $this->getActiveKey(advance: false);
+    }
+
+    /**
+     * Returns the next healthy GeminiApiKey model using atomic round-robin distribution.
+     * Also balances via request counts if Cache increments don't persist across workers.
+     */
+    public function getActiveKey(bool $advance = true): ?GeminiApiKey
     {
         $availableKeys = $this->getAvailablePoolKeys();
 
         if ($availableKeys->isNotEmpty()) {
-            // Atomic sequence increment across concurrent workers
-            $rrIndex = (int) Cache::increment('gemini_key_pool_rr_index');
-            $selected = $availableKeys->values()->get($rrIndex % $availableKeys->count());
-            return $selected;
+            $count = $availableKeys->count();
+            if ($count === 1) {
+                return $availableKeys->first();
+            }
+
+            $values = $availableKeys->values();
+            $leastUsedPos = 0;
+            $minReqs = PHP_INT_MAX;
+            foreach ($values as $pos => $k) {
+                $reqs = (int) $k->total_requests;
+                if ($reqs < $minReqs) {
+                    $minReqs = $reqs;
+                    $leastUsedPos = $pos;
+                }
+            }
+
+            if ($advance) {
+                // DatabaseStore::increment() returns false if the key row doesn't exist yet;
+                // seed it with the least-used key position so atomic increments persist and start balanced.
+                Cache::add('gemini_key_pool_rr_index', $leastUsedPos, now()->addDays(30));
+                $rrIndex = Cache::increment('gemini_key_pool_rr_index');
+
+                if (is_int($rrIndex) && $rrIndex >= 1) {
+                    return $values->get(($rrIndex - 1) % $count);
+                }
+
+                return $values->get($leastUsedPos);
+            }
+
+            $rrCurrent = (int) Cache::get('gemini_key_pool_rr_index', 0);
+            if ($rrCurrent <= 0) {
+                return $values->get($leastUsedPos);
+            }
+
+            return $values->get($rrCurrent % $count);
         }
 
         // Fallback: If all active keys with tokens are in cooldown, pick the one recovering soonest
@@ -228,6 +382,11 @@ class GeminiKeyRotationService
                     Log::warning("[GeminiPool] Key '{$candidate['label']}' rejected ({$result->status()}). Failing over...", ['error' => $errorMsg]);
                     $lastError = new RuntimeException($errorMsg);
                     continue;
+                }
+
+                if ($result instanceof Response && $result->failed()) {
+                    $this->recordFailure($dbModel, $this->extractErrorMessage($result) ?? ('HTTP ' . $result->status()));
+                    return $result;
                 }
 
                 // Success! Record usage metric and clear exhausted state if present
@@ -409,16 +568,17 @@ class GeminiKeyRotationService
 
     protected function isRateLimitException(Throwable $e): bool
     {
-        if ($e->getCode() === 429) {
+        if ($e instanceof SpeechRateLimitedException || $e->getCode() === 429) {
             return true;
         }
 
-        $msg = $e->getMessage();
+        $msg = strtolower($e->getMessage());
         if (
             str_contains($msg, '429') ||
-            str_contains($msg, 'RESOURCE_EXHAUSTED') ||
-            str_contains($msg, 'Quota exceeded') ||
-            str_contains($msg, 'Too Many Requests')
+            str_contains($msg, 'resource_exhausted') ||
+            str_contains($msg, 'quota exceeded') ||
+            str_contains($msg, 'too many requests') ||
+            str_contains($msg, 'rate limit')
         ) {
             return true;
         }
@@ -440,6 +600,21 @@ class GeminiKeyRotationService
             return 'HTTP ' . $result->status() . ': ' . substr($result->body(), 0, 200);
         }
         return null;
+    }
+
+    protected function recordFailure(?GeminiApiKey $key, string $reason): void
+    {
+        if (! $key) {
+            return;
+        }
+
+        $key->update([
+            'total_requests' => $key->total_requests + 1,
+            'failed_requests' => $key->failed_requests + 1,
+            'last_used_at' => now(),
+            'last_error_at' => now(),
+            'last_error_message' => substr($reason, 0, 500),
+        ]);
     }
 
     protected function recordSuccess(?GeminiApiKey $key): void

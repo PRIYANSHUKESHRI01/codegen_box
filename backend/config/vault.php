@@ -115,4 +115,9 @@ return [
         'table' => 'vault_ai_qualifications_tb',
     ],
 
+    'sso' => [
+        'secret' => env('APTRUN_SSO_SECRET', 'MellowVaultAptRunSSO2026SecretKeySecureToken'),
+        'mellow_vault_url' => env('MELLOW_VAULT_SSO_URL', 'https://mellowvault.com/aptrun-sso'),
+    ],
+
 ];

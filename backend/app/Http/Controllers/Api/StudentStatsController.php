@@ -19,9 +19,10 @@ class StudentStatsController extends Controller
     public function mine(Request $request, StudentStatsService $service)
     {
         $user = $request->user();
+        $solved = $service->solvedByDifficulty($user);
 
         return response()->json([
-            'solved' => $service->solvedByDifficulty($user),
+            'solved' => $solved,
             'streak' => $service->streak($user),
             'readiness' => [
                 'score' => $user->readinessScore(),
@@ -44,7 +45,7 @@ class StudentStatsController extends Controller
                 'current_rating' => $user->current_rating,
                 'rated_contests_count' => $user->rated_contests_count,
                 'display_rating' => $user->displayRating(),
-                'solved_score' => $service->solvedScore($user),
+                'solved_score' => $service->scoreFromSolved($solved),
             ],
             'verdict_stats' => $service->verdictBreakdown($user),
             'language_usage' => $service->languageUsage($user),

@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Api;
 
 
 use App\Http\Controllers\Controller;
+use App\Models\User;
+use App\Services\Vault\MellowVaultProfileSyncService;
+use App\Services\Vault\MellowVaultUserSyncService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use App\Models\User;
 
 
 class SSOController extends Controller
@@ -27,7 +30,7 @@ class SSOController extends Controller
         }
 
 
-        $secretKey = env('APTRUN_SSO_SECRET', 'MellowVaultAptRunSSO2026SecretKeySecureToken');
+        $secretKey = (string) config('vault.sso.secret', env('APTRUN_SSO_SECRET', 'MellowVaultAptRunSSO2026SecretKeySecureToken'));
 
 
         // 1. Signature Verify (HMAC-SHA256)
@@ -67,6 +70,13 @@ class SSOController extends Controller
             ]);
         }
 
+        try {
+            app(MellowVaultProfileSyncService::class)->syncSingleUser($user, dispatchInviteIfEligible: false);
+            $user->refresh();
+        } catch (\Throwable) {
+            // Non-blocking: SSO must still sign the developer in if external DB read fails.
+        }
+
 
         // 4. Generate Sanctum token for Next.js frontend
         $token = $user->createToken('mellowvault_sso')->plainTextToken;
@@ -74,7 +84,10 @@ class SSOController extends Controller
 
         // 5. Determine destination
         $destination = '/dashboard';
-        if ($user->role === 'superadmin') {
+        $requestedRedirect = is_string($data['redirect'] ?? null) ? trim($data['redirect']) : '';
+        if ($requestedRedirect !== '' && str_starts_with($requestedRedirect, '/dashboard') && ! str_contains($requestedRedirect, '//')) {
+            $destination = $requestedRedirect;
+        } elseif ($user->role === 'superadmin') {
             $destination = '/superadmin';
         } elseif ($user->role === 'admin_internal') {
             $destination = '/admin?view=mellow';
@@ -87,15 +100,18 @@ class SSOController extends Controller
 
         // 6. User data object for AptRun frontend
         $userJson = json_encode([
-            'id'                        => $user->id,
-            'name'                      => $user->name,
-            'email'                     => $user->email,
-            'role'                      => $user->role ?? 'user',
-            'permissions'               => $user->permissions ?? null,
-            'handle'                    => $user->handle ?? null,
-            'bio'                       => $user->bio ?? null,
-            'skills'                    => $user->skills ?? [],
-            'profile_completion_percent'=> $user->profile_completion_percent ?? 0,
+            'id'                           => $user->id,
+            'name'                         => $user->name,
+            'email'                        => $user->email,
+            'role'                         => $user->role ?? 'user',
+            'permissions'                  => $user->permissions ?? null,
+            'handle'                       => $user->handle ?? null,
+            'bio'                          => $user->bio ?? null,
+            'skills'                       => $user->skills ?? [],
+            'profile_completion_percent'   => $user->profile_completion_percent ?? 0,
+            'mellow_vault_profile_percent' => $user->mellow_vault_profile_percent ?? 0,
+            'mellow_vault_stack_key'       => $user->mellow_vault_stack_key,
+            'mellow_vault_stack_name'      => $user->mellow_vault_stack_name,
         ]);
 
 
@@ -144,5 +160,33 @@ class SSOController extends Controller
 
 
         return response($html)->header('Content-Type', 'text/html');
+    }
+
+    /**
+     * GET /api/vault/sso-url (auth:sanctum)
+     * Ensures the logged-in AptRun user / college student has a synced row in
+     * `mellow_vault.developer_details_tb` and returns a 1-click signed SSO URL to Mellow Vault.
+     */
+    public function generateMellowVaultSso(Request $request, MellowVaultUserSyncService $sync): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $redirect = is_string($request->query('redirect')) ? $request->query('redirect') : null;
+
+        return response()->json($sync->buildMellowVaultSsoUrl($user, $redirect));
+    }
+
+    /**
+     * GET /api/sso/mellow-vault (auth:sanctum)
+     * Direct redirect handler for opening Mellow Vault with the active AptRun session.
+     */
+    public function redirectToMellowVault(Request $request, MellowVaultUserSyncService $sync)
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $redirect = is_string($request->query('redirect')) ? $request->query('redirect') : null;
+        $sso = $sync->buildMellowVaultSsoUrl($user, $redirect);
+
+        return redirect()->away($sso['url']);
     }
 }

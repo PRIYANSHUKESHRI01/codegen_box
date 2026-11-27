@@ -50,6 +50,9 @@ class Contest extends Model
      */
     public const CONTEST_TYPE_TALENT_POOL = 'talent_pool';
 
+    /** Provisioned as the Coding stage of a SuperAdmin CollegeAssessment — visible only to assigned students. */
+    public const CONTEST_TYPE_COLLEGE_ASSESSMENT = 'college_assessment';
+
     public const CONTEST_TYPES = [
         self::CONTEST_TYPE_GENERAL,
         self::CONTEST_TYPE_DAILY,
@@ -57,6 +60,7 @@ class Contest extends Model
         self::CONTEST_TYPE_TPO_MOCK,
         self::CONTEST_TYPE_COMPANY_HIRING,
         self::CONTEST_TYPE_TALENT_POOL,
+        self::CONTEST_TYPE_COLLEGE_ASSESSMENT,
     ];
 
     public const AUDIENCE_SCOPE_ALL = 'all';
@@ -239,7 +243,7 @@ class Contest extends Model
         return match ($this->contest_type) {
             self::CONTEST_TYPE_TPO_MOCK => $collegeId !== null && $this->owning_college_id === $collegeId,
             self::CONTEST_TYPE_COMPANY => $collegeId !== null && $this->placement_drive_id !== null
-                && $this->colleges()->where('colleges.id', $collegeId)->exists()
+                && ($this->relationLoaded('colleges') ? $this->colleges->contains('id', $collegeId) : $this->colleges()->where('colleges.id', $collegeId)->exists())
                 && DriveCollegeMapping::query()
                     ->where('placement_drive_id', $this->placement_drive_id)
                     ->where('college_id', $collegeId)
@@ -251,7 +255,7 @@ class Contest extends Model
             // assessment. `college_ids` here is Ops's explicit pick
             // (contest_colleges), never derived from any mapping.
             self::CONTEST_TYPE_TALENT_POOL => match ($this->audience_scope) {
-                self::AUDIENCE_SCOPE_COLLEGE => $collegeId !== null && $this->colleges()->where('colleges.id', $collegeId)->exists(),
+                self::AUDIENCE_SCOPE_COLLEGE => $collegeId !== null && ($this->relationLoaded('colleges') ? $this->colleges->contains('id', $collegeId) : $this->colleges()->where('colleges.id', $collegeId)->exists()),
                 self::AUDIENCE_SCOPE_DIRECT => $collegeId === null,
                 default => true, // AUDIENCE_SCOPE_ALL (or unset — treat as platform-wide)
             },
@@ -308,6 +312,13 @@ class Contest extends Model
      */
     public function isVisibleToUser(User $user): bool
     {
+        if ($this->contest_type === self::CONTEST_TYPE_COLLEGE_ASSESSMENT) {
+            return CollegeAssessmentAssignment::query()
+                ->where('user_id', $user->id)
+                ->whereHas('assessment', fn (Builder $q) => $q->where('contest_id', $this->id)->where('status', '!=', CollegeAssessment::STATUS_DRAFT))
+                ->exists();
+        }
+
         if ($this->contest_type === self::CONTEST_TYPE_COMPANY_HIRING) {
             if ($this->participants()->where('user_id', $user->id)->exists()) {
                 return true;

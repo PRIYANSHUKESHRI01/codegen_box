@@ -324,6 +324,11 @@ class User extends Authenticatable
             'readiness_scored_at' => 'datetime',
             'vault_ai_score' => 'float',
             'vault_ai_scored_at' => 'datetime',
+            'mellow_vault_dev_id' => 'integer',
+            'mellow_vault_pro_id' => 'integer',
+            'mellow_vault_profile_percent' => 'integer',
+            'mellow_vault_profile_synced_at' => 'datetime',
+            'vault_ai_invite_sent_at' => 'datetime',
             // Set by the unsubscribe link in a nudge e-mail (EmailPreferenceController) — never mass-assigned.
             'email_nudges_opt_out_at' => 'datetime',
             // What the person MUTED in Settings → Notifications ({"muted": ["hackathons"]}) — written only by NotificationService.

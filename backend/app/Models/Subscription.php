@@ -14,6 +14,29 @@ class Subscription extends Model
 
     public const STATUS_CANCELED = 'canceled';
 
+    /**
+     * Monotonic per-process version bumped whenever any subscription or plan
+     * changes, so per-instance memoization on HasSubscription never serves stale data.
+     */
+    private static int $memoVersion = 0;
+
+    protected static function booted(): void
+    {
+        $bump = static fn () => self::bumpMemoVersion();
+        static::saved($bump);
+        static::deleted($bump);
+    }
+
+    public static function memoVersion(): int
+    {
+        return self::$memoVersion;
+    }
+
+    public static function bumpMemoVersion(): void
+    {
+        self::$memoVersion++;
+    }
+
     protected $fillable = [
         'subscriber_type',
         'subscriber_id',

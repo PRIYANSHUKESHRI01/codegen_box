@@ -8,6 +8,7 @@ use App\Services\IssuedCredentialVault;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -171,6 +172,7 @@ class MellowVaultUserSyncService
                 'show_password' => $finalPassword,
                 'developer_status' => self::STATUS_AVAILABLE,
                 'login_status' => self::LOGIN_STATUS_ACTIVE,
+                'profile_complete' => 0,
                 'date' => now()->toDateString(),
                 'is_working_in_org' => 0,
                 'is_aptrun_synced' => 1,
@@ -228,6 +230,13 @@ class MellowVaultUserSyncService
                     ->where('dev_id', $existing->dev_id)
                     ->update($updateData);
 
+                $this->stampAptRunUser(
+                    $user,
+                    (int) $existing->dev_id,
+                    isset($existing->pro_id) && (int) $existing->pro_id > 0 ? (int) $existing->pro_id : null,
+                    (int) ($existing->profile_complete ?? 0)
+                );
+
                 return [
                     'success' => true,
                     'action' => 'updated',
@@ -245,6 +254,8 @@ class MellowVaultUserSyncService
 
             // Insert new developer row
             $devId = $this->connection()->table($this->table())->insertGetId($payload, 'dev_id');
+
+            $this->stampAptRunUser($user, (int) $devId, null, 0);
 
             return [
                 'success' => true,
@@ -515,6 +526,77 @@ class MellowVaultUserSyncService
             return $peek['password'] ?? null;
         } catch (Throwable) {
             return null;
+        }
+    }
+
+    /**
+     * Generates a 1-click signed SSO URL from AptRun -> Mellow Vault using the shared HMAC-SHA256
+     * secret (`APTRUN_SSO_SECRET`), ensuring the student's `developer_details_tb` profile exists first.
+     *
+     * @return array{url: string, dev_id: ?int, synced: bool, expires_in: int}
+     */
+    public function buildMellowVaultSsoUrl(User $user, ?string $redirect = null): array
+    {
+        $devId = $user->mellow_vault_dev_id;
+        $synced = $devId !== null;
+
+        if ($devId === null && $this->isConfigured()) {
+            $res = $this->syncUser($user);
+            if (! empty($res['success'])) {
+                $devId = $res['dev_id'] ?? $user->fresh()?->mellow_vault_dev_id;
+                $synced = true;
+            }
+        }
+
+        $secret = (string) config('vault.sso.secret', 'MellowVaultAptRunSSO2026SecretKeySecureToken');
+        $baseUrl = (string) config('vault.sso.mellow_vault_url', 'https://mellowvault.com/aptrun-sso');
+
+        $payload = [
+            'email' => mb_strtolower(trim((string) $user->email)),
+            'name' => $user->name,
+            'aptrun_user_id' => $user->id,
+            'dev_id' => $devId,
+            'college_id' => $user->college_id,
+            'role' => $user->role,
+            'issued_at' => time(),
+            'expires_at' => time() + 300,
+        ];
+        if ($redirect !== null && trim($redirect) !== '') {
+            $payload['redirect'] = trim($redirect);
+        }
+
+        $payloadEncoded = rtrim(strtr(base64_encode((string) json_encode($payload, JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+        $sig = hash_hmac('sha256', $payloadEncoded, $secret);
+
+        $separator = str_contains($baseUrl, '?') ? '&' : '?';
+
+        return [
+            'url' => "{$baseUrl}{$separator}payload={$payloadEncoded}&sig={$sig}",
+            'dev_id' => $devId ? (int) $devId : null,
+            'synced' => $synced,
+            'expires_in' => 300,
+        ];
+    }
+
+    private function stampAptRunUser(User $user, int $devId, ?int $proId, int $profilePercent): void
+    {
+        try {
+            if (! Schema::hasColumn('users', 'mellow_vault_dev_id')) {
+                return;
+            }
+
+            $updates = [
+                'mellow_vault_dev_id' => $devId,
+                'mellow_vault_profile_percent' => max(0, min(100, $profilePercent)),
+                'mellow_vault_profile_synced_at' => now(),
+            ];
+            if ($proId !== null) {
+                $updates['mellow_vault_pro_id'] = $proId;
+            }
+
+            $user->forceFill($updates)->saveQuietly();
+        } catch (Throwable) {
+            // Non-blocking: never fail primary account provisioning if optional mirror columns fail.
         }
     }
 }

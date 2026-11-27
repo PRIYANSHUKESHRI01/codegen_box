@@ -60,8 +60,9 @@ class InterviewController extends Controller
         // round is still reachable directly by slug via show()/start()/
         // answer()/complete() below, unchanged).
         $interviews = Interview::where('status', Interview::STATUS_PUBLISHED)
+            ->where('interview_type', '!=', Interview::INTERVIEW_TYPE_COLLEGE_ASSESSMENT)
             ->whereNull('interview_track_id')
-            ->with('company:id,name,logo')
+            ->with(['company:id,name,logo', 'colleges:id'])
             ->orderByDesc('created_at')
             ->get()
             ->filter(fn (Interview $interview) => $interview->isVisibleToUser($request->user())
@@ -71,6 +72,8 @@ class InterviewController extends Controller
             // interviews before the general ones; a CSE or unknown-branch student sees the list exactly as before.
             ->sortByDesc(fn (Interview $interview) => (int) $interview->isForBranchOf($request->user()))
             ->values();
+
+        $interviews->load('interviewQuestions.questionBank:id,expected_duration_seconds');
 
         $sessionsByInterviewId = InterviewSession::where('user_id', $request->user()->id)
             ->whereIn('interview_id', $interviews->pluck('id'))
@@ -293,34 +296,9 @@ class InterviewController extends Controller
             ->first()?->questionBank?->question_text;
 
         $rawTranscript = trim((string) ($validated['transcript_text'] ?? ''));
-        $durationSec = (int) ($validated['audio_duration_seconds'] ?? 0);
-        $wordCount = $rawTranscript !== '' ? str_word_count($rawTranscript) : 0;
-        $hasBadScript = AudioTranscriptionService::containsDisallowedScript($rawTranscript);
-        $missingOrPlaceholder = $rawTranscript === '' || $rawTranscript === '(Audio response submitted)';
-        // Catch partial browser transcripts (e.g. candidate spoke 5 words, paused 15s, then answered for 60s after browser STT dropped)
-        $suspiciouslySparseForDuration = $durationSec >= 15 && $wordCount < max(6, (int) floor($durationSec * 0.35));
 
-        if ($request->hasFile('audio') && ($missingOrPlaceholder || $hasBadScript || $suspiciouslySparseForDuration)) {
-            try {
-                $aiTranscript = trim(app(AudioTranscriptionService::class)->transcribeUploadedFile($request->file('audio'), $questionContext));
-                if ($aiTranscript !== '') {
-                    if ($missingOrPlaceholder || $hasBadScript || str_word_count($aiTranscript) > $wordCount) {
-                        $rawTranscript = $aiTranscript;
-                    }
-                } elseif ($missingOrPlaceholder || $hasBadScript) {
-                    $rawTranscript = '(Audio response submitted)';
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('[InterviewAnswer] AI audio transcription fallback failed', [
-                    'session_id' => $session->id,
-                    'error' => $e->getMessage(),
-                ]);
-                if ($missingOrPlaceholder || $hasBadScript) {
-                    $rawTranscript = '(Audio response submitted)';
-                }
-            }
-        } elseif ($missingOrPlaceholder || $hasBadScript) {
-            $rawTranscript = '(No answer recorded)';
+        if ($rawTranscript === '') {
+            $rawTranscript = $request->hasFile('audio') ? '(Audio response submitted)' : '(No answer recorded)';
         }
 
         $audioPath = null;
@@ -352,7 +330,7 @@ class InterviewController extends Controller
                 $session,
                 null,
                 $audioPath,
-                $durationSec,
+                (int) ($validated['audio_duration_seconds'] ?? 0),
                 $liveFeatures
             );
 
@@ -782,7 +760,9 @@ class InterviewController extends Controller
      */
     private function interviewSummary(Interview $interview, ?InterviewSession $session): array
     {
-        $questions = $interview->interviewQuestions()->with('questionBank:id,expected_duration_seconds')->get();
+        $questions = $interview->relationLoaded('interviewQuestions')
+            ? $interview->interviewQuestions
+            : $interview->interviewQuestions()->with('questionBank:id,expected_duration_seconds')->get();
 
         return [
             'id' => $interview->id,

@@ -23,7 +23,10 @@ class ContestController extends Controller
         // enough that this is simpler than duplicating the visibility rule
         // as a query scope, and it keeps that rule defined in exactly one place.
         $contests = Contest::where('status', Contest::STATUS_PUBLISHED)
-            ->with('company:id,name,logo')
+            ->where('contest_type', '!=', Contest::CONTEST_TYPE_COLLEGE_ASSESSMENT)
+            ->with(['company:id,name,logo', 'colleges:id'])
+            ->withCount('contestProblems')
+            ->withSum('contestProblems', 'points')
             ->orderByDesc('start_at')
             ->get()
             ->filter(fn (Contest $contest) => $contest->isVisibleToUser($request->user()))
@@ -165,8 +168,12 @@ class ContestController extends Controller
             'has_ended' => $contest->hasEnded(),
             'is_finalized' => $contest->finalized_at !== null,
             'is_registered' => in_array($contest->id, $registeredContestIds, true),
-            'problem_count' => $contest->contestProblems()->count(),
-            'total_points' => (int) $contest->contestProblems()->sum('points'),
+            'problem_count' => $contest->getAttribute('contest_problems_count') !== null
+                ? (int) $contest->getAttribute('contest_problems_count')
+                : $contest->contestProblems()->count(),
+            'total_points' => $contest->getAttribute('contest_problems_sum_points') !== null
+                ? (int) $contest->getAttribute('contest_problems_sum_points')
+                : (int) $contest->contestProblems()->sum('points'),
             'contest_type' => $contest->contest_type,
             // Daily editions only: when registration opens/closes and whether it is open right now (null for every other contest).
             'registration' => app(DailyChallengeService::class)->registrationPayload($contest),

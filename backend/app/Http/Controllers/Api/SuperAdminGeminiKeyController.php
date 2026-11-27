@@ -7,6 +7,7 @@ use App\Models\GeminiApiKey;
 use App\Services\GeminiKeyRotationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Validation\Rule;
 
 class SuperAdminGeminiKeyController extends Controller
@@ -44,19 +45,17 @@ class SuperAdminGeminiKeyController extends Controller
         $validated['is_active'] = $validated['is_active'] ?? true;
 
         $key = GeminiApiKey::create($validated);
-
-        // Directly sync with .env file so AptRun and server environment stay unified
-        $this->rotationService->syncToEnv();
+        Cache::forget('gemini_key_pool_rr_index');
 
         return response()->json([
-            'message' => "Gemini key slot '{$key->label}' added to pool and synced to .env.",
+            'message' => "Gemini key slot '{$key->label}' added to database pool.",
             'key' => $key,
             'schedule' => $this->rotationService->getScheduleDetails(),
         ], 201);
     }
 
     /**
-     * Updates an existing key slot and automatically syncs to .env.
+     * Updates an existing key slot in the database pool.
      */
     public function update(Request $request, GeminiApiKey $geminiKey): JsonResponse
     {
@@ -73,30 +72,26 @@ class SuperAdminGeminiKeyController extends Controller
         }
 
         $geminiKey->update($validated);
-
-        // Automatically sync updated keys to .env
-        $this->rotationService->syncToEnv();
+        Cache::forget('gemini_key_pool_rr_index');
 
         return response()->json([
-            'message' => "Gemini key '{$geminiKey->label}' updated and synced to .env.",
+            'message' => "Gemini key '{$geminiKey->label}' updated in database pool.",
             'key' => $geminiKey,
             'schedule' => $this->rotationService->getScheduleDetails(),
         ]);
     }
 
     /**
-     * Deletes a key slot from the pool and syncs to .env.
+     * Deletes a key slot from the database pool.
      */
     public function destroy(GeminiApiKey $geminiKey): JsonResponse
     {
         $label = $geminiKey->label;
         $geminiKey->delete();
-
-        // Resync remaining keys to .env
-        $this->rotationService->syncToEnv();
+        Cache::forget('gemini_key_pool_rr_index');
 
         return response()->json([
-            'message' => "Gemini key '{$label}' removed from pool and .env.",
+            'message' => "Gemini key '{$label}' removed from database pool.",
             'schedule' => $this->rotationService->getScheduleDetails(),
         ]);
     }
@@ -138,8 +133,7 @@ class SuperAdminGeminiKeyController extends Controller
     {
         $newState = ! $geminiKey->is_active;
         $geminiKey->update(['is_active' => $newState]);
-
-        $this->rotationService->syncToEnv();
+        Cache::forget('gemini_key_pool_rr_index');
 
         return response()->json([
             'message' => "Gemini key '{$geminiKey->label}' is now " . ($newState ? 'active' : 'inactive') . '.',
@@ -224,15 +218,13 @@ class SuperAdminGeminiKeyController extends Controller
     }
 
     /**
-     * Writes all active keys from the database rotation pool directly into .env.
+     * Dashboard-to-.env writing is disabled by design so .env cannot be modified via HTTP.
      */
     public function syncToEnv(): JsonResponse
     {
-        $count = $this->rotationService->syncToEnv();
-
         return response()->json([
-            'message' => "Synchronized {$count} keys from rotation pool into .env.",
+            'message' => 'Updating backend .env from the SuperAdmin dashboard is disabled. Keys are stored safely in the database pool.',
             'schedule' => $this->rotationService->getScheduleDetails(),
-        ]);
+        ], 403);
     }
 }

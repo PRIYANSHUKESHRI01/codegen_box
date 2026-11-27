@@ -35,10 +35,7 @@ class StudentStatsService
             ->get()
             ->mapWithKeys(fn ($row) => [$row->difficulty => (int) $row->count]);
 
-        $catalogTotals = Problem::select('difficulty')
-            ->get()
-            ->groupBy('difficulty')
-            ->map->count();
+        $catalogTotals = Problem::difficultyTotals();
 
         $shape = fn (string $difficulty) => [
             'solved' => $solvedByDifficulty[$difficulty] ?? 0,
@@ -54,17 +51,23 @@ class StudentStatsService
     }
 
     /**
+     * Difficulty-weighted score computed from an already-fetched solvedByDifficulty() shape.
+     */
+    public function scoreFromSolved(array $solved): int
+    {
+        return ($solved['easy']['solved'] ?? 0) * self::DIFFICULTY_POINTS['easy']
+            + ($solved['medium']['solved'] ?? 0) * self::DIFFICULTY_POINTS['medium']
+            + ($solved['hard']['solved'] ?? 0) * self::DIFFICULTY_POINTS['hard'];
+    }
+
+    /**
      * Difficulty-weighted score from real distinct-solved counts — feeds
      * the leaderboard/badge for any student who hasn't entered a rated
      * contest yet (see User::displayRating()).
      */
     public function solvedScore(User $user): int
     {
-        $solved = $this->solvedByDifficulty($user);
-
-        return $solved['easy']['solved'] * self::DIFFICULTY_POINTS['easy']
-            + $solved['medium']['solved'] * self::DIFFICULTY_POINTS['medium']
-            + $solved['hard']['solved'] * self::DIFFICULTY_POINTS['hard'];
+        return $this->scoreFromSolved($this->solvedByDifficulty($user));
     }
 
     /**
@@ -166,23 +169,19 @@ class StudentStatsService
      */
     public function topicMastery(User $user): array
     {
-        $problems = Problem::all(['id', 'tags']);
-        $tagsByProblem = $problems->mapWithKeys(fn (Problem $p) => [$p->id => $p->tags ?? []]);
+        $catalog = Problem::tagsCatalog();
+        $tagsByProblem = $catalog['tags_by_id'];
+        $tagTotals = $catalog['tag_totals'];
 
-        $tagTotals = [];
-        foreach ($problems as $problem) {
-            foreach ($problem->tags ?? [] as $tag) {
-                $tagTotals[$tag] = ($tagTotals[$tag] ?? 0) + 1;
-            }
-        }
-
-        $submissions = Submission::where('user_id', $user->id)->get(['problem_id', 'status']);
+        $submissions = DB::table('submissions')
+            ->where('user_id', $user->id)
+            ->get(['problem_id', 'status']);
         $tagAttempts = [];
         $tagAccepted = [];
         $tagSolvedIds = [];
 
         foreach ($submissions as $submission) {
-            foreach ($tagsByProblem[$submission->problem_id] ?? [] as $tag) {
+            foreach ($tagsByProblem[(int) $submission->problem_id] ?? [] as $tag) {
                 $tagAttempts[$tag] = ($tagAttempts[$tag] ?? 0) + 1;
                 if ($submission->status === Submission::STATUS_ACCEPTED) {
                     $tagAccepted[$tag] = ($tagAccepted[$tag] ?? 0) + 1;

@@ -446,14 +446,7 @@ class ReadinessScoreService
      */
     private function catalog(): array
     {
-        $problems = Problem::all(['id', 'difficulty', 'tags']);
-
-        return [
-            'totals' => $problems->groupBy('difficulty')->map->count()->all(),
-            'difficulty' => $problems->pluck('difficulty', 'id')->all(),
-            'tags' => $problems->mapWithKeys(fn (Problem $p) => [$p->id => $p->tags ?? []])->all(),
-            'tag_count' => $problems->flatMap(fn (Problem $p) => $p->tags ?? [])->unique()->count(),
-        ];
+        return Problem::readinessCatalog();
     }
 
     /**

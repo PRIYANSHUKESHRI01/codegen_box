@@ -28,6 +28,11 @@ export class SpeechGate {
   private lastLoud = 0;
   private lastFired = -Infinity;
 
+  reset(): void {
+    this.speechSince = null;
+    this.lastLoud = 0;
+  }
+
   /** @returns sustained-speech seconds when an episode completes, else null */
   feed(db: number, t: number): number | null {
     const loud = db > this.floor + SPEECH_ABOVE_FLOOR_DB && db > MIN_ABSOLUTE_DB;

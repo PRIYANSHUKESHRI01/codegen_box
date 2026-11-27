@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, Hourglass, Loader2, Mic, PlayCircle, RotateCcw, Search, X, AlertCircle, Trophy, Sparkles, Target, BarChart3 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { getCachedCatalog } from "@/lib/catalogCache";
 import { cn } from "@/lib/utils";
 import { CARD, Rise, isLive, roleIconOf, shortName, stackIconOf, themeOf } from "./curatedKit";
 import type { MockCatalogResponse, MockParentSet, MockRole, MockRound, MockStack, MockStartResponse } from "@/types/mockInterview";
@@ -559,8 +560,7 @@ export function MockInterviewExplorer({
   useEffect(() => {
     let live = true;
     setLoadError(null);
-    api
-      .get<MockCatalogResponse>("/mock-interviews/catalog")
+    getCachedCatalog<MockCatalogResponse>("/mock-interviews/catalog", { force: reloadKey > 0 })
       .then((res) => live && setCatalog(res))
       .catch((err) => live && setLoadError(err instanceof ApiError ? err.message : "Couldn't load the mock interviews."));
     return () => {

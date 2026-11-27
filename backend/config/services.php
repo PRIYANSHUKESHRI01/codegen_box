@@ -37,13 +37,33 @@ return [
 
     /*
     | AI Interview question generation and scoring (see App\Services\GeminiQuestionGeneratorService & GeminiInterviewScoringService).
-    | Multi-tier fallback hierarchy (Gemini 3 -> Gemini 2.5, never <2.0 or >3.x):
+    | Multi-tier fallback hierarchy (Gemini 3 -> Gemini 2.5, never <2.5 or >3.x):
     | cascades through gemini-3.6-flash -> gemini-3.5-flash -> gemini-3-flash-preview ->
     | gemini-3.1-flash-lite -> gemini-3.8-flash -> gemini-3.1-pro-preview ->
     | gemini-2.5-flash -> gemini-2.5-pro -> gemini-2.5-flash-lite.
     */
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY_1') ?: env('GEMINI_API_KEY'),
+        'api_keys' => (static function (): array {
+            $keys = [];
+            for ($i = 1; $i <= 50; $i++) {
+                $v = trim((string) env("GEMINI_API_KEY_{$i}", ''));
+                if ($v !== '' && ! in_array($v, $keys, true)) {
+                    $keys[$i] = $v;
+                }
+            }
+            foreach (array_filter(array_map('trim', explode(',', (string) env('GEMINI_API_KEYS', '')))) as $v) {
+                if ($v !== '' && ! in_array($v, $keys, true)) {
+                    $keys[] = $v;
+                }
+            }
+            $single = trim((string) env('GEMINI_API_KEY', ''));
+            if ($single !== '' && ! in_array($single, $keys, true)) {
+                $keys[] = $single;
+            }
+
+            return $keys;
+        })(),
         'model' => env('GEMINI_MODEL', 'gemini-3.6-flash'),
         'fallback_models' => array_filter(array_map('trim', explode(',', env('GEMINI_FALLBACK_MODELS', 'gemini-3.6-flash,gemini-3.5-flash,gemini-3-flash-preview,gemini-3.1-flash-lite,gemini-3.8-flash,gemini-3.1-pro-preview,gemini-2.5-flash,gemini-2.5-pro,gemini-2.5-flash-lite')))),
         // Second, informational "worth a second listen" call per speaking attempt; turn off on a tight quota.

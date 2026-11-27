@@ -23,6 +23,13 @@ class CuratedSetQuestion extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        $flush = static fn () => \App\Services\Vault\CuratedCatalog::flushCache();
+        static::saved($flush);
+        static::deleted($flush);
+    }
+
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

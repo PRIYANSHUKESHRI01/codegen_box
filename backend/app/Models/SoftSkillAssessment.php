@@ -34,7 +34,10 @@ class SoftSkillAssessment extends Model
 
     public const TYPE_COMPANY = 'company';
 
-    public const TYPES = [self::TYPE_GENERAL, self::TYPE_TPO_MOCK, self::TYPE_COMPANY];
+    /** Provisioned as the Soft Skills stage of a SuperAdmin CollegeAssessment — visible only to assigned students. */
+    public const TYPE_COLLEGE_ASSESSMENT = 'college_assessment';
+
+    public const TYPES = [self::TYPE_GENERAL, self::TYPE_TPO_MOCK, self::TYPE_COMPANY, self::TYPE_COLLEGE_ASSESSMENT];
 
     protected $fillable = [
         'title',
@@ -166,6 +169,13 @@ class SoftSkillAssessment extends Model
      */
     public function isVisibleToUser(User $user): bool
     {
+        if ($this->assessment_type === self::TYPE_COLLEGE_ASSESSMENT) {
+            return CollegeAssessmentAssignment::query()
+                ->where('user_id', $user->id)
+                ->whereHas('assessment', fn (Builder $q) => $q->where('soft_skill_assessment_id', $this->id)->where('status', '!=', CollegeAssessment::STATUS_DRAFT))
+                ->exists();
+        }
+
         // A TPO or Mellow can aim a test at certain branches (null = everyone).
         if (! $this->audienceIncludes($user)) {
             return false;

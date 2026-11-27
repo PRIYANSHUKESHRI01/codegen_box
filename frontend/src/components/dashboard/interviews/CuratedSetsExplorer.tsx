@@ -28,6 +28,7 @@ import {
   Hourglass,
 } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
+import { getCachedCatalog } from "@/lib/catalogCache";
 import { cn } from "@/lib/utils";
 import { CARD, Rise, isLive, roleIconOf, shortName, stackIconOf, themeOf } from "./curatedKit";
 import { Aurora, ScoreRing, VaSkeleton } from "@/components/dashboard/vaultAi/vaultKit";
@@ -525,8 +526,7 @@ export function CuratedSetsExplorer({ className, initialStack }: { className?: s
     let alive = true;
     setLoading(true);
     setLoadError(null);
-    api
-      .get<CuratedCatalogResponse>("/curated-interview-sets")
+    getCachedCatalog<CuratedCatalogResponse>("/curated-interview-sets", { force: reloadKey > 0 })
       .then((res) => {
         if (!alive) return;
         setCatalog(res);

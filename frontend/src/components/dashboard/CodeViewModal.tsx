@@ -1,52 +1,22 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Check, Copy, Loader2 } from "lucide-react";
-import SyntaxHighlighter from "react-syntax-highlighter/dist/esm/prism-light";
-import vscDarkPlus from "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus";
-import javascript from "react-syntax-highlighter/dist/esm/languages/prism/javascript";
-import python from "react-syntax-highlighter/dist/esm/languages/prism/python";
-import java from "react-syntax-highlighter/dist/esm/languages/prism/java";
-import cpp from "react-syntax-highlighter/dist/esm/languages/prism/cpp";
-import php from "react-syntax-highlighter/dist/esm/languages/prism/php";
-import c from "react-syntax-highlighter/dist/esm/languages/prism/c";
-import csharp from "react-syntax-highlighter/dist/esm/languages/prism/csharp";
-import go from "react-syntax-highlighter/dist/esm/languages/prism/go";
-import kotlin from "react-syntax-highlighter/dist/esm/languages/prism/kotlin";
-import rust from "react-syntax-highlighter/dist/esm/languages/prism/rust";
-import typescript from "react-syntax-highlighter/dist/esm/languages/prism/typescript";
-import swift from "react-syntax-highlighter/dist/esm/languages/prism/swift";
-import ruby from "react-syntax-highlighter/dist/esm/languages/prism/ruby";
-import dart from "react-syntax-highlighter/dist/esm/languages/prism/dart";
-import scala from "react-syntax-highlighter/dist/esm/languages/prism/scala";
-import elixir from "react-syntax-highlighter/dist/esm/languages/prism/elixir";
-import erlang from "react-syntax-highlighter/dist/esm/languages/prism/erlang";
-import racket from "react-syntax-highlighter/dist/esm/languages/prism/racket";
 import { languageLabel, prismLanguageFor } from "@/lib/judgeLanguages";
 import { cn } from "@/lib/utils";
 import { Modal } from "@/components/ui/Modal";
 
-// Exactly JudgeService::SUPPORTED_LANGUAGES on the backend — this viewer
-// only ever renders a real submission's own language, never arbitrary user
-// text, so there's no "unknown language" case to plan around.
-SyntaxHighlighter.registerLanguage("javascript", javascript);
-SyntaxHighlighter.registerLanguage("python", python);
-SyntaxHighlighter.registerLanguage("java", java);
-SyntaxHighlighter.registerLanguage("cpp", cpp);
-SyntaxHighlighter.registerLanguage("php", php);
-SyntaxHighlighter.registerLanguage("c", c);
-SyntaxHighlighter.registerLanguage("csharp", csharp);
-SyntaxHighlighter.registerLanguage("go", go);
-SyntaxHighlighter.registerLanguage("kotlin", kotlin);
-SyntaxHighlighter.registerLanguage("rust", rust);
-SyntaxHighlighter.registerLanguage("typescript", typescript);
-SyntaxHighlighter.registerLanguage("swift", swift);
-SyntaxHighlighter.registerLanguage("ruby", ruby);
-SyntaxHighlighter.registerLanguage("dart", dart);
-SyntaxHighlighter.registerLanguage("scala", scala);
-SyntaxHighlighter.registerLanguage("elixir", elixir);
-SyntaxHighlighter.registerLanguage("erlang", erlang);
-SyntaxHighlighter.registerLanguage("racket", racket);
+// Lazy-load SyntaxHighlighter + 18 Prism language grammars only when a code modal actually opens.
+const HighlightedCode = dynamic(() => import("./HighlightedCode"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center gap-2 bg-[#1e1e1e] p-12 text-2xs font-semibold text-white/60">
+      <Loader2 className="h-4 w-4 animate-spin" />
+      Highlighting code…
+    </div>
+  ),
+});
 
 const VERDICT_TONE: Record<string, string> = {
   accepted: "bg-status-success/15 text-status-success border-status-success/25",
@@ -162,22 +132,7 @@ export function CodeViewModal({ data, onClose }: CodeViewModalProps) {
             {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
             {copied ? "Copied" : "Copy"}
           </button>
-          <SyntaxHighlighter
-            language={prismLanguageFor(data.language)}
-            style={vscDarkPlus}
-            customStyle={{
-              margin: 0,
-              padding: "18px 16px",
-              fontSize: "13px",
-              lineHeight: 1.6,
-              background: "#1e1e1e",
-              fontFamily: "var(--font-mono), monospace",
-            }}
-            showLineNumbers
-            wrapLongLines
-          >
-            {data.code}
-          </SyntaxHighlighter>
+          <HighlightedCode language={prismLanguageFor(data.language)} code={data.code} />
         </div>
       )}
     </Modal>

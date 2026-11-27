@@ -5,10 +5,129 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class Problem extends Model
 {
     use HasFactory;
+
+    private const CACHE_DIFFICULTY_TOTALS = 'problems:difficulty-totals:v1';
+
+    private const CACHE_TAGS_CATALOG = 'problems:tags-catalog:v1';
+
+    private const CACHE_READINESS_CATALOG = 'problems:readiness-catalog:v1';
+
+    private const CACHE_INDEX_CATALOG = 'problems:index-catalog:v1';
+
+    private const CATALOG_TTL_SECONDS = 3600;
+
+    protected static function booted(): void
+    {
+        $flush = static fn () => self::flushCatalogCache();
+        static::saved($flush);
+        static::deleted($flush);
+    }
+
+    public static function flushCatalogCache(): void
+    {
+        Cache::forget(self::CACHE_DIFFICULTY_TOTALS);
+        Cache::forget(self::CACHE_TAGS_CATALOG);
+        Cache::forget(self::CACHE_READINESS_CATALOG);
+        Cache::forget(self::CACHE_INDEX_CATALOG);
+    }
+
+    /** @return array<string, int> difficulty => count */
+    public static function difficultyTotals(): array
+    {
+        return Cache::remember(self::CACHE_DIFFICULTY_TOTALS, self::CATALOG_TTL_SECONDS, function () {
+            return DB::table('problems')
+                ->select('difficulty')
+                ->selectRaw('COUNT(*) as total')
+                ->groupBy('difficulty')
+                ->pluck('total', 'difficulty')
+                ->map(fn ($v) => (int) $v)
+                ->all();
+        });
+    }
+
+    /** @return array{tags_by_id: array<int, list<string>>, tag_totals: array<string, int>} */
+    public static function tagsCatalog(): array
+    {
+        return Cache::remember(self::CACHE_TAGS_CATALOG, self::CATALOG_TTL_SECONDS, function () {
+            $tagsById = [];
+            $tagTotals = [];
+
+            foreach (DB::table('problems')->select(['id', 'tags'])->cursor() as $row) {
+                $tags = is_string($row->tags) ? (json_decode($row->tags, true) ?? []) : [];
+                $tagsById[(int) $row->id] = $tags;
+                foreach ($tags as $tag) {
+                    $tagTotals[$tag] = ($tagTotals[$tag] ?? 0) + 1;
+                }
+            }
+
+            return ['tags_by_id' => $tagsById, 'tag_totals' => $tagTotals];
+        });
+    }
+
+    /** @return array{totals: array<string, int>, difficulty: array<int, string>, tags: array<int, list<string>>, tag_count: int} */
+    public static function readinessCatalog(): array
+    {
+        return Cache::remember(self::CACHE_READINESS_CATALOG, self::CATALOG_TTL_SECONDS, function () {
+            $totals = [];
+            $difficulty = [];
+            $tags = [];
+            $allTags = [];
+
+            foreach (DB::table('problems')->select(['id', 'difficulty', 'tags'])->cursor() as $row) {
+                $id = (int) $row->id;
+                $diff = (string) $row->difficulty;
+                $rowTags = is_string($row->tags) ? (json_decode($row->tags, true) ?? []) : [];
+
+                $totals[$diff] = ($totals[$diff] ?? 0) + 1;
+                $difficulty[$id] = $diff;
+                $tags[$id] = $rowTags;
+                foreach ($rowTags as $tag) {
+                    $allTags[$tag] = true;
+                }
+            }
+
+            return [
+                'totals' => $totals,
+                'difficulty' => $difficulty,
+                'tags' => $tags,
+                'tag_count' => count($allTags),
+            ];
+        });
+    }
+
+    /** @return list<array<string, mixed>> */
+    public static function indexCatalog(): array
+    {
+        return Cache::remember(self::CACHE_INDEX_CATALOG, self::CATALOG_TTL_SECONDS, function () {
+            $out = [];
+            $rows = DB::table('problems')
+                ->orderBy('display_order')
+                ->orderBy('id')
+                ->get(['id', 'slug', 'title', 'difficulty', 'tags', 'companies', 'acceptance_rate', 'total_submissions', 'display_order']);
+
+            foreach ($rows as $row) {
+                $out[] = [
+                    'id' => (int) $row->id,
+                    'slug' => $row->slug,
+                    'title' => $row->title,
+                    'difficulty' => $row->difficulty,
+                    'tags' => is_string($row->tags) ? (json_decode($row->tags, true) ?? []) : [],
+                    'companies' => is_string($row->companies) ? json_decode($row->companies, true) : null,
+                    'acceptance_rate' => $row->acceptance_rate !== null ? number_format((float) $row->acceptance_rate, 2, '.', '') : null,
+                    'total_submissions' => $row->total_submissions !== null ? (int) $row->total_submissions : 0,
+                    'serial_number' => ((int) $row->display_order) + 100,
+                ];
+            }
+
+            return $out;
+        });
+    }
 
     public const DIFFICULTY_EASY = 'easy';
 

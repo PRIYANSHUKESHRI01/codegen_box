@@ -25,10 +25,10 @@ import { SolveButton, solveHref } from "@/components/practice/SolveButton";
 import { useResilientNavigation } from "@/lib/useResilientNavigation";
 import { COMPANY_ICONS } from "@/components/icons/CompanyIcons";
 import { ProblemSummary } from "@/types/problem";
-import type { MySubscriptionResponse } from "@/types/subscription";
-import { api } from "@/lib/api";
+import { getCachedCatalog } from "@/lib/catalogCache";
 import { cn } from "@/lib/utils";
 import { useAuthGuard } from "@/lib/useAuthGuard";
+import { useEntitlements } from "@/lib/useEntitlements";
 import { useMyStats } from "@/lib/useMyStats";
 import { useDebouncedValue } from "@/lib/useDebouncedValue";
 
@@ -120,14 +120,13 @@ function PracticeArenaPageContent() {
   const [problemsLoading, setProblemsLoading] = useState(true);
 
   const { stats } = useMyStats(status === "ready");
-  const [entitlements, setEntitlements] = useState<MySubscriptionResponse["entitlements"]>(undefined);
+  const entitlements = useEntitlements(status === "ready");
 
   useEffect(() => {
     if (status !== "ready") return;
     let cancelled = false;
 
-    api
-      .get<{ problems: ProblemSummary[] }>("/problems")
+    getCachedCatalog<{ problems: ProblemSummary[] }>("/problems")
       .then((res) => {
         if (!cancelled) setProblems(res.problems);
       })
@@ -135,13 +134,6 @@ function PracticeArenaPageContent() {
       .finally(() => {
         if (!cancelled) setProblemsLoading(false);
       });
-
-    api
-      .get<MySubscriptionResponse>("/me/subscription")
-      .then((res) => {
-        if (!cancelled) setEntitlements(res.entitlements);
-      })
-      .catch(() => {});
 
     return () => {
       cancelled = true;

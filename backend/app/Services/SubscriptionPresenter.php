@@ -76,8 +76,10 @@ class SubscriptionPresenter
             ->distinct('problem_id')
             ->count('problem_id');
 
+        $todayStart = today()->startOfDay();
+        $todayEnd = today()->endOfDay();
         $mockInterviewsUsedToday = InterviewSession::where('user_id', $user->id)
-            ->whereDate('started_at', today())
+            ->whereBetween('started_at', [$todayStart, $todayEnd])
             ->whereHas('interview', fn ($q) => $q->usesMockAllowance())
             ->count();
 

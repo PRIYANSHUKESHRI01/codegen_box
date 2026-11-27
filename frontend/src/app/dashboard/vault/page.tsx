@@ -15,6 +15,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  ExternalLink,
   ShieldCheck,
   Sparkles,
   Video,
@@ -85,6 +86,7 @@ export default function StudentVaultPage() {
   const [data, setData] = useState<StudentVaultResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [openingSso, setOpeningSso] = useState(false);
   const [confirmingHide, setConfirmingHide] = useState(false);
   const showToast = useToast();
 
@@ -150,6 +152,34 @@ export default function StudentVaultPage() {
         <div className="space-y-6">
           {/* What the Vault is for this student right now, and the one button that matters (locked below the line, open above it). */}
           <VaultHero data={data} door={door} />
+
+          <div className="flex flex-col gap-3 rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-500/[0.06] via-surface to-surface px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-0.5">
+              <p className="text-xs font-extrabold text-primary">Seamless Mellow Vault Session (1-Click SSO)</p>
+              <p className="text-[11px] text-text-secondary">
+                Your AptRun account is linked with Mellow Vault. Open your developer profile directly without logging in again.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={openingSso}
+              onClick={async () => {
+                setOpeningSso(true);
+                try {
+                  const res = await api.get<{ url: string }>("/vault/sso-url");
+                  window.open(res.url, "_blank", "noopener,noreferrer");
+                } catch (err) {
+                  showToast(err instanceof ApiError ? err.message : "Could not generate Mellow Vault SSO link.", "error");
+                } finally {
+                  setOpeningSso(false);
+                }
+              }}
+              className="inline-flex shrink-0 items-center gap-1.5 self-start rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-indigo-500 disabled:opacity-50 sm:self-center"
+            >
+              {openingSso ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ExternalLink className="h-3.5 w-3.5" />}
+              <span>{openingSso ? "Connecting..." : "Open Mellow Vault"}</span>
+            </button>
+          </div>
 
           {/* Below the line the page explains the benefit; above it the student's own choices come first. */}
           {door.state === "locked" && door.reason === "score" && <VaultSteps door={door} score={readiness.score} line={readiness.threshold} />}

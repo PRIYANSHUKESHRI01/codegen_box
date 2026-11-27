@@ -257,7 +257,8 @@ export class BrowserVoiceEngine implements VoiceEngine {
     }
 
     if (hasMediaRecorder()) {
-      const recorder = new MediaRecorder(this.stream, { mimeType: this.pickMimeType() });
+      const mimeType = this.pickMimeType();
+      const recorder = mimeType ? new MediaRecorder(this.stream, { mimeType }) : new MediaRecorder(this.stream);
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) this.chunks.push(e.data);
       };

@@ -254,3 +254,54 @@ describe("Local zero-cost Voice Biometric DSP extractor (v2)", () => {
     expect(lowMale!.voicedRatio).toBeGreaterThan(0.9);
   });
 });
+
+describe("Phone persistence across non-object vision ticks & pitch look-away", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    resetIntegrityUi();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    resetIntegrityUi();
+  });
+
+  it("maintains the 2-second phone_detected countdown even when intermediate frames omit phone analysis", () => {
+    const phases: string[] = [];
+    const engine = new IntegrityEngine({
+      surface: "interview",
+      basePath: "/interviews/test",
+      keepKey: "test-phone-key",
+      userKey: "user-1",
+      activityLabel: "interview",
+      handlers: {
+        phase: (p) => phases.push(p),
+        session: () => undefined,
+        violation: () => undefined,
+        consentError: () => undefined,
+        camera: () => undefined,
+        previewReady: () => undefined,
+      },
+    });
+    (engine as unknown as { phase: string }).phase = "active";
+    const guard = (engine as unknown as {
+      evaluateGraceGuard: (a: { faces: number; yaw: number | null; pitch: number | null; phone?: number }, sim: number | null) => void;
+    }).evaluateGraceGuard.bind(engine);
+
+    vi.setSystemTime(new Date("2026-11-26T10:00:00.000Z"));
+    // Frame 0: object detector sees phone
+    guard({ faces: 1, yaw: 0, pitch: 0, phone: 0.72 }, null);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 2 });
+
+    // Frame 1 (800ms later): object detector skipped (phone undefined) — warning MUST stay active!
+    vi.setSystemTime(new Date("2026-11-26T10:00:00.800Z"));
+    guard({ faces: 1, yaw: 0, pitch: 0 }, null);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 2 });
+
+    // 2.1s later: locks the session cleanly
+    vi.setSystemTime(new Date("2026-11-26T10:00:02.100Z"));
+    guard({ faces: 1, yaw: 0, pitch: 0 }, null);
+    expect(getIntegrityUi().graceWarning).toBeNull();
+    expect(phases).toContain("locked");
+  });
+});

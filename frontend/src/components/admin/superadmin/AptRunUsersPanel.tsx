@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { downloadApiFile } from "@/lib/download";
 import { formatDateTime, type ApiPage, type ApiPlatformUser } from "./types";
+import { MvProfileBadge } from "./MvProfileBadge";
 import { APTRUN_USER_ROLES, PLAN_FILTERS, roleInfo } from "./accountRoles";
 import { UserManageDrawer } from "./UserManageDrawer";
 import { RoleChips, UniversityPicker, useDirectoryFacets } from "./DirectoryFilters";
@@ -49,6 +50,8 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
   const [collegeId, setCollegeId] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "blocked">("");
   const [affiliation, setAffiliation] = useState<"all" | "college" | "independent">("all");
+  const [mvSource, setMvSource] = useState<"" | "mellow_vault" | "aptrun_only">("");
+  const [syncingMv, setSyncingMv] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [managedId, setManagedId] = useState<number | null>(null);
 
@@ -104,10 +107,11 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
 
       if (affiliation === "college") params.set("has_college", "1");
       else if (affiliation === "independent") params.set("has_college", "0");
+      if (mvSource) params.set("mv_source", mvSource);
 
       return params;
     },
-    [roleFilter, collegeId, searchDebounced, planFilter, statusFilter, affiliation]
+    [roleFilter, collegeId, searchDebounced, planFilter, statusFilter, affiliation, mvSource]
   );
 
   const latest = useRef(0);
@@ -189,9 +193,30 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
     setPlanFilter("");
     setStatusFilter("");
     setAffiliation("all");
+    setMvSource("");
   };
 
-  const isFiltered = Boolean(search || roleFilter || collegeId || planFilter || statusFilter || affiliation !== "all");
+  const handleSyncMvProfiles = async () => {
+    setSyncingMv(true);
+    try {
+      const res = await api.post<{ configured: boolean; matched_users: number; eligible_90: number }>(
+        "/superadmin/mellow-vault/sync-profiles",
+        { max_emails: 0 }
+      );
+      if (!res.configured) {
+        triggerToast("Mellow Vault database is not configured.", "error");
+      } else {
+        triggerToast(`Synced ${res.matched_users} Mellow Vault user(s) (${res.eligible_90} at 90%+).`);
+        load();
+      }
+    } catch (err) {
+      triggerToast(err instanceof ApiError ? err.message : "Failed to sync Mellow Vault percentages.", "error");
+    } finally {
+      setSyncingMv(false);
+    }
+  };
+
+  const isFiltered = Boolean(search || roleFilter || collegeId || planFilter || statusFilter || affiliation !== "all" || mvSource);
 
   const isAllOnPageSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id));
 
@@ -267,6 +292,16 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={handleSyncMvProfiles}
+            disabled={syncingMv}
+            title="Fetch latest profile completion % from Mellow Vault for all matching users"
+            className="inline-flex items-center gap-1.5 rounded-control border border-indigo-500/35 bg-indigo-500/10 px-3 py-1.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-subtle hover:bg-indigo-500/20 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw className={cn("h-3.5 w-3.5", syncingMv && "animate-spin")} />
+            <span>{syncingMv ? "Syncing MV..." : "Sync MV %"}</span>
+          </button>
           <button
             type="button"
             onClick={load}
@@ -373,6 +408,18 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
           <option value="blocked">Blocked Only</option>
         </select>
 
+        {/* Account origin filter */}
+        <select
+          value={mvSource}
+          onChange={(e) => setMvSource(e.target.value as "" | "mellow_vault" | "aptrun_only")}
+          aria-label="Filter by account origin"
+          className="h-8 rounded-control border border-border-subtle bg-elevated px-2.5 text-xs text-primary outline-none focus:border-accent-primary"
+        >
+          <option value="">All Sources</option>
+          <option value="mellow_vault">Mellow Vault Synced</option>
+          <option value="aptrun_only">AptRun Only (0%)</option>
+        </select>
+
         {isFiltered && (
           <button
             type="button"
@@ -435,6 +482,7 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
                   <th className="px-4 py-3">Role</th>
                   <th className="px-4 py-3">Affiliation / College</th>
                   <th className="px-4 py-3">Plan / Access</th>
+                  <th className="px-4 py-3">MV Profile %</th>
                   <th className="px-4 py-3">Joined</th>
                   <th className="px-4 py-3">Last Seen</th>
                   <th className="px-4 py-3">Status</th>
@@ -529,6 +577,11 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
                         ) : (
                           <span className="text-text-muted">—</span>
                         )}
+                      </td>
+
+                      {/* Mellow Vault Profile % / Account Origin */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <MvProfileBadge user={u} />
                       </td>
 
                       {/* Joined Date */}

@@ -24,6 +24,13 @@ class MockInterviewQuestion extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        $flush = static fn () => \App\Services\Mock\MockInterviewCatalog::flushCache();
+        static::saved($flush);
+        static::deleted($flush);
+    }
+
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

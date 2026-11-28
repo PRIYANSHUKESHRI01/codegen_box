@@ -281,6 +281,7 @@ class User extends Authenticatable
             // section. forceFill-only, like is_blocked: only SectionCoordinatorService writes it.
             'coordinator_scope' => 'array',
             'is_blocked' => 'boolean',
+            'enforce_trusted_login' => 'boolean',
             'blocked_at' => 'datetime',
             'cgpa' => 'decimal:2',
             'tenth_percentage' => 'decimal:2',
@@ -1366,5 +1367,15 @@ class User extends Authenticatable
     public function voiceVerificationLogs(): HasMany
     {
         return $this->hasMany(VoiceVerificationLog::class)->latest('checked_at');
+    }
+
+    public function superadminLoginLogs(): HasMany
+    {
+        return $this->hasMany(SuperadminLoginLog::class, 'user_id')->latest('id');
+    }
+
+    public function trustedDevices(): HasMany
+    {
+        return $this->hasMany(SuperadminTrustedDevice::class, 'user_id')->latest('id');
     }
 }

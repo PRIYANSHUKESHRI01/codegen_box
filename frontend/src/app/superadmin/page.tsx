@@ -48,9 +48,10 @@ import { VaultAiResultsList } from "@/components/admin/vault/VaultAiResultsList"
 import { SuperAdminDrivesPanel } from "@/components/admin/superadmin/SuperAdminDrivesPanel";
 import { VoiceVerificationPanel } from "@/components/admin/superadmin/VoiceVerificationPanel";
 import { CollegeAssessmentsPanel } from "@/components/admin/superadmin/CollegeAssessmentsPanel";
+import { SuperadminsPanel } from "@/components/admin/superadmin/SuperadminsPanel";
 import { useToast } from "@/lib/toast";
 
-type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "voice_verification" | "assessments" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "staff" | "accounts" | "infrastructure" | "audit";
+type Tab = "overview" | "platform_usage" | "activity" | "gemini_keys" | "voice_verification" | "assessments" | "drives" | "hackathons" | "vault_ai" | "users" | "students" | "leads" | "marketing" | "marketing_team" | "colleges" | "departments" | "merchant_navy" | "weekly_rewards" | "plans" | "subscriptions" | "payments" | "superadmins" | "staff" | "accounts" | "infrastructure" | "audit";
 
 const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -73,7 +74,9 @@ const TABS: { id: Tab; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "weekly_rewards", label: "Contest Rewards", icon: Gift },
   { id: "plans", label: "Plans & Pricing", icon: Wallet },
   { id: "subscriptions", label: "Subscriptions", icon: BadgeCheck },
-  { id: "payments", label: "Payments", icon: CreditCard },  { id: "staff", label: "Mellow Staff", icon: Users2 },
+  { id: "payments", label: "Payments", icon: CreditCard },
+  { id: "superadmins", label: "Superadmins & Security", icon: ShieldCheck },
+  { id: "staff", label: "Mellow Staff", icon: Users2 },
   { id: "accounts", label: "Accounts & Logins", icon: KeyRound },
   { id: "infrastructure", label: "Infrastructure & Flags", icon: Cpu },
   { id: "audit", label: "Audit Log", icon: ShieldAlert },
@@ -197,7 +200,9 @@ function SuperAdminPageContent() {
       {activeTab === "weekly_rewards" && <WeeklyRewardsPanel triggerToast={triggerToast} />}
       {activeTab === "plans" && <PlansPricingPanel triggerToast={triggerToast} />}
       {activeTab === "subscriptions" && <SubscriptionsPanel triggerToast={triggerToast} />}
-      {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} />}
+      {activeTab === "payments" && <PaymentsPanel triggerToast={triggerToast} />}
+      {activeTab === "superadmins" && <SuperadminsPanel triggerToast={triggerToast} />}
+      {activeTab === "staff" && <MellowStaffPanel meId={me.id} triggerToast={triggerToast} onOpenSuperadmins={() => goToTab("superadmins")} />}
       {activeTab === "accounts" && <AccountsPanel triggerToast={triggerToast} />}
       {activeTab === "infrastructure" && <InfrastructurePanel triggerToast={triggerToast} />}
       {activeTab === "audit" && <AuditLogPanel />}

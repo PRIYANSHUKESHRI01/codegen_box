@@ -10,6 +10,8 @@
                                 @if ($user->role === 'admin_tpo')
                                     AptRun has set up your Training &amp; Placement Officer account for {{ $user->college?->name ?? 'your campus' }}.
                                     Use the credentials below to sign in and start running placement drives.
+                                @elseif ($user->role === 'superadmin')
+                                    AptRun has set up your Superadmin account. Use the credentials below to sign in via the internal console.
                                 @elseif ($user->role === 'admin_internal')
                                     AptRun has set up your internal staff account. Use the credentials below to sign in.
                                 @elseif ($user->role === 'admin_marketing')

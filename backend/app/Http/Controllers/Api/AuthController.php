@@ -6,11 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Jobs\SendWelcomeEmail;
 use App\Models\ActivityLog;
 use App\Models\AuthEvent;
+use App\Models\SuperadminLoginLog;
 use App\Models\User;
 use App\Services\Activity\AuthEventRecorder;
 use App\Services\IssuedCredentialVault;
 use App\Services\LifecycleMailService;
 use App\Services\PasswordResetService;
+use App\Services\Security\SuperadminLoginTelemetryService;
 use App\Services\Vault\MellowVaultUserSyncService;
 use App\Support\SingleMail;
 use Illuminate\Database\QueryException;
@@ -88,16 +90,34 @@ class AuthController extends Controller
             // Which tab of the sign-in page the visitor picked (see User::LOGIN_PORTALS). Optional so a caller that
             // doesn't have tabs keeps working; the page itself always sends it.
             'portal' => ['nullable', 'string', Rule::in(array_keys(User::LOGIN_PORTALS))],
+            // Optional hardware/network telemetry from the browser (used for superadmin login security & laptop/IP binding).
+            'device_telemetry' => ['nullable', 'array'],
         ]);
 
         $user = User::where('email', $validated['email'])->first();
         $portal = $validated['portal'] ?? null;
+        $clientTelemetry = is_array($validated['device_telemetry'] ?? null) ? $validated['device_telemetry'] : [];
         $log = app(AuthEventRecorder::class);
+        $saTelemetry = app(SuperadminLoginTelemetryService::class);
+        $trackSuperadminSecurity = $user?->role === User::ROLE_SUPERADMIN || ($user === null && $portal === 'staff');
 
         if (! $user || ! Hash::check($validated['password'], $user->password)) {
             // Kept even when the address matched nobody, and when it matched somebody: a college that tried its demo login and
             // mistyped it is a very different story from one that never opened it.
             $log->record(AuthEvent::LOGIN_FAILED, $user, $request, $validated['email'], $user ? 'bad_password' : 'unknown_email', $portal);
+
+            if ($trackSuperadminSecurity) {
+                $saTelemetry->record(
+                    SuperadminLoginLog::EVENT_LOGIN_FAILED,
+                    $user,
+                    $request,
+                    $validated['email'],
+                    $user ? 'bad_password' : 'unknown_email',
+                    $portal,
+                    null,
+                    $clientTelemetry,
+                );
+            }
 
             throw ValidationException::withMessages([
                 'email' => ['These credentials do not match our records.'],
@@ -106,6 +126,19 @@ class AuthController extends Controller
 
         if ($user->is_blocked) {
             $log->record(AuthEvent::LOGIN_BLOCKED, $user, $request, null, 'blocked', $portal);
+
+            if ($user->role === User::ROLE_SUPERADMIN) {
+                $saTelemetry->record(
+                    SuperadminLoginLog::EVENT_LOGIN_BLOCKED,
+                    $user,
+                    $request,
+                    null,
+                    'blocked',
+                    $portal,
+                    null,
+                    $clientTelemetry,
+                );
+            }
 
             throw ValidationException::withMessages([
                 'email' => ['This account has been blocked. Contact an administrator.'],
@@ -118,6 +151,30 @@ class AuthController extends Controller
             $log->record(AuthEvent::LOGIN_FAILED, $user, $request, null, 'wrong_portal', $portal);
 
             throw ValidationException::withMessages(['email' => [$this->wrongPortalMessage($user, $portal)]]);
+        }
+
+        // Future-ready strict Laptop & IP allowlist enforcement for superadmin accounts (opt-in via enforce_trusted_login).
+        if ($user->role === User::ROLE_SUPERADMIN && $user->enforce_trusted_login) {
+            $matchedDevice = $saTelemetry->findMatchingTrustedDevice($user, $request, $clientTelemetry);
+
+            if (! $matchedDevice) {
+                $saTelemetry->record(
+                    SuperadminLoginLog::EVENT_LOGIN_REJECTED_DEVICE_IP,
+                    $user,
+                    $request,
+                    null,
+                    'untrusted_device_or_ip',
+                    $portal,
+                    null,
+                    $clientTelemetry,
+                );
+
+                throw ValidationException::withMessages([
+                    'email' => ['Sign-in denied: this laptop or IP address is not authorized for this superadmin account.'],
+                ]);
+            }
+
+            $matchedDevice->forceFill(['last_matched_at' => now()])->save();
         }
 
         // A password an admin generated on this account's behalf (manual
@@ -138,10 +195,24 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth')->plainTextToken;
+        $tokenModel = $user->createToken('auth');
+        $token = $tokenModel->plainTextToken;
 
         $this->touchLastSeen($user, force: true);
         $log->record(AuthEvent::LOGIN, $user, $request, null, null, $portal);
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            $saTelemetry->record(
+                SuperadminLoginLog::EVENT_LOGIN,
+                $user,
+                $request,
+                null,
+                null,
+                $portal,
+                $tokenModel->accessToken->id,
+                $clientTelemetry,
+            );
+        }
 
         return response()->json([
             'user' => $user->load(['college.collegeDepartments', 'company']),
@@ -169,6 +240,18 @@ class AuthController extends Controller
         // Leaving a superadmin's "view as" is worth a line in their audit trail, just like entering it.
         if ($user->isBeingImpersonated() && ($superadmin = User::find($user->impersonatorId())) !== null) {
             ActivityLog::record($superadmin, 'Stopped viewing an account ("view as")', 'User', $user->name, ['user_id' => $user->id]);
+        }
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            app(SuperadminLoginTelemetryService::class)->record(
+                SuperadminLoginLog::EVENT_LOGOUT,
+                $user,
+                $request,
+                null,
+                null,
+                null,
+                $user->currentAccessToken()?->id,
+            );
         }
 
         $user->currentAccessToken()->delete();
@@ -364,6 +447,16 @@ class AuthController extends Controller
 
         app(LifecycleMailService::class)->passwordChanged($user, 'settings');
         app(AuthEventRecorder::class)->record(AuthEvent::PASSWORD_CHANGED, $user, $request, null, 'settings');
+
+        if ($user->role === User::ROLE_SUPERADMIN) {
+            app(SuperadminLoginTelemetryService::class)->record(
+                SuperadminLoginLog::EVENT_PASSWORD_CHANGED,
+                $user,
+                $request,
+                null,
+                'settings',
+            );
+        }
 
         // Keep credentials in sync on Mellow Vault so user can log into Mellow Vault with the new password
         try {

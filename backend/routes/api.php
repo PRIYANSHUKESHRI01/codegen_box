@@ -117,6 +117,7 @@ use App\Http\Controllers\Api\SuperAdminAccountController;
 use App\Http\Controllers\Api\SuperAdminCollegeAssessmentController;
 use App\Http\Controllers\Api\SuperAdminCollegeController;
 use App\Http\Controllers\Api\SuperAdminLaunchpadProgramController;
+use App\Http\Controllers\Api\SuperAdminManagementController;
 use App\Http\Controllers\Api\SuperAdminController;
 use App\Http\Controllers\Api\SuperAdminMarketingTeamController;
 use App\Http\Controllers\Api\SuperAdminPlatformModuleController;
@@ -865,6 +866,24 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::get('/users/{user}/deletion-preview', [SuperAdminAccountController::class, 'deletionPreview']);
             Route::delete('/users/{user}', [SuperAdminAccountController::class, 'destroy'])
                 ->middleware('throttle:superadmin-sensitive');
+
+            // Superadmin Accounts & Login Security Telemetry (create/list/delete superadmins,
+            // full IP/network/browser/laptop login logs, and trusted laptop/IP allowlists).
+            Route::get('/superadmins', [SuperAdminManagementController::class, 'index']);
+            Route::post('/superadmins', [SuperAdminManagementController::class, 'store'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::get('/superadmins/{user}', [SuperAdminManagementController::class, 'show']);
+            Route::delete('/superadmins/{user}', [SuperAdminManagementController::class, 'destroy'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/superadmins/{user}/trusted-devices', [SuperAdminManagementController::class, 'addTrustedDevice'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::delete('/superadmins/{user}/trusted-devices/{device}', [SuperAdminManagementController::class, 'removeTrustedDevice'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/superadmins/{user}/security-policy', [SuperAdminManagementController::class, 'updateSecurityPolicy'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::post('/superadmins/{user}/revoke-session/{tokenId}', [SuperAdminManagementController::class, 'revokeSession'])
+                ->middleware('throttle:superadmin-sensitive');
+            Route::get('/superadmin-logins', [SuperAdminManagementController::class, 'loginLogs']);
 
             // Subscriptions: every plan anyone holds, and the hand tools to give, extend and end them.
             // A change is live on the holder's next request (see SuperAdminSubscriptionController).

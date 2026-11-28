@@ -15,6 +15,7 @@ import { RoleChips, useDirectoryFacets } from "./DirectoryFilters";
 interface MellowStaffPanelProps {
   meId: number;
   triggerToast: ToastTrigger;
+  onOpenSuperadmins?: () => void;
 }
 
 const STAFF_ROLES = "admin_internal,admin_marketing,superadmin";
@@ -35,7 +36,7 @@ const TEAM_CHOICES = [
  * Ops/Marketing sub-choice are a hard constraint from the already-approved
  * Marketing feature and must not change.
  */
-export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) {
+export function MellowStaffPanel({ meId, triggerToast, onOpenSuperadmins }: MellowStaffPanelProps) {
   const [staff, setStaff] = useState<ApiPlatformUser[]>([]);
   // `loaded` flips on the first answer; afterwards a new filter keeps the old rows on screen, dimmed (see StudentsPanel).
   const [loaded, setLoaded] = useState(false);
@@ -251,6 +252,16 @@ export function MellowStaffPanel({ meId, triggerToast }: MellowStaffPanelProps) 
             <Plus className="w-3.5 h-3.5" />
             <span>Add Staff / User</span>
           </button>
+          {onOpenSuperadmins && (
+            <button
+              type="button"
+              onClick={onOpenSuperadmins}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-control border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 text-xs font-semibold transition-colors"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Manage Superadmins</span>
+            </button>
+          )}
         </div>
       </div>
 

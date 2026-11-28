@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
 import { AuthUser, homeRouteForRole } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
+import { collectLoginTelemetry } from "@/lib/device/loginTelemetry";
 
 // Local-dev convenience only — see the matching comment on /login. Never
 // add a customer-facing role here; this page is exclusively superadmin and
@@ -50,8 +51,14 @@ export default function MellowInternalLoginPage() {
     setLoading(true);
 
     try {
+      const deviceTelemetry = await collectLoginTelemetry();
       // portal "staff": the server itself refuses anyone who isn't Mellow staff, before any session is issued.
-      const res = await api.post<{ user: AuthUser; token: string }>("/login", { email, password, portal: "staff" });
+      const res = await api.post<{ user: AuthUser; token: string }>("/login", {
+        email,
+        password,
+        portal: "staff",
+        ...(deviceTelemetry ? { device_telemetry: deviceTelemetry } : {}),
+      });
 
       if (!["superadmin", "admin_internal", "admin_marketing"].includes(res.user.role)) {
         setError("This sign-in is for Mellow staff accounts only.");

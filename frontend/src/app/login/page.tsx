@@ -29,6 +29,7 @@ import { AuthUser, Role, readRedirectParam, resolvePostLoginRoute } from "@/lib/
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 import { takeSignedOutNotice } from "@/lib/sessionEvents";
+import { collectLoginTelemetry } from "@/lib/device/loginTelemetry";
 
 // The three real customer-facing account types — every one of them is
 // something a real visitor could plausibly land on this page needing.
@@ -211,9 +212,15 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      const deviceTelemetry = await collectLoginTelemetry();
       const res = await api.post<
         { user: AuthUser; token: string } | { must_change_password: true; email: string; message: string }
-      >("/login", { email, password, portal: selectedRole });
+      >("/login", {
+        email,
+        password,
+        portal: selectedRole,
+        ...(deviceTelemetry ? { device_telemetry: deviceTelemetry } : {}),
+      });
 
       // A password an admin/TPO generated on this account's behalf is a
       // one-time credential — the backend refuses to issue a real session

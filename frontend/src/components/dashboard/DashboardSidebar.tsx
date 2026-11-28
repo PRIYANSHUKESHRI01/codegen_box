@@ -518,6 +518,7 @@ export function DashboardSidebar({
             { label: "Leads", href: "/superadmin?tab=leads", icon: UserSearch },
             { label: "Marketing Performance", href: "/superadmin?tab=marketing", icon: Megaphone },
             { label: "Marketing Team", href: "/superadmin?tab=marketing_team", icon: UserCog },
+            { label: "Superadmins & Security", href: "/superadmin?tab=superadmins", icon: ShieldCheck },
             { label: "Mellow Staff", href: "/superadmin?tab=staff", icon: Users2 },
             { label: "Accounts & Logins", href: "/superadmin?tab=accounts", icon: KeyRound },
             {

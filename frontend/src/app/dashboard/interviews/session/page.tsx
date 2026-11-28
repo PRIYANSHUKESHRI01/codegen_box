@@ -13,8 +13,12 @@ import type { StudentInterviewSummary } from "@/types/interview";
  */
 function MockSession() {
   const router = useRouter();
-  const slug = useSearchParams().get("slug") ?? "";
-  const [checked, setChecked] = useState(false);
+  const params = useSearchParams();
+  const slug = params.get("slug") ?? "";
+  const assessmentSlug = params.get("assessment") ?? "";
+  // In Launchpad / Campus Assessment flows (`?assessment=`), mount InterviewSessionView immediately so kept
+  // proctoring streams & fullscreen are claimed on frame 0 without waiting for an extra gating HTTP check.
+  const [checked, setChecked] = useState(Boolean(assessmentSlug));
 
   useEffect(() => {
     let alive = true;
@@ -22,8 +26,12 @@ function MockSession() {
       .get<StudentInterviewSummary>(`/interviews/${encodeURIComponent(slug)}`)
       .then((summary) => {
         if (!alive) return;
-        if (summary.is_qualification) router.replace(`/dashboard/vault-interviews/session?slug=${encodeURIComponent(slug)}`);
-        else setChecked(true);
+        if (summary.is_qualification) {
+          const suffix = assessmentSlug ? `&assessment=${encodeURIComponent(assessmentSlug)}` : "";
+          router.replace(`/dashboard/vault-interviews/session?slug=${encodeURIComponent(slug)}${suffix}`);
+        } else {
+          setChecked(true);
+        }
       })
       // If the check itself fails, the session page below reports the real problem in its own words.
       .catch(() => alive && setChecked(true));

@@ -91,12 +91,17 @@ describe("a Vault AI Interview set, before it is sat", () => {
     expect(screen.getByText(/counts toward your Mellow Vault series/)).toBeTruthy();
   });
 
-  it("starts the set in the Vault AI Interview's own session page", async () => {
+  it("shows the cache/incognito instruction modal before entering the Vault AI Interview session page", async () => {
     serve(summary());
     render(<VaultInterviewSetPage />);
 
     fireEvent.click(await screen.findByRole("button", { name: /Start Set 2/ }));
 
+    expect(await screen.findByTestId("vault-prestart-advisory-modal")).toBeTruthy();
+    expect(screen.getByText(/Clear Browser Cache or Use Incognito Mode/)).toBeTruthy();
+    expect(nav.push).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Interview/i }));
     expect(nav.push).toHaveBeenCalledWith("/dashboard/vault-interviews/session?slug=laravel-set-2");
   });
 
@@ -202,6 +207,8 @@ describe("a Vault AI Interview set, after it is sat", () => {
     expect(proceedButtons.length).toBeGreaterThan(0);
 
     fireEvent.click(proceedButtons[0]);
+    expect(await screen.findByTestId("vault-prestart-advisory-modal")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Continue to Interview/i }));
 
     await waitFor(() => {
       expect(net.post).toHaveBeenCalledWith("/vault-qualification/start-set", {

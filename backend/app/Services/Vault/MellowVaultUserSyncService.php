@@ -585,11 +585,16 @@ class MellowVaultUserSyncService
                 return;
             }
 
+            $normalizedPct = $profilePercent > 0 ? max(0, min(100, $profilePercent)) : null;
+
             $updates = [
                 'mellow_vault_dev_id' => $devId,
-                'mellow_vault_profile_percent' => max(0, min(100, $profilePercent)),
-                'mellow_vault_profile_synced_at' => now(),
+                'mellow_vault_profile_percent' => $normalizedPct,
+                'mellow_vault_profile_synced_at' => $normalizedPct !== null ? now() : $user->mellow_vault_profile_synced_at,
             ];
+            if ($normalizedPct !== null && Schema::hasColumn('users', 'mv_profile_percentage')) {
+                $updates['mv_profile_percentage'] = $normalizedPct;
+            }
             if ($proId !== null) {
                 $updates['mellow_vault_pro_id'] = $proId;
             }

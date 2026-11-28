@@ -48,5 +48,8 @@ class LaunchpadProgramSeeder extends Seeder
                 'target_scope' => ['student_mode' => 'selected', 'user_ids' => []],
             ]);
         }
+
+        // Keep existing unstarted Launchpad slots upgraded to Vault-calibrated hard questions & rubrics on re-seed.
+        $service->refreshUnstartedSlotInterviews(null, $actor);
     }
 }

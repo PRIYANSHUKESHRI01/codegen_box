@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\CollegeAssessment;
+use App\Models\CollegeAssessmentAssignment;
+use App\Models\ContestParticipant;
 use App\Models\SoftSkillAssessment;
 use App\Models\SoftSkillResponse;
 use App\Models\SoftSkillSession;
 use App\Models\User;
+use App\Services\CollegeAssessmentService;
 use App\Services\Integrity\IntegrityService;
 use App\Services\SoftSkillGradingService;
 use App\Services\SoftSkillQuestionSetService;
@@ -210,6 +214,12 @@ class SoftSkillController extends Controller
             ->count();
 
         abort_if(
+            $softSkillAssessment->assessment_type === SoftSkillAssessment::TYPE_COLLEGE_ASSESSMENT && $completedCount > 0,
+            403,
+            'Campus and Launchpad assessments can only be attempted once.'
+        );
+
+        abort_if(
             $softSkillAssessment->max_attempts !== null && $completedCount >= $softSkillAssessment->max_attempts,
             403,
             "You've used all {$softSkillAssessment->max_attempts} attempt(s) for this assessment."
@@ -271,11 +281,121 @@ class SoftSkillController extends Controller
         abort_if($softSkillSession->status === SoftSkillSession::STATUS_COMPLETED, 422, 'This assessment has already been submitted.');
         $this->assertIntegrity($request, $softSkillSession);
 
+        $validated = $request->validate([
+            'assessment_slug' => ['nullable', 'string', 'max:120'],
+            'minimal' => ['nullable', 'boolean'],
+        ]);
+
         // Grading itself lives in SoftSkillGradingService so a proctoring
         // lock (SoftSkillProctoringService) scores an attempt identically.
         $graded = $grader->finalize($softSkillSession);
 
-        return response()->json(['session' => $this->resultPayload($graded)]);
+        $assessmentSlug = $validated['assessment_slug'] ?? null;
+        $minimal = (bool) ($validated['minimal'] ?? false) || $assessmentSlug !== null;
+
+        $sessionPayload = $minimal
+            ? [
+                'id' => $graded->id,
+                'status' => $graded->status,
+                'attempt_number' => $graded->attempt_number,
+                'score_percent' => (float) $graded->score_percent,
+                'passed' => (bool) $graded->passed,
+                'completed_at' => $graded->completed_at,
+            ]
+            : $this->resultPayload($graded);
+
+        $next = null;
+        if ($assessmentSlug) {
+            $next = $this->resolveNextLaunchpadStage($request->user(), $graded, $assessmentSlug);
+        }
+
+        return response()->json([
+            'session' => $sessionPayload,
+            ...($next !== null ? ['next' => $next] : []),
+        ]);
+    }
+
+    /**
+     * Fast single-roundtrip handoff for Campus Assessment / Launchpad after Soft Skills submit:
+     * persists the soft skill score on the assignment and returns the next stage target immediately
+     * without forcing a separate `/advance` roundtrip or heavy 5-table re-sync.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function resolveNextLaunchpadStage(User $user, SoftSkillSession $graded, string $assessmentSlug): ?array
+    {
+        $assessment = CollegeAssessment::query()
+            ->where('slug', $assessmentSlug)
+            ->with(['contest:id,slug', 'interview:id,slug'])
+            ->first();
+
+        if (! $assessment) {
+            return null;
+        }
+
+        $assignment = CollegeAssessmentAssignment::query()
+            ->where('college_assessment_id', $assessment->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $assignment) {
+            return null;
+        }
+
+        if ($graded->proctoringSession?->isLocked()) {
+            app(CollegeAssessmentService::class)->syncAssignment($assignment);
+
+            return [
+                'next_stage' => 'complete',
+                'blocked_by_proctoring' => true,
+                'overall_score_percent' => 0.0,
+            ];
+        }
+
+        $updates = [
+            'soft_skill_session_id' => $graded->id,
+            'soft_skill_score_percent' => (float) $graded->score_percent,
+        ];
+        if ($assignment->started_at === null) {
+            $updates['started_at'] = $graded->started_at ?? now();
+        }
+        if ($assignment->status === CollegeAssessmentAssignment::STATUS_ASSIGNED) {
+            $updates['status'] = CollegeAssessmentAssignment::STATUS_IN_PROGRESS;
+        }
+
+        if ($assessment->include_coding && $assessment->contest) {
+            $contest = $assessment->contest;
+            $participant = ContestParticipant::firstOrCreate(
+                ['contest_id' => $contest->id, 'user_id' => $user->id],
+                ['registered_at' => now()]
+            );
+            $updates['contest_participant_id'] = $participant->id;
+            $assignment->update($updates);
+
+            $firstProblemId = $contest->contestProblems()->orderBy('display_order')->value('id');
+
+            return [
+                'next_stage' => 'coding',
+                'contest_slug' => $contest->slug,
+                'first_problem_id' => $firstProblemId,
+            ];
+        }
+
+        $assignment->update($updates);
+
+        if ($assessment->include_interview && $assessment->interview) {
+            return [
+                'next_stage' => 'interview',
+                'interview_slug' => $assessment->interview->slug,
+            ];
+        }
+
+        $synced = app(CollegeAssessmentService::class)->syncAssignment($assignment);
+
+        return [
+            'next_stage' => 'complete',
+            'overall_score_percent' => $synced->overall_score_percent,
+        ];
     }
 
     /** Reviewing a completed attempt — reached both right after submit() and from the Reports history card. */

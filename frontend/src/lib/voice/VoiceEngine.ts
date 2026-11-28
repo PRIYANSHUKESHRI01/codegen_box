@@ -45,6 +45,8 @@ export interface VoiceListenCallbacks {
 export interface VoiceEngine {
   isTtsSupported(): boolean;
   isSttSupported(): boolean;
+  /** Must be called inside the initial user gesture click to unlock browser audio & Web Speech synthesis across delayed awaits. */
+  unlockAudio?(): void;
   /** Speaks the question text aloud. Resolves when speech finishes (or immediately if TTS isn't supported, or if the browser never reports an end). */
   speak(text: string, callbacks?: VoiceSpeakCallbacks, options?: VoiceSpeakOptions): Promise<void>;
   /**

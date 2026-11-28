@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, Trophy, RotateCcw, ShieldAlert } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Trophy, RotateCcw, ShieldAlert } from "lucide-react";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { ReadinessRing } from "@/components/dashboard/student/ReadinessRing";
@@ -14,9 +14,22 @@ import { cn } from "@/lib/utils";
 import { CATEGORY_LABELS, CATEGORY_ORDER, type SoftSkillResult } from "@/types/softSkill";
 
 export default function SoftSkillResultPage() {
+  return (
+    <Suspense fallback={<SessionLoader />}>
+      <SoftSkillResultContent />
+    </Suspense>
+  );
+}
+
+function SoftSkillResultContent() {
   const { status } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId") ?? "";
+  const assessmentSlug = searchParams.get("assessment") ?? "";
+  const backHref = assessmentSlug
+    ? `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`
+    : "/dashboard/soft-skills";
+  const backLabel = assessmentSlug ? "Back to Campus Assessment" : "Back to Soft Skills";
 
   const [result, setResult] = useState<SoftSkillResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,11 +59,11 @@ export default function SoftSkillResultPage() {
 
   if (error || !result) {
     return (
-      <DashboardShell role="user" title="Soft Skills">
+      <DashboardShell role="user" title={assessmentSlug ? "Campus Assessment" : "Soft Skills"}>
         <div className="p-10 text-center text-xs text-status-danger rounded-panel bg-surface border border-border-subtle space-y-3">
           <p>{error}</p>
-          <Link href="/dashboard/soft-skills" className="text-accent-primary font-semibold hover:underline">
-            Back to Soft Skills
+          <Link href={backHref} className="text-accent-primary font-semibold hover:underline">
+            {backLabel}
           </Link>
         </div>
       </DashboardShell>
@@ -60,8 +73,19 @@ export default function SoftSkillResultPage() {
   const endedByProctoring = result.proctoring?.terminated === true;
 
   return (
-    <DashboardShell role="user" title="Soft Skills" subtitle={result.assessment_title}>
+    <DashboardShell
+      role="user"
+      title={assessmentSlug ? "Campus Assessment" : "Soft Skills"}
+      subtitle={result.assessment_title}
+      back={{ href: backHref, label: backLabel }}
+    >
       <div className="max-w-3xl mx-auto space-y-4">
+        <div className="flex items-center justify-between">
+          <Link href={backHref} className="inline-flex items-center gap-1.5 text-xs font-bold text-text-secondary hover:text-primary">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            {backLabel}
+          </Link>
+        </div>
         <div className="rounded-panel bg-surface border border-border-subtle shadow-card p-6 space-y-5">
           <div className="flex flex-col items-center gap-3 text-center">
             <ReadinessRing value={Math.round(result.score_percent)} label={endedByProctoring ? "Ended" : result.passed ? "Passed" : "Below Target"} />
@@ -106,7 +130,7 @@ export default function SoftSkillResultPage() {
             })}
           </div>
 
-          {!result.passed && (
+          {!result.passed && !assessmentSlug && (
             <Link
               href={`/dashboard/soft-skills/session?slug=${result.assessment_slug}`}
               className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-control bg-accent-primary hover:bg-accent-primary-hover text-white text-xs font-bold transition-colors"

@@ -69,7 +69,7 @@ return [
             'block_multi_monitor' => (bool) env('INTEGRITY_STRICT_BLOCK_MULTI_MONITOR', true),
             'focus_loss_strike' => (int) env('INTEGRITY_STRICT_FOCUS_LOSS', 3),
             'ai' => (bool) env('INTEGRITY_STRICT_AI', true),
-            'ai_strikes' => ['multiple_faces'],
+            'ai_strikes' => ['multiple_faces', 'face_mismatch', 'face_away', 'phone_detected', 'no_face', 'speech_detected'],
             'clipboard' => 'editor_only',
         ],
         'standard' => [
@@ -84,7 +84,7 @@ return [
             'block_multi_monitor' => (bool) env('INTEGRITY_STANDARD_BLOCK_MULTI_MONITOR', true),
             'focus_loss_strike' => (int) env('INTEGRITY_STANDARD_FOCUS_LOSS', 4),
             'ai' => (bool) env('INTEGRITY_STANDARD_AI', true),
-            'ai_strikes' => ['multiple_faces', 'face_mismatch', 'face_away', 'phone_detected'],
+            'ai_strikes' => ['multiple_faces', 'face_mismatch', 'face_away', 'phone_detected', 'no_face', 'speech_detected'],
             'clipboard' => 'block_all',
         ],
         'practice' => [

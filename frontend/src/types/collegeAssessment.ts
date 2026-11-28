@@ -121,6 +121,7 @@ export interface CollegeAssessmentSummaryItem {
   ends_at: string | null;
   published_at: string | null;
   enforce_sequence: boolean;
+  blocked_by_proctoring?: boolean;
   campaign_locked?: boolean;
   campaign_lock_reason?: string | null;
   passing_score_percent: number;
@@ -177,6 +178,7 @@ export interface StudentCollegeAssessment {
   starts_at: string | null;
   ends_at: string | null;
   enforce_sequence: boolean;
+  blocked_by_proctoring?: boolean;
   campaign_locked?: boolean;
   campaign_lock_reason?: string | null;
   passing_score_percent: number;
@@ -258,6 +260,7 @@ export interface LaunchpadProgramSummary {
 export interface LaunchpadAssessmentSlotSummary {
   set: number;
   status: CollegeAssessmentAssignmentStatus;
+  blocked_by_proctoring?: boolean;
   overall_score_percent: number | null;
   soft_skill_score_percent: number | null;
   coding_score_percent: number | null;
@@ -308,6 +311,7 @@ export interface StudentLaunchpadCampaign {
     title: string;
     status: CollegeAssessmentAssignmentStatus;
     locked?: boolean;
+    blocked_by_proctoring?: boolean;
     lock_reason?: string | null;
     overall_score_percent: number | null;
     soft_skill_score_percent: number | null;

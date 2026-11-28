@@ -40,7 +40,7 @@ class EmailBrandingTest extends TestCase
         $this->assertStringContainsString('Mellow Vault', $html);
         $this->assertStringContainsString('https://mellowvault.com', $html);
         $this->assertStringContainsString(config('brand.support_email'), $html);
-        $this->assertStringContainsString('+91 76785 78295', $html);
+        $this->assertStringContainsString('+91 93111 48660', $html);
         $this->assertStringContainsString('PRAYUKTI DEVELOPMENT PRIVATE LIMITED', $html);
         $this->assertStringContainsString('CIN U62099UP2024PTC207212', $html);
         $this->assertStringContainsString('© '.date('Y').' AptRun. All Rights Reserved.', html_entity_decode($html));

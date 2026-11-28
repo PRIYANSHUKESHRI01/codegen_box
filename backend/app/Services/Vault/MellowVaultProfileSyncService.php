@@ -203,23 +203,30 @@ class MellowVaultProfileSyncService
     public function matchSkillsToCatalog(?string $mvJob, ?string $mvSkills, mixed $aptrunSkills): array
     {
         $terms = [];
-        foreach ([$mvJob, $mvSkills] as $raw) {
-            if (is_string($raw) && trim($raw) !== '') {
-                foreach (preg_split('/[,;|\/]+/', $raw) ?: [] as $part) {
-                    $clean = $this->normalizeLabel($part);
-                    if ($clean !== '') {
-                        $terms[] = $clean;
+        $pushTerms = function (string $raw) use (&$terms): void {
+            foreach (preg_split('/[,;|\/]+/', $raw) ?: [] as $part) {
+                $clean = $this->normalizeLabel($part);
+                if ($clean === '') {
+                    continue;
+                }
+                $terms[] = $clean;
+                foreach (preg_split('/\s+/', $clean) ?: [] as $word) {
+                    if (strlen($word) >= 2 && ! in_array($word, ['developer', 'engineer', 'development', 'programming', 'specialist', 'intern'], true)) {
+                        $terms[] = $word;
                     }
                 }
+            }
+        };
+
+        foreach ([$mvJob, $mvSkills] as $raw) {
+            if (is_string($raw) && trim($raw) !== '') {
+                $pushTerms($raw);
             }
         }
         if (is_array($aptrunSkills)) {
             foreach ($aptrunSkills as $skill) {
-                if (is_string($skill)) {
-                    $clean = $this->normalizeLabel($skill);
-                    if ($clean !== '') {
-                        $terms[] = $clean;
-                    }
+                if (is_string($skill) && trim($skill) !== '') {
+                    $pushTerms($skill);
                 }
             }
         }
@@ -239,6 +246,7 @@ class MellowVaultProfileSyncService
         $best = ['stack_key' => null, 'role_key' => null, 'stack_name' => null];
 
         foreach ($this->catalog->summaryRoles() as $roleKey => $role) {
+            $roleNorm = str_replace('_', ' ', (string) $roleKey);
             foreach ((array) ($role['stacks'] ?? []) as $stackKey => $stack) {
                 $tags = array_map(fn ($t) => $this->normalizeLabel((string) $t), (array) ($stack['tags'] ?? []));
                 $aliases = array_map(fn ($a) => $this->normalizeLabel((string) $a), (array) ($stack['aliases'] ?? []));
@@ -259,6 +267,8 @@ class MellowVaultProfileSyncService
                         $score += 6;
                     } elseif (strlen($term) >= 3 && (str_contains($name, $term) || str_contains($term, $keyNorm))) {
                         $score += 4;
+                    } elseif ($term === $roleNorm) {
+                        $score += 3;
                     }
                 }
 
@@ -285,17 +295,7 @@ class MellowVaultProfileSyncService
     public function syncSingleUser(User $user, bool $dispatchInviteIfEligible = false, int $threshold = self::DEFAULT_THRESHOLD, bool $syncDispatch = false): array
     {
         if (! $this->isConfigured()) {
-            $pct = (int) ($user->mellow_vault_profile_percent ?? 0);
-
-            return [
-                'found' => $user->mellow_vault_profile_synced_at !== null,
-                'profile_percent' => $pct,
-                'pro_id' => $user->mellow_vault_pro_id,
-                'stack_key' => $user->mellow_vault_stack_key,
-                'stack_name' => $user->mellow_vault_stack_name,
-                'hit_90' => $pct >= $threshold,
-                'invite_dispatched' => false,
-            ];
+            return $this->syncSingleDirectOrNull($user, $dispatchInviteIfEligible, $threshold, $syncDispatch);
         }
 
         try {
@@ -313,17 +313,7 @@ class MellowVaultProfileSyncService
                 ->first();
 
             if (! $row) {
-                $pct = (int) ($user->mellow_vault_profile_percent ?? 0);
-
-                return [
-                    'found' => false,
-                    'profile_percent' => $pct,
-                    'pro_id' => $user->mellow_vault_pro_id,
-                    'stack_key' => $user->mellow_vault_stack_key,
-                    'stack_name' => $user->mellow_vault_stack_name,
-                    'hit_90' => $pct >= $threshold,
-                    'invite_dispatched' => false,
-                ];
+                return $this->syncSingleDirectOrNull($user, $dispatchInviteIfEligible, $threshold, $syncDispatch);
             }
 
             $headings = $this->headingMap();
@@ -340,34 +330,71 @@ class MellowVaultProfileSyncService
 
             return [
                 'found' => true,
+                'is_mellow_vault_user' => true,
                 'profile_percent' => $res['profile_percent'],
+                'mv_profile_percentage' => $res['profile_percent'],
+                'mv_skill' => $res['mv_skill'],
                 'pro_id' => $res['pro_id'],
                 'stack_key' => $res['stack_key'],
                 'stack_name' => $res['stack_name'],
-                'hit_90' => $res['profile_percent'] >= $threshold,
+                'hit_90' => $res['profile_percent'] !== null && $res['profile_percent'] >= $threshold,
                 'invite_dispatched' => $res['invited'],
             ];
         } catch (Throwable) {
-            $pct = (int) ($user->mellow_vault_profile_percent ?? 0);
-
-            return [
-                'found' => false,
-                'profile_percent' => $pct,
-                'pro_id' => $user->mellow_vault_pro_id,
-                'stack_key' => $user->mellow_vault_stack_key,
-                'stack_name' => $user->mellow_vault_stack_name,
-                'hit_90' => $pct >= $threshold,
-                'invite_dispatched' => false,
-            ];
+            return $this->syncSingleDirectOrNull($user, $dispatchInviteIfEligible, $threshold, $syncDispatch);
         }
     }
 
     /**
-     * Scans `mellow_vault.developer_details_tb` across all developers, syncs their `profile_complete` %
-     * and resolved tech stack onto matching AptRun `users`, and sends up to `$maxEmails` interview
-     * invitation emails for users newly crossing `$threshold` (90%).
+     * Fallback for `syncSingleUser()` when the external Mellow Vault DB is unconfigured or has no row:
+     * processes direct `users.mv_profile_percentage` / `users.mv_skill` if present, otherwise keeps
+     * AptRun-native users strictly null across Mellow Vault fields.
      *
-     * @return array{configured: bool, scanned: int, matched_users: int, updated_users: int, eligible_90: int, invites_queued: int, skipped_already_invited: int, skipped_locked_or_opted_out: int}
+     * @return array<string, mixed>
+     */
+    private function syncSingleDirectOrNull(User $user, bool $dispatchInviteIfEligible, int $threshold, bool $syncDispatch): array
+    {
+        if ($user->mv_profile_percentage !== null || filled($user->mv_skill)) {
+            $res = $this->handleDirectMvColumnsChanged($user, $dispatchInviteIfEligible, $threshold, $syncDispatch, false);
+
+            return [
+                'found' => true,
+                'is_mellow_vault_user' => true,
+                'profile_percent' => $res['profile_percent'],
+                'mv_profile_percentage' => $res['profile_percent'],
+                'mv_skill' => $res['mv_skill'],
+                'pro_id' => $res['pro_id'],
+                'stack_key' => $res['stack_key'],
+                'stack_name' => $res['stack_name'],
+                'hit_90' => $res['profile_percent'] !== null && $res['profile_percent'] >= $threshold,
+                'invite_dispatched' => $res['invited'],
+            ];
+        }
+
+        $isMv = $user->isMellowVaultUser();
+        $pct = $isMv ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null;
+
+        return [
+            'found' => $isMv,
+            'is_mellow_vault_user' => $isMv,
+            'profile_percent' => $pct,
+            'mv_profile_percentage' => $pct,
+            'mv_skill' => $isMv ? $user->mv_skill : null,
+            'pro_id' => $isMv ? $user->mellow_vault_pro_id : null,
+            'stack_key' => $isMv ? $user->mellow_vault_stack_key : null,
+            'stack_name' => $isMv ? $user->mellow_vault_stack_name : null,
+            'hit_90' => $pct !== null && $pct >= $threshold,
+            'invite_dispatched' => false,
+        ];
+    }
+
+    /**
+     * Processes both:
+     *  1) Direct `users.mv_profile_percentage` + `users.mv_skill` rows (written in production by API push,
+     *     SSO, or direct AWS DB sync without needing `MELLOW_VAULT_DB_DATABASE`), and
+     *  2) External `mellow_vault.developer_details_tb` rows when that DB connection is configured.
+     *
+     * @return array{configured: bool, direct_scanned: int, scanned: int, matched_users: int, updated_users: int, eligible_90: int, invites_queued: int, skipped_already_invited: int, skipped_locked_or_opted_out: int}
      */
     public function syncAll(
         int $threshold = self::DEFAULT_THRESHOLD,
@@ -377,8 +404,10 @@ class MellowVaultProfileSyncService
         ?string $onlyEmail = null,
         bool $syncDispatch = false,
     ): array {
+        $hasDirectCols = $this->hasDirectMvColumns();
         $stats = [
-            'configured' => $this->isConfigured(),
+            'configured' => $this->isConfigured() || $hasDirectCols,
+            'direct_scanned' => 0,
             'scanned' => 0,
             'matched_users' => 0,
             'updated_users' => 0,
@@ -388,7 +417,54 @@ class MellowVaultProfileSyncService
             'skipped_locked_or_opted_out' => 0,
         ];
 
-        if (! $stats['configured']) {
+        if ($hasDirectCols) {
+            $directQuery = User::query()
+                ->where('role', User::ROLE_USER)
+                ->where(function ($q) {
+                    $q->whereNotNull('mv_profile_percentage')
+                        ->orWhereNotNull('mv_skill');
+                })
+                ->orderBy('id');
+
+            if ($onlyUserId !== null) {
+                $directQuery->where('id', $onlyUserId);
+            }
+            if ($onlyEmail !== null && trim($onlyEmail) !== '') {
+                $directQuery->whereRaw('LOWER(email) = ?', [mb_strtolower(trim($onlyEmail))]);
+            }
+
+            $directQuery->chunkById(250, function ($users) use (&$stats, $threshold, $maxEmails, $dryRun, $syncDispatch) {
+                foreach ($users as $user) {
+                    $stats['direct_scanned']++;
+                    $stats['matched_users']++;
+                    $allowEmail = $maxEmails > 0 ? ($stats['invites_queued'] < $maxEmails) : false;
+
+                    $outcome = $this->handleDirectMvColumnsChanged(
+                        $user,
+                        $allowEmail,
+                        $threshold,
+                        $syncDispatch,
+                        $dryRun
+                    );
+
+                    if ($outcome['updated']) {
+                        $stats['updated_users']++;
+                    }
+                    if ($outcome['profile_percent'] !== null && $outcome['profile_percent'] >= $threshold) {
+                        $stats['eligible_90']++;
+                    }
+                    if ($outcome['invited']) {
+                        $stats['invites_queued']++;
+                    } elseif ($outcome['skip_reason'] === 'already_invited') {
+                        $stats['skipped_already_invited']++;
+                    } elseif ($outcome['skip_reason'] === 'ineligible') {
+                        $stats['skipped_locked_or_opted_out']++;
+                    }
+                }
+            });
+        }
+
+        if (! $this->isConfigured()) {
             return $stats;
         }
 
@@ -488,131 +564,306 @@ class MellowVaultProfileSyncService
     ): array {
         $devId = isset($row['dev_id']) ? (int) $row['dev_id'] : $user->mellow_vault_dev_id;
         $proId = isset($row['pro_id']) && (int) $row['pro_id'] > 0 ? (int) $row['pro_id'] : null;
-        $percent = max(0, min(100, (int) ($row['profile_complete'] ?? 0)));
+        $rawPercent = $row['mv_profile_percentage'] ?? $row['profile_complete'] ?? $user->mv_profile_percentage ?? $user->mellow_vault_profile_percent;
+        $percent = $rawPercent !== null ? max(0, min(100, (int) $rawPercent)) : null;
 
-        $resolved = $this->resolveStack($proId, $headings);
-        if ($resolved['stack_key'] === null) {
-            $skillFallback = $this->matchSkillsToCatalog(
-                isset($row['job']) ? (string) $row['job'] : null,
-                isset($row['skills']) ? (string) $row['skills'] : null,
-                $user->skills
-            );
-            if ($skillFallback['stack_key'] !== null) {
-                $resolved['stack_key'] = $skillFallback['stack_key'];
-                $resolved['role_key'] = $skillFallback['role_key'];
-                $resolved['stack_name'] = $skillFallback['stack_name'];
-            }
-        }
+        $incomingMvSkill = $row['mv_skill'] ?? $row['skills'] ?? $row['job'] ?? $user->mv_skill;
+        $mvSkill = is_string($incomingMvSkill) && trim($incomingMvSkill) !== '' ? trim($incomingMvSkill) : $user->mv_skill;
+
+        $resolved = $this->resolveDirectStack($user, $mvSkill, $proId, $headings, isset($row['job']) ? (string) $row['job'] : null);
         $stackKey = $resolved['stack_key'];
         $stackName = $resolved['stack_name'];
 
-        $changed = (int) ($user->mellow_vault_profile_percent ?? 0) !== $percent
+        if ($mvSkill === null && $stackName !== null) {
+            $mvSkill = $stackName;
+        }
+
+        $changed = ($percent !== null && (int) ($user->mellow_vault_profile_percent ?? -1) !== $percent)
+            || ($this->hasDirectMvColumns() && $user->mv_profile_percentage !== $percent)
+            || ($this->hasDirectMvColumns() && $user->mv_skill !== $mvSkill)
             || $user->mellow_vault_dev_id !== $devId
             || $user->mellow_vault_pro_id !== $proId
             || $user->mellow_vault_stack_key !== $stackKey
             || $user->mellow_vault_stack_name !== $stackName;
 
         if ($changed && ! $dryRun) {
-            $user->forceFill([
+            $updates = [
                 'mellow_vault_dev_id' => $devId,
                 'mellow_vault_pro_id' => $proId,
                 'mellow_vault_stack_key' => $stackKey,
                 'mellow_vault_stack_name' => $stackName,
                 'mellow_vault_profile_percent' => $percent,
                 'mellow_vault_profile_synced_at' => now(),
-            ])->save();
-        }
-
-        $invited = false;
-        $skipReason = null;
-
-        if ($percent >= $threshold) {
-            if ($user->vault_ai_invite_sent_at !== null) {
-                $skipReason = 'already_invited';
-            } elseif (
-                $user->is_blocked
-                || $user->email_nudges_opt_out_at !== null
-                || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)
-                || $this->vaultAccess->forUser($user, fresh: false, persist: false)['state'] !== VaultAiAccessService::STATE_OPEN
-            ) {
-                $skipReason = 'ineligible';
-            } elseif (VaultInterviewInvite::where('user_id', $user->id)->whereIn('status', [
-                VaultInterviewInvite::STATUS_QUEUED,
-                VaultInterviewInvite::STATUS_SENT,
-                VaultInterviewInvite::STATUS_OPENED,
-            ])->exists()) {
-                $skipReason = 'already_invited';
-            } elseif ($dispatchEmail) {
-                if (! $dryRun) {
-                    $url = $this->buildMagicInterviewUrl($user, $stackKey);
-                    $invite = VaultInterviewInvite::create([
-                        'user_id' => $user->id,
-                        'dev_id' => $devId,
-                        'pro_id' => $proId,
-                        'profile_percent' => $percent,
-                        'stack_key' => $stackKey,
-                        'stack_name' => $stackName,
-                        'invite_url' => $url,
-                        'status' => VaultInterviewInvite::STATUS_QUEUED,
-                    ]);
-
-                    // Stamp immediately so parallel cron ticks never queue a second invite for this user
-                    $user->forceFill([
-                        'vault_ai_invite_sent_at' => now(),
-                        'vault_ai_invite_stack_key' => $stackKey,
-                    ])->save();
-
-                    $job = new SendVaultStackInterviewInviteJob($invite->id);
-                    if ($syncDispatch) {
-                        SendVaultStackInterviewInviteJob::dispatchSync($invite->id);
-                    } else {
-                        dispatch($job);
-                    }
-                }
-                $invited = true;
+            ];
+            if ($this->hasDirectMvColumns()) {
+                $updates['mv_profile_percentage'] = $percent;
+                $updates['mv_skill'] = $mvSkill;
             }
+            $user->forceFill($updates)->saveQuietly();
         }
+
+        $inviteOutcome = $this->maybeDispatchNinetyPercentInvite(
+            $user,
+            $percent,
+            $threshold,
+            $devId,
+            $proId,
+            $stackKey,
+            $stackName,
+            $dispatchEmail,
+            $syncDispatch,
+            $dryRun
+        );
 
         return [
             'updated' => $changed,
             'profile_percent' => $percent,
+            'mv_skill' => $mvSkill,
             'pro_id' => $proId,
             'stack_key' => $stackKey,
             'stack_name' => $stackName,
-            'invited' => $invited,
-            'skip_reason' => $skipReason,
+            'invited' => $inviteOutcome['invited'],
+            'skip_reason' => $inviteOutcome['skip_reason'],
         ];
     }
 
     /**
-     * Generates a 14-day temporary signed 1-click route that logs the developer directly
-     * into their AptRun Vault AI Interview screen pre-selected to `$stackKey`.
+     * Resolves `mv_skill` / `mv_profile_percentage` written directly on AptRun's `users` row (no external DB needed),
+     * stamps the matched Vault AI Interview stack, and sends the 1-click interview email once `>= threshold` (90%).
+     *
+     * @return array{updated: bool, profile_percent: ?int, mv_skill: ?string, pro_id: ?int, stack_key: ?string, stack_name: ?string, invited: bool, skip_reason: ?string}
+     */
+    public function handleDirectMvColumnsChanged(
+        User $user,
+        bool $dispatchEmail = true,
+        int $threshold = self::DEFAULT_THRESHOLD,
+        bool $syncDispatch = false,
+        bool $dryRun = false,
+    ): array {
+        $rawPercent = $user->mv_profile_percentage ?? $user->mellow_vault_profile_percent;
+        $percent = $rawPercent !== null ? max(0, min(100, (int) $rawPercent)) : null;
+        $mvSkill = is_string($user->mv_skill) && trim($user->mv_skill) !== '' ? trim($user->mv_skill) : null;
+        $proId = $user->mellow_vault_pro_id;
+
+        $headings = $proId !== null ? $this->headingMap() : [];
+        $resolved = $this->resolveDirectStack($user, $mvSkill, $proId, $headings);
+        $stackKey = $resolved['stack_key'] ?? $user->mellow_vault_stack_key;
+        $stackName = $resolved['stack_name'] ?? $user->mellow_vault_stack_name;
+
+        $changed = $user->mellow_vault_stack_key !== $stackKey
+            || $user->mellow_vault_stack_name !== $stackName
+            || $user->mellow_vault_profile_percent !== $percent
+            || $user->mellow_vault_profile_synced_at === null
+            || ($this->hasDirectMvColumns() && $percent !== null && $user->mv_profile_percentage !== $percent);
+
+        if ($changed && ! $dryRun) {
+            $updates = [
+                'mellow_vault_stack_key' => $stackKey,
+                'mellow_vault_stack_name' => $stackName,
+                'mellow_vault_profile_percent' => $percent,
+                'mellow_vault_profile_synced_at' => $user->mellow_vault_profile_synced_at ?? now(),
+            ];
+            if ($this->hasDirectMvColumns() && $percent !== null) {
+                $updates['mv_profile_percentage'] = $percent;
+            }
+            $user->forceFill($updates)->saveQuietly();
+        }
+
+        $inviteOutcome = $this->maybeDispatchNinetyPercentInvite(
+            $user,
+            $percent,
+            $threshold,
+            $user->mellow_vault_dev_id,
+            $proId,
+            $stackKey,
+            $stackName,
+            $dispatchEmail,
+            $syncDispatch,
+            $dryRun
+        );
+
+        return [
+            'updated' => $changed,
+            'profile_percent' => $percent,
+            'mv_skill' => $mvSkill,
+            'pro_id' => $proId,
+            'stack_key' => $stackKey,
+            'stack_name' => $stackName,
+            'invited' => $inviteOutcome['invited'],
+            'skip_reason' => $inviteOutcome['skip_reason'],
+        ];
+    }
+
+    /**
+     * Resolves an AptRun CuratedCatalog stack from `pro_id`, explicit `mv_skill`, or user's existing skills.
+     *
+     * @param  array<int, string>  $headings
+     * @return array{stack_key: ?string, role_key: ?string, stack_name: ?string}
+     */
+    public function resolveDirectStack(
+        User $user,
+        ?string $mvSkill = null,
+        ?int $proId = null,
+        array $headings = [],
+        ?string $mvJob = null,
+    ): array {
+        $resolved = $this->resolveStack($proId, $headings);
+
+        if ($resolved['stack_key'] === null && is_string($mvSkill) && trim($mvSkill) !== '') {
+            $exact = $this->matchHeadingToCatalog($mvSkill);
+            if ($exact['stack_key'] !== null) {
+                $resolved = $exact;
+            }
+        }
+
+        if ($resolved['stack_key'] === null) {
+            $skillFallback = $this->matchSkillsToCatalog($mvJob, $mvSkill, $user->skills);
+            if ($skillFallback['stack_key'] !== null) {
+                $resolved['stack_key'] = $skillFallback['stack_key'];
+                $resolved['role_key'] = $skillFallback['role_key'];
+                $resolved['stack_name'] = $skillFallback['stack_name'];
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Dispatches the 1-click Vault AI Interview invitation email + in-app notification once a Mellow Vault user reaches `>= $threshold`.
+     *
+     * @return array{invited: bool, skip_reason: ?string}
+     */
+    private function maybeDispatchNinetyPercentInvite(
+        User $user,
+        ?int $percent,
+        int $threshold,
+        ?int $devId,
+        ?int $proId,
+        ?string $stackKey,
+        ?string $stackName,
+        bool $dispatchEmail,
+        bool $syncDispatch,
+        bool $dryRun,
+    ): array {
+        if ($percent === null || $percent < $threshold) {
+            return ['invited' => false, 'skip_reason' => null];
+        }
+
+        if ($user->vault_ai_invite_sent_at !== null) {
+            return ['invited' => false, 'skip_reason' => 'already_invited'];
+        }
+
+        $collegeLocked = $user->isCollegeStudent()
+            && ! $user->isMellowVaultUser()
+            && $this->vaultAccess->forUser($user, fresh: false, persist: false)['state'] !== VaultAiAccessService::STATE_OPEN;
+
+        if (
+            $user->is_blocked
+            || $user->email_nudges_opt_out_at !== null
+            || ! filter_var($user->email, FILTER_VALIDATE_EMAIL)
+            || $collegeLocked
+        ) {
+            return ['invited' => false, 'skip_reason' => 'ineligible'];
+        }
+
+        if (VaultInterviewInvite::where('user_id', $user->id)->whereIn('status', [
+            VaultInterviewInvite::STATUS_QUEUED,
+            VaultInterviewInvite::STATUS_SENT,
+            VaultInterviewInvite::STATUS_OPENED,
+        ])->exists()) {
+            return ['invited' => false, 'skip_reason' => 'already_invited'];
+        }
+
+        if (! $dispatchEmail) {
+            return ['invited' => false, 'skip_reason' => null];
+        }
+
+        if (! $dryRun) {
+            $url = $this->buildMagicInterviewUrl($user, $stackKey);
+            $invite = VaultInterviewInvite::create([
+                'user_id' => $user->id,
+                'dev_id' => $devId,
+                'pro_id' => $proId,
+                'profile_percent' => $percent,
+                'stack_key' => $stackKey,
+                'stack_name' => $stackName,
+                'invite_url' => $url,
+                'status' => VaultInterviewInvite::STATUS_QUEUED,
+            ]);
+
+            // Stamp immediately so parallel cron ticks or simultaneous pushes never queue a duplicate invite
+            $user->forceFill([
+                'vault_ai_invite_sent_at' => now(),
+                'vault_ai_invite_stack_key' => $stackKey,
+            ])->saveQuietly();
+
+            $job = new SendVaultStackInterviewInviteJob($invite->id);
+            if ($syncDispatch) {
+                SendVaultStackInterviewInviteJob::dispatchSync($invite->id);
+            } else {
+                dispatch($job);
+            }
+        }
+
+        return ['invited' => true, 'skip_reason' => null];
+    }
+
+    private function hasDirectMvColumns(): bool
+    {
+        static $present = null;
+        if ($present === true) {
+            return true;
+        }
+
+        return $present = Schema::hasColumn('users', 'mv_profile_percentage')
+            && Schema::hasColumn('users', 'mv_skill');
+    }
+
+    /**
+     * Generates the direct AptRun frontend Vault AI Interview route pre-selected to `$stackKey`.
+     * When the developer clicks from email:
+     *  - If already signed in -> opens `/dashboard/vault-interviews?stack=...` directly.
+     *  - If signed out -> auth guard sends them to `/login?redirect=...` and launches the
+     *    interview page right after login (never Student Overview `/dashboard`).
      */
     public function buildMagicInterviewUrl(User $user, ?string $stackKey): string
     {
-        $params = ['user' => $user->id];
+        $frontendUrl = rtrim((string) config('app.frontend_url', env('FRONTEND_URL', '')), '/');
+        $base = $frontendUrl !== '' ? $frontendUrl : rtrim((string) config('app.url', ''), '/');
+        $path = '/dashboard/vault-interviews';
         if ($stackKey !== null && $stackKey !== '') {
-            $params['stack'] = $stackKey;
+            $path .= '?stack='.urlencode($stackKey);
         }
 
-        return URL::temporarySignedRoute('vault.interview.open', now()->addDays(14), $params);
+        return $base.$path;
     }
 
     /**
      * Canonical account-origin + Mellow Vault profile % fields shared across admin user lists.
-     * AptRun-only users (not synced in `mellow_vault.developer_details_tb`) explicitly report
-     * `account_origin = 'aptrun'` and `mellow_vault_profile_percent = 0`.
+     * AptRun-only users (who did not come from Mellow Vault) explicitly report
+     * `account_origin = 'aptrun'`, `mv_profile_percentage = null`, `mv_skill = null`,
+     * and `mellow_vault_profile_percent = null`.
      *
-     * @return array{is_mellow_vault_user: bool, account_origin: string, mellow_vault_profile_percent: int, mellow_vault_stack_key: ?string, mellow_vault_stack_name: ?string, vault_ai_invite_sent_at: mixed}
+     * @return array{is_mellow_vault_user: bool, account_origin: string, mv_profile_percentage: ?int, mv_skill: ?string, mellow_vault_profile_percent: ?int, mellow_vault_stack_key: ?string, mellow_vault_stack_name: ?string, vault_ai_invite_sent_at: mixed}
      */
     public static function decorateOriginFields(User $user): array
     {
-        $isMv = $user->mellow_vault_dev_id !== null || $user->mellow_vault_profile_synced_at !== null;
+        $isMv = $user->isMellowVaultUser();
+        $pct = $isMv
+            ? ($user->mv_profile_percentage !== null
+                ? (int) $user->mv_profile_percentage
+                : ($user->mellow_vault_profile_percent !== null ? (int) $user->mellow_vault_profile_percent : null))
+            : null;
+        $skill = $isMv
+            ? (filled($user->mv_skill) ? (string) $user->mv_skill : ($user->mellow_vault_stack_name ?: null))
+            : null;
 
         return [
             'is_mellow_vault_user' => $isMv,
             'account_origin' => $isMv ? 'mellow_vault' : 'aptrun',
-            'mellow_vault_profile_percent' => $isMv ? (int) ($user->mellow_vault_profile_percent ?? 0) : 0,
+            'mv_profile_percentage' => $pct,
+            'mv_skill' => $skill,
+            'mellow_vault_profile_percent' => $pct,
             'mellow_vault_stack_key' => $isMv ? $user->mellow_vault_stack_key : null,
             'mellow_vault_stack_name' => $isMv ? $user->mellow_vault_stack_name : null,
             'vault_ai_invite_sent_at' => $isMv ? $user->vault_ai_invite_sent_at : null,
@@ -649,7 +900,7 @@ class MellowVaultProfileSyncService
     private function normalizeLabel(string $label): string
     {
         $clean = preg_replace('/\s+/', ' ', mb_strtolower(trim($label))) ?? '';
-        $clean = str_replace(['next.js', 'node.js', 'react.js', 'vue.js', 'express.js'], ['nextjs', 'nodejs', 'react', 'vue', 'express'], $clean);
+        $clean = str_replace(['reactjs', 'next.js', 'node.js', 'react.js', 'vue.js', 'express.js'], ['react', 'nextjs', 'nodejs', 'react', 'vue', 'express'], $clean);
 
         return trim($clean);
     }

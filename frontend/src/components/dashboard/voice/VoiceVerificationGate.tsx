@@ -24,7 +24,7 @@ export function VoiceVerificationGate({
   returnTo,
   children,
 }: {
-  surfaceLabel: "Vault AI Interview" | "Mock AI Interview";
+  surfaceLabel: "Vault AI Interview" | "Mock AI Interview" | "Launchpad Program" | "Campus Assessment" | "AI Interview";
   returnTo: string;
   children: ReactNode;
 }) {
@@ -202,9 +202,10 @@ export function VoiceVerificationGate({
           </div>
 
           <p className="max-w-3xl text-sm leading-relaxed text-text-secondary">
-            Before taking a <strong className="font-semibold text-primary">Vault AI Interview</strong> or practising a{" "}
-            <strong className="font-semibold text-primary">Mock AI Interview</strong>, complete this quick{" "}
-            <strong className="font-semibold text-primary">proctored 5-minute voice interview</strong> once. You will never have to repeat it — your verified voiceprint unlocks all future interviews.
+            Please complete the <strong className="font-semibold text-primary">one-time 5-minute voice recording</strong> first before starting your{" "}
+            <strong className="font-semibold text-primary">{surfaceLabel}</strong>,{" "}
+            <strong className="font-semibold text-primary">Vault AI Interview</strong>, or{" "}
+            <strong className="font-semibold text-primary">Mock AI Interview</strong>. You only need to complete it once — your verified voiceprint unlocks all future sessions.
           </p>
 
           <div className="grid gap-3 sm:grid-cols-3">

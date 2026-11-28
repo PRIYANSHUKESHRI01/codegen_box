@@ -18,9 +18,13 @@ interface ProblemHeaderBarProps {
   activeAction?: "run" | "submit" | null;
   /** Overrides the back button's label — this bar is shared with the contest solve page, where "Back to Practice Arena" is simply wrong. */
   backLabel?: string;
+  /** Optional proctoring/status badge rendered inline before Run / Submit so it never overlaps buttons. */
+  statusSlot?: React.ReactNode;
+  /** Optional extra control rendered beside Run / Submit (e.g. Campus Assessment problem switcher / next stage button). */
+  rightSlot?: React.ReactNode;
 }
 
-export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = false, activeAction = null, backPending = false, backLabel = "Back to Practice Arena" }: ProblemHeaderBarProps) {
+export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = false, activeAction = null, backPending = false, backLabel = "Back to Practice Arena", statusSlot, rightSlot }: ProblemHeaderBarProps) {
   // Callers that only say "running" keep the old behaviour: it is the Run button that spins.
   const runBusy = running && activeAction !== "submit";
   const submitBusy = running && activeAction === "submit";
@@ -69,8 +73,9 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {problem.acceptance_rate !== null && (
-          <span className="hidden lg:inline text-2xs font-mono text-text-muted whitespace-nowrap">
+        {statusSlot}
+        {problem.acceptance_rate != null && problem.total_submissions != null && (
+          <span className="hidden xl:inline text-2xs font-mono text-text-muted whitespace-nowrap">
             {problem.acceptance_rate}% acceptance · {formatNumber(problem.total_submissions)} submissions
           </span>
         )}
@@ -98,6 +103,7 @@ export function ProblemHeaderBar({ problem, onBack, onRun, onSubmit, running = f
         >
           {submitBusy ? "Judging…" : "Submit"}
         </Button>
+        {rightSlot}
       </div>
     </div>
   );

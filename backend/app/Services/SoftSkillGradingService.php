@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SoftSkillResponse;
 use App\Models\SoftSkillSession;
 use App\Services\Vault\VaultRefreshService;
 use Illuminate\Support\Facades\DB;
@@ -46,11 +47,17 @@ class SoftSkillGradingService
 
             $categoryTally = [];
             $correctCount = 0;
+            $correctIds = [];
+            $incorrectIds = [];
 
             foreach ($responses as $response) {
                 $question = $response->assessmentQuestion->question;
                 $isCorrect = $response->selected_index !== null && (int) $response->selected_index === (int) $question->correct_index;
-                $response->update(['is_correct' => $isCorrect]);
+                if ($isCorrect) {
+                    $correctIds[] = $response->id;
+                } else {
+                    $incorrectIds[] = $response->id;
+                }
 
                 $categoryTally[$question->category] ??= ['correct' => 0, 'total' => 0];
                 $categoryTally[$question->category]['total']++;
@@ -58,6 +65,13 @@ class SoftSkillGradingService
                     $categoryTally[$question->category]['correct']++;
                     $correctCount++;
                 }
+            }
+
+            if ($correctIds !== []) {
+                SoftSkillResponse::whereIn('id', $correctIds)->update(['is_correct' => true]);
+            }
+            if ($incorrectIds !== []) {
+                SoftSkillResponse::whereIn('id', $incorrectIds)->update(['is_correct' => false]);
             }
 
             $totalQuestions = $responses->count();
@@ -75,10 +89,22 @@ class SoftSkillGradingService
         });
 
         // A finished test is part of the student's readiness (and so, maybe, of the
-        // Vault) — re-score now instead of at the next scheduled refresh. Only for an
-        // attempt that actually ended just now, and it can never fail the submit.
+        // Vault) — re-score after the HTTP response flushes in web requests so submitting
+        // feels instantaneous in production, while console/test runs still execute inline.
         if ($justFinalized) {
-            app(VaultRefreshService::class)->refreshQuietly([$finalized->user_id]);
+            $userId = (int) $finalized->user_id;
+            if (app()->runningInConsole()) {
+                app(VaultRefreshService::class)->refreshQuietly([$userId]);
+            } else {
+                $ran = false;
+                app()->terminating(static function () use ($userId, &$ran) {
+                    if ($ran) {
+                        return;
+                    }
+                    $ran = true;
+                    app(VaultRefreshService::class)->refreshQuietly([$userId]);
+                });
+            }
         }
 
         return $finalized;

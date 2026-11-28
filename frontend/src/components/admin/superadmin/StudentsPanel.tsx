@@ -52,6 +52,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
   const catalog = useBranchCatalog();
   const [department, setDepartment] = useState("");
   const [readinessFilter, setReadinessFilter] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("");
   const [mvSource, setMvSource] = useState<"" | "mellow_vault" | "aptrun_only">("");
   const [syncingMv, setSyncingMv] = useState(false);
   const [showReadinessModal, setShowReadinessModal] = useState(false);
@@ -78,13 +79,17 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
     if (searchDebounced) params.set("search", searchDebounced);
     if (collegeId) params.set("college_id", collegeId);
     if (department) params.set("department", department);
-    if (readinessFilter === "above_50") params.set("min_readiness", "50");
+    if (readinessFilter === "above_75") params.set("min_readiness", "75");
+    else if (readinessFilter === "above_60") params.set("min_readiness", "60");
+    else if (readinessFilter === "above_50") params.set("min_readiness", "50");
+    else if (readinessFilter === "below_60") params.set("max_readiness", "59");
     else if (readinessFilter === "placement_ready") params.set("readiness_tier", "Placement Ready");
     else if (readinessFilter === "in_progress") params.set("readiness_tier", "In Progress");
     else if (readinessFilter === "needs_training") params.set("readiness_tier", "Needs Training");
+    if (sortOrder) params.set("sort", sortOrder);
     if (mvSource) params.set("mv_source", mvSource);
     return params;
-  }, [affiliation, searchDebounced, collegeId, department, readinessFilter, mvSource]);
+  }, [affiliation, searchDebounced, collegeId, department, readinessFilter, sortOrder, mvSource]);
 
   const handleDownloadReport = async () => {
     setDownloading(true);
@@ -162,7 +167,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
       .finally(() => setLoadingMore(false));
   };
 
-  const filtered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter || mvSource);
+  const filtered = Boolean(searchDebounced || collegeId || department || affiliation !== "all" || readinessFilter || sortOrder || mvSource);
   const clearFilters = () => {
     setSearch("");
     setSearchDebounced("");
@@ -170,6 +175,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
     setDepartment("");
     setAffiliation("all");
     setReadinessFilter("");
+    setSortOrder("");
     setMvSource("");
   };
 
@@ -309,10 +315,23 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
             className="rounded-control border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-primary outline-none focus:border-accent-primary"
           >
             <option value="">All readiness</option>
+            <option value="above_60">≥ 60% (Launchpad Gate)</option>
             <option value="above_50">≥ 50% Readiness</option>
             <option value="placement_ready">Placement Ready (≥75%)</option>
             <option value="in_progress">In Progress (45–74%)</option>
             <option value="needs_training">Needs Training (&lt;45%)</option>
+            <option value="below_60">&lt; 60% Readiness</option>
+          </select>
+          <select
+            aria-label="Sort by score"
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value)}
+            className="rounded-control border border-border-subtle bg-surface px-2.5 py-1.5 text-xs text-primary outline-none focus:border-accent-primary"
+          >
+            <option value="">Sort: Newest</option>
+            <option value="readiness_desc">Score: High → Low</option>
+            <option value="readiness_asc">Score: Low → High</option>
+            <option value="vault_ai_desc">Vault AI: High → Low</option>
           </select>
           <select
             aria-label="Filter by account origin"
@@ -322,7 +341,7 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
           >
             <option value="">All Sources</option>
             <option value="mellow_vault">Mellow Vault Synced</option>
-            <option value="aptrun_only">AptRun Only (0%)</option>
+            <option value="aptrun_only">AptRun Only (Null MV)</option>
           </select>
           <button
             type="button"
@@ -503,6 +522,11 @@ export function StudentsPanel({ triggerToast }: { triggerToast: ToastTrigger }) 
                           </div>
                         ) : (
                           "—"
+                        )}
+                        {s.vault_ai_score !== undefined && s.vault_ai_score !== null && (
+                          <span className="text-[10px] font-mono font-bold text-indigo-600 dark:text-indigo-400">
+                            Vault AI: {Number(s.vault_ai_score).toFixed(0)}%
+                          </span>
                         )}
                       </div>
                     </td>

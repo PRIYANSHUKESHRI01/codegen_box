@@ -157,7 +157,7 @@ class VoiceVerificationService
 
         if ($profile === null || ! $profile->isVerified()) {
             throw new HttpResponseException(response()->json([
-                'message' => 'Before taking a Vault AI Interview or practicing a Mock AI Interview, you must complete a one-time 5-minute Voice Identity Verification interview. You only need to complete this once — your saved voice baseline is automatically matched in all future interviews to protect exam integrity.',
+                'message' => 'Please complete your one-time 5-minute Voice Baseline Verification recording before starting any Launchpad Assessment, Vault AI Interview, or Mock AI Interview. Your saved voice baseline is verified only once and unlocks all future assessments and interviews.',
                 'code' => 'voice_verification_required',
                 'voice_verification' => $this->statusPayload($user),
             ], 403));

@@ -20,7 +20,7 @@ export interface ContestSummary {
   is_registered: boolean;
   problem_count: number;
   total_points: number;
-  contest_type: "general" | "daily" | "company" | "tpo_mock";
+  contest_type: "general" | "daily" | "company" | "tpo_mock" | "college_assessment";
   /** Daily Challenge editions only: when sign-up opens (15 h before) and closes (1 min before); null for every other contest. */
   registration: { state: "not_open" | "open" | "closed"; opens_at: string; closes_at: string } | null;
   company: { id: number; name: string; logo: string | null } | null;
@@ -29,6 +29,7 @@ export interface ContestSummary {
 export interface LiveContestProblemRef {
   id: number;
   points: number;
+  solved?: boolean;
   problem: {
     id: number;
     slug: string;
@@ -37,8 +38,16 @@ export interface LiveContestProblemRef {
   };
 }
 
+export interface LiveContestProblemDetailItem {
+  id: number;
+  points: number;
+  solved?: boolean;
+  problem: ProblemDetail;
+}
+
 export interface ContestDetail extends ContestSummary {
   problems?: LiveContestProblemRef[];
+  problem_details?: LiveContestProblemDetailItem[];
 }
 
 export interface ContestLeaderboardRow {

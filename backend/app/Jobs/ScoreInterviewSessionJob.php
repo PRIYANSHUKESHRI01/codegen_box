@@ -6,6 +6,7 @@ use App\Models\InterviewSession;
 use App\Services\GeminiInterviewScoringService;
 use App\Services\InterviewTrackAdvancementService;
 use App\Services\Interviews\StudyFeedbackService;
+use App\Services\Speech\AudioTranscriptionService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -66,12 +67,33 @@ class ScoreInterviewSessionJob implements ShouldQueue
             '(Audio response submitted)',
         ];
 
+        $transcriber = app(AudioTranscriptionService::class);
         $resultsByResponseId = collect();
         $itemsToScore = [];
 
         foreach ($session->responses as $response) {
             $transcript = trim((string) ($response->transcript_text ?? ''));
-            if (in_array(strtolower($transcript), array_map('strtolower', $emptyTranscriptPlaceholders), true)) {
+            $isPlaceholder = in_array(strtolower($transcript), array_map('strtolower', $emptyTranscriptPlaceholders), true);
+
+            // Recover transcript via Gemini Multimodal Audio when browser SpeechRecognition dropped speech but audio was recorded
+            if ($isPlaceholder && ! empty($response->audio_path)) {
+                try {
+                    $questionText = $response->interviewQuestion?->questionBank?->question_text;
+                    $recovered = trim($transcriber->transcribeStoragePath($response->audio_path, 'local', $questionText));
+                    if ($recovered !== '' && strtolower($recovered) !== '(no audible speech detected)') {
+                        $transcript = $recovered;
+                        $response->update(['transcript_text' => $recovered]);
+                        $isPlaceholder = false;
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('[ScoreInterviewSessionJob] Gemini audio transcription fallback failed', [
+                        'response_id' => $response->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
+            if ($isPlaceholder) {
                 $resultsByResponseId->put($response->id, [
                     'response_id' => $response->id,
                     'score' => 0,

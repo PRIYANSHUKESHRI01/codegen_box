@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Contest;
 use App\Models\ContestParticipant;
+use App\Models\ContestSubmission;
 use App\Services\DailyChallengeService;
+use App\Services\ProblemCodeGenerator\StarterCodeGenerator;
 use Illuminate\Http\Request;
 
 /**
@@ -42,14 +44,16 @@ class ContestController extends Controller
         ]);
     }
 
-    public function show(Request $request, Contest $contest)
+    public function show(Request $request, Contest $contest, StarterCodeGenerator $starterCodeGenerator)
     {
         abort_unless($contest->status === Contest::STATUS_PUBLISHED, 404);
         abort_unless($contest->isVisibleToUser($request->user()), 404);
 
-        $isRegistered = ContestParticipant::where('contest_id', $contest->id)
+        $participant = ContestParticipant::where('contest_id', $contest->id)
             ->where('user_id', $request->user()->id)
-            ->exists();
+            ->with('proctoringSession')
+            ->first();
+        $isRegistered = $participant !== null;
 
         $payload = $this->contestSummary($contest, $isRegistered ? [$contest->id] : []);
 
@@ -58,15 +62,45 @@ class ContestController extends Controller
         // problems in ordinary practice mode ahead of time and just retype
         // the solution live, defeating the point of a timed round.
         if ($contest->hasStarted()) {
-            $payload['problems'] = $contest->contestProblems()
-                ->with('problem:id,slug,title,difficulty')
+            $solvedProblemIds = ContestSubmission::where('contest_id', $contest->id)
+                ->where('user_id', $request->user()->id)
+                ->where('status', ContestSubmission::STATUS_ACCEPTED)
+                ->distinct()
+                ->pluck('contest_problem_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            $includeDetails = $request->boolean('include_details')
+                && ($contest->hasEnded() || ($isRegistered && ! $participant->proctoringSession?->isLocked()));
+
+            $contestProblems = $contest->contestProblems()
+                ->with($includeDetails ? ['problem.sampleTestCases'] : ['problem:id,slug,title,difficulty'])
                 ->orderBy('display_order')
-                ->get()
+                ->get();
+
+            $payload['problems'] = $contestProblems
                 ->map(fn ($cp) => [
                     'id' => $cp->id,
                     'points' => $cp->points,
-                    'problem' => $cp->problem,
+                    'solved' => in_array((int) $cp->id, $solvedProblemIds, true),
+                    'problem' => [
+                        'id' => $cp->problem->id,
+                        'slug' => $cp->problem->slug,
+                        'title' => $cp->problem->title,
+                        'difficulty' => $cp->problem->difficulty,
+                    ],
                 ]);
+
+            if ($includeDetails) {
+                $payload['problem_details'] = $contestProblems
+                    ->map(fn ($cp) => [
+                        'id' => (int) $cp->id,
+                        'solved' => in_array((int) $cp->id, $solvedProblemIds, true),
+                        ...ContestSubmissionController::formatContestProblem($cp, $starterCodeGenerator),
+                    ])
+                    ->values()
+                    ->all();
+            }
         }
 
         return response()->json($payload);
@@ -132,6 +166,7 @@ class ContestController extends Controller
      */
     public function leaderboard(Request $request, Contest $contest)
     {
+        abort_if($contest->contest_type === Contest::CONTEST_TYPE_COLLEGE_ASSESSMENT, 404);
         abort_unless($contest->isVisibleToUser($request->user()), 404);
 
         $participants = $contest->participants()

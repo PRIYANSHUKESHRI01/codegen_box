@@ -50,6 +50,8 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
   const [collegeId, setCollegeId] = useState("");
   const [statusFilter, setStatusFilter] = useState<"" | "active" | "blocked">("");
   const [affiliation, setAffiliation] = useState<"all" | "college" | "independent">("all");
+  const [readinessFilter, setReadinessFilter] = useState<string>("");
+  const [sortOrder, setSortOrder] = useState<string>("");
   const [mvSource, setMvSource] = useState<"" | "mellow_vault" | "aptrun_only">("");
   const [syncingMv, setSyncingMv] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -107,11 +109,18 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
 
       if (affiliation === "college") params.set("has_college", "1");
       else if (affiliation === "independent") params.set("has_college", "0");
+      if (readinessFilter === "above_60") params.set("min_readiness", "60");
+      else if (readinessFilter === "above_50") params.set("min_readiness", "50");
+      else if (readinessFilter === "placement_ready") params.set("readiness_tier", "Placement Ready");
+      else if (readinessFilter === "in_progress") params.set("readiness_tier", "In Progress");
+      else if (readinessFilter === "needs_training") params.set("readiness_tier", "Needs Training");
+      else if (readinessFilter === "below_60") params.set("max_readiness", "59");
+      if (sortOrder) params.set("sort", sortOrder);
       if (mvSource) params.set("mv_source", mvSource);
 
       return params;
     },
-    [roleFilter, collegeId, searchDebounced, planFilter, statusFilter, affiliation, mvSource]
+    [roleFilter, collegeId, searchDebounced, planFilter, statusFilter, affiliation, readinessFilter, sortOrder, mvSource]
   );
 
   const latest = useRef(0);
@@ -193,6 +202,8 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
     setPlanFilter("");
     setStatusFilter("");
     setAffiliation("all");
+    setReadinessFilter("");
+    setSortOrder("");
     setMvSource("");
   };
 
@@ -216,7 +227,7 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
     }
   };
 
-  const isFiltered = Boolean(search || roleFilter || collegeId || planFilter || statusFilter || affiliation !== "all" || mvSource);
+  const isFiltered = Boolean(search || roleFilter || collegeId || planFilter || statusFilter || affiliation !== "all" || readinessFilter || sortOrder || mvSource);
 
   const isAllOnPageSelected = users.length > 0 && users.every((u) => selectedIds.has(u.id));
 
@@ -408,6 +419,37 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
           <option value="blocked">Blocked Only</option>
         </select>
 
+        {/* Readiness / Score filter & sort (when viewing students or all) */}
+        {(!roleFilter || roleFilter === "user") && (
+          <>
+            <select
+              value={readinessFilter}
+              onChange={(e) => setReadinessFilter(e.target.value)}
+              aria-label="Filter by student score"
+              className="h-8 rounded-control border border-border-subtle bg-elevated px-2.5 text-xs text-primary outline-none focus:border-accent-primary"
+            >
+              <option value="">All Scores</option>
+              <option value="above_60">Readiness ≥ 60%</option>
+              <option value="above_50">Readiness ≥ 50%</option>
+              <option value="placement_ready">Placement Ready (≥75%)</option>
+              <option value="in_progress">In Progress (45–74%)</option>
+              <option value="needs_training">Needs Training (&lt;45%)</option>
+              <option value="below_60">Readiness &lt; 60%</option>
+            </select>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value)}
+              aria-label="Sort by student score"
+              className="h-8 rounded-control border border-border-subtle bg-elevated px-2.5 text-xs text-primary outline-none focus:border-accent-primary"
+            >
+              <option value="">Sort: Newest</option>
+              <option value="readiness_desc">Score: High → Low</option>
+              <option value="readiness_asc">Score: Low → High</option>
+              <option value="vault_ai_desc">Vault AI: High → Low</option>
+            </select>
+          </>
+        )}
+
         {/* Account origin filter */}
         <select
           value={mvSource}
@@ -417,7 +459,7 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
         >
           <option value="">All Sources</option>
           <option value="mellow_vault">Mellow Vault Synced</option>
-          <option value="aptrun_only">AptRun Only (0%)</option>
+          <option value="aptrun_only">AptRun Only (Null MV)</option>
         </select>
 
         {isFiltered && (
@@ -483,6 +525,7 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
                   <th className="px-4 py-3">Affiliation / College</th>
                   <th className="px-4 py-3">Plan / Access</th>
                   <th className="px-4 py-3">MV Profile %</th>
+                  <th className="px-4 py-3">Score</th>
                   <th className="px-4 py-3">Joined</th>
                   <th className="px-4 py-3">Last Seen</th>
                   <th className="px-4 py-3">Status</th>
@@ -582,6 +625,33 @@ export function AptRunUsersPanel({ triggerToast }: AptRunUsersPanelProps) {
                       {/* Mellow Vault Profile % / Account Origin */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <MvProfileBadge user={u} />
+                      </td>
+
+                      {/* Readiness & Vault AI Score */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {u.role === "user" ? (
+                          <div className="flex flex-col gap-0.5">
+                            <span
+                              className={cn(
+                                "font-mono text-xs font-extrabold",
+                                (u.readiness_score ?? 0) >= 75
+                                  ? "text-status-success"
+                                  : (u.readiness_score ?? 0) >= 60
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : "text-text-secondary"
+                              )}
+                            >
+                              {u.readiness_score !== undefined && u.readiness_score !== null ? `${u.readiness_score}%` : "—"}
+                            </span>
+                            {u.vault_ai_score !== undefined && u.vault_ai_score !== null && (
+                              <span className="font-mono text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                                AI: {Number(u.vault_ai_score).toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-text-muted">—</span>
+                        )}
                       </td>
 
                       {/* Joined Date */}

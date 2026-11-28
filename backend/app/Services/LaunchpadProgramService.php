@@ -15,6 +15,7 @@ use App\Models\Problem;
 use App\Models\SoftSkillAssessment;
 use App\Models\SoftSkillQuestion;
 use App\Models\User;
+use App\Services\Vault\CuratedCatalog;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -542,6 +543,7 @@ class LaunchpadProgramService
 
         $enrollments = $program->enrollments()
             ->with(['user:id,name,email,roll_number,college_id,department,branch,branch_code,graduation_year,discipline,track_focus,coding_opt_in', 'college:id,name,short_code'])
+            ->when(! empty($filters['user_id']), fn (Builder $q) => $q->where('user_id', (int) $filters['user_id']))
             ->when(! empty($filters['college_id']), fn (Builder $q) => $q->where('college_id', (int) $filters['college_id']))
             ->when(! empty($filters['branch_code']), fn (Builder $q) => $q->whereHas('user', fn (Builder $u) => $u->where('branch_code', $filters['branch_code'])))
             ->when(! empty($filters['status']), fn (Builder $q) => $q->where('status', $filters['status']))
@@ -566,7 +568,13 @@ class LaunchpadProgramService
         }
 
         $slotIds = $program->slots()->pluck('college_assessment_id')->all();
-        $assignments = CollegeAssessmentAssignment::whereIn('college_assessment_id', $slotIds)
+        $assignments = CollegeAssessmentAssignment::query()
+            ->with([
+                'softSkillSession.proctoringSession',
+                'contestParticipant.proctoringSession',
+                'interviewSession.proctoringSession',
+            ])
+            ->whereIn('college_assessment_id', $slotIds)
             ->whereIn('user_id', $students->pluck('id')->all())
             ->get()
             ->groupBy('user_id')
@@ -633,6 +641,7 @@ class LaunchpadProgramService
                 'assessment_1' => [
                     'set' => $enr->assessment_1_set,
                     'status' => $a1?->status ?? 'assigned',
+                    'blocked_by_proctoring' => $a1 ? $this->assessments->isBlockedByProctoring($a1) : false,
                     'overall_score_percent' => $a1?->overall_score_percent,
                     'soft_skill_score_percent' => $a1?->soft_skill_score_percent,
                     'coding_score_percent' => $a1?->coding_score_percent,
@@ -641,6 +650,7 @@ class LaunchpadProgramService
                 'assessment_2' => [
                     'set' => $enr->assessment_2_set,
                     'status' => $a2?->status ?? 'assigned',
+                    'blocked_by_proctoring' => $a2 ? $this->assessments->isBlockedByProctoring($a2) : false,
                     'overall_score_percent' => $a2?->overall_score_percent,
                     'soft_skill_score_percent' => $a2?->soft_skill_score_percent,
                     'coding_score_percent' => $a2?->coding_score_percent,
@@ -649,12 +659,58 @@ class LaunchpadProgramService
                 'assessment_3' => [
                     'set' => $enr->assessment_3_set,
                     'status' => $a3?->status ?? 'assigned',
+                    'blocked_by_proctoring' => $a3 ? $this->assessments->isBlockedByProctoring($a3) : false,
                     'overall_score_percent' => $a3?->overall_score_percent,
                     'soft_skill_score_percent' => $a3?->soft_skill_score_percent,
                     'coding_score_percent' => $a3?->coding_score_percent,
                     'interview_score_percent' => $a3?->interview_score_percent,
                 ],
             ];
+        }
+
+        $minReadiness = isset($filters['min_readiness']) && $filters['min_readiness'] !== '' ? (float) $filters['min_readiness'] : null;
+        $maxReadiness = isset($filters['max_readiness']) && $filters['max_readiness'] !== '' ? (float) $filters['max_readiness'] : null;
+        $minAvg = isset($filters['min_avg_score']) && $filters['min_avg_score'] !== '' ? (float) $filters['min_avg_score'] : null;
+        $maxAvg = isset($filters['max_avg_score']) && $filters['max_avg_score'] !== '' ? (float) $filters['max_avg_score'] : null;
+        $qualification = (string) ($filters['qualification'] ?? '');
+
+        $rows = array_values(array_filter($rows, function (array $row) use ($minReadiness, $maxReadiness, $minAvg, $maxAvg, $qualification) {
+            if ($minReadiness !== null && $row['readiness_score'] < $minReadiness) {
+                return false;
+            }
+            if ($maxReadiness !== null && $row['readiness_score'] > $maxReadiness) {
+                return false;
+            }
+            if ($minAvg !== null && ($row['program_avg_score'] === null || $row['program_avg_score'] < $minAvg)) {
+                return false;
+            }
+            if ($maxAvg !== null && ($row['program_avg_score'] === null || $row['program_avg_score'] > $maxAvg)) {
+                return false;
+            }
+            if ($qualification === 'fully_qualified' && ! $row['fully_qualified']) {
+                return false;
+            }
+            if ($qualification === 'readiness_ready' && ! $row['readiness_qualified']) {
+                return false;
+            }
+            if ($qualification === 'below_benchmark' && $row['fully_qualified']) {
+                return false;
+            }
+
+            return true;
+        }));
+
+        $sort = (string) ($filters['sort'] ?? '');
+        if ($sort !== '') {
+            usort($rows, function (array $a, array $b) use ($sort) {
+                return match ($sort) {
+                    'avg_desc' => ($b['program_avg_score'] ?? -1) <=> ($a['program_avg_score'] ?? -1),
+                    'avg_asc' => ($a['program_avg_score'] ?? 999) <=> ($b['program_avg_score'] ?? 999),
+                    'readiness_desc' => $b['readiness_score'] <=> $a['readiness_score'],
+                    'readiness_asc' => $a['readiness_score'] <=> $b['readiness_score'],
+                    default => $a['enrollment_id'] <=> $b['enrollment_id'],
+                };
+            });
         }
 
         $scoredRows = array_values(array_filter($rows, fn ($r) => $r['program_avg_score'] !== null));
@@ -664,8 +720,8 @@ class LaunchpadProgramService
                 'enrolled' => count($rows),
                 'in_progress' => collect($rows)->where('status', LaunchpadProgramEnrollment::STATUS_IN_PROGRESS)->count(),
                 'completed' => collect($rows)->where('status', LaunchpadProgramEnrollment::STATUS_COMPLETED)->count(),
-                'readiness_qualified' => $readinessReadyCount,
-                'fully_qualified' => $qualifiedCount,
+                'readiness_qualified' => collect($rows)->where('readiness_qualified', true)->count(),
+                'fully_qualified' => collect($rows)->where('fully_qualified', true)->count(),
                 'avg_program_score' => $scoredRows !== [] ? round(collect($scoredRows)->avg('program_avg_score'), 2) : null,
             ],
             'rows' => $rows,
@@ -747,6 +803,7 @@ class LaunchpadProgramService
                     'title' => $ca->title,
                     'status' => $st,
                     'locked' => $locked,
+                    'blocked_by_proctoring' => $assignment ? $this->assessments->isBlockedByProctoring($assignment) : false,
                     'lock_reason' => $lockReason,
                     'overall_score_percent' => $assignment?->overall_score_percent,
                     'soft_skill_score_percent' => $assignment?->soft_skill_score_percent,
@@ -865,22 +922,37 @@ class LaunchpadProgramService
             }
         }
 
-        $techBankIds = InterviewQuestionBank::where('is_active', true)
-            ->where(function ($q) {
-                $q->where('discipline', 'software')->orWhereIn('category', ['hr', 'behavioral', 'situational']);
-            })
-            ->orderBy('id')
-            ->pluck('id')
-            ->all();
+        // Pull HARD (falling back to medium) Vault-calibrated questions rather than oldest/easy bank entries
+        $techHardCuratedSets = $isNonTech ? [] : $this->hardVaultCuratedSetIds();
 
-        $nonTechBankIds = InterviewQuestionBank::where('is_active', true)
-            ->where(function ($q) {
-                $q->whereIn('category', ['hr', 'behavioral', 'situational', 'aptitude'])
-                    ->orWhereIn('discipline', ['bba', 'bcom', 'mba', 'mcom', 'comm_prof', 'economics', 'media_comm']);
-            })
-            ->orderBy('id')
-            ->pluck('id')
-            ->all();
+        $techBankIds = $isNonTech
+            ? []
+            : InterviewQuestionBank::where('is_active', true)
+                ->where('discipline', 'software')
+                ->where('difficulty', InterviewQuestionBank::DIFFICULTY_HARD)
+                ->orderByDesc('id')
+                ->pluck('id')
+                ->all();
+        if (! $isNonTech && $techBankIds === []) {
+            $techBankIds = InterviewQuestionBank::where('is_active', true)
+                ->where('discipline', 'software')
+                ->whereIn('category', [InterviewQuestionBank::CATEGORY_TECHNICAL, InterviewQuestionBank::CATEGORY_SITUATIONAL])
+                ->orderByRaw("case when difficulty = 'hard' then 0 when difficulty = 'medium' then 1 else 2 end")
+                ->pluck('id')
+                ->all();
+        }
+
+        $nonTechBankIds = $isNonTech
+            ? InterviewQuestionBank::where('is_active', true)
+                ->where(function ($q) {
+                    $q->whereIn('category', ['situational', 'behavioral', 'technical', 'aptitude'])
+                        ->orWhereIn('discipline', ['bba', 'bcom', 'mba', 'mcom', 'comm_prof', 'economics', 'media_comm']);
+                })
+                ->where('difficulty', '!=', InterviewQuestionBank::DIFFICULTY_EASY)
+                ->orderByRaw("case when difficulty = 'hard' then 0 when difficulty = 'medium' then 1 else 2 end")
+                ->pluck('id')
+                ->all()
+            : [];
 
         $startsAt = $program->starts_at ?? now();
         $endsAt = $program->ends_at ?? $startsAt->copy()->addDays($program->duration_days);
@@ -937,13 +1009,20 @@ class LaunchpadProgramService
                     }
                 }
 
-                // 3. JD-aligned AI Interview config
-                $bankPool = $isNonTech ? $nonTechBankIds : $techBankIds;
+                // 3. Vault-grade AI Interview config (Tech uses Curated Series 2/3 + hard production scenarios; Non-Tech uses hard case studies)
+                $pickedCuratedSets = [];
                 $pickedBankIds = [];
-                if ($bankPool !== []) {
-                    $bCount = count($bankPool);
+                if (! $isNonTech && $techHardCuratedSets !== []) {
+                    $pickedCuratedSets[] = $techHardCuratedSets[$sliceIndex % count($techHardCuratedSets)];
+                } elseif ($isNonTech && $nonTechBankIds !== []) {
+                    $bCount = count($nonTechBankIds);
                     for ($b = 0; $b < min(2, $bCount); $b++) {
-                        $pickedBankIds[] = $bankPool[($sliceIndex * 2 + $b) % $bCount];
+                        $pickedBankIds[] = $nonTechBankIds[($sliceIndex * 2 + $b) % $bCount];
+                    }
+                } elseif (! $isNonTech && $techBankIds !== []) {
+                    $bCount = count($techBankIds);
+                    for ($b = 0; $b < min(2, $bCount); $b++) {
+                        $pickedBankIds[] = $techBankIds[($sliceIndex * 2 + $b) % $bCount];
                     }
                 }
 
@@ -952,8 +1031,8 @@ class LaunchpadProgramService
                 $assessmentPayload = [
                     'title' => "{$program->title} - Assessment {$assessmentNum}",
                     'description' => ($isNonTech
-                        ? "Non-Tech Assessment {$assessmentNum} (Set {$setNum}) — Communication, Analytical Aptitude & Role/HR AI Interview. Fully proctored."
-                        : "Tech Assessment {$assessmentNum} (Set {$setNum}) — DSA & Web Coding, Soft Skills & Technical AI Interview. Fully proctored."),
+                        ? "Non-Tech Assessment {$assessmentNum} (Set {$setNum}) — Communication, Analytical Aptitude & Case-Based AI Interview. Fully proctored."
+                        : "Tech Assessment {$assessmentNum} (Set {$setNum}) — DSA & Web Coding, Soft Skills & Vault-Grade Technical AI Interview. Fully proctored."),
                     'starts_at' => $startsAt->toIso8601String(),
                     'ends_at' => $endsAt->toIso8601String(),
                     'enforce_sequence' => false,
@@ -973,8 +1052,17 @@ class LaunchpadProgramService
                     'include_interview' => true,
                     'interview_weight' => $isNonTech ? 50 : 30,
                     'interview_config' => [
+                        'curated_set_ids' => $pickedCuratedSets,
+                        'curated_question_limit' => 3,
                         'question_bank_ids' => $pickedBankIds,
                         'custom_questions' => $customPrompts,
+                        'discipline' => $isNonTech ? 'comm_prof' : 'software',
+                        'practice_config' => [
+                            'source' => 'launchpad_program',
+                            'track' => $isNonTech ? LaunchpadProgram::TRACK_NON_TECH : LaunchpadProgram::TRACK_TECH,
+                            'assessment_number' => $assessmentNum,
+                            'set_number' => $setNum,
+                        ],
                     ],
                     'target_scope' => [
                         'student_mode' => 'selected',
@@ -996,9 +1084,108 @@ class LaunchpadProgramService
     }
 
     /**
-     * Returns 3 distinct, non-overlapping industry-standard JD prompts per (Assessment 1..3, Set 1..3).
+     * Collects Vault Series 2 & Series 3 (Scalable Implementation & Systems Design / Edge Cases) curated set IDs
+     * from `CuratedCatalog` across core software stacks so Tech Launchpad interviews match Vault AI difficulty.
      *
-     * @return list<array{text: string, category: string, difficulty: string, duration_seconds: int}>
+     * @return list<string>
+     */
+    private function hardVaultCuratedSetIds(): array
+    {
+        $catalog = app(CuratedCatalog::class);
+        $picked = [];
+        foreach ($catalog->roles() as $role) {
+            foreach ($role['stacks'] ?? [] as $stack) {
+                foreach ($catalog->allSets($stack) as $setData) {
+                    $seriesNum = (int) ($setData['series_number'] ?? 1);
+                    $setNum = (int) ($setData['set_number'] ?? 1);
+                    $count = (int) ($setData['question_count'] ?? count($setData['questions'] ?? []));
+                    if ($count >= 3 && ($seriesNum >= 2 || $setNum === 3) && ! empty($setData['id'])) {
+                        $picked[] = (string) $setData['id'];
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($picked));
+    }
+
+    /**
+     * Upgrades all unstarted slot interviews in an existing Launchpad program (or all published/draft programs)
+     * to the latest Vault-calibrated hard Tech / Non-Tech interview questions without touching active/completed sessions.
+     */
+    public function refreshUnstartedSlotInterviews(?LaunchpadProgram $program = null, ?User $actor = null): int
+    {
+        $actor ??= User::where('role', User::ROLE_SUPERADMIN)->first() ?? User::first();
+        if (! $actor) {
+            return 0;
+        }
+
+        $programs = $program ? collect([$program]) : LaunchpadProgram::with('slots.assessment.interview')->get();
+        $updated = 0;
+
+        foreach ($programs as $prog) {
+            $prog->loadMissing('slots.assessment.interview');
+            $isNonTech = $prog->track === LaunchpadProgram::TRACK_NON_TECH;
+            $curatedPool = $isNonTech ? [] : $this->hardVaultCuratedSetIds();
+            $nonTechPool = $isNonTech
+                ? InterviewQuestionBank::where('is_active', true)
+                    ->where(function ($q) {
+                        $q->whereIn('category', ['situational', 'behavioral', 'technical', 'aptitude'])
+                            ->orWhereIn('discipline', ['bba', 'bcom', 'mba', 'mcom', 'comm_prof', 'economics', 'media_comm']);
+                    })
+                    ->where('difficulty', '!=', InterviewQuestionBank::DIFFICULTY_EASY)
+                    ->orderByRaw("case when difficulty = 'hard' then 0 when difficulty = 'medium' then 1 else 2 end")
+                    ->pluck('id')
+                    ->all()
+                : [];
+
+            foreach ($prog->slots as $slot) {
+                $ca = $slot->assessment;
+                $iv = $ca?->interview;
+                if (! $ca || ! $iv || $iv->sessions()->exists()) {
+                    continue;
+                }
+
+                $sliceIndex = (($slot->assessment_number - 1) * 3) + ($slot->set_number - 1);
+                $pickedCurated = ! $isNonTech && $curatedPool !== []
+                    ? [$curatedPool[$sliceIndex % count($curatedPool)]]
+                    : [];
+                $pickedBankIds = [];
+                if ($isNonTech && $nonTechPool !== []) {
+                    $bCount = count($nonTechPool);
+                    for ($b = 0; $b < min(2, $bCount); $b++) {
+                        $pickedBankIds[] = $nonTechPool[($sliceIndex * 2 + $b) % $bCount];
+                    }
+                }
+
+                $cfg = $ca->interview_config ?? [];
+                $cfg['curated_set_ids'] = $pickedCurated;
+                $cfg['curated_question_limit'] = 3;
+                $cfg['question_bank_ids'] = $pickedBankIds;
+                $cfg['custom_questions'] = $this->jdInterviewPrompts($isNonTech, (int) $slot->assessment_number, (int) $slot->set_number);
+                $cfg['discipline'] = $isNonTech ? 'comm_prof' : 'software';
+                $cfg['practice_config'] = [
+                    'source' => 'launchpad_program',
+                    'track' => $isNonTech ? LaunchpadProgram::TRACK_NON_TECH : LaunchpadProgram::TRACK_TECH,
+                    'assessment_number' => (int) $slot->assessment_number,
+                    'set_number' => (int) $slot->set_number,
+                ];
+
+                $ca->update(['interview_config' => $cfg]);
+                $this->assessments->refreshSlotInterview($actor, $ca, $cfg);
+                $updated++;
+            }
+        }
+
+        return $updated;
+    }
+
+    /**
+     * Returns 3 hardcore Vault-calibrated production / strategy prompts (with explicit Gemini reviewer rubrics)
+     * per (Assessment 1..3, Set 1..3), paired alongside 3 Vault Curated questions for Tech (6 total)
+     * or tough bank scenarios for Non-Tech (5-6 total).
+     *
+     * @return list<array{text: string, category: string, difficulty: string, duration_seconds: int, note: string}>
      */
     private function jdInterviewPrompts(bool $isNonTech, int $assessmentNum, int $setNum): array
     {
@@ -1006,53 +1193,53 @@ class LaunchpadProgramService
             $bank = [
                 1 => [
                     1 => [
-                        ['text' => 'Walk through how you choose between an Array, Hash Map, or Binary Search Tree to optimize time and space complexity.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Explain OOP encapsulation, polymorphism, and how REST APIs structure status codes and validation cleanly.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Describe a full-stack or backend bug you debugged end-to-end and what automated test would prevent it.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                        ['text' => 'Walk through how you would design and debug a distributed flash-sale inventory lock across MySQL and Redis so two concurrent checkouts can never oversell the final unit even under node crashes or lock timeouts.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must contrast pessimistic row locks (SELECT FOR UPDATE), atomic Redis Lua/DECR + DB optimistic version column, lock TTL expiry hazards, and idempotent rollback on crash.'],
+                        ['text' => 'Given a dashboard query scanning 12 million submission rows that degrades p99 latency to 4 seconds, how do you inspect the execution plan, design covering composite indexes, and avoid killing INSERT throughput?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must discuss EXPLAIN ANALYZE (seq scan vs index-only scan, cardinality/column order, composite index prefix rule, B-tree page splits/write amplification) and summary/materialized tables.'],
+                        ['text' => 'Explain the memory and execution model behind JavaScript/Node async closures, microtask vs macrotask starvation, and how you track down a slow heap leak in a live React + API process.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain Promise/microtask queue starvation blocking event loop ticks/timers, retained DOM/closure references, Chrome DevTools heap snapshots, and Allocation Timeline diffing.'],
                     ],
                     2 => [
-                        ['text' => 'How do database indexes in MySQL/PostgreSQL speed up queries, and what write trade-offs do they introduce?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Explain recursion vs dynamic programming with a concrete example of overlapping subproblems.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Tell us about an application performance bottleneck you improved in React, Next.js, Node, or Laravel.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                        ['text' => 'Design a multi-tenant rate limiter and sliding-window burst protector across stateless API servers without split-brain inaccuracies or single-key Redis hotspots.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover Redis sorted-set or sliding-window counter with Lua atomicity, fail-open vs fail-closed trade-offs on Redis outage, local L1 token cache + sharded keys for hot tenants.'],
+                        ['text' => 'In a Next.js + React data-heavy workspace, how do you diagnose Hydration mismatches, waterfall server/client fetches, and expensive state re-renders without breaking SEO or auth state?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain SSR/CSR nondeterministic tree divergence, React Profiler commit causes, parallel RSC/Promise.all data fetching, memoization boundaries, and key stability.'],
+                        ['text' => 'Compare Zero-Downtime Blue/Green migrations when renaming or splitting a live production SQL column under active read/write traffic.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must describe expand-and-contract pattern: additive nullable column -> dual-write triggers/app code -> chunked backfill -> switch reads -> drop legacy constraint cleanly.'],
                     ],
                     3 => [
-                        ['text' => 'How would you use Redis caching and pagination to protect a high-traffic API endpoint from slowing down?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Compare BFS vs DFS and explain when graph cycle detection or topological sort applies in production systems.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Why are you excited for a 6-month on-site Software Development / Web Engineering Internship at Mellow Vault?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                        ['text' => 'Your S3 direct-upload pipeline and webhook consumer begin failing selectively under 500 concurrent candidates with connection pool exhaustion and duplicate jobs. Walk through root-cause isolation and architecture fixes.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must identify pre-signed S3 URL offloading vs backend proxy blocking workers, PgBouncer/MySQL max_connections tuning, idempotent queue job keys, backoff + DLQ handling.'],
+                        ['text' => 'How do you architect Refresh Token Rotation with reuse detection across Next.js SSR, API middleware, and concurrent browser tabs so a stolen token immediately invalidates the token family without falsely logging out active users?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover HttpOnly Secure SameSite cookies, single-flight refresh lock across parallel tab requests (grace window vs replay detection), token family revocation on reuse detection.'],
+                        ['text' => 'Compare consistency vs latency trade-offs between Write-Through, Cache-Aside with stampede locking, and Asynchronous Outbox invalidation in high-read leaderboards or assessment scoring.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must address thundering herd / singleflight mutex leases on cache miss, transactional outbox pattern for reliable async propagation, and stale-read bounds.'],
                     ],
                 ],
                 2 => [
                     1 => [
-                        ['text' => 'Design a relational schema for an assessment platform tracking users, tests, submissions, and scores with foreign keys.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'How does JWT or Sanctum token authentication work securely across Next.js frontends and REST backends?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'How do you handle a merge conflict or tight sprint deadline when collaborating on Git with teammates?', 'category' => 'behavioral', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                        ['text' => 'Design an end-to-end async code-judging pipeline handling untrusted user code execution, queue priority lanes, sandbox memory/fork-bomb isolation, and duplicate retry safety.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must discuss cgroups/seccomp/namespaces or Firecracker container limits, non-root readonly mounts, network egress blocking, separate priority worker queues, idempotency job tokens.'],
+                        ['text' => 'Walk through how B-Tree indexes fail on high-cardinality UUID primary keys vs monotonic IDs/UUIDv7, and how cursor-based keyset pagination eliminates O(N) OFFSET degradation.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover random UUID B-tree page splits/buffer pool cache churn, UUIDv7 timestamp ordering, and keyset (WHERE id > last_id) deterministic stability under concurrent inserts.'],
+                        ['text' => 'Describe the hardest production race condition or silent data-corruption bug you diagnosed: what observability signals proved the hypothesis and what invariant guarantees prevented recurrence?', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for concrete distributed/state concurrency root cause, log/trace/metrics correlation, DB constraints or locking fix, and regression test coverage.'],
                     ],
                     2 => [
-                        ['text' => 'Explain ACID transactions and race-condition prevention when two users update the same database counter.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'How do you make a responsive Next.js/React dashboard fast, accessible, and cross-browser reliable?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Share a project you built independently and the key engineering trade-off you had to make.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                        ['text' => 'Explain how Deadlock detection works in InnoDB/PostgreSQL, why consistent lock ordering prevents circular waits, and how you design idempotent retry loops on serialization failures.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover lock wait graphs, acquiring row locks in sorted primary-key order, catching SQLSTATE 40001/1213 with bounded jittered retries inside stateless transactions.'],
+                        ['text' => 'How would you eliminate N+1 queries, memory bloat, and blocking serialization when generating a CSV + JSON analytics export for 100,000+ student records cleanly?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain eager loading / SQL aggregation in DB instead of PHP/JS loops, chunkById or cursor streaming, HTTP StreamedResponse chunked output, and memory O(1) bounds.'],
+                        ['text' => 'Contrast CORS preflight security, SameSite cookie CSRF defense, CSP headers against stored XSS, and parameterized AST execution for preventing multi-vector web exploits.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must clearly separate XSS vs CSRF vs SQLi trust boundaries, why CORS is browser-enforced (not server auth), strict CSP/nonce/sanitization, and why HttpOnly stops XSS cookie exfiltration.'],
                     ],
                     3 => [
-                        ['text' => 'Explain WebSockets / WebRTC vs standard polling and when to offload work into async background queues.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'What is the N+1 query problem in ORMs like Eloquent or Prisma, and how do you eliminate it?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'What feedback from a code review taught you the biggest lesson as a developer?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                        ['text' => 'Compare WebSockets, Server-Sent Events (SSE), and HTTP long-polling at 20,000 concurrent connections: connection memory footprint, load-balancer sticky state, and backpressure recovery.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must discuss file descriptors/epolled sockets, Redis Pub/Sub cross-node fanout, SSE auto-reconnect with Last-Event-ID vs bi-directional WebSocket heartbeats and client jitter.'],
+                        ['text' => 'If a client submits the same state-changing webhook or checkout request twice while a slow downstream payment call is still in flight, how do you implement database-backed idempotency keys safely?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain unique idempotency key constraint + IN_PROGRESS lock state, returning cached response on duplicate retry, request payload hash validation, and expiry cleanup.'],
+                        ['text' => 'What trade-offs determine whether you split a modular monolith into separate microservices versus keeping transactional boundaries in one database with async domain jobs?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must evaluate distributed transaction cost (Saga/2PC overhead), network latency vs independent scaling/deployment isolation, schema coupling, and operational observability burden.'],
                     ],
                 ],
                 3 => [
                     1 => [
-                        ['text' => 'If an API backed by S3 uploads and MySQL starts failing under 500 concurrent requests, how do you diagnose and stabilize it?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 150],
-                        ['text' => 'Explain idempotency in payment webhooks and third-party API integrations so retries never double-charge.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'What monthly engineering habits and KPIs will help you convert this 6-month internship into a PPO?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                        ['text' => 'Architect a real-time proctored exam telemetry system tracking sequence integrity, tamper-evident hash chains, offline/reconnection gaps, and server-side state authority even if the browser devtools are manipulated.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain cryptographic hash-chain event logs (prev_hash + seq), server-side monotonicity verification, server timestamps & silent-gap penalties, and gating answer endpoints on live heartbeats.'],
+                        ['text' => 'Given a third-party AI scoring API experiencing sporadic 429 rate limits and 15-second tail latencies, design a fault-tolerant key-rotation pool, circuit breaker, and graceful async recovery queue.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must address round-robin key health state (RPM vs RPD cooldown TTLs), model tier cascade, non-blocking job queues, idempotent retries, and honest degraded UI status without fake data.'],
+                        ['text' => 'Tell me about a high-stakes architectural disagreement you navigated with technical benchmarks or failure-mode proofs rather than opinion.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must demonstrate rigorous quantitative benchmarking/profiling, evaluating latency/cost/maintainability trade-offs objectively, and concrete production outcome.'],
                     ],
                     2 => [
-                        ['text' => 'Compare SQL joins vs denormalized caching when building an analytics leaderboard for thousands of students.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'How do you structure unit and integration tests before shipping a new REST endpoint?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Describe a time you took ownership beyond your assigned task to unblock your team.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                        ['text' => 'Explain PostgreSQL/MySQL MVCC isolation levels (Read Committed vs Repeatable Read vs Serializable), phantom reads, and how write-skew occurs even under Snapshot Isolation.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain snapshot timestamps/undo logs, lost update vs write skew across two disjoint rows invariant, and mitigation via SELECT FOR UPDATE or Serializable locks.'],
+                        ['text' => 'Design a low-latency semantic search + RBAC-filtered catalog query across 500,000 documents ensuring users never retrieve unauthorized records in top-K vector/SQL results.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must distinguish pre-filtering vs post-filtering recall collapse, partition/index scoping by tenant/role, cache invalidation on ACL changes, and latency SLAs.'],
+                        ['text' => 'How do you enforce contract safety and zero breaking deploys between a TypeScript Next.js frontend and Laravel/Node REST APIs across parallel feature teams?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must address strict DTO/OpenAPI schemas, additive backward-compatible API versioning, contract/integration CI checks before deployment, and feature flags.'],
                     ],
                     3 => [
-                        ['text' => 'How would you implement rate limiting and sliding-window throttling to prevent API abuse cleanly?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Explain CORS, CSRF, and SQL injection protections in modern web architecture.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                        ['text' => 'Where do you want to grow technically over the next 12 months if selected for Mellow Vault?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                        ['text' => 'Walk through designing a distributed job scheduler guaranteeing at-least-once cron execution across 4 worker containers without duplicate triggers or lost schedules after container restarts.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover leader election or atomic DB lease (`next_run_at` compare-and-swap / `SKIP LOCKED`), heartbeat renewal, fencing tokens, and idempotent downstream consumers.'],
+                        ['text' => 'Analyze how CDN edge caching, stale-while-revalidate headers, HTTP ETags, and database read replicas work together — and which endpoints must strictly bypass caches.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must separate public cacheable assets vs personalized/authenticated state, read-your-own-writes lag on replicas, Cache-Control `private, no-store` on sensitive/exam routes.'],
+                        ['text' => 'Looking at a legacy codebase with flaky tests, tight coupling, and slow deployments, how do you prioritize incremental refactoring while delivering weekly roadmap milestones?', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must articulate strangler-fig/seam refactoring, high-ROI integration tests around critical revenue/security paths first, and measurable velocity metrics.'],
                     ],
                 ],
             ];
@@ -1063,53 +1250,62 @@ class LaunchpadProgramService
         $nonTechBank = [
             1 => [
                 1 => [
-                    ['text' => 'Pitch Mellow Vault & AptRun in 60 seconds to a college Placement Officer (TPO) who says they already have a portal.', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'A prospective candidate is hesitant to complete online onboarding over Google Meet. How do you build trust and convert them?', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'Why are you interested in Onboarding, Business Development, Growth, or Product Operations at Mellow Vault?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: A Tier-1 college Placement Officer says "We already use an assessment vendor and have zero bandwidth to onboard another platform this semester." Deliver your exact objection-handling structure, ROI proof points, and pilot close ask.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must address zero-migration friction, verifiable anti-cheating/employer readiness signal differentiation, low-risk scoped pilot proposal, and specific decision-maker next step.'],
+                    ['text' => 'You are given 500 leads from a campus drive: 40% never answer calls, 30% drop off during video onboarding verification, and your weekly conversion target is 18%. Diagnose the funnel stages and build a daily execution playbook.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover multi-channel cadence (WhatsApp/SMS pre-warm + peak time windows), pre-call objection resolution, CRM SLA tagging, and measurable conversion math (target = 90 verified conversions).'],
+                    ['text' => 'Tell me about a high-pressure negotiation or skeptical stakeholder conversation where your initial pitch failed, what root cause you identified, and how you flipped the outcome.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must demonstrate structured STAR reasoning, uncovering hidden stakeholder objection, concrete pivot in framing/evidence, and quantified result.'],
+                    ['text' => 'Walk through how you design Product UAT test matrices for a multi-step onboarding workflow involving camera permissions, OTP timeouts, slow 3G mobile networks, and incomplete KYC retries.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must specify boundary/negative cases, state recovery across refreshes, telemetry/error capture steps for devs, and objective release go/no-go gates.'],
                 ],
                 2 => [
-                    ['text' => 'Imagine launching a Meta & Google Ads campaign with a ₹25,000 budget. How do you evaluate CPL and ROAS after week 1?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'How would you handle an angry college partner calling about delayed onboarding verification before a drive?', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'Describe a time you persuaded someone to say yes when their first answer was no.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                    ['text' => 'Case Study: You spent ₹60,000 on Meta and LinkedIn ads across 2 weeks. Meta CPL is ₹45 with 8% test-completion rate; LinkedIn CPL is ₹140 with 38% completion rate. Calculate effective cost per completed candidate and defend your exact Week 3 budget reallocation.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Math check: Meta cost/completed = 45/0.08 = ₹562.50; LinkedIn cost/completed = 140/0.38 = ₹368.42. LinkedIn is ~35% cheaper on true CAC despite higher raw CPL; candidate must identify funnel quality optimization + retargeting.'],
+                    ['text' => 'A key partner college TPO calls angrily 2 hours before an assessment window because 45 eligible students report account verification delays. Outline your hour-by-hour crisis communication, engineering escalation, and SLA recovery.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover immediate transparent acknowledgement, structured bug/data triage (batch CSV IDs, repro steps), contingency window buffer, proactive student comms, and post-mortem fix.'],
+                    ['text' => 'Design a repeatable outbound B2B sequence (LinkedIn + cold email + cold call) targeting VP HR / Campus Recruitment leads at mid-market SaaS firms. Include hook hypothesis, follow-up cadence, and disqualification criteria.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must articulate ICP pain hook (screening noise/fake assessments), 5-7 touch multi-modal cadence, value drops, and BANT/MEDDIC qualification guardrails.'],
+                    ['text' => 'Describe a time you spotted a silent operational bottleneck before management noticed it, built a tracking dashboard or SOP without being asked, and quantified the time or revenue saved.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for proactive ownership, root-cause metrics, cross-team SOP adoption, and quantified impact.'],
                 ],
                 3 => [
-                    ['text' => 'Walk through how you maintain daily CRM logs for 60 outbound calls and ensure zero leads slip through the funnel.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'What checks would you run during User Acceptance Testing (UAT) before launching a new student onboarding page?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'How do you stay disciplined and motivated in a target-driven KPI environment?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: 1,200 students registered for a Mellow Vault Launchpad campaign, 680 opened Soft Skills, only 290 started Coding, and 160 finished AI Interview. Pinpoint the highest-leverage drop-off, form hypotheses, and design A/B recovery experiments.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Largest absolute/relative leak is Soft Skills -> Coding (57% drop) + Interview (45% drop). Must hypothesize friction (proctoring re-prompts, anxiety, reminders, timing) and propose controlled WhatsApp/UI/UX experiments with sample metrics.'],
+                    ['text' => 'When building executive CRM & analytics trackers across 15 colleges, how do you enforce data hygiene across reps, define lead-aging SLAs, and audit forecast accuracy weekly?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must define mandatory stage exit criteria, automated validation rules, weighted pipeline stages vs optimistic guesses, and cohort aging alerts.'],
+                    ['text' => 'An enterprise hiring partner threatens to cancel a renewal unless given a 40% discount citing a cheaper competitor. How do you audit their utilization data and negotiate a value-preserving outcome?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must avoid reflexive discounting: diagnose under-adoption/value perception, anchor on cost-per-verified-hire & screening hours saved, offer structured volume/multi-quarter tiers instead of flat price slash.'],
+                    ['text' => 'Compare Organic Content / SEO / Campus Ambassador distribution vs Paid Acquisition for early-stage B2B2C talent platforms over a 90-day horizon.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must contrast CAC payback velocity vs compounding marginal cost, attribution lags, viral K-factor loops via college cohorts, and channel mix sequencing.'],
                 ],
             ],
             2 => [
                 1 => [
-                    ['text' => 'Compare On-Page SEO vs Off-Page SEO and how organic content helps lower Customer Acquisition Cost.', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'You host a 1-on-1 Google Meet onboarding session and the candidate speaks only Hindi while unsure of next steps. How do you lead the call?', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'Tell us about an event, club, or sales target you organized end-to-end with measurable outcomes.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                    ['text' => 'Case Study: Launchpad engagement drops sharply on Day 3 of a 5-day sprint for Non-Tech students. Design an automated + high-touch lifecycle nudge architecture (WhatsApp, email, coordinator calls) tailored by behavioral segment.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must segment users cleanly (not-started vs stuck mid-stage vs proctoring-blocked), define trigger timing, personalized copy hooks, opt-out hygiene, and uplift control measurement.'],
+                    ['text' => 'Explain Attribution Modeling challenges across Instagram Reels, LinkedIn Thought Leadership, Campus WhatsApp forwards, and Direct Web traffic inside GA4 — and how you avoid double-counting conversions.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must explain UTM discipline, first-click vs data-driven attribution, dark social direct traffic distortion, and self-reported attribution validation.'],
+                    ['text' => 'During an onboarding call with a hesitant candidate in a non-English speaking region, how do you diagnose genuine technical anxiety vs lack of intent within the first 3 minutes and convert them?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for bilingual empathy, active diagnostic questions, clear low-friction live screen guidance, and decisive timeboxing on low-intent leads.'],
+                    ['text' => 'Walk through a failed campaign, project, or partnership you owned end-to-end. What early leading indicators did you miss and what systematic check did you introduce afterward?', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Requires radical accountability (no blaming teammates), analytical breakdown of leading vs lagging metrics, and durable process change.'],
                 ],
                 2 => [
-                    ['text' => 'If 500 students registered for a campaign but only 180 completed Round 1 in 48 hours, what funnel fixes would you execute?', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'How would you structure a LinkedIn + cold-call outreach sequence to book demos with HR leaders?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'Describe a time you managed multiple urgent follow-ups at the same time without missing a deadline.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
+                    ['text' => 'Case Study: Engineering has capacity for only ONE Q3 sprint feature — either (A) Automated WhatsApp deadline reminders or (B) TPO Bulk Score CSV Export + Filtering. Use an explicit prioritization framework (RICE/ICE + revenue/retention impact) to defend your call.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must evaluate Reach, Impact, Confidence, Effort cleanly, tie each option to immediate business bottleneck (completion rate vs placement partner trust), and address trade-off mitigation for the deferred item.'],
+                    ['text' => 'Paid landing page traffic surged 55% week-over-week after a viral reel, but signup-to-assessment start rate fell from 62% to 24%. Conduct a systematic funnel diagnosis across acquisition intent, UX latency, and messaging mismatch.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must check audience quality shift (clickbait/broad targeting vs intent), mobile page-load/CORS errors, promise-to-landing copy mismatch, and cohort segmentation in GA4.'],
+                    ['text' => 'You manage 4 parallel campus drives in one week alongside 60 daily outbound calls and two product bug escalations. Walk through your exact prioritization triage and escalation rules.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must separate urgent revenue/live-drive blockers vs scheduled batch blocks, delegate/automate status updates, and avoid dropped SLAs.'],
+                    ['text' => 'How do you write crisp acceptance criteria and reproduction bug tickets for backend/frontend engineers so sprint velocity never stalls on back-and-forth clarification?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must specify environment/device/user role, exact API status/network console logs, Given-When-Then acceptance criteria, and edge cases.'],
                 ],
                 3 => [
-                    ['text' => 'How do Google Analytics (GA4) and Google Sheets help compare social campaigns across Instagram, LinkedIn, and YouTube?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'A sales prospect asks for a heavy discount right after the demo. How do you handle objection and protect value?', 'category' => 'situational', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'What strengths make you a strong fit for client-facing operations and partnership coordination?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: Competitor X offers free mock tests to colleges while Mellow Vault focuses on verified employer-ready Talent Vault placement outcomes. Build a competitive battlecard and objection rebuttal script for partner meetings.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must position verified signal vs unproctored noise, direct recruiter hiring access (Vault outcomes), cost-of-cheating brand damage, and measurable college placement KPIs.'],
+                    ['text' => 'Walk through Unit Economics of a campus acquisition program: given ₹18,000 rep salary + ₹12,000 ad spend yielding 240 qualified assessments and 14 paid recruiter hires at ₹8,000 revenue each, compute payback and identify sensitivity levers.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Math: Total cost = ₹30,000; Revenue = 14 * ₹8,000 = ₹1,12,000 (3.73x gross ROAS, ₹125/qualified candidate, ₹2,143 CAC/hire). Must identify completion-to-hire conversion as strongest sensitivity lever.'],
+                    ['text' => 'A hiring client wants custom assessment weights and urgent manual overrides outside standard policy 4 hours before campus rollout. How do you balance client delight against platform fairness and operational SLA?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must distinguish flexible config vs non-negotiable integrity/fairness guardrails, negotiate scoped alternatives transparently, and document sign-off cleanly.'],
+                    ['text' => 'Describe a time you had to influence a technical or senior stakeholder without formal authority using structured data and customer insights.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for clear evidence synthesis, speaking the stakeholder language (engineering cost/risk or revenue impact), and measurable result.'],
                 ],
             ],
             3 => [
                 1 => [
-                    ['text' => 'Case Study: You must onboard 300 final-year students across 3 branches within 5 days. Outline your day-by-day execution plan.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 150],
-                    ['text' => 'How do you measure quality vs quantity when tracking daily outreach calls and conversion ratios in CRM?', 'category' => 'technical', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'Which track appeals to you most — BD/Onboarding, Digital Marketing, or Product Operations — and why?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: You must onboard and verify 400 final-year students across 4 geographically spread colleges within a strict 5-day launch window. Present your day-by-day critical path, bottleneck mitigation, and real-time KPI command sheet.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must sequence bulk data import/TPO alignment (Day 1), tiered high-touch onboarding waves (Day 2-3), escalation sprints for blocked/laggard segments (Day 4), cutoff lock & verification audit (Day 5).'],
+                    ['text' => 'How do you audit whether an onboarding team is hitting activity targets (100 calls/day) while harming conversion quality vs executing high-converting consultative discovery?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must link input activity metrics with stage conversion rates (talk-to-complete, 7-day retention/drop-off, call QA rubrics) to spot gaming/spam outreach.'],
+                    ['text' => 'Imagine launching Launchpad 2026 into an unfamiliar city with zero prior TPO relationships. Design your first 14-day zero-to-one market entry and anchor-partner win strategy.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must cover ICP college tiering, warm/alumni/recruiter demand leverage (reverse-pitching real jobs), anchor case study design, and rapid follow-up cadence.'],
+                    ['text' => 'Tell us about an ambiguous, under-resourced initiative you took from zero structure to predictable execution.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for structured decomposition of ambiguity, fast scrappy MVP validation, repeatable SOPs, and quantified output.'],
                 ],
                 2 => [
-                    ['text' => 'Case Study: A B2B hiring partner wants to compare Competitor A vs Mellow Vault before signing an MOU. How do you present competitive advantages?', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 150],
-                    ['text' => 'Explain how clear documentation and cross-team communication between tech and growth prevent launch delays.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'How do you handle rejection after 15 unsuccessful cold calls in a row?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: Two weeks post-launch, 30% of Non-Tech students fail the proctoring check or exit mid-interview due to mic/environment confusion, risking college partner dissatisfaction. Lead the cross-functional fix across Ops, Support, and Product.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must separate preventable UX friction vs genuine violations, quantify drop-off error codes, deploy instant Ops pre-flight guides + propose high-impact product telemetry/UI fixes cleanly.'],
+                    ['text' => 'How would you design a 30-day multi-channel B2B & student marketing calendar pairing employer case studies, webinar funnels, and retargeting loops with strict weekly ROI checkpoints?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must align TOFU/MOFU/BOFU assets cleanly, track conversion checkpoints per week, enforce kill-criteria on underperforming creatives, and repurpose top-performing angles.'],
+                    ['text' => 'Describe a conflict between Sales/Growth promising an aggressive timeline and Product/Ops flagging quality risks. How did you broker an honest, metrics-backed resolution?', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Look for balanced commercial + operational judgment, scope phasing (MVP now vs Phase 2), and preserving partner trust without burning engineering/ops.'],
+                    ['text' => 'What frameworks do you use to turn qualitative call recordings and rejection transcripts into high-impact landing-page and script improvements?', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must outline systematic objection tagging, frequency weighting, verbatim customer language reuse in copy, and measured before/after conversion testing.'],
                 ],
                 3 => [
-                    ['text' => 'Case Study: Paid ad clicks increased 40% this week, but sign-ups stayed flat. Diagnose the possible landing-page and audience causes.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 150],
-                    ['text' => 'Share a time you took feedback and turned a weak metric into a strong result.', 'category' => 'behavioral', 'difficulty' => 'medium', 'duration_seconds' => 120],
-                    ['text' => 'How do you see yourself contributing in an on-site, fast-paced Noida team over the next 6 months?', 'category' => 'hr', 'difficulty' => 'easy', 'duration_seconds' => 90],
+                    ['text' => 'Case Study: You notice 60% of high-scoring Non-Tech finalists have strong English fluency yet struggle with quantitative business cases (CPL/conversion math) during recruiter interviews. Design a 5-day intervention before final placements.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must propose targeted diagnostic benchmarks, micro-drills on real business case math, calibrated rubric feedback, and cohort readiness uplift validation.'],
+                    ['text' => 'Design a partner Health Score combining activation speed, student completion rate, proctoring integrity ratio, and hiring outcomes — and define exact trigger playbooks when a college turns Amber or Red.', 'category' => 'technical', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must specify weighted leading indicators, clear numeric thresholds for Green/Amber/Red, automated alerts, and executive business review playbooks.'],
+                    ['text' => 'If a senior decision-maker pushes back mid-meeting claiming "AI interviews feel impersonal for business roles," deliver your crisp evidence-backed counter-argument.', 'category' => 'situational', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must address structured rubric consistency, eliminating recruiter scheduling bias/fatigue, verifiable spoken transcripts + human auditability, and time-to-shortlist compression.'],
+                    ['text' => 'Walk through how you decide when to double down on a failing growth/outreach experiment versus killing it quickly — cite a concrete threshold example.', 'category' => 'behavioral', 'difficulty' => 'hard', 'duration_seconds' => 180, 'note' => 'Must distinguish statistically meaningful sample size vs premature panic, isolate execution error vs channel-market mismatch, and state clear pre-committed stop-loss bounds.'],
                 ],
             ],
         ];

@@ -18,7 +18,7 @@ import type { BatchAck, IntegrityEvent, WebEventType } from "./types";
 export const URGENT_EVENTS: ReadonlySet<WebEventType> = new Set<WebEventType>([
   "fullscreen_exit", "tab_switch", "devtools_detected", "focus_lost", "tamper_detected", "automation_detected", "multi_monitor",
   "screen_share_stopped", "screen_share_changed", "camera_lost", "camera_blocked", "virtual_camera", "mic_lost", "synthetic_input",
-  "multiple_faces", "face_mismatch", "phone_detected", "no_face", "face_away",
+  "multiple_faces", "face_mismatch", "phone_detected", "no_face", "face_away", "speech_detected",
 ]);
 
 /** Dropped first when the queue is full: they add nothing a reviewer needs once the strike-class events are kept. */

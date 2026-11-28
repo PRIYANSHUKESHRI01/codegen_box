@@ -25,6 +25,8 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Reveal, ScoreRing } from "@/components/dashboard/vaultAi/vaultKit";
 import { BeforeYouStart, BriefingGrid, BriefingHero, HowItWorks, Rise } from "@/components/dashboard/interviews/briefing/BriefingParts";
 import { InterviewerCard } from "@/components/dashboard/interviews/briefing/InterviewerCard";
+import { VaultPreStartAdvisoryModal } from "@/components/dashboard/vaultAi/VaultPreStartAdvisoryModal";
+import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -67,8 +69,9 @@ function VaultInterviewSetContent() {
   const [launchingNext, setLaunchingNext] = useState(false);
   // Pressing Start gives feedback at once; the interview is a full-screen experience and takes a moment to open.
   const [opening, setOpening] = useState(false);
+  const [advisoryMode, setAdvisoryMode] = useState<"current" | "next" | null>(null);
 
-  const handleLaunchNextSet = async () => {
+  const launchNextSetNow = async () => {
     if (!interview?.qualification?.stack_key || setNumber === null || launchingNext) return;
     const nextSet = setNumber + 1;
     setLaunchingNext(true);
@@ -77,11 +80,28 @@ function VaultInterviewSetContent() {
         stack: interview.qualification.stack_key,
         set_number: nextSet,
       });
+      setAdvisoryMode(null);
       router.push(`${HOME}/session?slug=${encodeURIComponent(res.interview.slug)}`);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "Could not launch next set. Please try from the qualification circuit.");
       setLaunchingNext(false);
     }
+  };
+
+  const handleLaunchNextSet = () => {
+    if (!interview?.qualification?.stack_key || setNumber === null || launchingNext) return;
+    setAdvisoryMode("next");
+  };
+
+  const handleProceedFromAdvisory = () => {
+    if (!interview) return;
+    if (advisoryMode === "next") {
+      void launchNextSetNow();
+      return;
+    }
+    setAdvisoryMode(null);
+    setOpening(true);
+    router.push(`${HOME}/session?slug=${encodeURIComponent(interview.slug)}`);
   };
 
   const handleRetryScoring = async () => {
@@ -202,6 +222,10 @@ function VaultInterviewSetContent() {
         ) : error || !interview ? (
           <div className="rounded-2xl border border-status-danger/30 bg-status-danger/[0.06] p-10 text-center text-xs text-status-danger">{error ?? "This set isn't available."}</div>
         ) : (
+          <VoiceVerificationGate
+            surfaceLabel="Vault AI Interview"
+            returnTo={`${HOME}/view?slug=${encodeURIComponent(slug)}`}
+          >
           <BriefingGrid
             main={
               <>
@@ -443,10 +467,7 @@ function VaultInterviewSetContent() {
                     <button
                       type="button"
                       disabled={opening}
-                      onClick={() => {
-                        setOpening(true);
-                        router.push(`${HOME}/session?slug=${encodeURIComponent(interview.slug)}`);
-                      }}
+                      onClick={() => setAdvisoryMode("current")}
                       className="va-sheen relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-indigo-500 via-violet-500 to-fuchsia-500 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-indigo-500/40 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-80"
                     >
                       {opening ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Mic className="h-4 w-4" aria-hidden />}
@@ -458,8 +479,17 @@ function VaultInterviewSetContent() {
               </Rise>
             }
           />
+          </VoiceVerificationGate>
         )}
       </div>
+
+      <VaultPreStartAdvisoryModal
+        open={advisoryMode !== null}
+        setTitle={advisoryMode === "next" && setNumber !== null ? `Set ${setNumber + 1}` : interview?.title}
+        proceeding={opening || launchingNext}
+        onCancel={() => setAdvisoryMode(null)}
+        onProceed={handleProceedFromAdvisory}
+      />
     </DashboardShell>
   );
 }

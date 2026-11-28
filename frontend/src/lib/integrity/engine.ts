@@ -25,6 +25,7 @@ import { isChromium, requestEntireScreen, ShareError, supportsScreenShare, type 
 import { levelDb, SpeechGate } from "./detectors/speech";
 import { loadVision, type Delegate, type VisionEngine, type FrameAnalysis } from "./detectors/vision";
 import { computeFaceSimilarity, FACE_MATCH_THRESHOLD } from "./detectors/faceIdentity";
+import { PhonePresenceTracker } from "./detectors/phoneDetector";
 import { captureStill, EvidenceUploader, jitteredMs } from "./evidence";
 import { browserFamily, deviceFingerprint, newInstanceId } from "./fingerprint";
 import { claim, discard, park } from "./keeper";
@@ -76,6 +77,10 @@ export interface EngineOptions {
   userKey: string;
   /** "contest", "test", "interview", "practice sitting" — used in error messages. */
   activityLabel: string;
+  /** Require entire-screen share up front even if this round's own policy only marks it optional (e.g. unified Launchpad handoff). */
+  requireScreenShare?: boolean;
+  /** Require Chrome/Edge up front for verifiable entire-screen sharing across multi-round flows. */
+  requireChromium?: boolean;
   /** The contest problem and (with a strike) the code open at that moment. */
   getContext?: (withCode: boolean) => Record<string, unknown> | null;
   handlers: EngineHandlers;
@@ -89,6 +94,8 @@ interface StartResponse {
 const STILL_MIN_GAP_MS = 5000;
 /** How long a leaving page's camera is held for the same attempt's next page, outside contests (see KeptAttempt.graceMs): just long enough for a remount. */
 const NON_CONTEST_GRACE_MS = 1500;
+const POLICY_CACHE_TTL_MS = 60_000;
+const policyCache = new Map<IntegritySurface, { policy: IntegrityPolicy; mode: "integrity" | "legacy"; cachedAt: number }>();
 
 /**
  * Everything the browser does for one proctored attempt, behind one object so the five proctored pages share it:
@@ -132,11 +139,16 @@ export class IntegrityEngine {
   private reportedExtensions = new Set<string>();
   private attached = false;
   private ended = false;
+  private handedOff = false;
   private starting = false;
   private guardianPollFailures = 0;
   private baselinePhoto: string | null = null;
   private baselineDescriptor: number[] | null = null;
-  private lastPhoneReading: { at: number; score: number } | null = null;
+  private phoneTracker = new PhonePresenceTracker();
+  private consecutiveFaceMismatches = 0;
+  private consecutiveLookAway = 0;
+  private lastAiIncidentAt: Partial<Record<WebEventType, number>> = {};
+  private claimedKept = false;
   private poseBaseline: { samples: { yaw: number; pitch: number }[]; yaw: number; pitch: number } = { samples: [], yaw: 0, pitch: 0 };
   private activeGraceViolation: {
     type: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited";
@@ -155,6 +167,7 @@ export class IntegrityEngine {
     if (this.attached) return;
     this.attached = true;
     this.ended = false;
+    this.handedOff = false;
     const gen = ++this.gen;
     setIntegrityUi({
       attached: true,
@@ -165,8 +178,11 @@ export class IntegrityEngine {
     if (kept) {
       this.instance = kept.instance;
       this.ids = kept.deviceId;
+      if (kept.baselinePhoto) this.baselinePhoto = kept.baselinePhoto;
+      if (kept.baselineDescriptor?.length) this.baselineDescriptor = kept.baselineDescriptor;
       if (isStreamLive(kept.camera)) this.adoptCamera(kept.camera as MediaStream);
       if (isStreamLive(kept.screen)) this.adoptScreen(kept.screen as MediaStream);
+      if (this.camera || this.screen) this.claimedKept = true;
     }
 
     // Load policy & build pre-flight checks BEFORE entering the "consent" phase so
@@ -177,13 +193,14 @@ export class IntegrityEngine {
     this.buildChecks();
     this.watchPreStart();
 
-    // The camera and screen survived the page change and the browser is still fullscreen: go straight back in.
+    // The camera and screen survived the page change and the browser is still fullscreen: go straight back in
+    // without switching to "consent" / rendering ProctoringConsentGate while /proctoring/start is in flight.
     if (kept && this.camera && document.fullscreenElement && checksPass(getIntegrityUi().checks)) {
-      this.setPhase("consent");
       void this.begin(true);
       return;
     }
 
+    this.claimedKept = false;
     this.setPhase("consent");
   }
 
@@ -193,7 +210,19 @@ export class IntegrityEngine {
     this.attached = false;
     this.gen++;
 
-    const keep = opts.keep && this.phase === "active" && !this.ended;
+    if (this.handedOff) {
+      this.restoreTitle();
+      forgetEditorClipboard();
+      resetIntegrityUi();
+      return;
+    }
+
+    const keep =
+      opts.keep &&
+      !this.ended &&
+      (this.phase === "active" || this.claimedKept || (this.starting && Boolean(this.camera || this.screen)));
+    const wasClaimedKept = this.claimedKept;
+    this.claimedKept = false;
     const camera = keep ? this.camera?.stream ?? null : null;
     const screen = keep ? this.screen?.stream ?? null : null;
 
@@ -213,7 +242,13 @@ export class IntegrityEngine {
         screen,
         instance: this.instance,
         deviceId: this.ids,
-        graceMs: this.o.surface === "contest" ? undefined : NON_CONTEST_GRACE_MS,
+        baselinePhoto: this.baselinePhoto,
+        baselineDescriptor: this.baselineDescriptor,
+        graceMs:
+          wasClaimedKept || this.o.surface === "contest" || this.o.keepKey.startsWith("assessment:")
+            ? 30_000
+            : NON_CONTEST_GRACE_MS,
+        unclaimedMs: wasClaimedKept || this.o.keepKey.startsWith("assessment:") ? 15_000 : undefined,
         release: () => {
           stopStream(camera);
           stopStream(screen);
@@ -278,7 +313,7 @@ export class IntegrityEngine {
     setCheck({ ...this.check("screen", "working"), detail: "Choose \"Entire screen\", pick your screen and press Share…" });
 
     try {
-      const share = await requestEntireScreen({ requireVerifiableSurface: this.policy.chromium_only });
+      const share = await requestEntireScreen({ requireVerifiableSurface: this.policy.chromium_only || Boolean(this.o.requireChromium) });
       this.adoptScreen(share.stream, share.surface);
     } catch (err) {
       const message = err instanceof ShareError ? err.message : "Couldn't start screen sharing. Please try again.";
@@ -342,6 +377,51 @@ export class IntegrityEngine {
     this.setPhase("completed");
   }
 
+  /**
+   * Closes ONLY this round's telemetry log and hands the live camera, entire-screen share, baseline identity, and
+   * active fullscreen state cleanly over to the next round under the same `keepKey` (Launchpad multi-stage flow).
+   */
+  handOff(): void {
+    if (this.ended || this.handedOff) return;
+    this.handedOff = true;
+    this.ended = true;
+    const id = this.boot?.id;
+    const camera = this.camera?.stream ?? null;
+    const screen = this.screen?.stream ?? null;
+    this.stopWork();
+    detachHiddenVideo(this.cameraVideo);
+    detachHiddenVideo(this.screenVideo);
+    this.cameraVideo = null;
+    this.screenVideo = null;
+    this.camera = null;
+    this.screen = null;
+
+    park(this.o.keepKey, {
+      userKey: this.o.userKey,
+      camera,
+      screen,
+      instance: this.instance,
+      deviceId: this.ids,
+      baselinePhoto: this.baselinePhoto,
+      baselineDescriptor: this.baselineDescriptor,
+      graceMs: 30_000,
+      unclaimedMs: 15_000,
+      release: () => {
+        stopStream(camera);
+        stopStream(screen);
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      },
+      onUnclaimed: () => {
+        if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
+      },
+    });
+
+    if (id) void api.post(`/integrity/${id}/end`, { reason: "completed" }, { keepalive: true }).catch(() => undefined);
+    this.restoreTitle();
+    forgetEditorClipboard();
+    resetIntegrityUi();
+  }
+
   setBaselineIdentity(photo: string, descriptor?: number[] | null): void {
     this.baselinePhoto = photo;
     if (descriptor && descriptor.length > 0) {
@@ -356,6 +436,14 @@ export class IntegrityEngine {
   // ═══ policy & checklist ═════════════════════════════════════════════════════════════════════════════════════════════
 
   private async loadPolicy(): Promise<void> {
+    const isTestEnv = typeof process !== "undefined" && Boolean(process.env?.VITEST);
+    const cached = !isTestEnv ? policyCache.get(this.o.surface) : undefined;
+    if (cached && Date.now() - cached.cachedAt < POLICY_CACHE_TTL_MS) {
+      this.policy = cached.policy;
+      this.mode = cached.mode;
+      this.policyKnown = true;
+    }
+
     for (let attempt = 0; attempt < 3 && !this.policyKnown; attempt++) {
       try {
         const res = await api.get<{ enabled: boolean; policy: IntegrityPolicy | null }>(`/integrity/policy?surface=${this.o.surface}`);
@@ -367,6 +455,9 @@ export class IntegrityEngine {
           this.policy = { ...FALLBACK_POLICY, screen_share: "off", guardian: "off", ai: false, block_multi_monitor: false, focus_loss_strike: 0, webcam_snapshot: 0, clipboard: this.o.surface === "contest" ? "editor_only" : "block_all" };
         }
         this.policyKnown = true;
+        if (!isTestEnv) {
+          policyCache.set(this.o.surface, { policy: this.policy, mode: this.mode, cachedAt: Date.now() });
+        }
       } catch (err) {
         // An old server without the endpoint behaves like the layer being off; any other failure is retried.
         if (err instanceof ApiError && err.status === 404) {
@@ -379,8 +470,23 @@ export class IntegrityEngine {
       }
     }
 
+    const effectiveScreenShare =
+      this.o.requireScreenShare && this.mode === "integrity"
+        ? "required"
+        : this.mode === "integrity"
+          ? this.policy.screen_share
+          : "off";
+    const uiPolicy =
+      this.mode === "integrity"
+        ? {
+            ...this.policy,
+            screen_share: effectiveScreenShare,
+            chromium_only: this.policy.chromium_only || Boolean(this.o.requireChromium),
+          }
+        : null;
+
     setIntegrityUi({
-      policy: this.mode === "integrity" ? this.policy : null,
+      policy: uiPolicy,
       guardian: { ...getIntegrityUi().guardian, mode: this.mode === "integrity" ? this.policy.guardian : "off" },
     });
   }
@@ -392,7 +498,7 @@ export class IntegrityEngine {
     };
     const required: Record<PreflightCheck["id"], boolean> = {
       browser: true, tamper: true, automation: true, camera: this.policy.camera === "required", mic: false,
-      display: this.policy.block_multi_monitor, screen: this.policy.screen_share === "required", network: false, guardian: this.policy.guardian === "required",
+      display: this.policy.block_multi_monitor, screen: this.policy.screen_share === "required" || Boolean(this.o.requireScreenShare), network: false, guardian: this.policy.guardian === "required",
     };
 
     return { id, label: labels[id], status, required: required[id], detail };
@@ -407,7 +513,7 @@ export class IntegrityEngine {
     setCheck(this.automationCheck());
     setCheck(this.check("camera", this.camera ? "ok" : "pending", this.camera ? this.camera.label || "Camera ready" : undefined));
     if (integrity) setCheck(this.displayCheck());
-    if (integrity && this.policy.screen_share !== "off") {
+    if (integrity && (this.policy.screen_share !== "off" || this.o.requireScreenShare)) {
       setCheck(this.check("screen", this.screen ? "ok" : "pending", this.screen ? "Your entire screen is being shared." : undefined));
     }
     if (integrity && this.policy.guardian !== "off") {
@@ -424,14 +530,19 @@ export class IntegrityEngine {
 
     // Drop checks the profile does not use.
     setIntegrityUi((s) => ({
-      checks: s.checks.filter((c) => (integrity || ["browser", "automation", "camera"].includes(c.id)) && (c.id !== "screen" || this.policy.screen_share !== "off") && (c.id !== "guardian" || this.policy.guardian !== "off")),
+      checks: s.checks.filter(
+        (c) =>
+          (integrity || ["browser", "automation", "camera"].includes(c.id)) &&
+          (c.id !== "screen" || this.policy.screen_share !== "off" || Boolean(this.o.requireScreenShare)) &&
+          (c.id !== "guardian" || this.policy.guardian !== "off")
+      ),
     }));
   }
 
   private browserCheck(): PreflightCheck {
     const ok = !!navigator.mediaDevices?.getUserMedia && !!document.documentElement.requestFullscreen;
     if (!ok) return { ...this.check("browser", "fail"), detail: "This browser lacks camera or fullscreen support.", fix: "Use a recent Chrome or Edge on a computer." };
-    if (this.policy.chromium_only && !isChromium()) {
+    if ((this.policy.chromium_only || this.o.requireChromium) && !isChromium()) {
       return {
         ...this.check("browser", "fail"),
         detail: isMac() ? "Safari can't confirm which screen you share, so this attempt needs Chrome or Edge." : "This attempt needs Chrome or Edge.",
@@ -524,11 +635,11 @@ export class IntegrityEngine {
   // ═══ starting the attempt ═══════════════════════════════════════════════════════════════════════════════════════════
 
   private async begin(auto: boolean): Promise<void> {
-    if (this.starting || this.ended || (this.phase !== "consent" && this.phase !== "blocked")) return;
+    if (this.starting || this.ended || (!auto && this.phase !== "consent" && this.phase !== "blocked")) return;
     if (!this.capable()) return;
     this.starting = true;
     this.o.handlers.consentError(null);
-    this.setPhase("starting");
+    if (!auto) this.setPhase("starting");
 
     try {
       if (!this.camera && this.policy.camera === "required") {
@@ -589,9 +700,11 @@ export class IntegrityEngine {
         return;
       }
 
+      this.claimedKept = false;
       this.activate();
       this.setPhase(document.fullscreenElement || auto ? "active" : "fullscreen_lost");
     } finally {
+      this.claimedKept = false;
       this.starting = false;
     }
   }
@@ -1023,10 +1136,15 @@ export class IntegrityEngine {
 
       const video = this.cameraVideo;
       if (video && !document.hidden && !this.lost.camera) {
+        const nowMs = Date.now();
+        const detectObjects =
+          frame++ % 2 === 0 ||
+          this.phoneTracker.isSuspect(nowMs) ||
+          this.activeGraceViolation?.type === "phone_detected";
         const t0 = performance.now();
         let analysis = null;
         try {
-          analysis = this.vision.analyse(video, frame++ % 4 === 0);
+          analysis = this.vision.analyse(video, detectObjects);
         } catch {
           analysis = null;
         }
@@ -1050,8 +1168,7 @@ export class IntegrityEngine {
             phone: analysis.phone,
             faceSimilarity,
           })) {
-            this.emit(f.type, f.data);
-            void this.still("webcam", { flagged: true, reason: f.type, meta: f.data });
+            this.emitAiStrikeOnce(f.type, f.data, 45_000);
           }
 
           this.evaluateGraceGuard(analysis, faceSimilarity);
@@ -1097,27 +1214,32 @@ export class IntegrityEngine {
     return times[1] <= 600;
   }
 
+  private emitAiStrikeOnce(type: WebEventType, data?: Record<string, unknown>, minGapMs = 20_000): boolean {
+    if (this.ended) return false;
+    const now = Date.now();
+    const prev = this.lastAiIncidentAt[type] ?? 0;
+    if (now - prev < minGapMs) return false;
+
+    this.lastAiIncidentAt[type] = now;
+    this.emit(type, data);
+    void this.still("webcam", { flagged: true, reason: type, meta: data });
+    return true;
+  }
+
   private evaluateGraceGuard(analysis: FrameAnalysis, faceSimilarity: number | null, overrideViolation?: "speech_prohibited" | null): void {
     if (this.ended || this.phase !== "active") return;
 
+    const now = Date.now();
     let violationType: "face_mismatch" | "phone_detected" | "no_face" | "multiple_faces" | "face_away" | "speech_prohibited" | null = overrideViolation ?? null;
     let message = "";
+    const phoneReading = !overrideViolation ? this.phoneTracker.feed(now, analysis.phone) : { active: false, score: 0 };
 
     if (!violationType) {
-      if (analysis.phone !== undefined) {
-        if (analysis.phone >= 0.45) {
-          this.lastPhoneReading = { at: Date.now(), score: analysis.phone };
-        } else {
-          this.lastPhoneReading = null;
-        }
-      }
-
-      const activePhoneDetected =
-        (analysis.phone !== undefined && analysis.phone >= 0.45) ||
-        (this.lastPhoneReading !== null && Date.now() - this.lastPhoneReading.at < 3500);
+      const activePhoneDetected = phoneReading.active;
 
       // Track personal resting head pose baseline across the first 6 neutral single-face frames
-      let yawDelta = analysis.yaw !== null ? Math.abs(analysis.yaw) : 0;
+      let yawDelta = 0;
+      let signedPitchDelta = 0;
       let pitchDelta = 0;
       if (analysis.faces === 1 && analysis.yaw !== null && analysis.pitch !== null) {
         if (this.poseBaseline.samples.length < 6) {
@@ -1130,34 +1252,65 @@ export class IntegrityEngine {
           }
         } else {
           yawDelta = Math.abs(analysis.yaw - this.poseBaseline.yaw);
-          pitchDelta = Math.abs(analysis.pitch - this.poseBaseline.pitch);
+          signedPitchDelta = analysis.pitch - this.poseBaseline.pitch;
+          pitchDelta = Math.abs(signedPitchDelta);
         }
       }
 
+      const poseDistorted = analysis.faces === 1 && (yawDelta > 0.28 || pitchDelta > 0.28);
+      if (this.baselineDescriptor && analysis.faces === 1 && faceSimilarity !== null && !poseDistorted) {
+        if (faceSimilarity < FACE_MATCH_THRESHOLD) {
+          this.consecutiveFaceMismatches += 1;
+        } else {
+          this.consecutiveFaceMismatches = 0;
+        }
+      } else {
+        this.consecutiveFaceMismatches = 0;
+      }
+
+      const confirmedFaceMismatch =
+        this.baselineDescriptor !== null &&
+        analysis.faces === 1 &&
+        faceSimilarity !== null &&
+        !poseDistorted &&
+        (faceSimilarity < 0.72 || this.consecutiveFaceMismatches >= 2);
+
+      // Looking toward edges/bottom-right corner of the monitor keeps yaw/down-pitch under these bounds;
+      // only trigger look-away + strike when actually looking outside the screen.
+      const lookingOutsideScreen =
+        analysis.faces === 1 &&
+        (yawDelta > 0.36 || signedPitchDelta > 0.35 || -signedPitchDelta > 0.28);
+      if (lookingOutsideScreen) {
+        this.consecutiveLookAway += 1;
+      } else {
+        this.consecutiveLookAway = 0;
+      }
+      const confirmedLookAway =
+        lookingOutsideScreen &&
+        (this.consecutiveLookAway >= 2 || yawDelta > 0.45 || signedPitchDelta > 0.45 || -signedPitchDelta > 0.36);
+
       if (activePhoneDetected) {
         violationType = "phone_detected";
-        message = "Prohibited mobile phone detected. Remove it immediately or your interview will be terminated.";
+        message = `Prohibited mobile phone detected. Remove it immediately or your ${this.o.activityLabel} will be terminated.`;
       } else if (analysis.faces === 0) {
         violationType = "no_face";
-        message = "No face detected in camera view. Please face the camera directly.";
+        message = "No face detected in camera view. Please face the camera directly within 5 seconds.";
       } else if (analysis.faces > 1) {
         violationType = "multiple_faces";
-        message = `Multiple people detected (${analysis.faces} faces in camera). Only 1 candidate is allowed — ask everyone else to leave the frame within 5 seconds or your interview will be blocked.`;
-      } else if (this.baselineDescriptor && faceSimilarity !== null && faceSimilarity < FACE_MATCH_THRESHOLD) {
+        message = `Multiple people detected (${analysis.faces} faces in camera). Only 1 candidate is allowed — ask everyone else to leave the frame within 5 seconds or your ${this.o.activityLabel} will be blocked.`;
+      } else if (confirmedFaceMismatch) {
         violationType = "face_mismatch";
         message = "Face mismatch detected. The person in view does not match the verified candidate photo.";
-      } else if (analysis.faces === 1 && (yawDelta > 0.2 || pitchDelta > 0.22)) {
+      } else if (confirmedLookAway) {
         violationType = "face_away";
-        message = "Looking away from screen detected. Please face the interview camera directly.";
+        message = "Looking outside screen detected. Please keep your focus on the assessment screen.";
       }
     } else if (violationType === "speech_prohibited") {
       message = "Sustained side conversation detected during preparation.";
     }
 
-    const now = Date.now();
-    // Looking away and multiple-people detection both give a clear 5-second reminder before blocking;
-    // phone, absent face, and face mismatch lock at 2s.
-    const graceSeconds = violationType === "face_away" || violationType === "multiple_faces" ? 5 : 2;
+    // All grace warnings start consistently at 5 seconds.
+    const graceSeconds = 5;
 
     if (violationType) {
       if (!this.activeGraceViolation || this.activeGraceViolation.type !== violationType) {
@@ -1166,6 +1319,15 @@ export class IntegrityEngine {
           deadlineAt: now + graceSeconds * 1000,
           message,
         };
+
+        // Every proctoring warning (multiple people, face mismatch, mobile phone, etc.) awards 1 strike across all exams.
+        const strikeEventType: WebEventType = violationType === "speech_prohibited" ? "speech_detected" : violationType;
+        this.emitAiStrikeOnce(strikeEventType, {
+          grace_warning: true,
+          ...(violationType === "multiple_faces" ? { faces: analysis.faces } : {}),
+          ...(violationType === "phone_detected" && phoneReading.score > 0 ? { score: Math.round(phoneReading.score * 100) / 100 } : {}),
+          ...(violationType === "face_mismatch" && faceSimilarity !== null ? { similarity: Math.round(faceSimilarity * 100) / 100 } : {}),
+        }, 20_000);
       }
 
       if (!this.activeGraceViolation) return;
@@ -1182,16 +1344,15 @@ export class IntegrityEngine {
 
       if (secondsRemaining <= 0) {
         const type = violation.type;
-        const elapsedGrace = type === "face_away" || type === "multiple_faces" ? 5 : 2;
         const reason =
           type === "phone_detected"
-            ? "A prohibited mobile phone was detected in front of the camera and was not removed within 2 seconds."
+            ? "A prohibited mobile phone was detected in front of the camera and was not removed within 5 seconds."
             : type === "face_mismatch"
-            ? "Face mismatch detected: the person facing the camera did not match the verified candidate photo."
+            ? "Face mismatch detected: the person facing the camera did not match the verified candidate photo within 5 seconds."
             : type === "no_face"
-            ? "Candidate left the camera view and was not detected for more than 2 seconds."
+            ? "Candidate left the camera view and was not detected for more than 5 seconds."
             : type === "multiple_faces"
-            ? `Multiple people (${analysis.faces} faces) remained in the camera view for more than 5 seconds. Only one person is permitted in an interview.`
+            ? `Multiple people (${analysis.faces} faces) remained in the camera view for more than 5 seconds. Only one person is permitted.`
             : type === "face_away"
             ? "Candidate looked away / turned head sideways towards an off-screen person for more than 5 seconds."
             : "Prohibited side conversation detected while interviewer was speaking or during preparation time.";
@@ -1199,7 +1360,7 @@ export class IntegrityEngine {
         const eventType = type === "speech_prohibited" ? "speech_detected" : type;
         const eventData = {
           grace_period_exceeded: true,
-          duration_seconds: elapsedGrace,
+          duration_seconds: graceSeconds,
           ...(type === "multiple_faces" ? { faces: analysis.faces } : {}),
         };
         if (this.transport) {
@@ -1267,12 +1428,9 @@ export class IntegrityEngine {
           if (this.o.surface === "interview") {
             const context = this.o.getContext?.(false);
             const phase = (context as { phase?: string })?.phase;
-            this.emit("speech_detected", { seconds, phase, prohibited: phase === "prep" });
-            if (phase === "prep") {
-              void this.still("webcam", { flagged: true, reason: "speech_detected", meta: { phase, seconds } });
-            }
+            this.emitAiStrikeOnce("speech_detected", { seconds, phase, prohibited: phase === "prep" }, 20_000);
           } else {
-            this.emit("speech_detected", { seconds });
+            this.emitAiStrikeOnce("speech_detected", { seconds }, 20_000);
           }
         }
       });

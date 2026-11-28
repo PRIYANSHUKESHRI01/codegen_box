@@ -114,7 +114,11 @@ function Intro({ access }: { access: VaultAiAccess | null }) {
 }
 
 interface MellowVaultProfileSyncStatus {
-  profile_percent: number;
+  is_mellow_vault_user?: boolean;
+  account_origin?: "mellow_vault" | "aptrun";
+  profile_percent: number | null;
+  mv_profile_percentage?: number | null;
+  mv_skill?: string | null;
   threshold: number;
   hit_90: boolean;
   pro_id: number | null;
@@ -145,13 +149,15 @@ function VaultExplorerWithParams() {
     };
   }, []);
 
-  const showProfileBanner = mvStatus && mvStatus.profile_percent > 0 && mvStatus.hit_90;
+  const effectivePct = mvStatus ? (mvStatus.mv_profile_percentage ?? mvStatus.profile_percent) : null;
+  const showProfileBanner = Boolean(mvStatus && mvStatus.hit_90 && effectivePct !== null && effectivePct >= (mvStatus.threshold ?? 90));
   const alreadyOnMatchedStack =
     !!stackParam && !!mvStatus?.stack_key && stackParam.toLowerCase() === mvStatus.stack_key.toLowerCase();
+  const skillOrStackLabel = mvStatus?.stack_name || mvStatus?.mv_skill || null;
 
   return (
     <div className="space-y-5">
-      {showProfileBanner && (
+      {showProfileBanner && mvStatus && (
         <div className="flex flex-col gap-3 rounded-2xl border border-indigo-500/25 bg-gradient-to-r from-indigo-500/[0.08] via-violet-500/[0.04] to-transparent px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
@@ -159,14 +165,14 @@ function VaultExplorerWithParams() {
             </span>
             <div className="space-y-0.5">
               <p className="text-xs font-extrabold text-primary">
-                Mellow Vault Profile {mvStatus.profile_percent}% Complete
-                {mvStatus.stack_name ? ` · ${mvStatus.stack_name}` : ""}
+                Mellow Vault Profile {effectivePct}% Complete
+                {skillOrStackLabel ? ` · ${skillOrStackLabel}` : ""}
               </p>
               <p className="text-[11px] text-text-secondary">
                 {alreadyOnMatchedStack
                   ? "Your matched technical track is pre-loaded below — start Round 1 whenever you are ready."
-                  : mvStatus.stack_name
-                  ? `Your profile stack is ${mvStatus.stack_name}. Jump straight to your pre-matched qualification rounds.`
+                  : skillOrStackLabel
+                  ? `Your profile skill stack is ${skillOrStackLabel}. Jump straight to your pre-matched qualification rounds.`
                   : "You reached 90%+ on Mellow Vault. Pick your track below to begin your Vault AI Interview."}
               </p>
             </div>

@@ -149,6 +149,30 @@ export class BrowserVoiceEngine implements VoiceEngine {
     return hasSpeechRecognition() && hasMediaRecorder();
   }
 
+  unlockAudio(): void {
+    if (typeof window === "undefined") return;
+    try {
+      const a = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA");
+      a.volume = 0.01;
+      void a.play().catch(() => undefined);
+    } catch {
+      /* ignore autoplay unlock errors */
+    }
+    if (this.isTtsSupported()) {
+      try {
+        const synth = window.speechSynthesis;
+        synth.resume();
+        if (!synth.speaking && !synth.pending) {
+          const prime = new SpeechSynthesisUtterance("");
+          prime.volume = 0;
+          synth.speak(prime);
+        }
+      } catch {
+        /* ignore speech unlock errors */
+      }
+    }
+  }
+
   async speak(text: string, callbacks?: VoiceSpeakCallbacks, options?: VoiceSpeakOptions): Promise<void> {
     // The real voice first: a recording of this question made by a neural model. Anything short of it playing falls straight through to the
     // browser's own voice below, so the question is always read.
@@ -163,14 +187,18 @@ export class BrowserVoiceEngine implements VoiceEngine {
       if (outcome === "ended" || this.speechCancelled) return;
     }
 
-    if (!this.isTtsSupported()) return;
+    if (!this.isTtsSupported() || this.speechCancelled) return;
 
     const voices = await this.loadVoices();
+    const synth = window.speechSynthesis;
+    if (synth.speaking || synth.pending) {
+      synth.cancel();
+      // Chromium silently drops utterances passed synchronously right after cancel(); yield one short tick.
+      await new Promise((r) => window.setTimeout(r, 45));
+    }
+    if (this.speechCancelled) return;
 
     return new Promise((resolve) => {
-      const synth = window.speechSynthesis;
-      synth.cancel();
-
       const utterance = new SpeechSynthesisUtterance(text);
       const voice = pickVoice(voices);
       if (voice) {
@@ -178,6 +206,7 @@ export class BrowserVoiceEngine implements VoiceEngine {
         utterance.lang = voice.lang;
       }
       utterance.rate = 0.98;
+      utterance.volume = 1;
 
       let settled = false;
       // Some voices (Chrome's network ones in particular) occasionally go quiet without ever firing onend, which would leave the
@@ -186,10 +215,14 @@ export class BrowserVoiceEngine implements VoiceEngine {
         synth.cancel();
         settle();
       }, text.length * 140 + 5000);
+      const resumePulse = window.setInterval(() => {
+        if (!settled && synth.paused) synth.resume();
+      }, 600);
       const settle = () => {
         if (settled) return;
         settled = true;
         window.clearTimeout(watchdog);
+        window.clearInterval(resumePulse);
         resolve();
       };
 
@@ -203,6 +236,7 @@ export class BrowserVoiceEngine implements VoiceEngine {
       // Chrome drops an utterance's events if nothing references it, so keep it on the instance until the next one replaces it.
       this.currentUtterance = utterance;
       synth.speak(utterance);
+      if (synth.paused) synth.resume();
     });
   }
 

@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { IntegrityEngine } from "@/lib/integrity/engine";
+import { PhonePresenceTracker, scorePhoneCandidate } from "@/lib/integrity/detectors/phoneDetector";
 import { getIntegrityUi, resetIntegrityUi } from "@/lib/integrity/store";
 import { AnswerEditor } from "@/components/dashboard/interviews/room/AnswerEditor";
 import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
@@ -91,6 +92,64 @@ describe("Multiple-person camera detection (5-second reminder + block)", () => {
     vi.setSystemTime(new Date("2026-11-26T10:00:02.000Z"));
     guard({ faces: 1, yaw: 0, pitch: 0 }, null);
     expect(getIntegrityUi().graceWarning).toBeNull();
+  });
+
+  it("starts all warning timers from 5 seconds and emits 1 strike per warning episode", () => {
+    const engine = new IntegrityEngine({
+      surface: "contest",
+      basePath: "/contests/c1/problems/1",
+      keepKey: "test-key-3",
+      userKey: "user-1",
+      activityLabel: "contest",
+      handlers: {
+        phase: () => undefined,
+        session: () => undefined,
+        violation: () => undefined,
+        consentError: () => undefined,
+        camera: () => undefined,
+        previewReady: () => undefined,
+      },
+    });
+    const emitted: string[] = [];
+    (engine as unknown as { phase: string }).phase = "active";
+    (engine as unknown as { baselineDescriptor: number[] | null }).baselineDescriptor = [1, 0, 0];
+    (engine as unknown as { emit: (type: string) => void }).emit = (type: string) => emitted.push(type);
+
+    const guard = (engine as unknown as {
+      evaluateGraceGuard: (a: { faces: number; yaw: number | null; pitch: number | null; phone?: number }, sim: number | null) => void;
+    }).evaluateGraceGuard.bind(engine);
+
+    vi.setSystemTime(new Date("2026-11-26T10:00:00.000Z"));
+    guard({ faces: 0, yaw: null, pitch: null }, null);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "no_face", secondsRemaining: 5 });
+
+    // Recovery + face mismatch (two consecutive frames or severe < 0.72) -> 5s timer + 1 strike
+    vi.setSystemTime(new Date("2026-11-26T10:00:02.000Z"));
+    guard({ faces: 1, yaw: 0, pitch: 0 }, 0.65);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "face_mismatch", secondsRemaining: 5 });
+
+    // Recovery + phone detection -> 5s timer + 1 strike
+    vi.setSystemTime(new Date("2026-11-26T10:00:04.000Z"));
+    guard({ faces: 1, yaw: 0, pitch: 0, phone: 0.7 }, 0.95);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 5 });
+
+    expect(emitted).toEqual(["no_face", "face_mismatch", "phone_detected"]);
+  });
+});
+
+describe("Accurate mobile phone detection (geometry filter + multi-frame tracker)", () => {
+  it("filters out huge background boxes and confirms tilted phones across consecutive frames", () => {
+    // Reject background wall / huge region (> 45% area)
+    expect(scorePhoneCandidate(0.65, "cell phone", { originX: 0, originY: 0, width: 500, height: 400 }, 640, 480)).toBe(0);
+    // Accept compact portrait "remote" often misclassified from dark smartphone screen
+    expect(scorePhoneCandidate(0.55, "remote", { originX: 100, originY: 120, width: 70, height: 140 }, 640, 480)).toBeCloseTo(0.4675, 3);
+
+    const tracker = new PhonePresenceTracker();
+    // Single moderate reading marks suspect without immediately alarming
+    expect(tracker.feed(1000, 0.34).active).toBe(false);
+    expect(tracker.isSuspect(1500)).toBe(true);
+    // Second moderate reading confirms phone quickly
+    expect(tracker.feed(1800, 0.36).active).toBe(true);
   });
 });
 
@@ -266,7 +325,7 @@ describe("Phone persistence across non-object vision ticks & pitch look-away", (
     resetIntegrityUi();
   });
 
-  it("maintains the 2-second phone_detected countdown even when intermediate frames omit phone analysis", () => {
+  it("maintains the 5-second phone_detected countdown even when intermediate frames omit phone analysis", () => {
     const phases: string[] = [];
     const engine = new IntegrityEngine({
       surface: "interview",
@@ -291,17 +350,60 @@ describe("Phone persistence across non-object vision ticks & pitch look-away", (
     vi.setSystemTime(new Date("2026-11-26T10:00:00.000Z"));
     // Frame 0: object detector sees phone
     guard({ faces: 1, yaw: 0, pitch: 0, phone: 0.72 }, null);
-    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 2 });
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 5 });
 
     // Frame 1 (800ms later): object detector skipped (phone undefined) — warning MUST stay active!
     vi.setSystemTime(new Date("2026-11-26T10:00:00.800Z"));
     guard({ faces: 1, yaw: 0, pitch: 0 }, null);
-    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 2 });
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "phone_detected", secondsRemaining: 5 });
 
-    // 2.1s later: locks the session cleanly
-    vi.setSystemTime(new Date("2026-11-26T10:00:02.100Z"));
+    // 5.1s later: locks the session cleanly
+    vi.setSystemTime(new Date("2026-11-26T10:00:05.100Z"));
     guard({ faces: 1, yaw: 0, pitch: 0 }, null);
     expect(getIntegrityUi().graceWarning).toBeNull();
     expect(phases).toContain("locked");
+  });
+
+  it("allows looking at the bottom-right corner of the screen without warning, and only flags looking outside the screen", () => {
+    const engine = new IntegrityEngine({
+      surface: "interview",
+      basePath: "/interviews/test",
+      keepKey: "test-corner-gaze",
+      userKey: "user-1",
+      activityLabel: "interview",
+      handlers: {
+        phase: () => undefined,
+        session: () => undefined,
+        violation: () => undefined,
+        consentError: () => undefined,
+        camera: () => undefined,
+        previewReady: () => undefined,
+      },
+    });
+    const emitted: string[] = [];
+    (engine as unknown as { phase: string }).phase = "active";
+    (engine as unknown as { emit: (type: string) => void }).emit = (type: string) => emitted.push(type);
+    const guard = (engine as unknown as {
+      evaluateGraceGuard: (a: { faces: number; yaw: number | null; pitch: number | null; phone?: number }, sim: number | null) => void;
+    }).evaluateGraceGuard.bind(engine);
+
+    vi.setSystemTime(new Date("2026-11-26T10:00:00.000Z"));
+    // First 6 neutral frames calibrate resting baseline (yaw: 0, pitch: 0.05)
+    for (let i = 0; i < 6; i++) {
+      guard({ faces: 1, yaw: 0, pitch: 0.05 }, null);
+    }
+
+    // Looking at bottom-right screen corner (e.g. yaw: 0.26, pitch: +0.30) must NOT warn or strike
+    guard({ faces: 1, yaw: 0.26, pitch: 0.3 }, null);
+    guard({ faces: 1, yaw: 0.28, pitch: 0.32 }, null);
+    expect(getIntegrityUi().graceWarning).toBeNull();
+    expect(emitted).toEqual([]);
+
+    // Looking genuinely outside screen (e.g. yaw: 0.40 sideways for 2 frames) triggers 5s warning + 1 strike
+    guard({ faces: 1, yaw: 0.4, pitch: 0.05 }, null);
+    expect(getIntegrityUi().graceWarning).toBeNull();
+    guard({ faces: 1, yaw: 0.4, pitch: 0.05 }, null);
+    expect(getIntegrityUi().graceWarning).toMatchObject({ type: "face_away", secondsRemaining: 5 });
+    expect(emitted).toEqual(["face_away"]);
   });
 });

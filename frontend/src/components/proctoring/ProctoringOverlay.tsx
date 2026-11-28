@@ -1,10 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AlertTriangle, ClipboardX, Maximize } from "lucide-react";
+import { AlertTriangle, ClipboardX, Maximize, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/Button";
+import { useIntegrityUi } from "@/lib/integrity/store";
 import { AssuranceBadge, IntegrityHoldLayer } from "./IntegrityHoldLayer";
 import { violationLabel, type ProctoringPhase, type ProctoringSessionState, type ViolationType } from "@/lib/proctoring/types";
+
+/** Combined recording + strike-count status pill — shared inline or floating across proctored surfaces. */
+export function ProctoringStatusPill({
+  session,
+  className = "",
+}: {
+  session: ProctoringSessionState;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex items-center gap-2.5 px-3 py-1.5 rounded-control bg-surface border border-border-strong shadow-card text-2xs font-bold whitespace-nowrap ${className}`.trim()}
+    >
+      <span className="flex items-center gap-1.5 text-status-danger" title="Your attempt is being proctored">
+        <span className="w-2 h-2 rounded-full bg-status-danger animate-pulse" aria-hidden="true" />
+        <span className="hidden sm:inline">Recording</span>
+      </span>
+      <span className="h-3.5 w-px bg-border-subtle" aria-hidden="true" />
+      <span className="flex items-center gap-1.5 text-text-secondary">
+        <AlertTriangle className={session.violation_count > 0 ? "w-3.5 h-3.5 text-status-warning" : "w-3.5 h-3.5 text-text-muted"} />
+        {session.violation_count}/{session.max_violations} strikes
+      </span>
+      <AssuranceBadge />
+    </div>
+  );
+}
 
 /**
  * Rendered on top of the normal contest problem UI (absolutely positioned,
@@ -26,6 +53,7 @@ export function ProctoringOverlay({
   studentName,
   rollNumber,
   onResumeFullscreen,
+  hideStatusPill = false,
 }: {
   phase: ProctoringPhase;
   session: ProctoringSessionState | null;
@@ -33,9 +61,11 @@ export function ProctoringOverlay({
   studentName: string;
   rollNumber: string | null;
   onResumeFullscreen: () => void;
+  hideStatusPill?: boolean;
 }) {
   const [toast, setToast] = useState<{ type: ViolationType; count: number; max: number } | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const { graceWarning } = useIntegrityUi();
 
   useEffect(() => {
     if (!lastViolation) return;
@@ -69,18 +99,47 @@ export function ProctoringOverlay({
           itself is never shown here; this is just an honest indicator that
           it's running in the background, plus the always-visible strike
           count (not just at toast time). */}
-      {session && (
-        <div className="fixed top-4 right-4 z-50 flex items-center gap-2.5 px-3 py-1.5 rounded-control bg-surface border border-border-strong shadow-card text-2xs font-bold">
-          <span className="flex items-center gap-1.5 text-status-danger" title="Your attempt is being proctored">
-            <span className="w-2 h-2 rounded-full bg-status-danger animate-pulse" aria-hidden="true" />
-            <span className="hidden sm:inline">Recording</span>
-          </span>
-          <span className="h-3.5 w-px bg-border-subtle" aria-hidden="true" />
-          <span className="flex items-center gap-1.5 text-text-secondary">
-            <AlertTriangle className={session.violation_count > 0 ? "w-3.5 h-3.5 text-status-warning" : "w-3.5 h-3.5 text-text-muted"} />
-            {session.violation_count}/{session.max_violations} strikes
-          </span>
-          <AssuranceBadge />
+      {!hideStatusPill && session && <ProctoringStatusPill session={session} className="fixed top-4 right-4 z-50" />}
+
+      {/* Active Vault-AI-style grace countdown warning for multiple people / phone / face mismatch / absent face / looking away */}
+      {graceWarning && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          className="fixed top-16 sm:top-20 inset-x-4 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-[70] max-w-lg w-full rounded-2xl border-2 border-status-danger bg-status-danger/95 text-white p-4 shadow-2xl backdrop-blur-md"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white">
+              <ShieldAlert className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black uppercase tracking-wider text-white">
+                  {graceWarning.type === "phone_detected"
+                    ? "PROHIBITED DEVICE DETECTED"
+                    : graceWarning.type === "face_mismatch"
+                    ? "FACE IDENTITY MISMATCH"
+                    : graceWarning.type === "no_face"
+                    ? "FACE NOT DETECTED"
+                    : graceWarning.type === "face_away"
+                    ? "LOOKING AWAY / HEAD TURNED SIDEWAYS"
+                    : graceWarning.type === "speech_prohibited"
+                    ? "PROHIBITED SPEECH / CONVERSATION DETECTED"
+                    : "MULTIPLE PEOPLE DETECTED"}
+                </p>
+                <span className="rounded-full bg-black/40 px-2.5 py-0.5 font-mono text-xs font-extrabold text-white">
+                  {graceWarning.secondsRemaining}s left
+                </span>
+              </div>
+              <p className="mt-1 text-xs font-medium text-white/95 leading-snug">
+                {graceWarning.message}
+              </p>
+              <div className="mt-2.5 flex items-center justify-between gap-2 text-2xs text-white/80">
+                <span>Session will terminate automatically if not resolved.</span>
+                <span className="font-semibold underline">Auto-recovers when resolved</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -465,7 +465,7 @@ def build_how_to_use_pdf():
       </div>
       <div class="corp-auth-item">
         <div class="corp-auth-label">Enterprise Support &amp; Desk</div>
-        <div class="corp-auth-val">support@mellowvault.com &middot; +91 76785 78295</div>
+        <div class="corp-auth-val">support@mellowvault.com &middot; +91 93111 48660</div>
       </div>
       <div class="corp-auth-item">
         <div class="corp-auth-label">Information Security Standards</div>
@@ -1878,7 +1878,7 @@ def build_how_to_use_pdf():
   <div style="background: #0f172a; color: #ffffff; border-radius: 6px; padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; margin-top: 6px;">
     <div>
       <div style="font-size: 8.5pt; font-weight: 700;">AptRun™ Enterprise Skilling &middot; Product of Mellow Vault (Prayukti Development Pvt. Ltd. &middot; CIN: U62099UP2024PTC207212)</div>
-      <div style="font-size: 7.2pt; color: #94a3b8;">Official Support &amp; Helpdesk: support@mellowvault.com &middot; Helpline: +91 76785 78295 &middot; Registered Office: Noida / New Delhi, India</div>
+      <div style="font-size: 7.2pt; color: #94a3b8;">Official Support &amp; Helpdesk: support@mellowvault.com &middot; Helpline: +91 93111 48660 &middot; Registered Office: Noida / New Delhi, India</div>
     </div>
     <div style="text-align: right;">
       <span class="badge badge-green" style="font-size: 7.5pt;">SYSTEM OPERATIONAL &middot; 99.99%</span>

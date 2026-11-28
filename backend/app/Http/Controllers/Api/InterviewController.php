@@ -201,7 +201,8 @@ class InterviewController extends Controller
             $session->update(['status' => InterviewSession::STATUS_IN_PROGRESS, 'started_at' => now()]);
         }
 
-        // The candidate's own request makes the current question's voice; get the one after it ready while they answer.
+        // Synthesize greeting + current + upcoming question clips right after start response flushes
+        $this->warmSpeech($interview, $session->current_question_order, includeLine: $session->current_question_order > 0 ? 'welcome_back' : 'greeting');
         $this->warmSpeech($interview, $session->current_question_order + 1);
 
         return response()->json($this->sessionPayload($interview, $session));
@@ -688,7 +689,11 @@ class InterviewController extends Controller
      */
     private function canReattempt(Interview $interview, InterviewSession $session): bool
     {
-        if ($interview->isTrackRound() || $interview->interview_type === Interview::INTERVIEW_TYPE_COMPANY_HIRING) {
+        if (
+            $interview->isTrackRound()
+            || $interview->interview_type === Interview::INTERVIEW_TYPE_COMPANY_HIRING
+            || $interview->interview_type === Interview::INTERVIEW_TYPE_COLLEGE_ASSESSMENT
+        ) {
             return false;
         }
 
@@ -828,8 +833,8 @@ class InterviewController extends Controller
         return $speech->available() ? ['enabled' => true, 'lines' => $speech->lines()] : ['enabled' => false, 'lines' => (object) []];
     }
 
-    /** Synthesises the question at `$index` after the response has been sent, so the candidate never waits for it. */
-    private function warmSpeech(Interview $interview, int $index): void
+    /** Synthesises the question at `$index` (and optional greeting line) after the response has been sent. */
+    private function warmSpeech(Interview $interview, int $index, ?string $includeLine = null): void
     {
         $speech = app(InterviewSpeech::class);
 
@@ -837,7 +842,14 @@ class InterviewController extends Controller
             return;
         }
 
-        app()->terminating(function () use ($interview, $index, $speech) {
+        app()->terminating(function () use ($interview, $index, $includeLine, $speech) {
+            if ($includeLine !== null) {
+                try {
+                    $speech->forLine($includeLine);
+                } catch (\Throwable) {
+                    // Best-effort line warm-up
+                }
+            }
             $speech->warm($interview->interviewQuestions()->orderBy('display_order')->get()->get($index));
         });
     }

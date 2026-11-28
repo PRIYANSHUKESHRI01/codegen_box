@@ -31,7 +31,11 @@ function ContestDetailPageContent() {
   const { status } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
+  const assessmentSlug = searchParams.get("assessment") ?? "";
   const router = useRouter();
+  const backHref = assessmentSlug
+    ? `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`
+    : "/dashboard/contests";
 
   const [contest, setContest] = useState<ContestDetail | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "not_found">("loading");
@@ -47,6 +51,14 @@ function ContestDetailPageContent() {
     api
       .get<ContestDetail>(`/contests/${slug}`)
       .then((res) => {
+        if (assessmentSlug || res.contest_type === "college_assessment") {
+          router.replace(
+            assessmentSlug
+              ? `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`
+              : "/dashboard/assessments"
+          );
+          return;
+        }
         setContest(res);
         setLoadState("ready");
       })
@@ -57,6 +69,10 @@ function ContestDetailPageContent() {
 
   useEffect(() => {
     if (status !== "ready") return;
+    if (assessmentSlug) {
+      router.replace(`/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`);
+      return;
+    }
     // An address with no contest in it (a bookmark, an old link) has nothing to load — say so instead of "Loading contest…" for ever.
     if (!slug) {
       setLoadState("not_found");
@@ -64,7 +80,7 @@ function ContestDetailPageContent() {
     }
     loadContest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, slug]);
+  }, [status, slug, assessmentSlug]);
 
   // If the next screen has not appeared after a while (a dropped connection, a blocked navigation) the press must not stay stuck.
   useEffect(() => {
@@ -87,11 +103,15 @@ function ContestDetailPageContent() {
 
   if (loadState === "not_found" || !contest) {
     return (
-      <DashboardShell role="user" title="Contest not found">
+      <DashboardShell
+        role="user"
+        title="Contest not found"
+        back={assessmentSlug ? { href: backHref, label: "Campus Assessment" } : undefined}
+      >
         <div className="p-10 text-center text-sm text-text-muted">
           This contest doesn&apos;t exist or isn&apos;t published.{" "}
-          <Link href="/dashboard/contests" className="text-accent-primary hover:underline">
-            Back to contests
+          <Link href={backHref} className="text-accent-primary hover:underline">
+            {assessmentSlug ? "Back to Campus Assessment" : "Back to contests"}
           </Link>
         </div>
       </DashboardShell>
@@ -128,14 +148,20 @@ function ContestDetailPageContent() {
     if (opening !== null) return;
     setOpening(key);
     prefetchContestProblem(contest.slug, contestProblemId);
-    router.push(contestProblemHref(contest.slug, contestProblemId));
+    const base = contestProblemHref(contest.slug, contestProblemId);
+    router.push(assessmentSlug ? `${base}&assessment=${encodeURIComponent(assessmentSlug)}` : base);
   };
 
   const minutesFromNow = Math.round((new Date(contest.start_at).getTime() - Date.now()) / 60000);
   const minutesToEnd = Math.round((new Date(contest.end_at).getTime() - Date.now()) / 60000);
 
   return (
-    <DashboardShell role="user" title={contest.title} subtitle={contest.description ?? undefined}>
+    <DashboardShell
+      role="user"
+      title={contest.title}
+      subtitle={contest.description ?? undefined}
+      back={assessmentSlug ? { href: backHref, label: "Campus Assessment" } : undefined}
+    >
       {/* Header card */}
       <div className="p-5 sm:p-6 rounded-panel bg-surface border border-border-subtle shadow-subtle flex flex-col md:flex-row md:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
@@ -260,7 +286,7 @@ function ContestDetailPageContent() {
 
       {/* Tabs */}
       <div className="flex items-center gap-1 p-1 rounded-btn bg-surface border border-border-subtle shadow-subtle w-fit">
-        {(["problems", "leaderboard"] as Tab[]).map((t) => (
+        {((assessmentSlug || contest.contest_type === "college_assessment") ? (["problems"] as Tab[]) : (["problems", "leaderboard"] as Tab[])).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}

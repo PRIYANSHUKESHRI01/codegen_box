@@ -1,5 +1,6 @@
 import { headPose } from "./attention";
 import { extractFaceDescriptor } from "./faceIdentity";
+import { scorePhoneCandidate } from "./phoneDetector";
 
 /**
  * In-browser face and phone detection with MediaPipe (WebAssembly, served from our own origin — see public/integrity).
@@ -100,8 +101,8 @@ export async function loadVision(base = "/integrity", delegate: Delegate = "CPU"
       objects = await vision.ObjectDetector.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: `${base}/models/efficientdet_lite0.tflite`, delegate },
         runningMode: "VIDEO",
-        scoreThreshold: 0.35,
-        maxResults: 6,
+        scoreThreshold: 0.26,
+        maxResults: 8,
       });
     } catch {
       objects = null; // faces still work without the phone detector
@@ -138,9 +139,12 @@ export async function loadVision(base = "/integrity", delegate: Delegate = "CPU"
 
       if (withObjects && objects) {
         let best = 0;
+        const fw = video.videoWidth;
+        const fh = video.videoHeight;
         for (const d of objects.detectForVideo(video, stamp()).detections) {
           for (const c of d.categories) {
-            if (c.categoryName === "cell phone") best = Math.max(best, c.score);
+            const candidate = scorePhoneCandidate(c.score, c.categoryName, d.boundingBox, fw, fh);
+            if (candidate > best) best = candidate;
           }
         }
         out.phone = best;

@@ -182,3 +182,69 @@ export function homeRouteForRole(role: Role): string {
       return "/dashboard";
   }
 }
+
+/** Reads the `redirect` query parameter from `window.location.search` without needing a `<Suspense>` boundary. */
+export function readRedirectParam(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return new URLSearchParams(window.location.search).get("redirect");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Validates an optional post-login `redirect` path against open-redirect tricks and the signed-in user's role,
+ * returning the deep link (e.g. `/dashboard/vault-interviews?stack=react_nextjs`) or falling back to `homeRouteForRole`.
+ */
+export function resolvePostLoginRoute(role: Role, rawRedirect?: string | null): string {
+  const fallback = homeRouteForRole(role);
+  if (typeof rawRedirect !== "string") return fallback;
+
+  const trimmed = rawRedirect.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.startsWith("/\\")) {
+    return fallback;
+  }
+
+  const pathname = trimmed.split(/[?#]/)[0] || "/";
+  if (
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/signup" ||
+    pathname === "/mellow-internal"
+  ) {
+    return fallback;
+  }
+
+  const isStaffConsolePath =
+    pathname.startsWith("/superadmin") ||
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/tpo") ||
+    pathname.startsWith("/marketing") ||
+    pathname.startsWith("/coordinator") ||
+    pathname.startsWith("/company");
+
+  if (role === "user") {
+    return isStaffConsolePath ? fallback : trimmed;
+  }
+
+  if (role === "superadmin" || role === "admin_internal") {
+    return trimmed;
+  }
+
+  if (role === "admin_tpo" || role === "section_coordinator") {
+    return pathname.startsWith("/tpo") || pathname.startsWith("/coordinator") || pathname.startsWith("/admin")
+      ? trimmed
+      : fallback;
+  }
+
+  if (role === "admin_marketing") {
+    return pathname.startsWith("/marketing") ? trimmed : fallback;
+  }
+
+  if (role === "admin_company") {
+    return pathname.startsWith("/company") || pathname.startsWith("/admin") ? trimmed : fallback;
+  }
+
+  return fallback;
+}

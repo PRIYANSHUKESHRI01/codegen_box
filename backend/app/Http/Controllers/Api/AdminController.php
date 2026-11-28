@@ -522,9 +522,15 @@ class AdminController extends Controller
 
         if ($mvSource = $request->query('mv_source')) {
             if ($mvSource === 'mellow_vault') {
-                $query->where(fn ($q) => $q->whereNotNull('mellow_vault_dev_id')->orWhereNotNull('mellow_vault_profile_synced_at'));
+                $query->where(fn ($q) => $q->whereNotNull('mv_profile_percentage')
+                    ->orWhereNotNull('mv_skill')
+                    ->orWhereNotNull('mellow_vault_dev_id')
+                    ->orWhereNotNull('mellow_vault_profile_synced_at'));
             } elseif ($mvSource === 'aptrun_only') {
-                $query->whereNull('mellow_vault_dev_id')->whereNull('mellow_vault_profile_synced_at');
+                $query->whereNull('mv_profile_percentage')
+                    ->whereNull('mv_skill')
+                    ->whereNull('mellow_vault_dev_id')
+                    ->whereNull('mellow_vault_profile_synced_at');
             }
         }
 

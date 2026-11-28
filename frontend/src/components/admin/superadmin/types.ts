@@ -37,6 +37,7 @@ export interface ApiPlatformUser {
   /** Only present for role=user rows. */
   readiness_tier?: "Placement Ready" | "In Progress" | "Needs Training";
   readiness_score?: number | null;
+  vault_ai_score?: number | null;
   /** Granular section access — only ever non-null for admin_internal/admin_marketing rows. See User::hasPermission on the backend. */
   permissions: string[] | null;
   /** True while the account still has the temporary password it was issued (it must pick its own at next login). */
@@ -45,10 +46,12 @@ export interface ApiPlatformUser {
   credentials_email_sent_at?: string | null;
   /** Whether the temporary password this account was issued can be looked up — never the password itself. */
   credential_state?: CredentialState;
-  /** Distinguish Mellow Vault synced accounts from AptRun-only users (whose MV % stays 0 until synced). */
+  /** Distinguish Mellow Vault synced accounts from AptRun-only users (whose MV fields stay null). */
   is_mellow_vault_user?: boolean;
   account_origin?: "mellow_vault" | "aptrun";
-  mellow_vault_profile_percent?: number;
+  mv_profile_percentage?: number | null;
+  mv_skill?: string | null;
+  mellow_vault_profile_percent?: number | null;
   mellow_vault_stack_key?: string | null;
   mellow_vault_stack_name?: string | null;
   vault_ai_invite_sent_at?: string | null;

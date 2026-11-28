@@ -39,8 +39,9 @@ export const AWAY_MS = 8_000;
 export const MISMATCH_MS = 3_000;
 const REARM_MS = { no_face: 45_000, multiple_faces: 60_000, face_away: 45_000, phone_detected: 60_000, face_mismatch: 45_000 } as const;
 
-const YAW_LIMIT = 0.22;
-const PITCH_LIMIT = 0.2;
+const YAW_LIMIT = 0.36;
+const PITCH_DOWN_LIMIT = 0.35;
+const PITCH_UP_LIMIT = 0.28;
 const PHONE_SCORE = 0.5;
 const PHONE_CONFIRM_GAP_MS = 10_000;
 const BASELINE_FRAMES = 8;
@@ -115,8 +116,9 @@ export class AttentionRules {
         if (this.samples.yaw.length >= BASELINE_FRAMES) this.baseline = { yaw: median(this.samples.yaw), pitch: median(this.samples.pitch) };
       } else {
         const dy = Math.abs(o.yaw - this.baseline.yaw);
-        const dp = Math.abs(o.pitch - this.baseline.pitch);
-        if (dy > YAW_LIMIT || dp > PITCH_LIMIT) {
+        const signedPitch = o.pitch - this.baseline.pitch;
+        const dp = Math.abs(signedPitch);
+        if (dy > YAW_LIMIT || signedPitch > PITCH_DOWN_LIMIT || -signedPitch > PITCH_UP_LIMIT) {
           this.awaySince ??= o.t;
           if (o.t - this.awaySince >= AWAY_MS && this.armed("face_away", o.t)) {
             out.push({ type: "face_away", data: { seconds: Math.round((o.t - this.awaySince) / 1000), yaw: round(dy), pitch: round(dp) } });

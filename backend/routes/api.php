@@ -258,6 +258,7 @@ Route::prefix('vault/sync')->group(function () {
     Route::get('/user/{user}/status', [MellowVaultSyncApiController::class, 'userStatus']);
     Route::post('/batch', [MellowVaultSyncApiController::class, 'syncBatch']);
     Route::post('/profile-completion', [VaultProfileSyncController::class, 'pushFromMellowVault'])->middleware('throttle:60,1');
+    Route::post('/mv-profiles', [VaultProfileSyncController::class, 'pushBatchFromMellowVault'])->middleware('throttle:60,1');
 });
 
 // Mellow Vault score transfer API (transfer Vault AI Interview scores >= 60% with qualification message)
@@ -1544,6 +1545,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'not.impersonating'])->grou
             Route::post('/assessments/{collegeAssessment}/start-soft-skill', [StudentCollegeAssessmentController::class, 'startSoftSkill']);
             Route::post('/assessments/{collegeAssessment}/start-coding', [StudentCollegeAssessmentController::class, 'startCoding']);
             Route::post('/assessments/{collegeAssessment}/start-interview', [StudentCollegeAssessmentController::class, 'startInterview']);
+            Route::post('/assessments/{collegeAssessment}/advance', [StudentCollegeAssessmentController::class, 'advance']);
 
             Route::get('/problems/{problem}', [ProblemController::class, 'show'])->middleware('capability:coding_practice');
             // Run/Submit only enqueue (202 + token) — the verdict is collected

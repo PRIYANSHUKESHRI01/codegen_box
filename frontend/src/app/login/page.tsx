@@ -25,7 +25,7 @@ import { ForgotPasswordModal } from "@/components/auth/ForgotPasswordModal";
 import { ForcePasswordResetModal } from "@/components/auth/ForcePasswordResetModal";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { AuthUser, Role, homeRouteForRole } from "@/lib/auth";
+import { AuthUser, Role, readRedirectParam, resolvePostLoginRoute } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 import { takeSignedOutNotice } from "@/lib/sessionEvents";
@@ -181,12 +181,15 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forcePasswordResetEmail, setForcePasswordResetEmail] = useState<string | null>(null);
+  const [redirectAfterLogin, setRedirectAfterLogin] = useState<string | null>(null);
 
   // Sent here because the server ended the session (the account was blocked, or signed out of every device):
-  // say why, in the same banner a failed sign-in uses.
+  // say why, in the same banner a failed sign-in uses. Also capture any deep-link `?redirect=...` target
+  // (e.g. clicking a Vault AI Interview link from email while signed out).
   useEffect(() => {
     const notice = takeSignedOutNotice();
     if (notice) setError(notice);
+    setRedirectAfterLogin(readRedirectParam());
   }, []);
 
   // Selecting a tab always updates which persona's copy/labels show; in dev
@@ -238,7 +241,7 @@ export default function LoginPage() {
       }
 
       login(res.token, res.user);
-      router.push(homeRouteForRole(res.user.role));
+      router.push(resolvePostLoginRoute(res.user.role, redirectAfterLogin ?? readRedirectParam()));
     } catch (err) {
       setError(err instanceof ApiError ? offerableMessage(err.message) : "Unable to sign in. Please try again.");
       setLoading(false);
@@ -543,7 +546,10 @@ export default function LoginPage() {
               {/* Sign Up Redirect */}
               <div className="text-center text-sm font-medium text-text-secondary">
                 Don&apos;t have an account yet?{" "}
-                <Link href="/signup" className="text-accent-primary font-bold hover:underline">
+                <Link
+                  href={redirectAfterLogin ? `/signup?redirect=${encodeURIComponent(redirectAfterLogin)}` : "/signup"}
+                  className="text-accent-primary font-bold hover:underline"
+                >
                   Sign up now &rarr;
                 </Link>
               </div>
@@ -565,7 +571,7 @@ export default function LoginPage() {
         onComplete={(token, user) => {
           setForcePasswordResetEmail(null);
           login(token, user);
-          router.push(homeRouteForRole(user.role));
+          router.push(resolvePostLoginRoute(user.role, redirectAfterLogin ?? readRedirectParam()));
         }}
       />
     </AuthChrome>

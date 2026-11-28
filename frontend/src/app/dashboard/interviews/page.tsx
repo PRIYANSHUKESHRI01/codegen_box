@@ -107,29 +107,29 @@ function InterviewsListContent() {
             )}
             <MockInterviewExplorer />
           </div>
+
+          {focused ? null : loading ? (
+            <div className="mt-6 p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Loading interviews...
+            </div>
+          ) : interviews.length === 0 && tracks.length === 0 ? (
+            <div id="from-your-college" className="mt-8 p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
+              Nothing from your college yet — shortlisted interviews and mock rounds they schedule for you will appear here.
+            </div>
+          ) : (
+            <div id="from-your-college" className="mt-8 space-y-8 scroll-mt-20">
+              {tracks.length > 0 && <TrackSection tracks={tracks} />}
+              {inProgress.length > 0 && <InterviewSection title="Resume" interviews={inProgress} accent="warning" />}
+              {notStarted.length > 0 && <InterviewSection title="Available" interviews={notStarted} accent="primary" />}
+              {scheduled.length > 0 && <InterviewSection title="Scheduled" interviews={scheduled} accent="primary" />}
+              {completed.length > 0 && <InterviewSection title="Completed" interviews={completed} accent="muted" />}
+              {missed.length > 0 && <InterviewSection title="Closed" interviews={missed} accent="muted" />}
+              {practice.length > 0 && <InterviewSection title="Your practice interviews" interviews={practice} accent="primary" />}
+            </div>
+          )}
         </VoiceVerificationGate>
       </div>
-
-      {focused ? null : loading ? (
-        <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
-          <Loader2 className="w-4 h-4 animate-spin" />
-          Loading interviews...
-        </div>
-      ) : interviews.length === 0 && tracks.length === 0 ? (
-        <div id="from-your-college" className="mt-8 p-10 text-center text-xs text-text-muted rounded-panel bg-surface border border-border-subtle">
-          Nothing from your college yet — shortlisted interviews and mock rounds they schedule for you will appear here.
-        </div>
-      ) : (
-        <div id="from-your-college" className="mt-8 space-y-8 scroll-mt-20">
-          {tracks.length > 0 && <TrackSection tracks={tracks} />}
-          {inProgress.length > 0 && <InterviewSection title="Resume" interviews={inProgress} accent="warning" />}
-          {notStarted.length > 0 && <InterviewSection title="Available" interviews={notStarted} accent="primary" />}
-          {scheduled.length > 0 && <InterviewSection title="Scheduled" interviews={scheduled} accent="primary" />}
-          {completed.length > 0 && <InterviewSection title="Completed" interviews={completed} accent="muted" />}
-          {missed.length > 0 && <InterviewSection title="Closed" interviews={missed} accent="muted" />}
-          {practice.length > 0 && <InterviewSection title="Your practice interviews" interviews={practice} accent="primary" />}
-        </div>
-      )}
     </DashboardShell>
   );
 }

@@ -19,8 +19,8 @@ return [
     'legal_entity' => 'PRAYUKTI DEVELOPMENT PRIVATE LIMITED',
     'cin' => 'U62099UP2024PTC207212',
     'support_email' => env('BRAND_SUPPORT_EMAIL', 'support@mellowvault.com'),
-    'support_phone' => '+91 76785 78295',
-    'support_phone_href' => 'tel:+917678578295',
+    'support_phone' => '+91 93111 48660',
+    'support_phone_href' => 'tel:+919311148660',
     'location' => 'Noida / New Delhi, India',
 
     // The public website every link and image in an e-mail points at. NOT app.frontend_url: that is wherever the app runs (localhost in

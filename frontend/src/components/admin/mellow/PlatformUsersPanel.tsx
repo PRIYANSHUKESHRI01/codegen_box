@@ -19,7 +19,9 @@ interface ApiUser {
   college: { id: number; name: string } | null;
   is_mellow_vault_user?: boolean;
   account_origin?: "mellow_vault" | "aptrun";
-  mellow_vault_profile_percent?: number;
+  mv_profile_percentage?: number | null;
+  mv_skill?: string | null;
+  mellow_vault_profile_percent?: number | null;
   mellow_vault_stack_name?: string | null;
   vault_ai_invite_sent_at?: string | null;
 }

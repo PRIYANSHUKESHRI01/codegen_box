@@ -380,6 +380,7 @@ export function LaunchpadProgramBanner({
             <div className="grid gap-4 p-5 sm:p-7 md:grid-cols-3">
               {c.assessments.map((a) => {
                 const isLocked = !!a.locked;
+                const isBlocked = !!a.blocked_by_proctoring;
                 const isDone = a.status === "completed";
                 const isInProgress = a.status === "in_progress";
                 const isNextActive = !isLocked && !isDone;
@@ -397,6 +398,8 @@ export function LaunchpadProgramBanner({
                       "flex flex-col justify-between rounded-xl border p-5 transition-all",
                       isLocked
                         ? "border-border-subtle/70 bg-surface-muted/30 text-text-muted"
+                        : isBlocked
+                        ? "border-rose-500/40 bg-rose-500/[0.04]"
                         : isNextActive
                         ? "border-indigo-500/40 bg-surface shadow-[0_6px_22px_-12px_rgba(79,70,229,0.35)] ring-1 ring-indigo-500/10"
                         : "border-emerald-500/30 bg-surface"
@@ -408,14 +411,16 @@ export function LaunchpadProgramBanner({
                           <span
                             className={cn(
                               "inline-flex h-6 w-6 items-center justify-center rounded-lg text-[11px] font-extrabold tabular-nums",
-                              isDone
+                              isBlocked
+                                ? "bg-rose-500/15 text-rose-700 dark:text-rose-300"
+                                : isDone
                                 ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
                                 : isNextActive
                                 ? "bg-indigo-600 text-white"
                                 : "bg-surface-muted text-text-muted"
                             )}
                           >
-                            {isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : `0${a.number}`}
+                            {isBlocked ? "✕" : isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : `0${a.number}`}
                           </span>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-text-muted">
                             Set {a.set_number}
@@ -425,6 +430,10 @@ export function LaunchpadProgramBanner({
                         {isLocked ? (
                           <span className="inline-flex items-center gap-1 rounded-pill bg-surface-muted px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-text-muted">
                             <Lock className="h-2.5 w-2.5" /> Locked
+                          </span>
+                        ) : isBlocked ? (
+                          <span className="inline-flex items-center gap-1 rounded-pill bg-rose-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-rose-700 dark:text-rose-300">
+                            Blocked · 0%
                           </span>
                         ) : (
                           <span
@@ -497,7 +506,9 @@ export function LaunchpadProgramBanner({
                       ) : (
                         <div className="flex items-center justify-between gap-2">
                           <span className="text-xs font-bold text-text-secondary">
-                            {a.overall_score_percent !== null ? (
+                            {isBlocked ? (
+                              <span className="text-rose-600">Blocked: 0%</span>
+                            ) : a.overall_score_percent !== null ? (
                               <span className="text-primary">Overall: {a.overall_score_percent}%</span>
                             ) : (
                               "Proctored session"
@@ -508,12 +519,14 @@ export function LaunchpadProgramBanner({
                             href={`/dashboard/assessments/view?slug=${encodeURIComponent(a.slug)}`}
                             className={cn(
                               "inline-flex items-center gap-1.5 rounded-pill px-4 py-1.5 text-xs font-bold transition-all",
-                              isDone
+                              isBlocked
+                                ? "border border-rose-500/30 bg-rose-500/10 text-rose-700 hover:border-rose-500/50"
+                                : isDone
                                 ? "border border-border-subtle bg-elevated text-primary hover:border-primary/40"
                                 : "bg-indigo-600 text-white shadow-sm shadow-indigo-600/20 hover:bg-indigo-500"
                             )}
                           >
-                            {isDone ? "View Scorecard" : isInProgress ? "Resume" : "Start Assessment"}
+                            {isBlocked ? "View Lock Details" : isDone ? "View Scorecard" : isInProgress ? "Resume" : "Start Assessment"}
                             <ArrowRight className="h-3.5 w-3.5" />
                           </Link>
                         </div>

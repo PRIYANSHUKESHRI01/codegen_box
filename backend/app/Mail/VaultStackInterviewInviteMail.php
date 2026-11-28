@@ -33,8 +33,8 @@ class VaultStackInterviewInviteMail extends Mailable
     {
         $track = $this->stackName ?: $this->rawHeading;
         $subject = $track
-            ? "Your Mellow Vault profile hit {$this->profilePercent}% — Start your {$track} Vault AI Interview"
-            : "Your Mellow Vault profile hit {$this->profilePercent}% — Start your Vault AI Interview";
+            ? "You completed {$this->profilePercent}% of your Mellow Vault profile — take your {$track} Vault AI Interview to hit 100%"
+            : "You completed {$this->profilePercent}% of your Mellow Vault profile — take your Vault AI Interview to hit 100%";
 
         return $this->subject($subject)->view('emails.vault-stack-interview-invite');
     }

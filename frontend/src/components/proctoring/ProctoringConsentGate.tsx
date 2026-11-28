@@ -41,13 +41,16 @@ export function ProctoringConsentGate({
   candidateName = "",
   onLeave,
   startLabel,
+  badge,
+  sessionNote,
+  requireVerificationPhoto,
 }: {
   phase: ProctoringPhase;
   consentError: string | null;
   devicePreviewReady: boolean;
   previewVideoRef: React.RefObject<HTMLVideoElement>;
   onEnableDevices: () => void;
-  onConsent: () => void;
+  onConsent: (verifiedPhoto?: string | null, verifiedDescriptor?: number[] | null) => void;
   /** Which kind of attempt this gates — only changes the wording (see proctoringCopy.ts). Defaults to the original contest copy. */
   activity?: ProctoringActivity;
   /** The same stream the attempt will use; the lobby reads it to show the microphone level. Without it the meter simply stays quiet. */
@@ -58,21 +61,35 @@ export function ProctoringConsentGate({
   onLeave?: () => void;
   /** Optional custom button label for beginning the assessment. */
   startLabel?: string;
+  /** Optional badge text override (e.g. "Launchpad Assessment"). */
+  badge?: string;
+  /** Optional context line beside the header label. */
+  sessionNote?: string;
+  /** Override whether a baseline verification photo step is required before starting. */
+  requireVerificationPhoto?: boolean;
 }) {
   const copy = CONSENT_COPY[activity];
   const integrity = useIntegrityUi().policy !== null;
+  const needsPhoto = requireVerificationPhoto ?? activity === "soft_skill";
 
   const rules: LobbyRule[] = [
     { icon: Maximize, text: "Your screen will switch to fullscreen for the duration of your attempt. Exiting it is logged as a violation." },
-    ...(!integrity
+    ...(activity === "soft_skill"
       ? [
           {
             icon: Camera,
-            text: "Your camera turns on and records for your own attempt only — video stays in your browser and is never uploaded or stored. It won't be shown on screen once your attempt begins.",
+            text: "Your camera stays visible in a dedicated panel the entire time, with continuous 2-second face verification and look-away detection.",
           },
-          { icon: Mic, text: "Your microphone records alongside the camera, for the same reason." },
         ]
-      : []),
+      : !integrity
+        ? [
+            {
+              icon: Camera,
+              text: "Your camera turns on and records for your own attempt only — video stays in your browser and is never uploaded or stored. It won't be shown on screen once your attempt begins.",
+            },
+            { icon: Mic, text: "Your microphone records alongside the camera, for the same reason." },
+          ]
+        : []),
     { icon: AlertTriangle, tone: "warn", text: copy.strikes },
     ...(copy.paste ? [{ icon: ClipboardX, text: copy.paste }] : []),
   ];
@@ -81,8 +98,9 @@ export function ProctoringConsentGate({
     <ProctoringScreenFrame testId="proctoring-lobby">
       <InterviewLobby
         sessionLabel={copy.label}
+        sessionNote={sessionNote}
         candidateName={candidateName}
-        badge={copy.badge}
+        badge={badge ?? copy.badge}
         intro={copy.intro}
         previewVideoRef={previewVideoRef}
         cameraStream={cameraStream}
@@ -97,6 +115,7 @@ export function ProctoringConsentGate({
         disclosure={integrity ? <IntegrityDisclosure /> : null}
         footer={integrity ? copy.footer.replace(" Video stays in your browser.", "") : copy.footer}
         onLeave={onLeave}
+        requireVerificationPhoto={needsPhoto}
       />
     </ProctoringScreenFrame>
   );

@@ -34,14 +34,15 @@ class SyncMellowVaultProfiles extends Command
         $result = $service->syncAll($threshold, $maxEmails, $dryRun, $onlyUserId, $onlyEmail, $syncDispatch);
 
         if (! $result['configured']) {
-            $this->warn('Mellow Vault database is not configured (MELLOW_VAULT_DB_DATABASE is blank).');
+            $this->warn('Mellow Vault integration is not available (neither direct MV columns nor external DB configured).');
 
             return self::SUCCESS;
         }
 
         $this->info(sprintf(
-            '%sScanned %d Mellow Vault row(s); matched %d user(s) (%d updated), %d at >=%d%%, %d invite(s) %s, %d already invited, %d skipped.',
+            '%sScanned %d direct user(s) + %d external Mellow Vault row(s); matched %d user(s) (%d updated), %d at >=%d%%, %d invite(s) %s, %d already invited, %d skipped.',
             $dryRun ? '[DRY RUN] ' : '',
+            $result['direct_scanned'] ?? 0,
             $result['scanned'],
             $result['matched_users'],
             $result['updated_users'],

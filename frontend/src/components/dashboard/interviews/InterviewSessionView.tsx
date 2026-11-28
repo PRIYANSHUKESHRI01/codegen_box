@@ -175,13 +175,15 @@ function InterviewSessionViewSlugWrapper({ variant }: { variant: InterviewSessio
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
   const from = searchParams.get("from");
+  const assessmentSlug = searchParams.get("assessment") ?? "";
   const { checked, isMobilePhone } = useMobilePhoneGuard();
 
   if (!checked) return <InterviewBoot />;
 
   if (isMobilePhone) {
-    const backHref =
-      variant === "vault"
+    const backHref = assessmentSlug
+      ? `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`
+      : variant === "vault"
         ? "/dashboard/vault-interviews"
         : from === "merchant-navy"
           ? "/dashboard/merchant-navy"
@@ -206,8 +208,15 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const vault = variant === "vault";
   const { status, user } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
-  // Opened from the Merchant Navy section (it adds ?from=merchant-navy), "back" leads there rather than to the Mock AI Interview.
-  const home = vault ? "/dashboard/vault-interviews" : searchParams.get("from") === "merchant-navy" ? "/dashboard/merchant-navy" : "/dashboard/interviews";
+  const assessmentSlug = searchParams.get("assessment") ?? "";
+  // Opened from Campus Assessments / Launchpad (`?assessment=`) or Merchant Navy (`?from=merchant-navy`): "back" stays in that section.
+  const home = assessmentSlug
+    ? `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`
+    : vault
+      ? "/dashboard/vault-interviews"
+      : searchParams.get("from") === "merchant-navy"
+        ? "/dashboard/merchant-navy"
+        : "/dashboard/interviews";
   const slug = searchParams.get("slug") ?? "";
   const router = useRouter();
 
@@ -230,6 +239,8 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [interviewSessionReady, setInterviewSessionReady] = useState(false);
+  const [voiceGateError, setVoiceGateError] = useState<{ blocked: boolean; message: string } | null>(null);
   const [micErrorMessage, setMicErrorMessage] = useState<string | null>(null);
   const [listenHint, setListenHint] = useState<string | null>(null);
   /** The running transcript of the answer being spoken, and how much of it the recognizer has committed (the rest it may still revise). */
@@ -365,9 +376,13 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
+  const isCampusFlow = Boolean(assessmentSlug);
   const proctoring = useInterviewProctoring({
     basePath,
-    enabled: status === "ready",
+    keepKey: isCampusFlow ? `assessment:${assessmentSlug}` : undefined,
+    requireScreenShare: isCampusFlow,
+    requireChromium: isCampusFlow,
+    enabled: status === "ready" && interviewSessionReady,
     getContext: () => ({ phase, questionId: question?.interview_question_id, vault, answeredCount }),
   });
 
@@ -407,7 +422,7 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       if (speechInfo?.enabled) {
         setPhase("speaking");
         setVoiceLoading(true);
-        clip = await voiceCache.get(`q:${q.interview_question_id}`, `${basePath}/questions/${q.interview_question_id}/speech`);
+        clip = await voiceCache.get(`q:${q.interview_question_id}`, `${basePath}/questions/${q.interview_question_id}/speech`, 4500);
         setVoiceLoading(false);
         if (leftRef.current) return;
       }
@@ -487,6 +502,10 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
     const res = startResponseRef.current;
     if (!res?.question || phase !== "ready") return;
 
+    // Unlock browser Audio & SpeechSynthesis inside the real user gesture click BEFORE the 3-second countdown
+    // or speech clip downloads run, so Chrome never blocks playback with NotAllowedError.
+    engineRef.current.unlockAudio?.();
+
     interviewStartedAtRef.current = Date.now();
     setPhase("countdown");
     for (let n = timing.countdownSeconds; n >= 1; n--) {
@@ -513,14 +532,25 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
       setTotalQuestions(res.total_questions);
       setAnsweredCount(res.answered_count);
       if (res.complete || !res.question) {
+        setInterviewSessionReady(false);
         setPhase("complete");
       } else {
+        setInterviewSessionReady(true);
         setPhase("loading");
       }
     } catch (err) {
-      if (err instanceof ApiError && err.code === "voice_verification_required") {
-        const returnTo = typeof window !== "undefined" ? window.location.pathname + window.location.search : home;
-        router.replace(`/dashboard/voice-verification?returnTo=${encodeURIComponent(returnTo)}`);
+      setInterviewSessionReady(false);
+      if (err instanceof ApiError && (err.code === "voice_verification_required" || err.code === "voice_verification_blocked")) {
+        proctoring.endSession();
+        if (typeof document !== "undefined" && document.fullscreenElement) {
+          void document.exitFullscreen().catch(() => undefined);
+        }
+        setVoiceGateError({
+          blocked: err.code === "voice_verification_blocked",
+          message:
+            err.message ||
+            "Please complete your 5-minute Voice Baseline Verification recording before starting this interview.",
+        });
         return;
       }
       setErrorMessage(err instanceof ApiError ? err.message : "Couldn't start this interview.");
@@ -1108,6 +1138,47 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
 
   if (status !== "ready") return <InterviewBoot />;
 
+  if (voiceGateError) {
+    const returnTo = typeof window !== "undefined" ? window.location.pathname + window.location.search : home;
+    const verifyHref = `/dashboard/voice-verification?returnTo=${encodeURIComponent(returnTo)}`;
+    return (
+      <DashboardShell role="user" title="Voice Verification Required" fullBleed hideChrome>
+        <div className="flex flex-1 items-center justify-center p-6">
+          <div className="w-full max-w-lg rounded-3xl border border-indigo-500/30 bg-surface p-7 shadow-2xl space-y-5 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-300">
+              <AlertTriangle className="h-7 w-7" aria-hidden />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-lg font-extrabold text-primary">
+                {voiceGateError.blocked ? "Voice Verification Blocked" : "5-Minute Voice Recording Required"}
+              </h2>
+              <p className="text-sm leading-relaxed text-text-secondary">{voiceGateError.message}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3 pt-1 justify-center">
+              <button
+                type="button"
+                onClick={() => router.push(home)}
+                className="rounded-full border border-border-subtle px-5 py-3 text-xs font-bold text-text-secondary hover:text-primary"
+              >
+                Back to Dashboard
+              </button>
+              {!voiceGateError.blocked && (
+                <button
+                  type="button"
+                  onClick={() => router.push(verifyHref)}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 px-6 py-3 text-xs font-extrabold text-white shadow-lg shadow-indigo-600/25 hover:from-indigo-500 hover:to-violet-500"
+                >
+                  <span>Complete 5-Min Voice Verification</span>
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </DashboardShell>
+    );
+  }
+
   const sessionLabel = vault ? "Vault AI Interview" : studyMode ? "Merchant Navy Orals" : "AI Interview";
   const sessionNote = vault
     ? setInfo?.series_number != null && setInfo?.set_number != null
@@ -1213,23 +1284,38 @@ function InterviewSessionViewContent({ variant }: { variant: InterviewSessionVar
             ) : (
               <>
                 {phase === "error" && (
-                  <InterviewError message={errorMessage} retrying={starting} onRetry={startInterview} onBack={() => router.push(home)} backLabel={vault ? "Back to Qualification Circuit" : "Back to Interviews"} />
+                  <InterviewError
+                    message={errorMessage}
+                    retrying={starting}
+                    onRetry={startInterview}
+                    onBack={() => router.push(home)}
+                    backLabel={assessmentSlug ? "Back to Campus Assessment" : vault ? "Back to Qualification Circuit" : "Back to Interviews"}
+                  />
                 )}
 
                 {phase === "complete" && (
                   <InterviewComplete
                     vault={vault}
                     study={studyMode}
-                    backLabel={studyMode ? (home === "/dashboard/merchant-navy" ? "Back to Merchant Navy" : "Back to Mock Interviews") : undefined}
+                    backLabel={
+                      assessmentSlug
+                        ? "Back to Campus Assessment"
+                        : studyMode
+                          ? (home === "/dashboard/merchant-navy" ? "Back to Merchant Navy" : "Back to Mock Interviews")
+                          : undefined
+                    }
                     result={result}
                     totalQuestions={totalQuestions}
                     answeredCount={answeredCount}
                     elapsedSeconds={completionElapsedSeconds}
                     reattempting={reattempting}
+                    disableReattempt={isCampusFlow}
                     onReattempt={handleReattempt}
                     onRetryScoring={handleRetryScoring}
                     onBack={() => {
-                      if (vault && setInfo?.stack_key) {
+                      if (assessmentSlug) {
+                        router.push(home);
+                      } else if (vault && setInfo?.stack_key) {
                         router.push(`/dashboard/vault-interviews?stack=${encodeURIComponent(setInfo.stack_key)}`);
                       } else {
                         router.push(home);

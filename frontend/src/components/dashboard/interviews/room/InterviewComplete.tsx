@@ -81,6 +81,7 @@ export function InterviewComplete({
   elapsedSeconds,
   reattempting,
   onReattempt,
+  disableReattempt = false,
   onRetryScoring,
   onBack,
   qualification,
@@ -98,6 +99,8 @@ export function InterviewComplete({
   elapsedSeconds: number | null;
   reattempting: boolean;
   onReattempt: () => void;
+  /** Campus / Launchpad assessments permit only one attempt — never show re-attempt controls. */
+  disableReattempt?: boolean;
   onRetryScoring?: () => Promise<void> | void;
   onBack: () => void;
   qualification?: {
@@ -115,11 +118,12 @@ export function InterviewComplete({
   const scoring = !result || result.status === "scoring";
   const done = result?.status === "scored" ? result : null;
   const percent = Math.round(done?.composite_score_percent ?? 0);
-  const belowBar = done !== null && !vault && percent < 60 && done.reattemptable !== false;
+  const allowReattempt = !disableReattempt;
+  const belowBar = allowReattempt && done !== null && !vault && percent < 60 && done.reattemptable !== false;
   const needsReview = result?.status === "needs_human_review";
   // A study set can always be practised again; any other interview only when it scored below the bar.
   // For pending review/eval, answers are saved so reattempt is an optional alternative, not the main CTA.
-  const canReattempt = study ? done !== null && done.reattemptable !== false : belowBar;
+  const canReattempt = allowReattempt && (study ? done !== null && done.reattemptable !== false : belowBar);
 
   const currentSetNumber = qualification?.set_number ?? null;
   const hasNextSet = vault && currentSetNumber !== null && currentSetNumber < 3 && !!qualification?.stack_key && !!onStartNextSet;
@@ -402,7 +406,7 @@ export function InterviewComplete({
               )}
             </div>
 
-            {result?.reattemptable && (
+            {allowReattempt && result?.reattemptable && (
               <p className="text-center text-3xs text-text-muted">
                 Want to discard these answers and take a fresh sitting instead?{" "}
                 <button

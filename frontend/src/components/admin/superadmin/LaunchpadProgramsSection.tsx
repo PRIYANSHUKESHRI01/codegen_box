@@ -70,9 +70,15 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
   const [resultsRows, setResultsRows] = useState<LaunchpadResultRow[]>([]);
   const [resultsLoading, setResultsLoading] = useState(false);
   const [filterCollegeId, setFilterCollegeId] = useState("");
+  const [filterBranchCode, setFilterBranchCode] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterQualification, setFilterQualification] = useState("");
+  const [filterMinReadiness, setFilterMinReadiness] = useState("");
+  const [filterMinAvgScore, setFilterMinAvgScore] = useState("");
+  const [filterSort, setFilterSort] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
   const [exportingCsv, setExportingCsv] = useState(false);
+  const [selectedStudentRow, setSelectedStudentRow] = useState<LaunchpadResultRow | null>(null);
 
   const loadPrograms = useCallback(async () => {
     try {
@@ -235,16 +241,57 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
     }
   };
 
+  const buildResultsParams = useCallback(
+    (overrides?: {
+      cid?: string;
+      branch?: string;
+      st?: string;
+      qual?: string;
+      minReady?: string;
+      minAvg?: string;
+      sort?: string;
+      q?: string;
+    }) => {
+      const params = new URLSearchParams();
+      const cid = overrides?.cid ?? filterCollegeId;
+      const branch = overrides?.branch ?? filterBranchCode;
+      const st = overrides?.st ?? filterStatus;
+      const qual = overrides?.qual ?? filterQualification;
+      const minReady = overrides?.minReady ?? filterMinReadiness;
+      const minAvg = overrides?.minAvg ?? filterMinAvgScore;
+      const sort = overrides?.sort ?? filterSort;
+      const q = overrides?.q ?? filterSearch;
+      if (cid) params.set("college_id", cid);
+      if (branch) params.set("branch_code", branch);
+      if (st) params.set("status", st);
+      if (qual) params.set("qualification", qual);
+      if (minReady !== "") params.set("min_readiness", minReady);
+      if (minAvg !== "") params.set("min_avg_score", minAvg);
+      if (sort) params.set("sort", sort);
+      if (q.trim()) params.set("q", q.trim());
+      return params;
+    },
+    [filterCollegeId, filterBranchCode, filterStatus, filterQualification, filterMinReadiness, filterMinAvgScore, filterSort, filterSearch]
+  );
+
   const loadResults = useCallback(
-    async (slug: string, cid = filterCollegeId, st = filterStatus, q = filterSearch) => {
+    async (
+      slug: string,
+      overrides?: {
+        cid?: string;
+        branch?: string;
+        st?: string;
+        qual?: string;
+        minReady?: string;
+        minAvg?: string;
+        sort?: string;
+        q?: string;
+      }
+    ) => {
       try {
         setResultsLoading(true);
         await ensureOptions();
-        const params = new URLSearchParams();
-        if (cid) params.set("college_id", cid);
-        if (st) params.set("status", st);
-        if (q.trim()) params.set("q", q.trim());
-        const qs = params.toString();
+        const qs = buildResultsParams(overrides).toString();
         const res = await api.get<{
           program: LaunchpadProgramSummary;
           summary: {
@@ -266,36 +313,43 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
         setResultsLoading(false);
       }
     },
-    [ensureOptions, filterCollegeId, filterSearch, filterStatus, triggerToast]
+    [ensureOptions, buildResultsParams, triggerToast]
   );
 
   const openResults = async (slug: string) => {
     setFilterCollegeId("");
+    setFilterBranchCode("");
     setFilterStatus("");
+    setFilterQualification("");
+    setFilterMinReadiness("");
+    setFilterMinAvgScore("");
+    setFilterSort("");
     setFilterSearch("");
     setResultsSlug(slug);
-    await loadResults(slug, "", "", "");
+    await loadResults(slug, { cid: "", branch: "", st: "", qual: "", minReady: "", minAvg: "", sort: "", q: "" });
   };
 
-  const handleExportCsv = async () => {
+  const handleExportCsv = async (userId?: number | null, studentName?: string | null) => {
     if (!resultsSlug) return;
     try {
       setExportingCsv(true);
-      const params = new URLSearchParams();
-      if (filterCollegeId) params.set("college_id", filterCollegeId);
-      if (filterStatus) params.set("status", filterStatus);
-      if (filterSearch.trim()) params.set("q", filterSearch.trim());
+      const params = userId ? new URLSearchParams({ user_id: String(userId) }) : buildResultsParams();
       const qs = params.toString();
       const blob = await api.getFile(`/superadmin/launchpad-programs/${resultsSlug}/export${qs ? `?${qs}` : ""}`);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${resultsSlug}-report.csv`;
+      const safeName = studentName
+        ? studentName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
+        : "";
+      a.download = userId
+        ? `${resultsSlug}-${safeName || `student-${userId}`}-scorecard.csv`
+        : `${resultsSlug}-report.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      triggerToast("Program CSV scorecard exported.", "success");
+      triggerToast(userId ? "Individual student CSV exported." : "Program CSV scorecard exported.", "success");
     } catch (err) {
       triggerToast(err instanceof ApiError ? err.message : "CSV export failed.", "error");
     } finally {
@@ -813,7 +867,7 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                 <button
                   type="button"
                   disabled={exportingCsv}
-                  onClick={handleExportCsv}
+                  onClick={() => void handleExportCsv()}
                   className="inline-flex items-center gap-1.5 rounded-pill bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {exportingCsv ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
@@ -821,7 +875,10 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                 </button>
                 <button
                   type="button"
-                  onClick={() => setResultsSlug(null)}
+                  onClick={() => {
+                    setSelectedStudentRow(null);
+                    setResultsSlug(null);
+                  }}
                   className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover"
                 >
                   <X className="h-5 w-5" />
@@ -867,7 +924,7 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                   onChange={(e) => {
                     const val = e.target.value;
                     setFilterCollegeId(val);
-                    loadResults(resultsSlug, val, filterStatus, filterSearch);
+                    loadResults(resultsSlug, { cid: val });
                   }}
                   className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
                 >
@@ -879,11 +936,27 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                   ))}
                 </select>
                 <select
+                  value={filterBranchCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterBranchCode(val);
+                    loadResults(resultsSlug, { branch: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">All Branches</option>
+                  {options?.branches.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.short}
+                    </option>
+                  ))}
+                </select>
+                <select
                   value={filterStatus}
                   onChange={(e) => {
                     const val = e.target.value;
                     setFilterStatus(val);
-                    loadResults(resultsSlug, filterCollegeId, val, filterSearch);
+                    loadResults(resultsSlug, { st: val });
                   }}
                   className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
                 >
@@ -892,19 +965,76 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
+                <select
+                  value={filterQualification}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterQualification(val);
+                    loadResults(resultsSlug, { qual: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">All Qualification</option>
+                  <option value="fully_qualified">Fully Qualified</option>
+                  <option value="readiness_ready">Readiness 60%+</option>
+                  <option value="below_benchmark">Not Yet Qualified</option>
+                </select>
+                <select
+                  value={filterMinReadiness}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMinReadiness(val);
+                    loadResults(resultsSlug, { minReady: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">Any Readiness %</option>
+                  <option value="60">Readiness ≥ 60%</option>
+                  <option value="75">Readiness ≥ 75%</option>
+                  <option value="50">Readiness ≥ 50%</option>
+                </select>
+                <select
+                  value={filterMinAvgScore}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMinAvgScore(val);
+                    loadResults(resultsSlug, { minAvg: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">Any Avg Score %</option>
+                  <option value="80">Avg ≥ 80%</option>
+                  <option value="60">Avg ≥ 60%</option>
+                  <option value="40">Avg ≥ 40%</option>
+                </select>
+                <select
+                  value={filterSort}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterSort(val);
+                    loadResults(resultsSlug, { sort: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">Default Order</option>
+                  <option value="avg_desc">Highest Avg Score</option>
+                  <option value="avg_asc">Lowest Avg Score</option>
+                  <option value="readiness_desc">Highest Readiness %</option>
+                  <option value="readiness_asc">Lowest Readiness %</option>
+                </select>
                 <input
                   type="text"
                   value={filterSearch}
                   onChange={(e) => setFilterSearch(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") loadResults(resultsSlug, filterCollegeId, filterStatus, filterSearch);
+                    if (e.key === "Enter") loadResults(resultsSlug);
                   }}
                   placeholder="Search student, email, or roll..."
-                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs min-w-[220px]"
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs min-w-[200px]"
                 />
                 <button
                   type="button"
-                  onClick={() => loadResults(resultsSlug, filterCollegeId, filterStatus, filterSearch)}
+                  onClick={() => loadResults(resultsSlug)}
                   className="rounded-lg border border-border-subtle bg-surface-muted px-3 py-1.5 text-xs font-bold text-primary hover:bg-surface-hover"
                 >
                   Apply
@@ -930,11 +1060,16 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                         <th className="p-3">Assessment 3</th>
                         <th className="p-3">Avg</th>
                         <th className="p-3">Qualified</th>
+                        <th className="p-3 text-right">Individual</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-subtle">
                       {resultsRows.map((row) => (
-                        <tr key={row.enrollment_id} className="hover:bg-surface-hover">
+                        <tr
+                          key={row.enrollment_id}
+                          onClick={() => setSelectedStudentRow(row)}
+                          className="cursor-pointer hover:bg-surface-hover"
+                        >
                           <td className="p-3">
                             <div className="font-bold text-primary">{row.student.name ?? "Student"}</div>
                             <div className="text-[11px] text-text-muted">
@@ -952,30 +1087,28 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                               {row.readiness_score}%
                             </span>
                           </td>
-                          <td className="p-3">
-                            <div className="font-mono text-[10px] text-indigo-600">Set {row.assessment_1.set}</div>
-                            <div>
-                              {row.assessment_1.overall_score_percent !== null
-                                ? `${row.assessment_1.overall_score_percent}%`
-                                : row.assessment_1.status}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-mono text-[10px] text-indigo-600">Set {row.assessment_2.set}</div>
-                            <div>
-                              {row.assessment_2.overall_score_percent !== null
-                                ? `${row.assessment_2.overall_score_percent}%`
-                                : row.assessment_2.status}
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="font-mono text-[10px] text-indigo-600">Set {row.assessment_3.set}</div>
-                            <div>
-                              {row.assessment_3.overall_score_percent !== null
-                                ? `${row.assessment_3.overall_score_percent}%`
-                                : row.assessment_3.status}
-                            </div>
-                          </td>
+                          {[row.assessment_1, row.assessment_2, row.assessment_3].map((slot, idx) => (
+                            <td key={idx} className="p-3">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] text-indigo-600">Set {slot.set}</span>
+                                {slot.blocked_by_proctoring && (
+                                  <span className="rounded bg-rose-500/15 px-1 py-0.5 text-[9px] font-bold text-rose-700">
+                                    Blocked
+                                  </span>
+                                )}
+                              </div>
+                              <div className="font-bold text-primary">
+                                {slot.overall_score_percent !== null
+                                  ? `${slot.overall_score_percent}%`
+                                  : slot.status}
+                              </div>
+                              <div className="text-[10px] text-text-muted space-x-1.5">
+                                {slot.soft_skill_score_percent !== null && <span>SS:{slot.soft_skill_score_percent}%</span>}
+                                {slot.coding_score_percent !== null && <span>Code:{slot.coding_score_percent}%</span>}
+                                {slot.interview_score_percent !== null && <span>AI:{slot.interview_score_percent}%</span>}
+                              </div>
+                            </td>
+                          ))}
                           <td className="p-3 font-extrabold text-primary">
                             {row.program_avg_score !== null ? `${row.program_avg_score}%` : "—"}
                           </td>
@@ -990,12 +1123,162 @@ export function LaunchpadProgramsSection({ options, ensureOptions, triggerToast 
                               </span>
                             )}
                           </td>
+                          <td className="p-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedStudentRow(row)}
+                                className="rounded-md border border-border-subtle bg-surface-muted px-2 py-1 text-[11px] font-bold text-primary hover:bg-surface-hover"
+                              >
+                                Details
+                              </button>
+                              <button
+                                type="button"
+                                disabled={exportingCsv}
+                                title="Export this student's Launchpad CSV"
+                                onClick={() => void handleExportCsv(row.student.id, row.student.name)}
+                                className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-500/20 disabled:opacity-50"
+                              >
+                                <Download className="h-3 w-3" />
+                                CSV
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* INDIVIDUAL STUDENT LAUNCHPAD SCORECARD MODAL */}
+      {resultsSlug && selectedStudentRow && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/65 p-4">
+          <div className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden rounded-panel border border-border-subtle bg-surface shadow-2xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-subtle px-6 py-4">
+              <div>
+                <h4 className="text-base font-extrabold text-primary">
+                  {selectedStudentRow.student.name ?? "Student Scorecard"}
+                </h4>
+                <p className="text-xs text-text-muted">
+                  {selectedStudentRow.student.email}
+                  {selectedStudentRow.student.roll_number ? ` · Roll ${selectedStudentRow.student.roll_number}` : ""}
+                  {selectedStudentRow.student.college?.name ? ` · ${selectedStudentRow.student.college.name}` : ""}
+                  {selectedStudentRow.student.branch || selectedStudentRow.student.branch_code
+                    ? ` · ${selectedStudentRow.student.branch || selectedStudentRow.student.branch_code}`
+                    : ""}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={exportingCsv}
+                  onClick={() => void handleExportCsv(selectedStudentRow.student.id, selectedStudentRow.student.name)}
+                  className="inline-flex items-center gap-1.5 rounded-pill bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {exportingCsv ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                  Export Student CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStudentRow(null)}
+                  className="rounded-lg p-1.5 text-text-muted hover:bg-surface-hover"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border border-border-subtle bg-surface-muted/40 p-3">
+                  <div className="text-[11px] font-bold text-text-muted">Readiness Score</div>
+                  <div className={cn("text-xl font-extrabold", selectedStudentRow.readiness_qualified ? "text-emerald-600" : "text-amber-600")}>
+                    {selectedStudentRow.readiness_score}%
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border-subtle bg-surface-muted/40 p-3">
+                  <div className="text-[11px] font-bold text-text-muted">Completed</div>
+                  <div className="text-xl font-extrabold text-primary">{selectedStudentRow.assessments_completed}/3</div>
+                </div>
+                <div className="rounded-xl border border-border-subtle bg-surface-muted/40 p-3">
+                  <div className="text-[11px] font-bold text-text-muted">Program Avg Score</div>
+                  <div className="text-xl font-extrabold text-indigo-600">
+                    {selectedStudentRow.program_avg_score !== null ? `${selectedStudentRow.program_avg_score}%` : "—"}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border-subtle bg-surface-muted/40 p-3">
+                  <div className="text-[11px] font-bold text-text-muted">Status</div>
+                  <div className="mt-1">
+                    {selectedStudentRow.fully_qualified ? (
+                      <span className="rounded-pill bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700">Qualified</span>
+                    ) : (
+                      <span className="rounded-pill bg-amber-500/15 px-2.5 py-0.5 text-xs font-bold text-amber-700 capitalize">
+                        {selectedStudentRow.status.replace("_", " ")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3">
+                {[selectedStudentRow.assessment_1, selectedStudentRow.assessment_2, selectedStudentRow.assessment_3].map((slot, idx) => (
+                  <div
+                    key={idx}
+                    className={cn(
+                      "rounded-xl border p-4 space-y-3",
+                      slot.blocked_by_proctoring ? "border-rose-500/35 bg-rose-500/[0.04]" : "border-border-subtle bg-elevated/40"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-extrabold text-primary">Assessment {idx + 1}</div>
+                        <div className="font-mono text-[10px] text-indigo-600">Rotated Set {slot.set}</div>
+                      </div>
+                      {slot.blocked_by_proctoring ? (
+                        <span className="rounded-pill bg-rose-500/15 px-2 py-0.5 text-[10px] font-bold text-rose-700">
+                          Blocked · 0%
+                        </span>
+                      ) : (
+                        <span className="rounded-pill bg-surface px-2 py-0.5 text-[10px] font-bold text-text-secondary capitalize border border-border-subtle">
+                          {slot.status.replace("_", " ")}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="border-t border-border-subtle pt-2.5 space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-muted">Soft Skills</span>
+                        <span className="font-bold text-primary">
+                          {slot.soft_skill_score_percent !== null ? `${slot.soft_skill_score_percent}%` : "—"}
+                        </span>
+                      </div>
+                      {slot.coding_score_percent !== null && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-muted">Coding Round</span>
+                          <span className="font-bold text-primary">{slot.coding_score_percent}%</span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-muted">AI Interview</span>
+                        <span className="font-bold text-primary">
+                          {slot.interview_score_percent !== null ? `${slot.interview_score_percent}%` : "—"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-border-subtle pt-1.5 font-extrabold">
+                        <span className="text-primary">Overall</span>
+                        <span className={slot.blocked_by_proctoring ? "text-rose-600" : "text-indigo-600"}>
+                          {slot.overall_score_percent !== null ? `${slot.overall_score_percent}%` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>

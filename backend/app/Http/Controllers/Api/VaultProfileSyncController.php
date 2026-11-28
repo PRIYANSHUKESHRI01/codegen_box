@@ -83,7 +83,11 @@ class VaultProfileSyncController extends Controller
             'bio' => $user->bio ?? null,
             'skills' => $user->skills ?? [],
             'profile_completion_percent' => $user->profile_completion_percent ?? 0,
-            'mellow_vault_profile_percent' => $user->mellow_vault_profile_percent ?? 0,
+            'is_mellow_vault_user' => $user->isMellowVaultUser(),
+            'account_origin' => $user->isMellowVaultUser() ? 'mellow_vault' : 'aptrun',
+            'mv_profile_percentage' => $user->isMellowVaultUser() ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null,
+            'mv_skill' => $user->isMellowVaultUser() ? $user->mv_skill : null,
+            'mellow_vault_profile_percent' => $user->isMellowVaultUser() ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null,
             'mellow_vault_stack_key' => $user->mellow_vault_stack_key,
             'mellow_vault_stack_name' => $user->mellow_vault_stack_name,
         ]);
@@ -139,27 +143,49 @@ class VaultProfileSyncController extends Controller
         $user = $request->user();
         $cacheKey = "mv-profile-sync:user:{$user->id}";
 
-        if (! Cache::has($cacheKey) && $this->sync->isConfigured()) {
+        $needsDirectSync = ($user->mv_profile_percentage !== null || filled($user->mv_skill))
+            && (
+                $user->mellow_vault_profile_synced_at === null
+                || $user->mellow_vault_profile_percent !== $user->mv_profile_percentage
+                || ($user->mv_profile_percentage >= MellowVaultProfileSyncService::DEFAULT_THRESHOLD && $user->vault_ai_invite_sent_at === null)
+            );
+
+        if ($needsDirectSync || ! Cache::has($cacheKey)) {
             $this->sync->syncSingleUser($user, dispatchInviteIfEligible: true);
             $user->refresh();
             Cache::put($cacheKey, true, 60);
         }
 
-        $pct = (int) ($user->mellow_vault_profile_percent ?? 0);
-        $stackKey = $user->mellow_vault_stack_key;
+        $isMv = $user->isMellowVaultUser();
+        $pct = $isMv ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null;
+        $stackKey = $isMv ? $user->mellow_vault_stack_key : null;
+
+        if ($isMv) {
+            VaultInterviewInvite::where('user_id', $user->id)
+                ->whereNull('opened_at')
+                ->update([
+                    'status' => VaultInterviewInvite::STATUS_OPENED,
+                    'opened_at' => now(),
+                ]);
+        }
+
         $directUrl = $stackKey
             ? '/dashboard/vault-interviews?stack='.urlencode($stackKey)
             : '/dashboard/vault-interviews';
 
         return response()->json([
+            'is_mellow_vault_user' => $isMv,
+            'account_origin' => $isMv ? 'mellow_vault' : 'aptrun',
             'profile_percent' => $pct,
+            'mv_profile_percentage' => $pct,
+            'mv_skill' => $isMv ? ($user->mv_skill ?? $user->mellow_vault_stack_name) : null,
             'threshold' => MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
-            'hit_90' => $pct >= MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
-            'pro_id' => $user->mellow_vault_pro_id,
+            'hit_90' => $pct !== null && $pct >= MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
+            'pro_id' => $isMv ? $user->mellow_vault_pro_id : null,
             'stack_key' => $stackKey,
-            'stack_name' => $user->mellow_vault_stack_name,
-            'synced_at' => $user->mellow_vault_profile_synced_at?->toIso8601String(),
-            'invite_sent_at' => $user->vault_ai_invite_sent_at?->toIso8601String(),
+            'stack_name' => $isMv ? $user->mellow_vault_stack_name : null,
+            'synced_at' => $isMv ? $user->mellow_vault_profile_synced_at?->toIso8601String() : null,
+            'invite_sent_at' => $isMv ? $user->vault_ai_invite_sent_at?->toIso8601String() : null,
             'direct_url' => $directUrl,
         ]);
     }
@@ -167,17 +193,27 @@ class VaultProfileSyncController extends Controller
     /**
      * POST /api/vault/sync/profile-completion
      *
-     * Optional real-time webhook/push endpoint for Mellow Vault backend when a developer's
-     * `profile_complete` changes or crosses 90%, or to sync a single developer on demand.
+     * Real-time push endpoint for Mellow Vault / AWS production integration when a Mellow Vault developer's
+     * `mv_profile_percentage` (or `profile_complete`) and `mv_skill` are synced. Once `mv_profile_percentage >= 90`,
+     * automatically resolves `mv_skill` to the matching Vault AI Interview stack and dispatches the interview link.
      */
     public function pushFromMellowVault(Request $request): JsonResponse
     {
+        if (! $this->isTrustedPush($request)) {
+            return response()->json(['message' => 'Unauthorized Mellow Vault sync request.'], 401);
+        }
+
         $validated = $request->validate([
             'user_id' => ['nullable', 'integer'],
             'email' => ['nullable', 'email'],
             'dev_id' => ['nullable', 'integer'],
+            'mv_profile_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
             'profile_complete' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'mv_skill' => ['nullable', 'string', 'max:255'],
+            'skill' => ['nullable', 'string', 'max:255'],
+            'skills' => ['nullable'],
             'pro_id' => ['nullable', 'integer', 'min:0'],
+            'sync_dispatch' => ['nullable', 'boolean'],
         ]);
 
         $user = ! empty($validated['user_id'])
@@ -192,26 +228,40 @@ class VaultProfileSyncController extends Controller
             return response()->json(['message' => 'Matching AptRun user not found.'], 404);
         }
 
-        if (isset($validated['profile_complete']) && $this->isTrustedPush($request)) {
+        $incomingPct = $validated['mv_profile_percentage'] ?? $validated['profile_complete'] ?? null;
+        $rawSkills = $validated['mv_skill'] ?? $validated['skill'] ?? $validated['skills'] ?? null;
+        if (is_array($rawSkills)) {
+            $rawSkills = implode(', ', array_filter(array_map('strval', $rawSkills)));
+        }
+        $incomingSkill = is_string($rawSkills) && trim($rawSkills) !== '' ? trim($rawSkills) : null;
+
+        if ($incomingPct !== null || $incomingSkill !== null) {
             $headings = $this->sync->headingMap();
             $result = $this->sync->applyDeveloperRow(
                 $user,
                 [
                     'dev_id' => $validated['dev_id'] ?? $user->mellow_vault_dev_id,
                     'pro_id' => $validated['pro_id'] ?? $user->mellow_vault_pro_id,
-                    'profile_complete' => (int) $validated['profile_complete'],
+                    'mv_profile_percentage' => $incomingPct !== null ? (int) $incomingPct : $user->mv_profile_percentage,
+                    'profile_complete' => $incomingPct !== null ? (int) $incomingPct : ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent),
+                    'mv_skill' => $incomingSkill ?? $user->mv_skill,
+                    'skills' => $incomingSkill ?? $user->mv_skill,
                 ],
                 $headings,
                 MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
                 dispatchEmail: true,
-                syncDispatch: false,
+                syncDispatch: (bool) ($validated['sync_dispatch'] ?? false),
                 dryRun: false
             );
+
+            Cache::forget("mv-profile-sync:user:{$user->id}");
 
             return response()->json([
                 'synced' => true,
                 'user_id' => $user->id,
+                'mv_profile_percentage' => $result['profile_percent'],
                 'profile_percent' => $result['profile_percent'],
+                'mv_skill' => $result['mv_skill'],
                 'stack_key' => $result['stack_key'],
                 'stack_name' => $result['stack_name'],
                 'invite_dispatched' => $result['invited'],
@@ -224,20 +274,116 @@ class VaultProfileSyncController extends Controller
     }
 
     /**
+     * POST /api/vault/sync/mv-profiles
+     *
+     * Batch ingestion endpoint for production Mellow Vault profile data (`mv_profile_percentage`, `mv_skill`).
+     * Only updates the supplied Mellow Vault students; AptRun-native users remain `null`.
+     */
+    public function pushBatchFromMellowVault(Request $request): JsonResponse
+    {
+        if (! $this->isTrustedPush($request)) {
+            return response()->json(['message' => 'Unauthorized Mellow Vault sync request.'], 401);
+        }
+
+        $validated = $request->validate([
+            'students' => ['required', 'array', 'min:1', 'max:500'],
+            'students.*.user_id' => ['nullable', 'integer'],
+            'students.*.email' => ['nullable', 'email'],
+            'students.*.dev_id' => ['nullable', 'integer'],
+            'students.*.mv_profile_percentage' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'students.*.profile_complete' => ['nullable', 'integer', 'min:0', 'max:100'],
+            'students.*.mv_skill' => ['nullable', 'string', 'max:255'],
+            'students.*.skill' => ['nullable', 'string', 'max:255'],
+            'students.*.pro_id' => ['nullable', 'integer', 'min:0'],
+            'sync_dispatch' => ['nullable', 'boolean'],
+        ]);
+
+        $headings = $this->sync->headingMap();
+        $syncDispatch = (bool) ($validated['sync_dispatch'] ?? false);
+        $processed = 0;
+        $invited = 0;
+        $notFound = [];
+
+        foreach ($validated['students'] as $row) {
+            $user = ! empty($row['user_id'])
+                ? User::find((int) $row['user_id'])
+                : (! empty($row['email'])
+                    ? User::whereRaw('LOWER(email) = ?', [mb_strtolower(trim((string) $row['email']))])->first()
+                    : (! empty($row['dev_id'])
+                        ? User::where('mellow_vault_dev_id', (int) $row['dev_id'])->first()
+                        : null));
+
+            if (! $user) {
+                $notFound[] = $row['email'] ?? $row['user_id'] ?? $row['dev_id'] ?? 'unknown';
+                continue;
+            }
+
+            $pct = $row['mv_profile_percentage'] ?? $row['profile_complete'] ?? $user->mv_profile_percentage;
+            $skill = $row['mv_skill'] ?? $row['skill'] ?? $user->mv_skill;
+
+            $outcome = $this->sync->applyDeveloperRow(
+                $user,
+                [
+                    'dev_id' => $row['dev_id'] ?? $user->mellow_vault_dev_id,
+                    'pro_id' => $row['pro_id'] ?? $user->mellow_vault_pro_id,
+                    'mv_profile_percentage' => $pct,
+                    'profile_complete' => $pct,
+                    'mv_skill' => $skill,
+                    'skills' => $skill,
+                ],
+                $headings,
+                MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
+                dispatchEmail: true,
+                syncDispatch: $syncDispatch,
+                dryRun: false
+            );
+
+            $processed++;
+            if ($outcome['invited']) {
+                $invited++;
+            }
+            Cache::forget("mv-profile-sync:user:{$user->id}");
+        }
+
+        return response()->json([
+            'synced' => true,
+            'processed' => $processed,
+            'invites_dispatched' => $invited,
+            'not_found' => $notFound,
+        ]);
+    }
+
+    /**
      * GET /api/admin/mellow-vault/profile-invites
      */
     public function adminIndex(): JsonResponse
     {
-        $invites = VaultInterviewInvite::with('user:id,name,email,mellow_vault_profile_percent,mellow_vault_stack_key')
+        $invites = VaultInterviewInvite::with('user:id,name,email,mv_profile_percentage,mv_skill,mellow_vault_profile_percent,mellow_vault_stack_key')
             ->latest('id')
             ->limit(100)
             ->get();
 
+        $mvUsersQuery = User::where('role', User::ROLE_USER)->where(function ($q) {
+            $q->whereNotNull('mv_profile_percentage')
+                ->orWhereNotNull('mv_skill')
+                ->orWhereNotNull('mellow_vault_dev_id')
+                ->orWhereNotNull('mellow_vault_profile_synced_at');
+        });
+
         $summary = [
             'configured' => $this->sync->isConfigured(),
             'mappings_count' => MellowVaultStackMapping::count(),
-            'synced_users' => User::whereNotNull('mellow_vault_profile_synced_at')->count(),
-            'users_90_plus' => User::where('mellow_vault_profile_percent', '>=', 90)->count(),
+            'synced_users' => (clone $mvUsersQuery)->count(),
+            'aptrun_only_users' => User::where('role', User::ROLE_USER)
+                ->whereNull('mv_profile_percentage')
+                ->whereNull('mv_skill')
+                ->whereNull('mellow_vault_dev_id')
+                ->whereNull('mellow_vault_profile_synced_at')
+                ->count(),
+            'users_90_plus' => User::where(function ($q) {
+                $q->where('mv_profile_percentage', '>=', 90)
+                    ->orWhere('mellow_vault_profile_percent', '>=', 90);
+            })->count(),
             'invites_sent' => VaultInterviewInvite::whereIn('status', [VaultInterviewInvite::STATUS_SENT, VaultInterviewInvite::STATUS_OPENED])->count(),
             'invites_opened' => VaultInterviewInvite::whereNotNull('opened_at')->count(),
             'invites_queued' => VaultInterviewInvite::where('status', VaultInterviewInvite::STATUS_QUEUED)->count(),
@@ -271,8 +417,13 @@ class VaultProfileSyncController extends Controller
     {
         $apiKey = (string) config('vault.api_key', '');
         $syncSecret = (string) config('vault.sync_secret', '');
+        $ssoSecret = (string) config('vault.sso.secret', env('APTRUN_SSO_SECRET', ''));
 
-        if ($apiKey !== '' && hash_equals($apiKey, (string) $request->bearerToken())) {
+        $presentedKey = (string) ($request->bearerToken()
+            ?: $request->header('X-Api-Key', '')
+            ?: $request->header('X-Vault-Key', ''));
+
+        if ($apiKey !== '' && $presentedKey !== '' && hash_equals($apiKey, $presentedKey)) {
             return true;
         }
 
@@ -280,6 +431,15 @@ class VaultProfileSyncController extends Controller
             return true;
         }
 
-        return $apiKey === '' && $syncSecret === '' && $this->sync->isConfigured();
+        if ($ssoSecret !== '' && hash_equals($ssoSecret, (string) $request->header('X-SSO-Secret', ''))) {
+            return true;
+        }
+
+        $actor = $request->user();
+        if ($actor && $actor->isAdmin()) {
+            return true;
+        }
+
+        return $apiKey === '' && $syncSecret === '';
     }
 }

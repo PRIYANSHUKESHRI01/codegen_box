@@ -5,8 +5,12 @@ import { surfaceFromBasePath, useIntegrityEngine, type UseIntegrityEngineResult 
 interface UseInterviewProctoringOptions {
   /** e.g. `/interviews/backend-engineer-ai-interview`, `/soft-skills/sessions/12`, `/core/sessions/7`, `/me/sittings/41`. */
   basePath: string;
+  /** Shared keepKey across Launchpad stages (e.g. `assessment:<slug>`) so camera, photo, screen share, and fullscreen survive handoffs. */
+  keepKey?: string;
   /** Only starts once true (the attempt has actually been fetched/started). */
   enabled: boolean;
+  requireScreenShare?: boolean;
+  requireChromium?: boolean;
   /**
    * What the attempt is called in the camera/fullscreen error messages ("...required for a proctored ${activityLabel}").
    * Defaults to "interview"; Soft Skills and Core tests pass "test", study sittings "practice sitting".
@@ -22,6 +26,23 @@ export type UseInterviewProctoringResult = UseIntegrityEngineResult;
  * mechanics are the same shared integrity engine contests use (lib/integrity); the surface is read off the base path,
  * and the server decides which profile (how strict) that surface runs under.
  */
-export function useInterviewProctoring({ basePath, enabled, activityLabel = "interview", getContext }: UseInterviewProctoringOptions): UseInterviewProctoringResult {
-  return useIntegrityEngine({ surface: surfaceFromBasePath(basePath), basePath, keepKey: basePath, activityLabel, enabled, getContext });
+export function useInterviewProctoring({
+  basePath,
+  keepKey,
+  enabled,
+  requireScreenShare,
+  requireChromium,
+  activityLabel = "interview",
+  getContext,
+}: UseInterviewProctoringOptions): UseInterviewProctoringResult {
+  return useIntegrityEngine({
+    surface: surfaceFromBasePath(basePath),
+    basePath,
+    keepKey: keepKey ?? basePath,
+    activityLabel,
+    enabled,
+    requireScreenShare,
+    requireChromium,
+    getContext,
+  });
 }

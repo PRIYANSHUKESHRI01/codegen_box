@@ -153,3 +153,8 @@ if (config('lifecycle_mail.drain_queue_from_scheduler') && config('queue.default
         ->withoutOverlapping(30)
         ->runInBackground();
 }
+
+Artisan::command('launchpad:refresh-interviews', function () {
+    $count = app(\App\Services\LaunchpadProgramService::class)->refreshUnstartedSlotInterviews();
+    $this->info("Refreshed {$count} unstarted Launchpad AI Interview slots with Vault-grade questions.");
+})->purpose('Upgrade existing unstarted Launchpad AI Interview slots to tough Vault-calibrated questions');

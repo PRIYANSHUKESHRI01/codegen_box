@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowRight, Calendar, CheckCircle2, ClipboardCheck, Code2, Lock, Mic, Sparkles } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { LaunchpadProgramBanner } from "@/components/dashboard/home/LaunchpadProgramBanner";
+import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
 import { SessionLoader } from "@/components/ui/SessionLoader";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
@@ -64,7 +65,9 @@ export default function StudentAssessmentsPage() {
         </div>
       )}
 
-      <LaunchpadProgramBanner variant="full" className="mb-6" />
+      <VoiceVerificationGate surfaceLabel="Launchpad Program" returnTo="/dashboard/assessments">
+        <LaunchpadProgramBanner variant="full" className="mb-6" />
+      </VoiceVerificationGate>
 
       {assessments.length === 0 && campaignSlugs.size === 0 ? (
         <div className="rounded-panel border border-dashed border-border-subtle bg-surface p-12 text-center">

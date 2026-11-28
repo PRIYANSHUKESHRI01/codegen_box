@@ -8,6 +8,7 @@ import { Mic, CheckCircle2, Loader2, Camera, Maximize, ShieldAlert, ShieldCheck,
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { BeforeYouStart, BriefingGrid, BriefingHero, HowItWorks, Rise } from "@/components/dashboard/interviews/briefing/BriefingParts";
 import { InterviewerCard } from "@/components/dashboard/interviews/briefing/InterviewerCard";
+import { VoiceVerificationGate } from "@/components/dashboard/voice/VoiceVerificationGate";
 import { useAuthGuard } from "@/lib/useAuthGuard";
 import { api, ApiError } from "@/lib/api";
 import { toast } from "@/lib/toast";
@@ -35,9 +36,11 @@ function InterviewDetailPageContent() {
   const { status } = useAuthGuard(["user"]);
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug") ?? "";
-  // Opened from the Merchant Navy section: the room and the way back stay in that section (see InterviewSessionView).
+  // Opened from Campus Assessments (`?assessment=`) or Merchant Navy (`?from=merchant-navy`): keep Back in that section.
   const from = searchParams.get("from");
-  const fromQs = from ? `&from=${encodeURIComponent(from)}` : "";
+  const assessmentSlug = searchParams.get("assessment") ?? "";
+  const extraQs = `${from ? `&from=${encodeURIComponent(from)}` : ""}${assessmentSlug ? `&assessment=${encodeURIComponent(assessmentSlug)}` : ""}`;
+  const fromQs = extraQs;
   const router = useRouter();
   const [interview, setInterview] = useState<StudentInterviewSummary | null>(null);
   const [makingReport, setMakingReport] = useState(false);
@@ -159,7 +162,17 @@ function InterviewDetailPageContent() {
   const windowNote = interview ? scheduleNote(interview) : null;
 
   return (
-    <DashboardShell role="user" title="AI Interview" back={from === "merchant-navy" ? { href: "/dashboard/merchant-navy", label: "Merchant Navy" } : undefined}>
+    <DashboardShell
+      role="user"
+      title={assessmentSlug ? "Campus Assessment · AI Interview" : "AI Interview"}
+      back={
+        assessmentSlug
+          ? { href: `/dashboard/assessments/view?slug=${encodeURIComponent(assessmentSlug)}`, label: "Campus Assessment" }
+          : from === "merchant-navy"
+            ? { href: "/dashboard/merchant-navy", label: "Merchant Navy" }
+            : undefined
+      }
+    >
       {loading ? (
         <div className="p-10 flex items-center justify-center gap-2 text-xs text-text-muted">
           <Loader2 className="w-4 h-4 animate-spin" />
@@ -169,7 +182,11 @@ function InterviewDetailPageContent() {
         <div className="p-10 text-center text-xs text-status-danger rounded-panel bg-surface border border-border-subtle">
           {error ?? "This interview isn't available."}
         </div>
-      ) : (
+      ) : !completed ? (
+        <VoiceVerificationGate
+          surfaceLabel={assessmentSlug ? "Launchpad Program" : "Mock AI Interview"}
+          returnTo={`/dashboard/interviews/view?slug=${encodeURIComponent(slug)}${fromQs}`}
+        >
         <BriefingGrid
           main={
             <>
@@ -442,6 +459,71 @@ function InterviewDetailPageContent() {
                   </button>
                 </InterviewerCard>
               )}
+            </Rise>
+          }
+        />
+        </VoiceVerificationGate>
+      ) : (
+        <BriefingGrid
+          main={
+            <>
+              <Rise>
+                <BriefingHero
+                  eyebrow={
+                    <>
+                      {interview.is_mock && (
+                        <span className="px-1.5 py-0.5 text-3xs font-bold uppercase rounded border bg-amber-500/10 text-amber-500 border-amber-500/25">Practice Round</span>
+                      )}
+                      {interview.company && <span className="text-xs font-semibold text-text-muted">{interview.company.name}</span>}
+                    </>
+                  }
+                  title={interview.title}
+                  description={interview.description}
+                  questionCount={interview.question_count}
+                  answered={interview.question_count}
+                  facts={[
+                    { label: "Questions", value: interview.question_count },
+                    ...(estimatedTime ? [{ label: "Est. time", value: estimatedTime }] : []),
+                    { label: "Status", value: "Completed" },
+                  ]}
+                  tone={interview.is_mock ? "amber" : "indigo"}
+                />
+              </Rise>
+              {result?.status === "scored" ? (
+                <div className="p-5 rounded-panel bg-surface border border-border-subtle shadow-subtle space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center border-2 border-accent-primary text-accent-primary shrink-0">
+                      <span className="text-sm font-black tabular-nums">{Math.round(result.composite_score_percent ?? 0)}%</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                        <Sparkles className="w-3.5 h-3.5 text-accent-primary" />
+                        Your Result
+                      </div>
+                      <p className="text-2xs text-text-muted mt-0.5">Scored by AI — a human reviewer can still adjust this.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void downloadReport()}
+                      disabled={makingReport}
+                      className="ml-auto inline-flex items-center gap-1.5 rounded-full border border-accent-primary/40 bg-accent-primary/10 px-3 py-1.5 text-2xs font-bold text-accent-primary transition-colors hover:bg-accent-primary/15 disabled:opacity-60"
+                    >
+                      {makingReport ? <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden /> : <FileText className="h-3.5 w-3.5" aria-hidden />}
+                      {makingReport ? "Preparing…" : "Download report (PDF)"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-panel bg-status-success/10 border border-status-success/25 flex items-center gap-2 text-xs font-semibold text-status-success">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>You&apos;ve completed this interview — your answers are being scored.</span>
+                </div>
+              )}
+            </>
+          }
+          aside={
+            <Rise delay={1}>
+              <InterviewerCard title="Interview complete" subtitle="Your result and the feedback on every answer are alongside." showChecks={false} />
             </Rise>
           }
         />

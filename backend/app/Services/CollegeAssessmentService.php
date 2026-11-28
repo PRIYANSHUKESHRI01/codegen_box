@@ -477,7 +477,8 @@ class CollegeAssessmentService
         $userIds = $assignments->pluck('user_id')->all();
 
         $softSessions = $assessment->include_soft_skills && $assessment->soft_skill_assessment_id
-            ? SoftSkillSession::where('soft_skill_assessment_id', $assessment->soft_skill_assessment_id)
+            ? SoftSkillSession::with('proctoringSession')
+                ->where('soft_skill_assessment_id', $assessment->soft_skill_assessment_id)
                 ->whereIn('user_id', $userIds)
                 ->orderByDesc('id')
                 ->get()
@@ -486,7 +487,8 @@ class CollegeAssessmentService
             : collect();
 
         $contestParticipants = $assessment->include_coding && $assessment->contest_id
-            ? ContestParticipant::where('contest_id', $assessment->contest_id)
+            ? ContestParticipant::with('proctoringSession')
+                ->where('contest_id', $assessment->contest_id)
                 ->whereIn('user_id', $userIds)
                 ->get()
                 ->keyBy('user_id')
@@ -503,7 +505,8 @@ class CollegeAssessmentService
             : [];
 
         $interviewSessions = $assessment->include_interview && $assessment->interview_id
-            ? InterviewSession::where('interview_id', $assessment->interview_id)
+            ? InterviewSession::with('proctoringSession')
+                ->where('interview_id', $assessment->interview_id)
                 ->whereIn('user_id', $userIds)
                 ->get()
                 ->keyBy('user_id')
@@ -526,14 +529,16 @@ class CollegeAssessmentService
         $uid = $assignment->user_id;
 
         $soft = $assessment->include_soft_skills && $assessment->soft_skill_assessment_id
-            ? SoftSkillSession::where('soft_skill_assessment_id', $assessment->soft_skill_assessment_id)
+            ? SoftSkillSession::with('proctoringSession')
+                ->where('soft_skill_assessment_id', $assessment->soft_skill_assessment_id)
                 ->where('user_id', $uid)
                 ->orderByDesc('id')
                 ->first()
             : null;
 
         $part = $assessment->include_coding && $assessment->contest_id
-            ? ContestParticipant::where('contest_id', $assessment->contest_id)
+            ? ContestParticipant::with('proctoringSession')
+                ->where('contest_id', $assessment->contest_id)
                 ->where('user_id', $uid)
                 ->first()
             : null;
@@ -550,7 +555,8 @@ class CollegeAssessmentService
             : false;
 
         $int = $assessment->include_interview && $assessment->interview_id
-            ? InterviewSession::where('interview_id', $assessment->interview_id)
+            ? InterviewSession::with('proctoringSession')
+                ->where('interview_id', $assessment->interview_id)
                 ->where('user_id', $uid)
                 ->first()
             : null;
@@ -561,12 +567,57 @@ class CollegeAssessmentService
     }
 
     /**
-     * Module lock state when `enforce_sequence` is enabled on the assessment.
+     * Returns true if ANY round in this assessment was locked out due to proctoring violations.
+     */
+    public function isBlockedByProctoring(CollegeAssessmentAssignment $assignment): bool
+    {
+        $assessment = $assignment->assessment;
+        $uid = $assignment->user_id;
+
+        if ($assessment->include_soft_skills && $assessment->soft_skill_assessment_id) {
+            $softLocked = SoftSkillSession::where('soft_skill_assessment_id', $assessment->soft_skill_assessment_id)
+                ->where('user_id', $uid)
+                ->whereHas('proctoringSession', fn ($q) => $q->where('status', 'locked'))
+                ->exists();
+            if ($softLocked) {
+                return true;
+            }
+        }
+
+        if ($assessment->include_coding && $assessment->contest_id) {
+            $partLocked = ContestParticipant::where('contest_id', $assessment->contest_id)
+                ->where('user_id', $uid)
+                ->whereHas('proctoringSession', fn ($q) => $q->where('status', 'locked'))
+                ->exists();
+            if ($partLocked) {
+                return true;
+            }
+        }
+
+        if ($assessment->include_interview && $assessment->interview_id) {
+            $intLocked = InterviewSession::where('interview_id', $assessment->interview_id)
+                ->where('user_id', $uid)
+                ->whereHas('proctoringSession', fn ($q) => $q->where('status', 'locked'))
+                ->exists();
+            if ($intLocked) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Module lock state when `enforce_sequence` is enabled or a round was proctoring-blocked.
      *
      * @return array{soft_skills: bool, coding: bool, interview: bool}
      */
     public function moduleLocks(CollegeAssessment $assessment, CollegeAssessmentAssignment $assignment): array
     {
+        if ($this->isBlockedByProctoring($assignment)) {
+            return ['soft_skills' => true, 'coding' => true, 'interview' => true];
+        }
+
         if (! $assessment->enforce_sequence) {
             return ['soft_skills' => false, 'coding' => false, 'interview' => false];
         }
@@ -591,13 +642,21 @@ class CollegeAssessmentService
     {
         $this->syncProgressForAssessment($assessment);
 
-        return CollegeAssessmentAssignment::query()
+        $passing = (float) $assessment->passing_score_percent;
+        $sort = (string) ($filters['sort'] ?? 'overall_desc');
+
+        $query = CollegeAssessmentAssignment::query()
             ->where('college_assessment_id', $assessment->id)
             ->with(['user:id,name,email,roll_number,college_id,department,branch,branch_code,graduation_year', 'user.college:id,name,short_code'])
             ->when(! empty($filters['status']), fn (Builder $q) => $q->where('status', $filters['status']))
             ->when(! empty($filters['college_id']), fn (Builder $q) => $q->whereHas('user', fn (Builder $u) => $u->where('college_id', (int) $filters['college_id'])))
             ->when(! empty($filters['department']), fn (Builder $q) => $q->whereHas('user', fn (Builder $u) => $u->where('department', $filters['department'])))
             ->when(! empty($filters['branch_code']), fn (Builder $q) => $q->whereHas('user', fn (Builder $u) => $u->where('branch_code', $filters['branch_code'])))
+            ->when(isset($filters['min_score']) && $filters['min_score'] !== '', fn (Builder $q) => $q->whereNotNull('overall_score_percent')->where('overall_score_percent', '>=', (float) $filters['min_score']))
+            ->when(isset($filters['max_score']) && $filters['max_score'] !== '', fn (Builder $q) => $q->whereNotNull('overall_score_percent')->where('overall_score_percent', '<=', (float) $filters['max_score']))
+            ->when(($filters['result'] ?? '') === 'pass', fn (Builder $q) => $q->whereNotNull('overall_score_percent')->where('overall_score_percent', '>=', $passing))
+            ->when(($filters['result'] ?? '') === 'below_benchmark', fn (Builder $q) => $q->whereNotNull('overall_score_percent')->where('overall_score_percent', '<', $passing))
+            ->when(($filters['result'] ?? '') === 'pending', fn (Builder $q) => $q->whereNull('overall_score_percent'))
             ->when(! empty($filters['q']), function (Builder $q) use ($filters) {
                 $term = '%'.trim((string) $filters['q']).'%';
                 $q->whereHas('user', fn (Builder $u) => $u->where(function (Builder $sub) use ($term) {
@@ -605,10 +664,17 @@ class CollegeAssessmentService
                         ->orWhere('email', 'like', $term)
                         ->orWhere('roll_number', 'like', $term);
                 }));
-            })
-            ->orderByDesc('overall_score_percent')
-            ->orderBy('id')
-            ->get();
+            });
+
+        match ($sort) {
+            'overall_asc' => $query->orderByRaw('overall_score_percent is null')->orderBy('overall_score_percent'),
+            'soft_desc' => $query->orderByDesc('soft_skill_score_percent'),
+            'coding_desc' => $query->orderByDesc('coding_score_percent'),
+            'interview_desc' => $query->orderByDesc('interview_score_percent'),
+            default => $query->orderByDesc('overall_score_percent'),
+        };
+
+        return $query->orderBy('id')->get();
     }
 
     private function applySyncedState(
@@ -655,6 +721,30 @@ class CollegeAssessmentService
                     $intScore = round((float) $int->composite_score_percent, 2);
                 }
             }
+        }
+
+        $proctoringBlocked = ($soft?->proctoringSession?->isLocked() ?? false)
+            || ($part?->proctoringSession?->isLocked() ?? false)
+            || ($int?->proctoringSession?->isLocked() ?? false);
+
+        if ($proctoringBlocked) {
+            $startedAt = $assignment->started_at ?? min(array_filter([$soft?->started_at, $part?->registered_at, $int?->started_at, now()]));
+            $assignment->update([
+                'status' => CollegeAssessmentAssignment::STATUS_COMPLETED,
+                'soft_skill_session_id' => $soft?->id,
+                'soft_skill_score_percent' => $assessment->include_soft_skills ? 0.0 : null,
+                'contest_participant_id' => $part?->id,
+                'coding_points' => $assessment->include_coding ? 0 : null,
+                'coding_max_points' => $assessment->include_coding ? $maxPoints : null,
+                'coding_score_percent' => $assessment->include_coding ? 0.0 : null,
+                'interview_session_id' => $int?->id,
+                'interview_score_percent' => $assessment->include_interview ? 0.0 : null,
+                'overall_score_percent' => 0.0,
+                'started_at' => $startedAt,
+                'completed_at' => $assignment->completed_at ?? now(),
+            ]);
+
+            return;
         }
 
         $anyStarted = $softStarted || $codingStarted || $intStarted || $assignment->started_at !== null;
@@ -840,9 +930,21 @@ class CollegeAssessmentService
         return $contest;
     }
 
+    /**
+     * Public entry point used by LaunchpadProgramService to upgrade unstarted slot interviews
+     * with Vault-calibrated hard questions and reviewer rubrics without altering active attempts.
+     *
+     * @param  array<string, mixed>  $cfg
+     */
+    public function refreshSlotInterview(User $actor, CollegeAssessment $assessment, array $cfg): Interview
+    {
+        return $this->provisionInterview($actor, $assessment, $cfg);
+    }
+
     private function provisionInterview(User $actor, CollegeAssessment $assessment, array $cfg): Interview
     {
         $interview = $assessment->interview;
+        $practiceConfig = is_array($cfg['practice_config'] ?? null) ? $cfg['practice_config'] : null;
 
         if ($interview === null) {
             $interview = Interview::create([
@@ -852,33 +954,50 @@ class CollegeAssessmentService
                 'status' => $assessment->isPublished() ? Interview::STATUS_PUBLISHED : Interview::STATUS_DRAFT,
                 'interview_type' => Interview::INTERVIEW_TYPE_COLLEGE_ASSESSMENT,
                 'is_mock' => false,
+                'practice_config' => $practiceConfig,
                 'created_by' => $actor->id,
             ]);
         } else {
             $interview->update([
                 'title' => "{$assessment->title} — AI Interview",
                 'description' => $assessment->description,
+                ...($practiceConfig !== null ? ['practice_config' => $practiceConfig] : []),
             ]);
         }
 
         if (! $interview->sessions()->exists()) {
             $bankIds = [];
+            $discipline = (string) ($cfg['discipline'] ?? 'software');
 
             // 1. From Curated (Vault) AI Interview Sets
             $curatedSetIds = array_values(array_filter(array_map('strval', (array) ($cfg['curated_set_ids'] ?? []))));
+            $curatedLimit = isset($cfg['curated_question_limit']) ? max(1, (int) $cfg['curated_question_limit']) : null;
             if ($curatedSetIds !== []) {
                 $wanted = array_flip($curatedSetIds);
+                $curatedPicked = [];
                 foreach ($this->curatedCatalog->roles() as $roleKey => $role) {
                     foreach ($role['stacks'] ?? [] as $stackKey => $stack) {
                         foreach ($this->curatedCatalog->allSets($stack) as $setData) {
                             if (isset($wanted[$setData['id']])) {
+                                $setDifficulty = ((int) ($setData['series_number'] ?? 1)) >= 2 || ((int) ($setData['set_number'] ?? 1)) >= 2
+                                    ? InterviewQuestionBank::DIFFICULTY_HARD
+                                    : InterviewQuestionBank::DIFFICULTY_MEDIUM;
                                 foreach ($setData['questions'] ?? [] as $q) {
-                                    $bankIds[] = $this->resolveBankQuestion($actor, $q, [$stackKey, $roleKey]);
+                                    $curatedPicked[] = $this->resolveBankQuestion(
+                                        $actor,
+                                        $q + ['difficulty' => $q['difficulty'] ?? $setDifficulty],
+                                        [$stackKey, $roleKey],
+                                        $discipline
+                                    );
                                 }
                             }
                         }
                     }
                 }
+                if ($curatedLimit !== null && count($curatedPicked) > $curatedLimit) {
+                    $curatedPicked = array_slice($curatedPicked, 0, $curatedLimit);
+                }
+                $bankIds = array_merge($bankIds, $curatedPicked);
             }
 
             // 2. From Mock AI Interview Rounds
@@ -887,7 +1006,7 @@ class CollegeAssessmentService
                 $found = $this->mockCatalog->round($roundId);
                 if ($found !== null) {
                     foreach ($found['round']['questions'] ?? [] as $q) {
-                        $bankIds[] = $this->resolveBankQuestion($actor, $q, [$found['stack']['key'], $found['role']['key']]);
+                        $bankIds[] = $this->resolveBankQuestion($actor, $q, [$found['stack']['key'], $found['role']['key']], $discipline);
                     }
                 }
             }
@@ -908,10 +1027,10 @@ class CollegeAssessmentService
                 $bankIds[] = $this->resolveBankQuestion($actor, [
                     'text' => $text,
                     'category' => $cq['category'] ?? InterviewQuestionBank::CATEGORY_TECHNICAL,
-                    'difficulty' => $cq['difficulty'] ?? InterviewQuestionBank::DIFFICULTY_MEDIUM,
-                    'duration_seconds' => (int) ($cq['duration_seconds'] ?? 120),
+                    'difficulty' => $cq['difficulty'] ?? InterviewQuestionBank::DIFFICULTY_HARD,
+                    'duration_seconds' => (int) ($cq['duration_seconds'] ?? 150),
                     'note' => $cq['note'] ?? null,
-                ], ['college-assessment']);
+                ], ['college-assessment', $discipline], $discipline);
             }
 
             $bankIds = array_values(array_unique(array_filter($bankIds)));
@@ -934,25 +1053,41 @@ class CollegeAssessmentService
     }
 
     /** @param  array<string, mixed>  $q */
-    private function resolveBankQuestion(User $actor, array $q, array $tags): int
+    private function resolveBankQuestion(User $actor, array $q, array $tags, string $discipline = 'software'): int
     {
         $text = trim((string) ($q['text'] ?? $q['question_text'] ?? ''));
+        $difficulty = in_array($q['difficulty'] ?? '', InterviewQuestionBank::DIFFICULTIES, true)
+            ? $q['difficulty']
+            : InterviewQuestionBank::DIFFICULTY_MEDIUM;
+        $note = $q['note'] ?? $q['notes_for_reviewer'] ?? null;
+        $duration = max(30, min(600, (int) ($q['duration_seconds'] ?? $q['expected_duration_seconds'] ?? 150)));
+
         $bank = InterviewQuestionBank::firstOrCreate(
-            ['question_text' => $text, 'discipline' => 'software'],
+            ['question_text' => $text, 'discipline' => $discipline],
             [
                 'category' => in_array($q['category'] ?? '', InterviewQuestionBank::CATEGORIES, true)
                     ? $q['category']
                     : InterviewQuestionBank::CATEGORY_TECHNICAL,
-                'difficulty' => in_array($q['difficulty'] ?? '', InterviewQuestionBank::DIFFICULTIES, true)
-                    ? $q['difficulty']
-                    : InterviewQuestionBank::DIFFICULTY_MEDIUM,
-                'expected_duration_seconds' => max(30, min(600, (int) ($q['duration_seconds'] ?? $q['expected_duration_seconds'] ?? 120))),
+                'difficulty' => $difficulty,
+                'expected_duration_seconds' => $duration,
                 'tags' => array_values(array_unique($tags)),
-                'notes_for_reviewer' => $q['note'] ?? $q['notes_for_reviewer'] ?? null,
+                'notes_for_reviewer' => $note,
                 'is_active' => true,
                 'created_by' => $actor->id,
             ]
         );
+
+        // Upgrade rubric/difficulty cleanly when curated or Launchpad sets add stronger criteria
+        $patch = [];
+        if ($note && ! $bank->notes_for_reviewer) {
+            $patch['notes_for_reviewer'] = $note;
+        }
+        if ($difficulty === InterviewQuestionBank::DIFFICULTY_HARD && $bank->difficulty !== InterviewQuestionBank::DIFFICULTY_HARD) {
+            $patch['difficulty'] = $difficulty;
+        }
+        if ($patch !== []) {
+            $bank->update($patch);
+        }
 
         return $bank->id;
     }

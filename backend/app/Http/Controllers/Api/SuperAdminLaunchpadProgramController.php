@@ -92,9 +92,16 @@ class SuperAdminLaunchpadProgramController extends Controller
     public function show(Request $request, LaunchpadProgram $launchpadProgram): JsonResponse
     {
         $filters = $request->validate([
+            'user_id' => ['sometimes', 'nullable', 'integer'],
             'college_id' => ['sometimes', 'nullable', 'integer'],
             'branch_code' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'string'],
+            'qualification' => ['sometimes', 'nullable', 'in:fully_qualified,readiness_ready,below_benchmark'],
+            'min_readiness' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_readiness' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'min_avg_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_avg_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'sort' => ['sometimes', 'nullable', 'in:avg_desc,avg_asc,readiness_desc,readiness_asc'],
             'q' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 
@@ -222,16 +229,29 @@ class SuperAdminLaunchpadProgramController extends Controller
     public function exportCsv(Request $request, LaunchpadProgram $launchpadProgram): StreamedResponse
     {
         $filters = $request->validate([
+            'user_id' => ['sometimes', 'nullable', 'integer'],
             'college_id' => ['sometimes', 'nullable', 'integer'],
             'branch_code' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'string'],
+            'qualification' => ['sometimes', 'nullable', 'in:fully_qualified,readiness_ready,below_benchmark'],
+            'min_readiness' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_readiness' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'min_avg_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_avg_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'sort' => ['sometimes', 'nullable', 'in:avg_desc,avg_asc,readiness_desc,readiness_asc'],
             'q' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 
         $dataset = $this->service->resultsDataset($launchpadProgram, $filters);
-        $filename = $launchpadProgram->slug.'-report-'.now()->format('Ymd-His').'.csv';
+        $userSuffix = ! empty($filters['user_id']) ? '-student-'.(int) $filters['user_id'] : '';
+        $filename = $launchpadProgram->slug.$userSuffix.'-report-'.now()->format('Ymd-His').'.csv';
 
-        return response()->streamDownload(function () use ($launchpadProgram, $dataset) {
+        $fmtScore = static fn ($val): string => $val !== null ? number_format((float) $val, 2, '.', '') : '';
+        $fmtSlotStatus = static fn (array $slot): string => ! empty($slot['blocked_by_proctoring'])
+            ? 'blocked_by_proctoring'
+            : (string) ($slot['status'] ?? 'assigned');
+
+        return response()->streamDownload(function () use ($launchpadProgram, $dataset, $fmtScore, $fmtSlotStatus) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
 
@@ -248,11 +268,23 @@ class SuperAdminLaunchpadProgramController extends Controller
                 'Readiness Score (%)',
                 'Readiness >= 60%',
                 'Assessment 1 Set',
-                'Assessment 1 Score (%)',
+                'Assessment 1 Status',
+                'Assessment 1 Soft Skills (%)',
+                'Assessment 1 Coding (%)',
+                'Assessment 1 AI Interview (%)',
+                'Assessment 1 Overall (%)',
                 'Assessment 2 Set',
-                'Assessment 2 Score (%)',
+                'Assessment 2 Status',
+                'Assessment 2 Soft Skills (%)',
+                'Assessment 2 Coding (%)',
+                'Assessment 2 AI Interview (%)',
+                'Assessment 2 Overall (%)',
                 'Assessment 3 Set',
-                'Assessment 3 Score (%)',
+                'Assessment 3 Status',
+                'Assessment 3 Soft Skills (%)',
+                'Assessment 3 Coding (%)',
+                'Assessment 3 AI Interview (%)',
+                'Assessment 3 Overall (%)',
                 'Assessments Completed',
                 'Program Avg Score (%)',
                 'Final Qualification',
@@ -260,6 +292,10 @@ class SuperAdminLaunchpadProgramController extends Controller
 
             foreach ($dataset['rows'] as $row) {
                 $s = $row['student'];
+                $a1 = $row['assessment_1'];
+                $a2 = $row['assessment_2'];
+                $a3 = $row['assessment_3'];
+
                 fputcsv($out, [
                     $launchpadProgram->title,
                     strtoupper($launchpadProgram->track),
@@ -272,14 +308,26 @@ class SuperAdminLaunchpadProgramController extends Controller
                     $row['status'],
                     number_format((float) $row['readiness_score'], 2, '.', ''),
                     $row['readiness_qualified'] ? 'Yes' : 'No',
-                    'Set '.$row['assessment_1']['set'],
-                    $row['assessment_1']['overall_score_percent'] !== null ? number_format((float) $row['assessment_1']['overall_score_percent'], 2, '.', '') : '',
-                    'Set '.$row['assessment_2']['set'],
-                    $row['assessment_2']['overall_score_percent'] !== null ? number_format((float) $row['assessment_2']['overall_score_percent'], 2, '.', '') : '',
-                    'Set '.$row['assessment_3']['set'],
-                    $row['assessment_3']['overall_score_percent'] !== null ? number_format((float) $row['assessment_3']['overall_score_percent'], 2, '.', '') : '',
+                    'Set '.$a1['set'],
+                    $fmtSlotStatus($a1),
+                    $fmtScore($a1['soft_skill_score_percent'] ?? null),
+                    $fmtScore($a1['coding_score_percent'] ?? null),
+                    $fmtScore($a1['interview_score_percent'] ?? null),
+                    $fmtScore($a1['overall_score_percent'] ?? null),
+                    'Set '.$a2['set'],
+                    $fmtSlotStatus($a2),
+                    $fmtScore($a2['soft_skill_score_percent'] ?? null),
+                    $fmtScore($a2['coding_score_percent'] ?? null),
+                    $fmtScore($a2['interview_score_percent'] ?? null),
+                    $fmtScore($a2['overall_score_percent'] ?? null),
+                    'Set '.$a3['set'],
+                    $fmtSlotStatus($a3),
+                    $fmtScore($a3['soft_skill_score_percent'] ?? null),
+                    $fmtScore($a3['coding_score_percent'] ?? null),
+                    $fmtScore($a3['interview_score_percent'] ?? null),
+                    $fmtScore($a3['overall_score_percent'] ?? null),
                     $row['assessments_completed'].'/3',
-                    $row['program_avg_score'] !== null ? number_format((float) $row['program_avg_score'], 2, '.', '') : '',
+                    $fmtScore($row['program_avg_score'] ?? null),
                     $row['fully_qualified'] ? 'Qualified' : 'Pending / Below Benchmark',
                 ]);
             }

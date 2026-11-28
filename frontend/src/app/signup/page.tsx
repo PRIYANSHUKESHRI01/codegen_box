@@ -26,7 +26,7 @@ import { AuthSubmitButton } from "@/components/auth/AuthSubmitButton";
 import { TalkToTeamModal } from "@/components/marketing-site/TalkToTeamModal";
 import { cn } from "@/lib/utils";
 import { api, ApiError } from "@/lib/api";
-import { AuthUser, homeRouteForRole } from "@/lib/auth";
+import { AuthUser, readRedirectParam, resolvePostLoginRoute } from "@/lib/auth";
 import { useAuth } from "@/lib/AuthContext";
 import { usePublicStats } from "@/lib/usePublicPlatformData";
 
@@ -108,15 +108,18 @@ export default function SignupPage() {
         graduation_year: gradYear ? Number(gradYear) : undefined,
       });
       login(token, user);
-      router.push(homeRouteForRole(user.role));
+      router.push(resolvePostLoginRoute(user.role, readRedirectParam()));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Unable to create your account. Please try again.");
       setLoading(false);
     }
   };
 
+  const redirectAfterAuth = readRedirectParam();
+  const loginAltHref = redirectAfterAuth ? `/login?redirect=${encodeURIComponent(redirectAfterAuth)}` : "/login";
+
   return (
-    <AuthChrome altLabel="Sign In Instead" altLabelShort="Sign in" altHref="/login">
+    <AuthChrome altLabel="Sign In Instead" altLabelShort="Sign in" altHref={loginAltHref}>
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
         {/* Left Column: value props — 5/7 split and max-w-xl card below,
             matching /login exactly instead of drifting to a narrower 4/8 +

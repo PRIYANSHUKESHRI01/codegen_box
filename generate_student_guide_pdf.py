@@ -1529,7 +1529,7 @@ def build_student_guide_pdf():
       </tr>
       <tr>
         <td><strong>Tier 2: Live Assessment Helpline</strong></td>
-        <td>Emergency WhatsApp: <strong>+91 76785 78295</strong></td>
+        <td>Emergency WhatsApp: <strong>+91 93111 48660</strong></td>
         <td><strong>Immediate (Under 10 minutes)</strong> during active campus placement drives</td>
       </tr>
       <tr>

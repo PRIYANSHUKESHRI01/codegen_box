@@ -159,7 +159,11 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
   } | null>(null);
   const [assignments, setAssignments] = useState<CollegeAssessmentAssignmentRow[]>([]);
   const [filterCollegeId, setFilterCollegeId] = useState<string>("");
+  const [filterBranchCode, setFilterBranchCode] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterResult, setFilterResult] = useState<string>("");
+  const [filterMinScore, setFilterMinScore] = useState<string>("");
+  const [filterSort, setFilterSort] = useState<string>("overall_desc");
   const [filterSearch, setFilterSearch] = useState<string>("");
   const [exportingCsv, setExportingCsv] = useState(false);
 
@@ -497,16 +501,53 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
     }
   };
 
+  const buildResultsParams = useCallback(
+    (overrides?: {
+      collegeId?: string;
+      branchCode?: string;
+      statusVal?: string;
+      resultVal?: string;
+      minScore?: string;
+      sortVal?: string;
+      qVal?: string;
+    }) => {
+      const params = new URLSearchParams();
+      const cid = overrides?.collegeId ?? filterCollegeId;
+      const br = overrides?.branchCode ?? filterBranchCode;
+      const st = overrides?.statusVal ?? filterStatus;
+      const res = overrides?.resultVal ?? filterResult;
+      const minS = overrides?.minScore ?? filterMinScore;
+      const sort = overrides?.sortVal ?? filterSort;
+      const q = overrides?.qVal ?? filterSearch;
+      if (cid) params.set("college_id", cid);
+      if (br) params.set("branch_code", br);
+      if (st) params.set("status", st);
+      if (res) params.set("result", res);
+      if (minS !== "") params.set("min_score", minS);
+      if (sort) params.set("sort", sort);
+      if (q.trim()) params.set("q", q.trim());
+      return params;
+    },
+    [filterCollegeId, filterBranchCode, filterStatus, filterResult, filterMinScore, filterSort, filterSearch]
+  );
+
   const loadResults = useCallback(
-    async (slug: string, collegeId = filterCollegeId, statusVal = filterStatus, qVal = filterSearch) => {
+    async (
+      slug: string,
+      overrides?: {
+        collegeId?: string;
+        branchCode?: string;
+        statusVal?: string;
+        resultVal?: string;
+        minScore?: string;
+        sortVal?: string;
+        qVal?: string;
+      }
+    ) => {
       try {
         setResultsLoading(true);
         await ensureBuilderOptions();
-        const params = new URLSearchParams();
-        if (collegeId) params.set("college_id", collegeId);
-        if (statusVal) params.set("status", statusVal);
-        if (qVal.trim()) params.set("q", qVal.trim());
-        const qs = params.toString();
+        const qs = buildResultsParams(overrides).toString();
 
         const res = await api.get<{
           assessment: CollegeAssessmentSummaryItem;
@@ -529,26 +570,26 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
         setResultsLoading(false);
       }
     },
-    [ensureBuilderOptions, filterCollegeId, filterSearch, filterStatus, triggerToast]
+    [ensureBuilderOptions, buildResultsParams, triggerToast]
   );
 
   const openResults = async (slug: string) => {
     setFilterCollegeId("");
+    setFilterBranchCode("");
     setFilterStatus("");
+    setFilterResult("");
+    setFilterMinScore("");
+    setFilterSort("overall_desc");
     setFilterSearch("");
     setResultsSlug(slug);
-    await loadResults(slug, "", "", "");
+    await loadResults(slug, { collegeId: "", branchCode: "", statusVal: "", resultVal: "", minScore: "", sortVal: "overall_desc", qVal: "" });
   };
 
   const handleExportCsv = async () => {
     if (!resultsSlug) return;
     try {
       setExportingCsv(true);
-      const params = new URLSearchParams();
-      if (filterCollegeId) params.set("college_id", filterCollegeId);
-      if (filterStatus) params.set("status", filterStatus);
-      if (filterSearch.trim()) params.set("q", filterSearch.trim());
-      const qs = params.toString();
+      const qs = buildResultsParams().toString();
 
       const blob = await api.getFile(
         `/superadmin/college-assessments/${resultsSlug}/export${qs ? `?${qs}` : ""}`
@@ -1972,7 +2013,7 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
                   onChange={(e) => {
                     const val = e.target.value;
                     setFilterCollegeId(val);
-                    loadResults(resultsSlug, val, filterStatus, filterSearch);
+                    loadResults(resultsSlug, { collegeId: val });
                   }}
                   className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
                 >
@@ -1984,11 +2025,27 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
                   ))}
                 </select>
                 <select
+                  value={filterBranchCode}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterBranchCode(val);
+                    loadResults(resultsSlug, { branchCode: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">All Branches</option>
+                  {options?.branches.map((b) => (
+                    <option key={b.code} value={b.code}>
+                      {b.short}
+                    </option>
+                  ))}
+                </select>
+                <select
                   value={filterStatus}
                   onChange={(e) => {
                     const val = e.target.value;
                     setFilterStatus(val);
-                    loadResults(resultsSlug, filterCollegeId, val, filterSearch);
+                    loadResults(resultsSlug, { statusVal: val });
                   }}
                   className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
                 >
@@ -1997,19 +2054,62 @@ export function CollegeAssessmentsPanel({ triggerToast }: Props) {
                   <option value="in_progress">In Progress</option>
                   <option value="completed">Completed</option>
                 </select>
+                <select
+                  value={filterResult}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterResult(val);
+                    loadResults(resultsSlug, { resultVal: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">All Results</option>
+                  <option value="pass">Passed Benchmark</option>
+                  <option value="below_benchmark">Below Benchmark</option>
+                  <option value="pending">Pending Score</option>
+                </select>
+                <select
+                  value={filterMinScore}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterMinScore(val);
+                    loadResults(resultsSlug, { minScore: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="">Any Score %</option>
+                  <option value="80">Overall ≥ 80%</option>
+                  <option value="60">Overall ≥ 60%</option>
+                  <option value="40">Overall ≥ 40%</option>
+                </select>
+                <select
+                  value={filterSort}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setFilterSort(val);
+                    loadResults(resultsSlug, { sortVal: val });
+                  }}
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs"
+                >
+                  <option value="overall_desc">Highest Overall %</option>
+                  <option value="overall_asc">Lowest Overall %</option>
+                  <option value="soft_desc">Highest Soft Skills %</option>
+                  <option value="coding_desc">Highest Coding %</option>
+                  <option value="interview_desc">Highest AI Interview %</option>
+                </select>
                 <input
                   type="text"
                   value={filterSearch}
                   onChange={(e) => setFilterSearch(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") loadResults(resultsSlug, filterCollegeId, filterStatus, filterSearch);
+                    if (e.key === "Enter") loadResults(resultsSlug);
                   }}
                   placeholder="Search student, email, or roll..."
-                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs min-w-[220px]"
+                  className="rounded-lg border border-border-subtle bg-surface px-3 py-1.5 text-xs min-w-[200px]"
                 />
                 <button
                   type="button"
-                  onClick={() => loadResults(resultsSlug, filterCollegeId, filterStatus, filterSearch)}
+                  onClick={() => loadResults(resultsSlug)}
                   className="rounded-lg border border-border-subtle bg-surface-muted px-3 py-1.5 text-xs font-bold text-primary hover:bg-surface-hover"
                 >
                   Apply Filters

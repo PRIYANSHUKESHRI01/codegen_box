@@ -6,36 +6,46 @@ export interface MvProfileUserFields {
   role?: string;
   is_mellow_vault_user?: boolean;
   account_origin?: "mellow_vault" | "aptrun";
-  mellow_vault_profile_percent?: number;
+  mv_profile_percentage?: number | null;
+  mv_skill?: string | null;
+  mellow_vault_profile_percent?: number | null;
   mellow_vault_stack_name?: string | null;
   vault_ai_invite_sent_at?: string | null;
 }
 
 /**
- * Cleanly distinguishes Mellow Vault synced accounts (real profile_complete % + tech stack)
- * from AptRun-only accounts (0% until Mellow Vault sync is enabled for them later).
+ * Cleanly distinguishes Mellow Vault synced accounts (real mv_profile_percentage + mv_skill)
+ * from AptRun-native users (whose MV fields remain null).
  */
 export function MvProfileBadge({ user }: { user: MvProfileUserFields }) {
   if (user.role && user.role !== "user") {
     return <span className="text-3xs text-text-muted">—</span>;
   }
 
-  const isMv = Boolean(user.is_mellow_vault_user || user.account_origin === "mellow_vault");
-  const pct = isMv ? Math.max(0, Math.min(100, Number(user.mellow_vault_profile_percent ?? 0))) : 0;
+  const isMv = Boolean(
+    user.is_mellow_vault_user ||
+      user.account_origin === "mellow_vault" ||
+      user.mv_profile_percentage != null ||
+      user.mv_skill != null
+  );
+  const rawPct = user.mv_profile_percentage ?? user.mellow_vault_profile_percent;
+  const pct = isMv && rawPct != null ? Math.max(0, Math.min(100, Number(rawPct))) : null;
 
   if (!isMv) {
     return (
       <div className="flex flex-col items-start gap-0.5">
         <div className="flex items-center gap-1.5">
-          <span className="font-mono text-xs font-bold text-text-muted">0%</span>
+          <span className="font-mono text-xs font-bold text-text-muted">—</span>
           <span className="rounded-full border border-border-subtle bg-elevated px-2 py-0.5 text-3xs font-semibold text-text-muted">
             AptRun Only
           </span>
         </div>
-        <span className="text-3xs text-text-muted/80">No Mellow Vault sync</span>
+        <span className="text-3xs text-text-muted/80">No Mellow Vault data</span>
       </div>
     );
   }
+
+  const skillLabel = user.mellow_vault_stack_name || user.mv_skill || "Stack unspecified";
 
   return (
     <div className="flex flex-col items-start gap-0.5">
@@ -43,19 +53,21 @@ export function MvProfileBadge({ user }: { user: MvProfileUserFields }) {
         <span
           className={cn(
             "font-mono text-xs font-extrabold",
-            pct >= 90
+            pct == null
+              ? "text-text-muted"
+              : pct >= 90
               ? "text-emerald-600 dark:text-emerald-400"
               : pct >= 50
               ? "text-indigo-600 dark:text-indigo-300"
               : "text-amber-600 dark:text-amber-400"
           )}
         >
-          {pct}%
+          {pct != null ? `${pct}%` : "—"}
         </span>
         <span
           className={cn(
             "rounded-full border px-2 py-0.5 text-3xs font-bold",
-            pct >= 90
+            (pct ?? 0) >= 90
               ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
               : "border-indigo-500/25 bg-indigo-500/10 text-indigo-700 dark:text-indigo-300"
           )}
@@ -68,8 +80,8 @@ export function MvProfileBadge({ user }: { user: MvProfileUserFields }) {
           </span>
         )}
       </div>
-      <span className="text-3xs text-text-muted truncate max-w-[160px]">
-        {user.mellow_vault_stack_name || "Stack unspecified"}
+      <span className="text-3xs text-text-muted truncate max-w-[160px]" title={user.mv_skill || skillLabel}>
+        {skillLabel}
       </span>
     </div>
   );

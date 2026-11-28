@@ -26,6 +26,11 @@ export interface KeptAttempt {
    * who leaves an interview must not be left with the camera light on for twenty seconds.
    */
   graceMs?: number;
+  /** How long before onUnclaimed fires (default 1.5 s). Longer handoffs (between Launchpad rounds) can set e.g. 15_000. */
+  unclaimedMs?: number;
+  /** Baseline verification photo + face descriptor captured at the initial consent gate. */
+  baselinePhoto?: string | null;
+  baselineDescriptor?: number[] | null;
   /**
    * Nobody took the entry over within a moment: the student has left the attempt's pages (not just moved to the next
    * problem). The streams are kept for the longer grace period in case they come straight back, but fullscreen should not
@@ -45,7 +50,7 @@ export function park(key: string, entry: KeptAttempt): void {
     parked.delete(key);
     entry.release();
   }, entry.graceMs ?? GRACE_MS);
-  const quick = window.setTimeout(() => entry.onUnclaimed?.(), UNCLAIMED_MS);
+  const quick = window.setTimeout(() => entry.onUnclaimed?.(), entry.unclaimedMs ?? UNCLAIMED_MS);
   parked.set(key, { entry, timer, quick });
 }
 

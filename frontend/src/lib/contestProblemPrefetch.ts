@@ -12,8 +12,8 @@ import type { ProblemDetail } from "@/types/problem";
 type Payload = { problem: ProblemDetail; points: number };
 
 const TTL_MS = 30_000;
-const MAX_ENTRIES = 8;
-const cache = new Map<string, { at: number; promise: Promise<Payload> }>();
+const MAX_ENTRIES = 16;
+const cache = new Map<string, { at: number; promise: Promise<Payload>; resolved?: Payload }>();
 
 const keyOf = (slug: string, contestProblemId: string | number) => `${slug}:${contestProblemId}`;
 const fresh = (entry: { at: number }) => Date.now() - entry.at < TTL_MS;
@@ -21,8 +21,14 @@ export const contestProblemPath = (slug: string, contestProblemId: string | numb
 
 function request(slug: string, contestProblemId: string | number): Promise<Payload> {
   const key = keyOf(slug, contestProblemId);
-  const promise = api.get<Payload>(contestProblemPath(slug, contestProblemId));
-  cache.set(key, { at: Date.now(), promise });
+  const entry: { at: number; promise: Promise<Payload>; resolved?: Payload } = {
+    at: Date.now(),
+    promise: api.get<Payload>(contestProblemPath(slug, contestProblemId)).then((res) => {
+      entry.resolved = res;
+      return res;
+    }),
+  };
+  cache.set(key, entry);
 
   while (cache.size > MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
@@ -30,11 +36,32 @@ function request(slug: string, contestProblemId: string | number): Promise<Paylo
     cache.delete(oldest);
   }
 
-  promise.catch(() => {
-    if (cache.get(key)?.promise === promise) cache.delete(key);
+  entry.promise.catch(() => {
+    if (cache.get(key)?.promise === entry.promise) cache.delete(key);
   });
 
-  return promise;
+  return entry.promise;
+}
+
+/** Populate the cache immediately from bulk responses (e.g. `GET /contests/{slug}?include_details=1`). */
+export function seedContestProblems(
+  slug: string,
+  items: Array<{ id: number | string; problem: ProblemDetail; points: number }> | undefined
+): void {
+  if (!slug || !items?.length) return;
+  const now = Date.now();
+  for (const item of items) {
+    const key = keyOf(slug, item.id);
+    const resolved: Payload = { problem: item.problem, points: item.points };
+    cache.set(key, { at: now, promise: Promise.resolve(resolved), resolved });
+  }
+}
+
+/** Synchronously reads a cached problem if already resolved — allows 0ms question toggles. */
+export function peekContestProblem(slug: string, contestProblemId: string | number): Payload | null {
+  if (!slug || !contestProblemId) return null;
+  const hit = cache.get(keyOf(slug, contestProblemId));
+  return hit && fresh(hit) && hit.resolved ? hit.resolved : null;
 }
 
 /** Fire and forget: warm the cache for a problem the student is about to open. */

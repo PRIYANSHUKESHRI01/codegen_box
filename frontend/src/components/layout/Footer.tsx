@@ -11,8 +11,8 @@ import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const SUPPORT_EMAIL = "support@mellowvault.com";
-const SUPPORT_PHONE_DISPLAY = "+91 76785 78295";
-const SUPPORT_PHONE_HREF = "tel:+917678578295";
+const SUPPORT_PHONE_DISPLAY = "+91 93111 48660";
+const SUPPORT_PHONE_HREF = "tel:+919311148660";
 const LOCATION = "Noida / New Delhi, India";
 
 /** AptRun is a product of Mellow Vault, a unit of Prayukti Development Private Limited — the legal line is shown exactly as registered. */

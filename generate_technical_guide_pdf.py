@@ -413,7 +413,7 @@ def build_technical_pdf():
       </div>
       <div class="corp-auth-item">
         <div class="corp-auth-label">Enterprise Tech Desk</div>
-        <div class="corp-auth-val">support@mellowvault.com &middot; +91 76785 78295</div>
+        <div class="corp-auth-val">support@mellowvault.com &middot; +91 93111 48660</div>
       </div>
       <div class="corp-auth-item">
         <div class="corp-auth-label">Security &amp; Compliance</div>

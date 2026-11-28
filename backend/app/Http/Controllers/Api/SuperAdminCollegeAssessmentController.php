@@ -105,6 +105,10 @@ class SuperAdminCollegeAssessmentController extends Controller
             'department' => ['sometimes', 'nullable', 'string'],
             'branch_code' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'string'],
+            'result' => ['sometimes', 'nullable', 'in:pass,below_benchmark,pending'],
+            'min_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'sort' => ['sometimes', 'nullable', 'in:overall_desc,overall_asc,soft_desc,coding_desc,interview_desc'],
             'q' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 
@@ -251,6 +255,10 @@ class SuperAdminCollegeAssessmentController extends Controller
             'department' => ['sometimes', 'nullable', 'string'],
             'branch_code' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'string'],
+            'result' => ['sometimes', 'nullable', 'in:pass,below_benchmark,pending'],
+            'min_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'max_score' => ['sometimes', 'nullable', 'numeric', 'min:0', 'max:100'],
+            'sort' => ['sometimes', 'nullable', 'in:overall_desc,overall_asc,soft_desc,coding_desc,interview_desc'],
             'q' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
 

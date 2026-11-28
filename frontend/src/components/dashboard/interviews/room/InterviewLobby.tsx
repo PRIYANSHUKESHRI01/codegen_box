@@ -48,6 +48,8 @@ export interface InterviewLobbyProps {
   badge?: string;
   /** The line under the heading. */
   intro?: string;
+  /** Whether a baseline verification photo is required before Start becomes enabled (default true). */
+  requireVerificationPhoto?: boolean;
 }
 
 const PRIMARY =
@@ -84,6 +86,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
     onLeave,
     badge = "Proctored interview",
     intro = "A quick look at your camera, microphone and screen — then we begin.",
+    requireVerificationPhoto = true,
   } = props;
 
   const ui = useIntegrityUi();
@@ -107,7 +110,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   const integrity = ui.policy !== null;
   const ready = !integrity || checksPass(ui.checks);
   const photoCaptured = Boolean(verifiedPhoto);
-  const canStart = ready && photoCaptured;
+  const canStart = ready && (!requireVerificationPhoto || photoCaptured);
   const missing = ui.checks.filter((c) => c.required && c.status !== "ok" && c.status !== "skipped").map((c) => c.label);
   const firstName = useMemo(() => candidateName.trim().split(/\s+/)[0] || "", [candidateName]);
 
@@ -166,7 +169,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
   };
 
   const handleConsentClick = () => {
-    if (!verifiedPhoto) {
+    if (requireVerificationPhoto && !verifiedPhoto) {
       setPhotoError("Please capture your verification photo before starting the interview.");
       return;
     }
@@ -175,7 +178,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
 
   const status = !devicePreviewReady
     ? { tone: "idle" as const, text: "First, allow your camera and microphone so we can check your setup." }
-    : !photoCaptured
+    : requireVerificationPhoto && !photoCaptured
       ? { tone: "todo" as const, text: "Click 'Take Verification Photo' first — required before you can start the interview." }
       : !ready
         ? { tone: "todo" as const, text: missing.length > 0 ? `Still needed: ${missing.join(" · ")}` : "A few checks are still running…" }
@@ -416,7 +419,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
             >
               <span aria-hidden className={cn("h-2 w-2 shrink-0 rounded-full", status.tone === "done" ? "bg-status-success" : status.tone === "todo" ? "animate-pulse bg-status-warning" : "bg-text-muted/50")} />
               <span className="truncate">{status.text}</span>
-              {devicePreviewReady && !photoCaptured && (
+              {devicePreviewReady && requireVerificationPhoto && !photoCaptured && (
                 <button
                   type="button"
                   onClick={handleCapturePhoto}
@@ -436,7 +439,7 @@ export function InterviewLobby(props: InterviewLobbyProps) {
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> Starting...
                 </>
-              ) : !photoCaptured ? (
+              ) : requireVerificationPhoto && !photoCaptured ? (
                 "Take verification photo to start"
               ) : ready ? (
                 startLabel

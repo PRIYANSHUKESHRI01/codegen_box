@@ -15,6 +15,8 @@ export interface UseIntegrityEngineOptions {
   activityLabel: string;
   /** Only starts once true (the attempt has actually loaded). */
   enabled: boolean;
+  requireScreenShare?: boolean;
+  requireChromium?: boolean;
   getContext?: (withCode: boolean) => Record<string, unknown> | null;
 }
 
@@ -32,6 +34,8 @@ export interface UseIntegrityEngineResult {
   resumeFullscreen: () => void;
   /** Call the instant the attempt is finished: stops the camera, screen share and fullscreen and closes the integrity log. */
   endSession: () => void;
+  /** Closes ONLY this round's integrity log and hands live camera/screen/fullscreen/baseline photo over to the next round. */
+  handOffSession: () => void;
   shareScreen: () => Promise<void>;
   connectGuardian: () => Promise<void>;
   resolveHold: () => Promise<void>;
@@ -45,7 +49,16 @@ export interface UseIntegrityEngineResult {
  * else) are thin wrappers over it, so all five proctored pages keep the hook contract they were written against and gain
  * the whole layer — checklist, telemetry, evidence, holds — without changing.
  */
-export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, enabled, getContext }: UseIntegrityEngineOptions): UseIntegrityEngineResult {
+export function useIntegrityEngine({
+  surface,
+  basePath,
+  keepKey,
+  activityLabel,
+  enabled,
+  requireScreenShare,
+  requireChromium,
+  getContext,
+}: UseIntegrityEngineOptions): UseIntegrityEngineResult {
   const { user } = useAuth();
   const userKey = String(user?.id ?? "anonymous");
 
@@ -71,6 +84,8 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
         keepKey,
         userKey,
         activityLabel,
+        requireScreenShare,
+        requireChromium,
         getContext: (withCode) => contextRef.current?.(withCode) ?? null,
         handlers: {
           phase: setPhase,
@@ -82,7 +97,7 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
         },
       }),
     // A new attempt (different base path / user) is a new engine.
-    [surface, basePath, keepKey, userKey, activityLabel]
+    [surface, basePath, keepKey, userKey, activityLabel, requireScreenShare, requireChromium]
   );
 
   useEffect(() => {
@@ -105,6 +120,7 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
   const grantConsentAndStart = useCallback(() => engine.grantConsentAndStart(), [engine]);
   const resumeFullscreen = useCallback(() => engine.resumeFullscreen(), [engine]);
   const endSession = useCallback(() => engine.end(), [engine]);
+  const handOffSession = useCallback(() => engine.handOff(), [engine]);
   const shareScreen = useCallback(() => engine.shareScreen(), [engine]);
   const connectGuardian = useCallback(() => engine.connectGuardian(), [engine]);
   const resolveHold = useCallback(() => engine.resolveHold(), [engine]);
@@ -127,6 +143,7 @@ export function useIntegrityEngine({ surface, basePath, keepKey, activityLabel, 
     grantConsentAndStart,
     resumeFullscreen,
     endSession,
+    handOffSession,
     shareScreen,
     connectGuardian,
     resolveHold,

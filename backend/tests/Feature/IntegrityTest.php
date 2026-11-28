@@ -369,14 +369,14 @@ class IntegrityTest extends TestCase
         $this->assertSame(1, $this->strikes($sessionId));
     }
 
-    public function test_ai_findings_never_cost_a_strike_in_the_standard_profile(): void
+    public function test_ai_findings_cost_one_strike_each_in_the_standard_profile(): void
     {
         Sanctum::actingAs($this->student());
         [$sessionId, , $uuid] = $this->proctoredAttempt();
 
         $this->beat($uuid, [$this->ev('multiple_faces'), $this->ev('phone_detected'), $this->ev('no_face')])->assertOk();
 
-        $this->assertSame(0, $this->strikes($sessionId));
+        $this->assertSame(3, $this->strikes($sessionId));
         $this->assertSame(3, IntegrityEvent::whereIn('type', ['multiple_faces', 'phone_detected', 'no_face'])->count());
         $this->assertGreaterThan(0, IntegritySession::where('uuid', $uuid)->value('risk_score'));
     }

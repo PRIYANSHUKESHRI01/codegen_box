@@ -12,7 +12,14 @@ use App\Services\GeminiKeyRotationService;
  */
 class GeminiSpeechSynthesizer extends HttpSpeechSynthesizer
 {
-    private const DEFAULT_TTS_MODEL = 'gemini-3.8-flash-tts';
+    private const DEFAULT_TTS_MODEL = 'gemini-2.5-flash-preview-tts';
+
+    /** @var list<string> */
+    private const TTS_MODEL_FALLBACKS = [
+        'gemini-2.5-flash-preview-tts',
+        'gemini-2.5-pro-preview-tts',
+        'gemini-3.8-flash-tts',
+    ];
 
     public function name(): string
     {
@@ -24,6 +31,12 @@ class GeminiSpeechSynthesizer extends HttpSpeechSynthesizer
         $configured = trim((string) ($this->config['model'] ?? ''));
 
         return GeminiKeyRotationService::isAllowedModel($configured) ? $configured : self::DEFAULT_TTS_MODEL;
+    }
+
+    /** @return list<string> */
+    private function modelCandidates(): array
+    {
+        return array_values(array_unique([$this->resolvedModel(), ...self::TTS_MODEL_FALLBACKS]));
     }
 
     public function voiceKey(): string
@@ -41,37 +54,44 @@ class GeminiSpeechSynthesizer extends HttpSpeechSynthesizer
     public function synthesize(string $text): SynthesizedSpeech
     {
         $rotationService = app(GeminiKeyRotationService::class);
-        $model = $this->resolvedModel();
-        $response = $rotationService->runWithFallback(function (string $currentKey) use ($text, $model) {
-            return $this->send(fn ($http) => $http->withHeaders(['x-goog-api-key' => $currentKey])->post(
-                'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent',
-                [
-                    'contents' => [['parts' => [['text' => $text]]]],
-                    'generationConfig' => [
-                        'responseModalities' => ['AUDIO'],
-                        'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $this->config['voice']]]],
-                    ],
-                ]
-            ));
-        });
+        $lastError = null;
 
-        $inline = $response->json('candidates.0.content.parts.0.inlineData') ?? $response->json('candidates.0.content.parts.0.inline_data');
-        $audio = is_array($inline) ? base64_decode((string) ($inline['data'] ?? ''), true) : false;
+        foreach ($this->modelCandidates() as $model) {
+            try {
+                $response = $rotationService->runWithFallback(function (string $currentKey) use ($text, $model) {
+                    return $this->send(fn ($http) => $http->withHeaders(['x-goog-api-key' => $currentKey])->post(
+                        'https://generativelanguage.googleapis.com/v1beta/models/'.$model.':generateContent',
+                        [
+                            'contents' => [['parts' => [['text' => $text]]]],
+                            'generationConfig' => [
+                                'responseModalities' => ['AUDIO'],
+                                'speechConfig' => ['voiceConfig' => ['prebuiltVoiceConfig' => ['voiceName' => $this->config['voice']]]],
+                            ],
+                        ]
+                    ));
+                });
 
-        if (! is_string($audio) || $audio === '') {
-            throw new SpeechUnavailableException('Gemini returned no audio.');
+                $inline = $response->json('candidates.0.content.parts.0.inlineData') ?? $response->json('candidates.0.content.parts.0.inline_data');
+                $audio = is_array($inline) ? base64_decode((string) ($inline['data'] ?? ''), true) : false;
+
+                if (is_string($audio) && $audio !== '') {
+                    $mime = (string) ($inline['mimeType'] ?? $inline['mime_type'] ?? '');
+
+                    if (str_starts_with($audio, 'RIFF')) {
+                        return new SynthesizedSpeech($audio, 'audio/wav', 'wav');
+                    }
+
+                    $rate = preg_match('/rate=(\d+)/', $mime, $m) ? (int) $m[1] : 24000;
+
+                    return SynthesizedSpeech::wavFromPcm($audio, $rate);
+                }
+            } catch (SpeechRateLimitedException $e) {
+                throw $e;
+            } catch (SpeechUnavailableException $e) {
+                $lastError = $e;
+            }
         }
 
-        $mime = (string) ($inline['mimeType'] ?? $inline['mime_type'] ?? '');
-
-        // Already a WAV file (the usual answer) - use it as it is.
-        if (str_starts_with($audio, 'RIFF')) {
-            return new SynthesizedSpeech($audio, 'audio/wav', 'wav');
-        }
-
-        // Bare PCM ("audio/L16;codec=pcm;rate=24000"): give it a container.
-        $rate = preg_match('/rate=(\d+)/', $mime, $m) ? (int) $m[1] : 24000;
-
-        return SynthesizedSpeech::wavFromPcm($audio, $rate);
+        throw $lastError ?? new SpeechUnavailableException('Gemini returned no audio.');
     }
 }

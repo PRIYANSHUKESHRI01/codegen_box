@@ -110,10 +110,20 @@ class SuperAdminController extends Controller
         // if the college does.
         $this->applyPlan($query, $request->query('plan'));
 
-        // Readiness score filtering
+        // Readiness & Vault AI score filtering
         if ($request->filled('min_readiness')) {
             $min = (int) $request->query('min_readiness');
             $query->where('users.readiness_score', '>=', $min);
+        }
+
+        if ($request->filled('max_readiness')) {
+            $max = (int) $request->query('max_readiness');
+            $query->where(fn ($q) => $q->whereNull('users.readiness_score')->orWhere('users.readiness_score', '<=', $max));
+        }
+
+        if ($request->filled('min_vault_ai')) {
+            $minVault = (float) $request->query('min_vault_ai');
+            $query->where('users.vault_ai_score', '>=', $minVault);
         }
 
         if ($request->filled('readiness_tier')) {
@@ -130,13 +140,28 @@ class SuperAdminController extends Controller
 
         if ($mvSource = $request->query('mv_source')) {
             if ($mvSource === 'mellow_vault') {
-                $query->where(fn ($q) => $q->whereNotNull('mellow_vault_dev_id')->orWhereNotNull('mellow_vault_profile_synced_at'));
+                $query->where(fn ($q) => $q->whereNotNull('mv_profile_percentage')
+                    ->orWhereNotNull('mv_skill')
+                    ->orWhereNotNull('mellow_vault_dev_id')
+                    ->orWhereNotNull('mellow_vault_profile_synced_at'));
             } elseif ($mvSource === 'aptrun_only') {
-                $query->whereNull('mellow_vault_dev_id')->whereNull('mellow_vault_profile_synced_at');
+                $query->whereNull('mv_profile_percentage')
+                    ->whereNull('mv_skill')
+                    ->whereNull('mellow_vault_dev_id')
+                    ->whereNull('mellow_vault_profile_synced_at');
             }
         }
 
-        $page = $query->latest()->paginate(50);
+        $sort = $request->query('sort');
+        match ($sort) {
+            'readiness_desc' => $query->orderByRaw('users.readiness_score is null')->orderByDesc('users.readiness_score')->latest('users.id'),
+            'readiness_asc' => $query->orderByRaw('users.readiness_score is null')->orderBy('users.readiness_score')->latest('users.id'),
+            'vault_ai_desc' => $query->orderByRaw('users.vault_ai_score is null')->orderByDesc('users.vault_ai_score')->latest('users.id'),
+            'vault_ai_asc' => $query->orderByRaw('users.vault_ai_score is null')->orderBy('users.vault_ai_score')->latest('users.id'),
+            default => $query->latest(),
+        };
+
+        $page = $query->paginate(50);
 
         // Whether a superadmin could look up the temporary password this account was issued — a presence check on one
         // page of ids, never the password and never a hash comparison (see IssuedCredentialVault::statesFor()).
@@ -563,6 +588,40 @@ class SuperAdminController extends Controller
         }
 
         $this->applyPlan($query, $request->query('plan'));
+
+        if ($request->filled('min_readiness')) {
+            $query->where('users.readiness_score', '>=', (int) $request->query('min_readiness'));
+        }
+        if ($request->filled('max_readiness')) {
+            $query->where(fn ($q) => $q->whereNull('users.readiness_score')->orWhere('users.readiness_score', '<=', (int) $request->query('max_readiness')));
+        }
+        if ($request->filled('min_vault_ai')) {
+            $query->where('users.vault_ai_score', '>=', (float) $request->query('min_vault_ai'));
+        }
+        if ($request->filled('readiness_tier')) {
+            $tier = $request->query('readiness_tier');
+            if ($tier === 'Placement Ready') {
+                $query->where('users.readiness_score', '>=', (int) config('readiness.tiers.placement_ready', 75));
+            } elseif ($tier === 'In Progress') {
+                $query->where('users.readiness_score', '>=', (int) config('readiness.tiers.in_progress', 45))
+                      ->where('users.readiness_score', '<', (int) config('readiness.tiers.placement_ready', 75));
+            } elseif ($tier === 'Needs Training') {
+                $query->where(fn ($q) => $q->whereNull('users.readiness_score')->orWhere('users.readiness_score', '<', (int) config('readiness.tiers.in_progress', 45)));
+            }
+        }
+        if ($mvSource = $request->query('mv_source')) {
+            if ($mvSource === 'mellow_vault') {
+                $query->where(fn ($q) => $q->whereNotNull('mv_profile_percentage')
+                    ->orWhereNotNull('mv_skill')
+                    ->orWhereNotNull('mellow_vault_dev_id')
+                    ->orWhereNotNull('mellow_vault_profile_synced_at'));
+            } elseif ($mvSource === 'aptrun_only') {
+                $query->whereNull('mv_profile_percentage')
+                    ->whereNull('mv_skill')
+                    ->whereNull('mellow_vault_dev_id')
+                    ->whereNull('mellow_vault_profile_synced_at');
+            }
+        }
 
         $users = $query->latest()->limit(5000)->get();
 

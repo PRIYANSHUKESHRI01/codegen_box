@@ -277,5 +277,6 @@ class DatabaseSeeder extends Seeder
         $this->call(CollegeAssessmentSeeder::class);
         $this->call(LaunchpadProgramSeeder::class);
         $this->call(MellowVaultStackMappingSeeder::class);
+        $this->call(MellowVaultProfileSyncSeeder::class);
     }
 }

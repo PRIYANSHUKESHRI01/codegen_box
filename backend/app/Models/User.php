@@ -230,6 +230,8 @@ class User extends Authenticatable
         'linkedin_url',
         'github_url',
         'skills',
+        'mv_profile_percentage',
+        'mv_skill',
     ];
 
     /**
@@ -327,6 +329,7 @@ class User extends Authenticatable
             'mellow_vault_dev_id' => 'integer',
             'mellow_vault_pro_id' => 'integer',
             'mellow_vault_profile_percent' => 'integer',
+            'mv_profile_percentage' => 'integer',
             'mellow_vault_profile_synced_at' => 'datetime',
             'vault_ai_invite_sent_at' => 'datetime',
             // Set by the unsubscribe link in a nudge e-mail (EmailPreferenceController) — never mass-assigned.
@@ -370,6 +373,41 @@ class User extends Authenticatable
 
             $user->resolveBranchFromLabel();
         });
+
+        static::saved(function (User $user) {
+            static $syncing = [];
+
+            if (isset($syncing[$user->id])) {
+                return;
+            }
+
+            if (! $user->wasChanged(['mv_profile_percentage', 'mv_skill'])) {
+                return;
+            }
+
+            if ($user->mv_profile_percentage === null && $user->mv_skill === null) {
+                return;
+            }
+
+            $syncing[$user->id] = true;
+            try {
+                app(\App\Services\Vault\MellowVaultProfileSyncService::class)
+                    ->handleDirectMvColumnsChanged($user);
+            } catch (\Throwable) {
+                // Non-blocking: never fail a user save if invite dispatch is temporarily unavailable.
+            } finally {
+                unset($syncing[$user->id]);
+            }
+        });
+    }
+
+    /** Whether this user originated from or has active profile data from Mellow Vault. */
+    public function isMellowVaultUser(): bool
+    {
+        return $this->mv_profile_percentage !== null
+            || $this->mv_skill !== null
+            || $this->mellow_vault_dev_id !== null
+            || $this->mellow_vault_profile_synced_at !== null;
     }
 
     /** Whether the departments migration has run (a deploy may ship code before `migrate`); only a positive answer is remembered. */

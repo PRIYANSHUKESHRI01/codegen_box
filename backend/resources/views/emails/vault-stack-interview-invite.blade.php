@@ -2,7 +2,7 @@
     $trackLabel = $stackName ?: ($rawHeading ?: 'Technical Track');
     $barWidth = max(0, min(100, (int) $profilePercent));
     $hasSpecificTrack = !empty($stackName) || !empty($rawHeading);
-    $preheader = "Your Mellow Vault profile hit {$profilePercent}%. Click once to open your {$trackLabel} Vault AI Interview on AptRun.";
+    $preheader = "You completed {$profilePercent}% of your Mellow Vault developer profile. Take your {$trackLabel} Vault AI Interview now to reach 100%.";
     $rounds = !empty($roundTitles) ? $roundTitles : [
         'Round 1 — Core Foundations & Concepts',
         'Round 2 — Architecture & Practical Problem Solving',
@@ -13,19 +13,19 @@
                     <tr>
                         <td style="padding:20px 32px 0 32px;">
                             <span style="display:inline-block; background-color:#D1FAE5; color:#065F46; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; padding:5px 12px; border-radius:999px; margin-bottom:4px;">
-                                Milestone Unlocked &middot; {{ $barWidth }}% Profile
+                                Almost There &middot; {{ $barWidth }}% Profile Complete
                             </span>
                             <h1 class="em-h" style="font-size:24px; line-height:1.28; font-weight:800; letter-spacing:-0.02em; margin:14px 0 10px 0; color:#0F172A;">
                                 @if ($hasSpecificTrack)
-                                    Your {{ $trackLabel }} AI Interview is ready
+                                    Complete your {{ $trackLabel }} AI Interview to reach 100%
                                 @else
-                                    Your Vault AI Interview is unlocked
+                                    Complete your Vault AI Interview to reach 100%
                                 @endif
                             </h1>
                             <p class="em-p" style="font-size:15px; line-height:1.7; color:#475569; margin:0 0 20px 0;">
                                 Hi {{ $user->name }},<br>
-                                Congratulations &mdash; your Mellow Vault developer profile has reached <strong>{{ $barWidth }}%</strong> completion.
-                                Take your verified <strong>{{ $trackLabel }}</strong> AI Interview now so hiring partners on Mellow Vault can shortlist you faster.
+                                You have completed <strong>{{ $barWidth }}%</strong> of your Mellow Vault developer profile &mdash; just one final step remains.
+                                Take this verified <strong>{{ $trackLabel }}</strong> Vault AI Interview now to complete your profile to <strong>100%</strong> and get shortlisted faster by hiring partners.
                             </p>
                         </td>
                     </tr>
@@ -42,7 +42,7 @@
                                                     Mellow Vault Profile Completion
                                                 </td>
                                                 <td align="right" style="font-size:13px; font-weight:800; color:#059669;">
-                                                    {{ $barWidth }}% Verified
+                                                    {{ $barWidth }}% &rarr; 100% via Vault AI
                                                 </td>
                                             </tr>
                                         </table>
@@ -150,7 +150,7 @@
                                 Start {{ $stackName ?: 'Vault AI' }} Interview &rarr;
                             </a>
                             <p class="em-muted" style="font-size:12px; line-height:1.6; color:#64748B; margin:12px 0 0 0;">
-                                <strong>1-click direct access:</strong> Opens straight into your {{ $trackLabel }} interview track on AptRun with your active session &mdash; no extra sign-in required.
+                                <strong>Direct interview access:</strong> Opens your {{ $trackLabel }} interview directly if you&apos;re already signed in, or launches it straight after you sign in.
                             </p>
                         </td>
                     </tr>

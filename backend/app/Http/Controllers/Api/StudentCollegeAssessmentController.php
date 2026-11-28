@@ -8,6 +8,7 @@ use App\Models\CollegeAssessmentAssignment;
 use App\Models\ContestParticipant;
 use App\Services\CollegeAssessmentService;
 use App\Services\LaunchpadProgramService;
+use App\Services\Voice\VoiceVerificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -63,9 +64,32 @@ class StudentCollegeAssessmentController extends Controller
     {
         $assignment = $this->requireOpenAssignment($request, $collegeAssessment);
         abort_unless($collegeAssessment->include_soft_skills && $collegeAssessment->softSkillAssessment, 404);
+        abort_if($this->service->isBlockedByProctoring($assignment), 403, 'This assessment was locked with a 0% score due to proctoring violations. Please continue to your next unlocked assessment.');
+        abort_if($assignment->soft_skill_score_percent !== null, 403, 'Soft Skills round has already been submitted and cannot be re-attempted.');
+        if ($collegeAssessment->include_interview) {
+            app(VoiceVerificationService::class)->assertEligible($request->user());
+        }
+
+        $firstProblemId = null;
+        $contestSlug = null;
+        if ($collegeAssessment->include_coding && $collegeAssessment->contest) {
+            $contest = $collegeAssessment->contest;
+            $contestSlug = $contest->slug;
+            $participant = ContestParticipant::firstOrCreate(
+                ['contest_id' => $contest->id, 'user_id' => $request->user()->id],
+                ['registered_at' => now()]
+            );
+            if ($assignment->contest_participant_id !== $participant->id) {
+                $assignment->update(['contest_participant_id' => $participant->id]);
+            }
+            $firstProblemId = $contest->contestProblems()->orderBy('display_order')->value('id');
+        }
 
         return response()->json([
             'soft_skill_slug' => $collegeAssessment->softSkillAssessment->slug,
+            'contest_slug' => $contestSlug,
+            'first_problem_id' => $firstProblemId,
+            'interview_slug' => $collegeAssessment->include_interview ? $collegeAssessment->interview?->slug : null,
         ]);
     }
 
@@ -73,6 +97,11 @@ class StudentCollegeAssessmentController extends Controller
     {
         $assignment = $this->requireOpenAssignment($request, $collegeAssessment);
         abort_unless($collegeAssessment->include_coding && $collegeAssessment->contest, 404);
+        abort_if($this->service->isBlockedByProctoring($assignment), 403, 'This assessment was locked with a 0% score due to proctoring violations. Please continue to your next unlocked assessment.');
+        abort_if($assignment->coding_score_percent !== null, 403, 'Coding round has already been submitted and cannot be re-attempted.');
+        if ($collegeAssessment->include_interview) {
+            app(VoiceVerificationService::class)->assertEligible($request->user());
+        }
 
         $locks = $this->service->moduleLocks($collegeAssessment, $assignment);
         if ($locks['coding']) {
@@ -89,8 +118,11 @@ class StudentCollegeAssessmentController extends Controller
             $assignment->update(['contest_participant_id' => $participant->id]);
         }
 
+        $firstProblemId = $contest->contestProblems()->orderBy('display_order')->value('id');
+
         return response()->json([
             'contest_slug' => $contest->slug,
+            'first_problem_id' => $firstProblemId,
         ]);
     }
 
@@ -98,6 +130,13 @@ class StudentCollegeAssessmentController extends Controller
     {
         $assignment = $this->requireOpenAssignment($request, $collegeAssessment);
         abort_unless($collegeAssessment->include_interview && $collegeAssessment->interview, 404);
+        abort_if($this->service->isBlockedByProctoring($assignment), 403, 'This assessment was locked with a 0% score due to proctoring violations. Please continue to your next unlocked assessment.');
+        abort_if(
+            $assignment->interview_session_id !== null && $assignment->interviewSession?->status === 'completed',
+            403,
+            'AI Interview round has already been submitted and cannot be re-attempted.'
+        );
+        app(VoiceVerificationService::class)->assertEligible($request->user());
 
         $locks = $this->service->moduleLocks($collegeAssessment, $assignment);
         if ($locks['interview']) {
@@ -106,6 +145,53 @@ class StudentCollegeAssessmentController extends Controller
 
         return response()->json([
             'interview_slug' => $collegeAssessment->interview->slug,
+        ]);
+    }
+
+    /**
+     * Resolves and prepares the next stage immediately after submitting Soft Skills or Coding,
+     * so Launchpad / Campus Assessment students transition straight into Coding or AI Interview.
+     */
+    public function advance(Request $request, CollegeAssessment $collegeAssessment): JsonResponse
+    {
+        $validated = $request->validate([
+            'completed_stage' => ['required', 'in:soft_skills,coding'],
+        ]);
+
+        $assignment = $this->requireOpenAssignment($request, $collegeAssessment);
+        abort_if($this->service->isBlockedByProctoring($assignment), 403, 'This assessment was locked with a 0% score due to proctoring violations. All remaining rounds in this assessment are closed.');
+        $stage = $validated['completed_stage'];
+
+        if ($stage === 'soft_skills' && $collegeAssessment->include_coding && $collegeAssessment->contest) {
+            $contest = $collegeAssessment->contest;
+            $participant = ContestParticipant::firstOrCreate(
+                ['contest_id' => $contest->id, 'user_id' => $request->user()->id],
+                ['registered_at' => now()]
+            );
+
+            if ($assignment->contest_participant_id !== $participant->id) {
+                $assignment->update(['contest_participant_id' => $participant->id]);
+            }
+
+            $firstProblemId = $contest->contestProblems()->orderBy('display_order')->value('id');
+
+            return response()->json([
+                'next_stage' => 'coding',
+                'contest_slug' => $contest->slug,
+                'first_problem_id' => $firstProblemId,
+            ]);
+        }
+
+        if ($collegeAssessment->include_interview && $collegeAssessment->interview) {
+            return response()->json([
+                'next_stage' => 'interview',
+                'interview_slug' => $collegeAssessment->interview->slug,
+            ]);
+        }
+
+        return response()->json([
+            'next_stage' => 'complete',
+            'overall_score_percent' => $assignment->overall_score_percent,
         ]);
     }
 
@@ -141,6 +227,7 @@ class StudentCollegeAssessmentController extends Controller
     {
         $assessment = $a->assessment;
         $locks = $this->service->moduleLocks($assessment, $a);
+        $blockedByProctoring = $this->service->isBlockedByProctoring($a);
         $campaignLockReason = app(LaunchpadProgramService::class)->campaignLockReasonForAssessment($assessment, $a->user);
 
         $modulesTotal = (int) $assessment->include_soft_skills + (int) $assessment->include_coding + (int) $assessment->include_interview;
@@ -158,6 +245,7 @@ class StudentCollegeAssessmentController extends Controller
             'starts_at' => $assessment->starts_at?->toIso8601String(),
             'ends_at' => $assessment->ends_at?->toIso8601String(),
             'enforce_sequence' => $assessment->enforce_sequence,
+            'blocked_by_proctoring' => $blockedByProctoring,
             'campaign_locked' => $campaignLockReason !== null,
             'campaign_lock_reason' => $campaignLockReason,
             'passing_score_percent' => $assessment->passing_score_percent,

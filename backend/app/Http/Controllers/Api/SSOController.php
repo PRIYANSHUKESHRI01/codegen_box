@@ -71,7 +71,33 @@ class SSOController extends Controller
         }
 
         try {
-            app(MellowVaultProfileSyncService::class)->syncSingleUser($user, dispatchInviteIfEligible: false);
+            $sync = app(MellowVaultProfileSyncService::class);
+            $incomingPct = $data['mv_profile_percentage'] ?? $data['profile_complete'] ?? null;
+            $incomingSkill = $data['mv_skill'] ?? $data['skill'] ?? $data['skills'] ?? null;
+            if (is_array($incomingSkill)) {
+                $incomingSkill = implode(', ', array_filter(array_map('strval', $incomingSkill)));
+            }
+
+            if ($incomingPct !== null || (is_string($incomingSkill) && trim($incomingSkill) !== '')) {
+                $sync->applyDeveloperRow(
+                    $user,
+                    [
+                        'dev_id' => $data['dev_id'] ?? $user->mellow_vault_dev_id,
+                        'pro_id' => $data['pro_id'] ?? $user->mellow_vault_pro_id,
+                        'mv_profile_percentage' => $incomingPct !== null ? (int) $incomingPct : $user->mv_profile_percentage,
+                        'profile_complete' => $incomingPct !== null ? (int) $incomingPct : ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent),
+                        'mv_skill' => is_string($incomingSkill) ? trim($incomingSkill) : $user->mv_skill,
+                        'skills' => is_string($incomingSkill) ? trim($incomingSkill) : $user->mv_skill,
+                    ],
+                    $sync->headingMap(),
+                    MellowVaultProfileSyncService::DEFAULT_THRESHOLD,
+                    dispatchEmail: true,
+                    syncDispatch: false,
+                    dryRun: false
+                );
+            } else {
+                $sync->syncSingleUser($user, dispatchInviteIfEligible: false);
+            }
             $user->refresh();
         } catch (\Throwable) {
             // Non-blocking: SSO must still sign the developer in if external DB read fails.
@@ -109,7 +135,11 @@ class SSOController extends Controller
             'bio'                          => $user->bio ?? null,
             'skills'                       => $user->skills ?? [],
             'profile_completion_percent'   => $user->profile_completion_percent ?? 0,
-            'mellow_vault_profile_percent' => $user->mellow_vault_profile_percent ?? 0,
+            'is_mellow_vault_user'         => $user->isMellowVaultUser(),
+            'account_origin'               => $user->isMellowVaultUser() ? 'mellow_vault' : 'aptrun',
+            'mv_profile_percentage'        => $user->isMellowVaultUser() ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null,
+            'mv_skill'                     => $user->isMellowVaultUser() ? $user->mv_skill : null,
+            'mellow_vault_profile_percent' => $user->isMellowVaultUser() ? ($user->mv_profile_percentage ?? $user->mellow_vault_profile_percent) : null,
             'mellow_vault_stack_key'       => $user->mellow_vault_stack_key,
             'mellow_vault_stack_name'      => $user->mellow_vault_stack_name,
         ]);

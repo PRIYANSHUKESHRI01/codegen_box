@@ -44,13 +44,28 @@ class ContestSubmissionController extends Controller
             $this->assertRegistered($request, $contest);
         }
 
-        $problem = $contestProblem->problem;
-
         // Same curated shape as ProblemController::show() — the hidden
         // suite backing a contest problem must never reach the client
         // either, and matters more here (a contest's real judging integrity
         // depends on it, not just a practice problem's).
-        return response()->json([
+        return response()->json(static::formatContestProblem($contestProblem, $starterCodeGenerator));
+    }
+
+    /**
+     * Shared problem serializer so both single-problem `show()` and bulk
+     * `ContestController::show(?include_details=1)` return identical curated fields
+     * (and never expose hidden test cases).
+     *
+     * @return array{problem: array<string, mixed>, points: int}
+     */
+    public static function formatContestProblem(ContestProblem $contestProblem, StarterCodeGenerator $starterCodeGenerator): array
+    {
+        $problem = $contestProblem->problem;
+        $samples = $problem->relationLoaded('sampleTestCases')
+            ? $problem->sampleTestCases->take(3)
+            : $problem->sampleTestCases()->take(3)->get();
+
+        return [
             'problem' => [
                 'id' => $problem->id,
                 'slug' => $problem->slug,
@@ -60,16 +75,16 @@ class ContestSubmissionController extends Controller
                 'description' => $problem->description,
                 'constraints' => $problem->constraints ?? [],
                 'hints' => $problem->hints ?? [],
-                'examples' => $problem->sampleTestCases()->take(3)->get()->map(fn (ProblemTestCase $tc) => [
+                'examples' => $samples->map(fn (ProblemTestCase $tc) => [
                     'input' => $tc->prettyInput($problem->params),
                     'output' => json_encode($tc->expected_output),
                     'explanation' => $tc->explanation,
-                ]),
+                ])->values()->all(),
                 'starter_code' => $starterCodeGenerator->generateAll($problem),
                 'case_counts' => $problem->caseCounts(),
             ],
-            'points' => $contestProblem->points,
-        ]);
+            'points' => (int) $contestProblem->points,
+        ];
     }
 
     public function run(Request $request, Contest $contest, ContestProblem $contestProblem, JudgeQueue $queue): JsonResponse

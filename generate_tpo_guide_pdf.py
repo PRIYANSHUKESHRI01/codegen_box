@@ -1511,7 +1511,7 @@ def build_tpo_guide_pdf():
     <tbody>
       <tr>
         <td><strong>Priority T1: Live Campus Drive Outage</strong></td>
-        <td>Emergency Hotline: <strong>+91 76785 78295</strong></td>
+        <td>Emergency Hotline: <strong>+91 93111 48660</strong></td>
         <td><strong>Immediate (Under 15 minutes)</strong> &middot; Dedicated DevOps engineer assigned</td>
       </tr>
       <tr>

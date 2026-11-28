@@ -22,6 +22,18 @@ export function useAuthGuard(allowedRoles?: Role[]) {
 
   useEffect(() => {
     if (authStatus === "signed_out") {
+      if (typeof window !== "undefined") {
+        const current = `${window.location.pathname}${window.location.search}`;
+        if (
+          current &&
+          current !== "/" &&
+          !current.startsWith("/login") &&
+          !current.startsWith("/signup")
+        ) {
+          router.replace(`/login?redirect=${encodeURIComponent(current)}`);
+          return;
+        }
+      }
       router.replace("/login");
       return;
     }
